@@ -4,7 +4,10 @@ use futures::{channel::mpsc::UnboundedSender, pin_mut, StreamExt};
 use std::{collections::VecDeque, sync::Arc};
 use utils_log::{debug, error, info};
 
-use crate::{traits::{ChainLogHandler, SignificantChainEvent}, errors::CoreEthereumIndexerError};
+use crate::{
+    errors::CoreEthereumIndexerError,
+    traits::{ChainLogHandler, SignificantChainEvent},
+};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use utils_types::primitives::{Snapshot, U256};
@@ -113,7 +116,13 @@ where
         cfg: IndexerConfig,
         egress: UnboundedSender<SignificantChainEvent>,
     ) -> Self {
-        Self { rpc: Some(rpc), db_processor: Some(db_processor), db, cfg, egress }
+        Self {
+            rpc: Some(rpc),
+            db_processor: Some(db_processor),
+            db,
+            cfg,
+            egress,
+        }
     }
 
     pub async fn start(&mut self) -> crate::errors::Result<()>
@@ -123,9 +132,13 @@ where
         V: HoprCoreEthereumDbActions + 'static,
     {
         if let None = self.rpc {
-            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+            return Err(CoreEthereumIndexerError::ProcessError(
+                "indexer is already started".into(),
+            ));
         } else if let None = self.db_processor {
-            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+            return Err(CoreEthereumIndexerError::ProcessError(
+                "indexer is already started".into(),
+            ));
         }
 
         info!("Starting indexer...");
@@ -253,8 +266,8 @@ where
                         if let Err(e) = tx_significant_events.unbounded_send(event.clone()) {
                             error!("failed to generate a significant chain event: {}", e);
                         }
-                    },
-                    Ok(None) => {},
+                    }
+                    Ok(None) => {}
                     Err(_) => {
                         error!("failed to process logs");
                     }
@@ -347,13 +360,10 @@ pub mod tests {
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let (indexing, _) = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
-        );
+        let (indexing, _) = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
         assert!(indexing.is_err()) // terminated by the close channel
     }
 
@@ -383,13 +393,10 @@ pub mod tests {
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let (indexing, _) = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
-        );
+        let (indexing, _) = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
         assert!(indexing.is_err()) // terminated by the close channel
     }
 
@@ -422,13 +429,10 @@ pub mod tests {
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let _ = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
-        );
+        let _ = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
     }
 
     #[async_std::test]
@@ -475,13 +479,10 @@ pub mod tests {
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
-        let _ = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
-        );
+        let _ = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
     }
 
     fn random_announcement_chain_event() -> SignificantChainEvent {

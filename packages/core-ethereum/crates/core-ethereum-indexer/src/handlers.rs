@@ -176,7 +176,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     // TODO: emit of channel update was here.
                     // we need to infer the amount since the actual amount is not part of any event
                     let amount = old_balance.sub(&channel.balance);
-                    return Ok(Some(SignificantChainEvent::TicketRedeem(channel.clone(), amount.clone())));
+                    return Ok(Some(SignificantChainEvent::TicketRedeem(
+                        channel.clone(),
+                        amount.clone(),
+                    )));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -1482,7 +1485,13 @@ pub mod tests {
             .unwrap();
 
         let closed_channel = db.read().await.get_channel(&channel_id).await.unwrap().unwrap();
-        let current_ticket_index = db.read().await.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        let current_ticket_index = db
+            .read()
+            .await
+            .get_current_ticket_index(&channel_id)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());

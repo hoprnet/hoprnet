@@ -162,18 +162,20 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async sendTransactionInternal(txPayload: TransactionPayload) {
-    return await this.chain.sendTransaction(true, txPayload, (_txHash: string) =>
-    {
-      const deferred = {} as DeferType<string>
+    return await this.chain.sendTransaction(
+      true,
+      txPayload,
+      (_txHash: string) => {
+        const deferred = {} as DeferType<string>
 
-      deferred.promise = new Promise<string>((resolve, _reject) => {
-        resolve("TODO: Needs to be done in HoprChain ")
-      }) 
+        deferred.promise = new Promise<string>((resolve, _reject) => {
+          resolve('TODO: Needs to be done in HoprChain ')
+        })
 
-      return deferred
-    }
-    // 
-    // this.setTxHandler(`${eventName}${txHash}`, txHash)
+        return deferred
+      }
+      //
+      // this.setTxHandler(`${eventName}${txHash}`, txHash)
     )
   }
 
@@ -199,7 +201,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-    // TODO: needs to observe state in the Rust HoprChain code on updates
+  // TODO: needs to observe state in the Rust HoprChain code on updates
   // public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
   //   //return this.indexer.resolvePendingTransaction(evt, tx)
   // }

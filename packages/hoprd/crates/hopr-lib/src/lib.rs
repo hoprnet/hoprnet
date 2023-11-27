@@ -104,7 +104,8 @@ mod native {
         chain_api: HoprChain,
         processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
         chain_cfg: ChainNetworkConfig,
-        #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery,   // TODO: remove once the entire construction happens in the new() method
+        #[cfg(feature = "wasm")]
+        chain_query: chain::wasm::WasmChainQuery, // TODO: remove once the entire construction happens in the new() method
         staking_safe_address: Address,
         staking_module_address: Address,
     }
@@ -263,18 +264,20 @@ mod native {
                 .await
                 .map_err(core_transport::errors::HoprTransportError::from)?;
 
-
             info!("Loading initial peers");
             let index_updater = self.transport_api.index_updater();
             for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
                 if self.transport_api.is_allowed_to_access_network(&peer_id).await {
                     debug!("Using initial public node '{peer_id}'");
-                    index_updater.emit_indexer_update(
-                        core_transport::IndexerToProcess::EligibilityUpdate(peer_id.clone(), PeerEligibility::Eligible)
-                    ).await;
-                    index_updater.emit_indexer_update(
-                        core_transport::IndexerToProcess::Announce(peer_id, multiaddresses)
-                    ).await;
+                    index_updater
+                        .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
+                            peer_id.clone(),
+                            PeerEligibility::Eligible,
+                        ))
+                        .await;
+                    index_updater
+                        .emit_indexer_update(core_transport::IndexerToProcess::Announce(peer_id, multiaddresses))
+                        .await;
                 }
             }
 
@@ -709,6 +712,7 @@ pub mod wasm_impl {
     use wasm_bindgen::prelude::*;
 
     use core_ethereum_api::ChannelEntry;
+    use core_transport::wasm_impls::PublicNodesResult;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -901,22 +905,20 @@ pub mod wasm_impl {
         /// Get the list of all announced public nodes in the network
         #[wasm_bindgen(js_name = getPublicNodes)]
         pub async fn _get_public_nodes(&self) -> Result<js_sys::Array, JsError> {
-            Ok(js_sys::Array::from_iter(self
-                .hopr
-                .get_public_nodes()
-                .await?
-                .into_iter()
-                .map(|(peer_id, address, multiaddresses)| {
-                    PublicNodesResult {
+            Ok(js_sys::Array::from_iter(
+                self.hopr
+                    .get_public_nodes()
+                    .await?
+                    .into_iter()
+                    .map(|(peer_id, address, multiaddresses)| PublicNodesResult {
                         id: peer_id.to_string().into(),
-                        address: address,
+                        address,
                         multiaddrs: multiaddresses
                             .into_iter()
                             .map(|ma| JsString::from(ma.to_string()))
                             .collect(),
-                    }
-                })
-                .map(JsValue::from)
+                    })
+                    .map(JsValue::from),
             ))
         }
 

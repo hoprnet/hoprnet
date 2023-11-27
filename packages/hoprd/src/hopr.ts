@@ -19,8 +19,7 @@ import {
   defer
 } from '@hoprnet/hopr-utils'
 
-import HoprCoreEthereum, {
-} from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import EventEmitter from 'events'
 import path from 'path'

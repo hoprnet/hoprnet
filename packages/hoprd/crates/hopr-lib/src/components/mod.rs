@@ -116,16 +116,15 @@ where
 
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
     let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-    let indexer_refreshing_loop =
-        crate::processes::spawn_refresh_process_for_chain_events(
-            me.public().to_peerid(),
-            core_transport::Keypair::public(&me_onchain).to_address(),
-            db.clone(),
-            multi_strategy.clone(),
-            rx_indexer_events,
-            channel_graph.clone(),
-            indexer_updater.clone()
-        );
+    let indexer_refreshing_loop = crate::processes::spawn_refresh_process_for_chain_events(
+        me.public().to_peerid(),
+        core_transport::Keypair::public(&me_onchain).to_address(),
+        db.clone(),
+        multi_strategy.clone(),
+        rx_indexer_events,
+        channel_graph.clone(),
+        indexer_updater.clone(),
+    );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
         me_onchain.clone(),
@@ -148,7 +147,6 @@ where
         addr_resolver.clone(),
         channel_graph.clone(),
     );
-
 
     let (mut heartbeat, hb_ping_rx, hb_pong_tx) = build_heartbeat(
         cfg.protocol,

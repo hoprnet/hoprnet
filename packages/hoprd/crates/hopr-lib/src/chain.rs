@@ -6,7 +6,6 @@ use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumAct
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use futures::channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
@@ -392,13 +391,7 @@ pub fn build_chain_api(
     rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
-    core_ethereum_api::HoprChain::new(
-        me_onchain,
-        db,
-        chain_actions,
-        rpc_operations,
-        channel_graph,
-    )
+    core_ethereum_api::HoprChain::new(me_onchain, db, chain_actions, rpc_operations, channel_graph)
 }
 
 #[cfg(feature = "wasm")]

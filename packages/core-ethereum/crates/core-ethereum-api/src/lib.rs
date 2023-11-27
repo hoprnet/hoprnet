@@ -1,14 +1,11 @@
 pub mod errors;
 pub mod executors;
 
-pub use core_types::channels::ChannelEntry;
 pub use core_ethereum_indexer::traits::SignificantChainEvent;
+pub use core_types::channels::ChannelEntry;
 
 use async_lock::{Mutex, RwLock};
 use core_ethereum_db::db::CoreEthereumDb;
-
-use futures::channel::mpsc::UnboundedSender;
-use futures::SinkExt;
 use std::sync::Arc;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -33,14 +30,18 @@ pub trait ChainQueries {
 }
 
 #[cfg(feature = "wasm")]
-pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;
+pub type JsonRpcClient =
+    core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;
 
 #[cfg(not(feature = "wasm"))]
 pub type JsonRpcClient = ethers::providers::Http;
 
 #[cfg(feature = "wasm")]
 pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
-    core_ethereum_rpc::client::JsonRpcProviderClient::new(base_url, core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor::default())
+    core_ethereum_rpc::client::JsonRpcProviderClient::new(
+        base_url,
+        core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor::default(),
+    )
 }
 
 #[cfg(not(feature = "wasm"))]

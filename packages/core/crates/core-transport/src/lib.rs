@@ -13,6 +13,10 @@ pub enum TransportOutput {
 }
 
 pub use {
+    crate::{
+        multiaddrs::decapsulate_p2p_protocol,
+        processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
+    },
     core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -20,10 +24,6 @@ pub use {
     core_network::network::{Health, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
-    crate::{
-        multiaddrs::decapsulate_p2p_protocol,
-        processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
-    },
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::UniversalTimer,
@@ -481,7 +481,7 @@ pub mod wasm_impls {
                             vec![ma]
                         } else {
                             vec![]
-                        }
+                        },
                     ))
                 }
             }

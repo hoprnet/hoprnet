@@ -1,26 +1,24 @@
-use std::{pin::Pin, sync::Arc, str::FromStr};
+use std::{pin::Pin, str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
 use core_ethereum_api::SignificantChainEvent;
-use core_path::channel_graph::ChannelGraph;
 use core_strategy::strategy::MultiStrategy;
-use core_types::{acknowledgement::AcknowledgedTicket, channels::ChannelEntry};
+use core_types::acknowledgement::AcknowledgedTicket;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver},
     future::poll_fn,
     Stream, StreamExt,
 };
 
-use core_transport::{ApplicationData, HalfKeyChallenge, TransportOutput, libp2p_identity::PeerId, IndexerToProcess};
+use core_transport::{libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, TransportOutput};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use utils_log::{error, debug, info};
+use utils_log::{debug, error};
 use utils_types::{primitives::Address, traits::PeerIdLike};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-
 
 /// Helper process responsible for refreshing the state of HOPR components
 /// from the chain events confirmed by the indexer.
@@ -32,8 +30,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db>(
     mut event_stream: UnboundedReceiver<SignificantChainEvent>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
-)
-where
+) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
 {
     spawn_local(async move {
@@ -49,12 +46,12 @@ where
                                 .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
                                 .filter(|v| !v.is_empty())
                                 .collect::<Vec<_>>();
-            
+
                             if mas.len() > 0 {
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
                                     .await;
-            
+
                                 if db
                                     .read()
                                     .await
@@ -73,9 +70,8 @@ where
                     } else {
                         error!("Announced PeerId ({peer}) has invalid format")
                     }
-                },
-                SignificantChainEvent::ChannelUpdate(channel) |
-                SignificantChainEvent::TicketRedeem(channel, _) => {
+                }
+                SignificantChainEvent::ChannelUpdate(channel) | SignificantChainEvent::TicketRedeem(channel, _) => {
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 
@@ -111,19 +107,22 @@ where
                             .await;
                         }
                     }
-                },
+                }
                 SignificantChainEvent::NetworkRegistryUpdate(address, allowed) => {
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 transport_indexer_actions
-                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(pk.to_peerid(), allowed.into()))
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
+                                        pk.to_peerid(),
+                                        allowed.into(),
+                                    ))
                                     .await;
                             }
                         }
                         Err(e) => error!("on_network_registry_node_allowed failed with: {}", e),
                     }
-                },
+                }
             }
         }
 
