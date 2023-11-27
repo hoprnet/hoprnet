@@ -12,6 +12,7 @@ use bindings::{
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_types::ContractAddresses;
 use core_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
@@ -20,33 +21,12 @@ use core_types::{
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
 use multiaddr::Multiaddr;
-use serde::Deserialize;
 use std::{str::FromStr, sync::Arc};
 use utils_log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,
 };
-
-/// Holds addresses of deployed HOPR contracts
-#[derive(Clone, Debug, Deserialize)]
-pub struct ContractAddresses {
-    /// HoprChannels contract, manages mixnet incentives
-    pub channels: Address,
-    /// HoprToken contract, the HOPR token
-    pub token: Address,
-    /// HoprNetworkRegistry contract, manages authorization to
-    /// participate in the HOPR network
-    pub network_registry: Address,
-    /// HoprAnnouncements, announces network information
-    pub announcements: Address,
-    /// HoprNodeSafeRegistry, mapping from chain_key to Safe instance
-    pub node_safe_registry: Address,
-    /// NodeManagementModule, permission module for Safe
-    pub node_management_module: Address,
-    /// TicketPriceOracle, used to set ticket price
-    pub ticket_price_oracle: Address,
-}
 
 pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     /// channels, announcements, network_registry, token: contract addresses
@@ -519,9 +499,9 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
             self.addresses.token,
             self.addresses.network_registry,
             self.addresses.announcements,
-            self.addresses.node_safe_registry,
-            self.addresses.node_management_module,
-            self.addresses.ticket_price_oracle,
+            self.addresses.safe_registry,
+            self.addresses.module_implementation,
+            self.addresses.price_oracle,
         ]
     }
 
@@ -557,13 +537,13 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
         } else if address.eq(&self.addresses.token) {
             let event = HoprTokenEvents::decode_log(&log)?;
             return self.on_token_event(&mut db, event, &snapshot).await;
-        } else if address.eq(&self.addresses.node_safe_registry) {
+        } else if address.eq(&self.addresses.safe_registry) {
             let event = HoprNodeSafeRegistryEvents::decode_log(&log)?;
             return self.on_node_safe_registry_event(&mut db, event, &snapshot).await;
-        } else if address.eq(&self.addresses.node_management_module) {
+        } else if address.eq(&self.addresses.module_implementation) {
             let event = HoprNodeManagementModuleEvents::decode_log(&log)?;
             return self.on_node_management_module_event(&mut db, event, &snapshot).await;
-        } else if address.eq(&self.addresses.ticket_price_oracle) {
+        } else if address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log)?;
             return self.on_ticket_price_oracle_event(&mut db, event, &snapshot).await;
         } else {
@@ -606,6 +586,7 @@ pub mod tests {
         types::Hash,
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_ethereum_types::ContractAddresses;
     use core_types::{
         account::{AccountEntry, AccountType},
         announcement::KeyBinding,
@@ -649,14 +630,16 @@ pub mod tests {
 
     fn init_handlers<U: HoprCoreEthereumDbActions>(db: Arc<RwLock<U>>) -> ContractEventHandlers<U> {
         ContractEventHandlers {
-            addresses: super::ContractAddresses {
+            addresses: ContractAddresses {
                 channels: *CHANNELS_ADDR,
                 token: *TOKEN_ADDR,
                 network_registry: *NETWORK_REGISTRY_ADDR,
-                node_safe_registry: *NODE_SAFE_REGISTRY_ADDR,
+                network_registry_proxy: Default::default(),
+                safe_registry: *NODE_SAFE_REGISTRY_ADDR,
                 announcements: *ANNOUNCEMENTS_ADDR,
-                node_management_module: *SAFE_MANAGEMENT_MODULE_ADDR,
-                ticket_price_oracle: *TICKET_PRICE_ORACLE_ADDR,
+                module_implementation: *SAFE_MANAGEMENT_MODULE_ADDR,
+                price_oracle: *TICKET_PRICE_ORACLE_ADDR,
+                stake_factory: Default::default(),
             },
             chain_key: *SELF_CHAIN_ADDRESS,
             safe_address: *SELF_CHAIN_ADDRESS,
@@ -1533,7 +1516,13 @@ pub mod tests {
         assert_eq!(channel.channel_epoch, 1u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
 
-        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        let current_ticket_index = db
+            .read()
+            .await
+            .get_current_ticket_index(&channel_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(current_ticket_index.eq(&U256::zero()));
     }
 
@@ -1589,7 +1578,13 @@ pub mod tests {
         assert_eq!(channel.ticket_index, 0u64.into());
 
         // after the channel epoch is bumped, the ticket index gets reset to zero
-        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        let current_ticket_index = db
+            .read()
+            .await
+            .get_current_ticket_index(&channel_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(current_ticket_index.eq(&U256::zero()));
     }
 
@@ -1644,7 +1639,13 @@ pub mod tests {
         assert_eq!(channel.ticket_index, ticket_index);
 
         // check the current_ticket_index is not smaller than the new ticket index
-        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        let current_ticket_index = db
+            .read()
+            .await
+            .get_current_ticket_index(&channel_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(current_ticket_index.ge(&ticket_index));
     }
 
@@ -1719,7 +1720,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.node_safe_registry.clone(),
+                handlers.addresses.safe_registry.clone(),
                 0u32,
                 safe_registered_log,
                 Snapshot::default(),
@@ -1758,7 +1759,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.node_safe_registry.clone(),
+                handlers.addresses.safe_registry.clone(),
                 0u32,
                 safe_registered_log,
                 Snapshot::default(),
@@ -1785,12 +1786,7 @@ pub mod tests {
         assert_eq!(db.read().await.get_ticket_price().await.unwrap(), None);
 
         handlers
-            .on_event(
-                handlers.addresses.ticket_price_oracle.clone(),
-                0u32,
-                log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.price_oracle.clone(), 0u32, log, Snapshot::default())
             .await
             .unwrap();
 

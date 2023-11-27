@@ -4,14 +4,18 @@ pub mod executors;
 pub use core_ethereum_indexer::traits::SignificantChainEvent;
 pub use core_types::channels::ChannelEntry;
 
-use async_lock::{Mutex, RwLock};
+use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
+use futures::channel::mpsc::UnboundedSender;
 use std::sync::Arc;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_indexer::block::{Indexer, IndexerConfig};
+use core_ethereum_indexer::handlers::ContractEventHandlers;
 use core_ethereum_rpc::rpc::RpcOperations;
+use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::{Address, Balance};
@@ -33,6 +37,8 @@ pub trait ChainQueries {
 pub type JsonRpcClient =
     core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;
 
+// Alternatively, core_ethereum_rpc::client::JsonRpcProviderClient<ReqwestHttpPostRequestor>
+// if more customizability is needed.
 #[cfg(not(feature = "wasm"))]
 pub type JsonRpcClient = ethers::providers::Http;
 
@@ -51,35 +57,43 @@ pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-    // indexer: Indexer<>,      // TODO: we need RPC at this point
+    indexer: Indexer<
+        RpcOperations<JsonRpcClient>,
+        ContractEventHandlers<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>,
+        CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>,
+    >,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
+    rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
 impl HoprChain {
     pub fn new(
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-        // rpc...
-        // contract_addresses: ContractAddresses,
-        // safe_address: Address,
-        // indexer_events_tx: UnboundedSender<SignificantChainEvent>
+        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+        contract_addresses: ContractAddresses,
+        safe_address: Address,
+        indexer_events_tx: UnboundedSender<SignificantChainEvent>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-        rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
+        rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
-        // TODO:
-        // let db_processor = ContractEventHandlers::new(contract_addresses, safe_address, me_onchain.public(), db.clone());
-        // let indexer = Indexer::new(rpc.clone(), db_processor, db.clone(), IndexerConfig::default(), indexer_events_tx);
+        let db_processor =
+            ContractEventHandlers::new(contract_addresses, safe_address, (&me_onchain).into(), db.clone());
+        let indexer = Indexer::new(
+            rpc_operations.clone(),
+            db_processor,
+            db.clone(),
+            IndexerConfig::default(),
+            indexer_events_tx,
+        );
         Self {
             me_onchain,
             db,
-            // indexer,
+            indexer,
             chain_actions,
             rpc_operations,
             channel_graph,
@@ -87,9 +101,7 @@ impl HoprChain {
     }
 
     pub async fn sync_chain(&mut self) -> errors::Result<()> {
-        Ok(())
-        // TODO:
-        // indexer.start().await
+        Ok(self.indexer.start().await?)
     }
 
     pub fn me_onchain(&self) -> Address {
@@ -149,8 +161,8 @@ impl HoprChain {
         self.db.clone()
     }
 
-    pub fn rpc(&self) -> Arc<Mutex<RpcOperations<JsonRpcClient>>> {
-        self.rpc_operations.clone()
+    pub fn rpc(&self) -> &RpcOperations<JsonRpcClient> {
+        &self.rpc_operations
     }
 }
 

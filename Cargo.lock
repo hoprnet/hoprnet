@@ -1232,6 +1232,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-rpc",
+ "core-ethereum-types",
  "core-types",
  "env_logger",
  "ethers",

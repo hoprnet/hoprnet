@@ -33,10 +33,21 @@ lazy_static::lazy_static! {
 /// Configuration of the RPC related parameters.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
+    /// Blockchain id
+    /// Default is 100.
     pub chain_id: u64,
+    /// Addresses of all deployed contracts
+    /// Default contains empty (null) addresses.
     pub contract_addrs: ContractAddresses,
+    /// Number of HTTP retries on retry-able failures
+    /// Defaults to 5
     pub max_http_retries: u32,
+    /// Expected block time of the blockchain
+    /// Defaults to 5 seconds
     pub expected_block_time: Duration,
+    /// Single log fetch chunk size
+    /// Defaults to 50
+    #[validate(range(min = 2))]
     pub logs_page_size: u64,
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
@@ -65,7 +76,7 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
-    contract_instances: ContractInstances<HoprMiddleware<P>>,
+    contract_instances: Arc<ContractInstances<HoprMiddleware<P>>>,
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
@@ -89,7 +100,11 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 
         Ok(Self {
             me: chain_key.into(),
-            contract_instances: ContractInstances::new(&cfg.contract_addrs, provider.clone(), cfg!(test)),
+            contract_instances: Arc::new(ContractInstances::new(
+                &cfg.contract_addrs,
+                provider.clone(),
+                cfg!(test),
+            )),
             cfg,
             provider,
         })

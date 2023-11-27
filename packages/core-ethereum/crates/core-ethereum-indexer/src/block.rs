@@ -178,7 +178,7 @@ where
         spawn_local(async move {
             let mut tx = Some(tx);
 
-            let block_stream = rpc
+            let mut block_stream = rpc
                 .try_stream_logs(latest_block_in_db.clone(), log_filter)
                 .expect("block stream should be constructible");
 
@@ -186,7 +186,6 @@ where
             let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
             let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
 
-            pin_mut!(block_stream);
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
 
@@ -308,7 +307,7 @@ pub mod tests {
         )))
     }
 
-    fn build_announcment_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
+    fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
         let mut logs: Vec<Log> = vec![];
 
         for i in 0..size {
@@ -457,7 +456,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
-            logs: build_announcment_logs(
+            logs: build_announcement_logs(
                 Address::random(),
                 4,
                 head_block - cfg.finalization - 1,
@@ -517,7 +516,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
-            logs: build_announcment_logs(
+            logs: build_announcement_logs(
                 Address::random(),
                 expected_finalized_event_count,
                 head_block - cfg.finalization - 1,

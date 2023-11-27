@@ -1,9 +1,11 @@
 use async_std::sync::RwLock;
 use futures::{channel::mpsc::unbounded, FutureExt};
+use std::str::FromStr;
 use std::{pin::Pin, sync::Arc, time::Duration};
 
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::db::CoreEthereumDb;
+use core_ethereum_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
@@ -21,6 +23,7 @@ use crate::{config::HoprLibConfig, constants};
 
 #[cfg(feature = "wasm")]
 use core_transport::wasm_impls::HoprTransport;
+use utils_types::primitives::Address;
 
 /// Enum differentiator for loop component futures.
 ///
@@ -100,8 +103,26 @@ where
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
-    let (tx_queue, chain_actions, rpc_operations) =
-        crate::chain::build_chain_components(&me_onchain, chain_config, cfg.safe_module.module_address, db.clone());
+    // TODO: this needs refactoring of the config structures
+    let contract_addrs = ContractAddresses {
+        announcements: Address::from_str(&chain_config.announcements).unwrap(),
+        channels: Address::from_str(&chain_config.channels).unwrap(),
+        token: Address::from_str(&chain_config.token).unwrap(),
+        price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
+        network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
+        network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
+        stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
+        safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
+        module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
+    };
+
+    let (tx_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
+        &me_onchain,
+        chain_config,
+        contract_addrs,
+        cfg.safe_module.module_address,
+        db.clone(),
+    );
 
     let multi_strategy = Arc::new(MultiStrategy::new(
         cfg.strategy,
@@ -129,6 +150,9 @@ where
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
         me_onchain.clone(),
         db.clone(),
+        contract_addrs,
+        cfg.safe_module.safe_address,
+        tx_indexer_events,
         chain_actions.clone(),
         rpc_operations.clone(),
         channel_graph.clone(),

@@ -1,11 +1,12 @@
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
-use async_std::sync::{Mutex, RwLock};
+use async_std::sync::RwLock;
 use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
+use futures::channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
@@ -17,6 +18,7 @@ use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::ContractAddresses;
 
+use core_ethereum_indexer::traits::SignificantChainEvent;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -332,12 +334,13 @@ impl ProtocolConfig {
 pub fn build_chain_components<Db>(
     me_onchain: &ChainKeypair,
     chain_config: ChainNetworkConfig,
+    contract_addrs: ContractAddresses,
     module_address: Address,
     db: Arc<RwLock<Db>>,
 ) -> (
     TransactionQueue<Db>,
     CoreEthereumActions<Db>,
-    Arc<Mutex<RpcOperations<JsonRpcClient>>>,
+    RpcOperations<JsonRpcClient>,
 )
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
@@ -346,31 +349,16 @@ where
         &chain_config.chain.default_provider, // TODO: is this the right value ?
     );
 
-    // TODO: this needs refactoring of the config structures
-    let contract_addrs = ContractAddresses {
-        announcements: Address::from_str(&chain_config.announcements).unwrap(),
-        channels: Address::from_str(&chain_config.channels).unwrap(),
-        token: Address::from_str(&chain_config.token).unwrap(),
-        price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
-        network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
-        network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
-        stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
-        safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
-        module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
-    };
-
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_config.chain.chain_id as u64,
-        contract_addrs: contract_addrs.clone(),
+        contract_addrs,
         max_http_retries: 10,                        // TODO: expose this value
         expected_block_time: Duration::from_secs(7), // TODO: expose this value
         ..RpcOperationsConfig::default()
     };
 
-    let rpc_operations = Arc::new(Mutex::new(
-        RpcOperations::new(rpc_client, &me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
-            .expect("failed to initialize RPC"),
-    ));
+    let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
+        .expect("failed to initialize RPC");
 
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone()),
@@ -387,11 +375,23 @@ where
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    contract_addrs: ContractAddresses,
+    safe_address: Address,
+    indexer_events_tx: UnboundedSender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
+    rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
-    core_ethereum_api::HoprChain::new(me_onchain, db, chain_actions, rpc_operations, channel_graph)
+    core_ethereum_api::HoprChain::new(
+        me_onchain,
+        db,
+        contract_addrs,
+        safe_address,
+        indexer_events_tx,
+        chain_actions,
+        rpc_operations,
+        channel_graph,
+    )
 }
 
 #[cfg(feature = "wasm")]
