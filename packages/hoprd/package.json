@@ -31,8 +31,6 @@
     "docs:watch": "typedoc --watch"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "workspace:packages/core",
-    "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/interface-peer-id": "1.0.5",
@@ -50,6 +48,7 @@
     "express": "4.18.2",
     "express-openapi": "12.1.3",
     "morgan": "^1.10.0",
+    "retimer": "4.0.0",
     "rewiremock": "3.14.5",
     "rlp": "3.0.0",
     "semver": "7.5.4",

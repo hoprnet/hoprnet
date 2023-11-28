@@ -45,7 +45,7 @@ jobs:
           fi
 
           # Resolve conflicts for package.json
-          packages=(connect core-ethereum core hoprd real utils)
+          packages=(connect hoprd real utils)
           for package in "${packages[@]}"; do
             if [ `git diff packages/$package/package.json | wc -l` -gt "0" ]; then 
               if [ `git diff packages/$package/package.json  | grep @@ | wc -l` -eq "1" ]; then
