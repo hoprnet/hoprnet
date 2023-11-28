@@ -26,8 +26,7 @@ fi
 release_name=${1} # Can be any of these values Build | ReleaseCandidate | Patch | Minor | Major
 
 
-#if [  -z "$(git status --porcelain)" ]; then 
-if [  -z "$(true)" ]; then 
+if [  -z "$(git status --porcelain)" ]; then 
   git checkout release/${release_name}
   git pull
   git checkout master
