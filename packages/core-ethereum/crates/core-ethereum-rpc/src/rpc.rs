@@ -6,9 +6,8 @@ use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddle
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
-use ethers::types::BlockId;
+use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
-use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -73,7 +72,6 @@ pub(crate) type HoprMiddleware<P> =
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug, Clone)]
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
-    me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
     contract_instances: Arc<ContractInstances<HoprMiddleware<P>>>,
@@ -86,7 +84,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     {
         let provider_client = RetryClientBuilder::default()
             .rate_limit_retries(cfg.max_http_retries)
-            .timeout_retries(cfg.max_http_retries) // Note that this does not take effect when using Si
+            .timeout_retries(cfg.max_http_retries) // Note that this does not take effect when using SimpleJsonRetryPolicy
             .initial_backoff(Duration::from_millis(500))
             .build(json_rpc, Box::new(retry_policy));
 
@@ -99,7 +97,6 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         );
 
         Ok(Self {
-            me: chain_key.into(),
             contract_instances: Arc::new(ContractInstances::new(
                 &cfg.contract_addrs,
                 provider.clone(),
@@ -127,11 +124,13 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(ts)
     }
 
-    async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance> {
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
         match balance_type {
             BalanceType::Native => {
-                let addr: H160 = self.me.into();
-                let native = self.provider.get_balance(addr, None).await?;
+                let native = self
+                    .provider
+                    .get_balance(NameOrAddress::Address(address.into()), None)
+                    .await?;
 
                 #[cfg(feature = "prometheus")]
                 METRIC_COUNT_RPC_CALLS.increment();
@@ -139,7 +138,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
-                let token_balance = self.contract_instances.token.balance_of(self.me.into()).call().await?;
+                let token_balance = self.contract_instances.token.balance_of(address.into()).call().await?;
 
                 #[cfg(feature = "prometheus")]
                 METRIC_COUNT_RPC_CALLS.increment();
@@ -184,6 +183,21 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         METRIC_COUNT_RPC_CALLS.increment();
 
         Ok(owner.into())
+    }
+
+    async fn get_channel_closure_notice_period(&self) -> Result<Duration> {
+        // TODO: should we cache this value internally ?
+        let notice_period = self
+            .contract_instances
+            .channels
+            .notice_period_channel_closure()
+            .call()
+            .await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
+        Ok(Duration::from_secs(notice_period as u64))
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
@@ -302,7 +316,10 @@ pub mod tests {
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
-        let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        let balance_1 = rpc
+            .get_balance((&chain_key_0).into(), BalanceType::Native)
+            .await
+            .unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -331,7 +348,10 @@ pub mod tests {
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
-        let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        let balance_1 = rpc
+            .get_balance((&chain_key_0).into(), BalanceType::Native)
+            .await
+            .unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -342,7 +362,10 @@ pub mod tests {
 
         let _ = wait_until_tx(tx_hash, &rpc, Duration::from_secs(8)).await;
 
-        let balance_2 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        let balance_2 = rpc
+            .get_balance((&chain_key_0).into(), BalanceType::Native)
+            .await
+            .unwrap();
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
     }
 
@@ -380,7 +403,7 @@ pub mod tests {
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
-        let balance = rpc.get_balance(BalanceType::HOPR).await.unwrap();
+        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
         assert_eq!(amount, balance.value().as_u64(), "invalid balance");
     }
 }

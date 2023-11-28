@@ -28,7 +28,10 @@ use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 #[cfg(feature = "wasm")]
-use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
+use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport, gloo_timers::future::sleep};
+
+#[cfg(not(feature = "wasm"))]
+use async_std::task::sleep;
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -74,6 +77,9 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
+    use crate::config::SafeModule;
+    use crate::constants::MIN_NATIVE_BALANCE;
+    use crate::errors::HoprLibError;
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
@@ -86,9 +92,9 @@ mod native {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
-    use utils_log::debug;
+    use std::time::Duration;
+    use utils_log::{debug, warn};
     use utils_types::traits::PeerIdLike;
-    use crate::errors::HoprLibError;
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
@@ -106,14 +112,12 @@ mod native {
         chain_api: HoprChain,
         processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
         chain_cfg: ChainNetworkConfig,
-        #[cfg(feature = "wasm")]
-        staking_safe_address: Address,
-        staking_module_address: Address,
+        safe_module_cfg: SafeModule,
     }
 
     impl Hopr {
         pub fn new<FOnReceived, FOnSent, FSaveTbf>(
-            cfg: crate::config::HoprLibConfig,
+            cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             my_addresses: Vec<Multiaddr>,
@@ -170,8 +174,7 @@ mod native {
                 chain_api,
                 processes: Some(processes),
                 chain_cfg: chain_config,
-                staking_safe_address: cfg.safe_module.safe_address,
-                staking_module_address: cfg.safe_module.module_address,
+                safe_module_cfg: cfg.safe_module,
             }
         }
 
@@ -204,16 +207,68 @@ mod native {
         }
 
         pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-            self
-                .chain_api
+            self.chain_api
                 .rpc()
-                .get_balance(balance_type)
+                .get_balance(self.me_onchain(), balance_type)
+                .await
+                .map_err(|e| HoprLibError::ChainApi(e.into()))
+        }
+
+        pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+            self.chain_api
+                .rpc()
+                .get_balance(self.safe_module_cfg.safe_address, balance_type)
+                .await
+                .map_err(|e| HoprLibError::ChainApi(e.into()))
+        }
+
+        pub fn get_safe_config(&self) -> SafeModule {
+            self.safe_module_cfg.clone()
+        }
+
+        pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
+            self.chain_api
+                .rpc()
+                .get_channel_closure_notice_period()
                 .await
                 .map_err(|e| HoprLibError::ChainApi(e.into()))
         }
 
         pub fn chain_config(&self) -> ChainNetworkConfig {
             self.chain_cfg.clone()
+        }
+
+        async fn wait_for_funds(&self) -> errors::Result<()> {
+            let max_delay = Duration::from_secs(200);
+            let multiplier = 1.05;
+            let min_native_balance = Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native);
+
+            let mut current_delay = Duration::from_secs(2);
+
+            while current_delay <= max_delay {
+                match self
+                    .chain_api
+                    .rpc()
+                    .get_balance(self.me_onchain(), BalanceType::Native)
+                    .await
+                {
+                    Ok(current_balance) => {
+                        info!("current balance is {}", current_balance.to_formatted_string());
+                        if current_balance.gte(&min_native_balance) {
+                            info!("node is funded");
+                            return Ok(());
+                        } else {
+                            warn!("still unfunded, trying again soon");
+                        }
+                    }
+                    Err(e) => error!("error while querying for balance: {e}"),
+                }
+
+                sleep(current_delay).await;
+                current_delay = current_delay.mul_f64(multiplier);
+            }
+
+            Err(HoprLibError::GeneralError("timeout waiting for balance".into()))
         }
 
         pub async fn run(
@@ -227,10 +282,7 @@ mod native {
 
             info!("Starting hopr node...");
 
-            // TODO: add wait for funds function
-            /*if let Err(_) = self.chain_query.waitForFunds().await {
-                panic!("Failed to wait for the funds")
-            }*/
+            self.wait_for_funds().await.expect("failed to wait for funds");
 
             self.aliases
                 .write()
@@ -239,7 +291,7 @@ mod native {
 
             self.state = State::Initializing;
 
-            let balance = self.get_balance(BalanceType::Native)?;
+            let balance = self.get_balance(BalanceType::Native).await?;
 
             let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
 
@@ -290,11 +342,16 @@ mod native {
 
             // Possibly register node-safe pair to NodeSafeRegistry. Following that the
             // connector is set to use safe tx variants.
-            if can_register_with_safe(self.me_onchain(), self.staking_safe_address, self.chain_api.rpc()).await?
+            if can_register_with_safe(
+                self.me_onchain(),
+                self.safe_module_cfg.safe_address,
+                self.chain_api.rpc(),
+            )
+            .await?
             {
                 info!("Registering safe by node");
 
-                if self.me_onchain() == self.staking_safe_address {
+                if self.me_onchain() == self.safe_module_cfg.safe_address {
                     return Err(errors::HoprLibError::GeneralError(
                         "cannot self as staking safe address".into(),
                     ));
@@ -303,13 +360,14 @@ mod native {
                 if let Ok(_) = self
                     .chain_api
                     .actions_ref()
-                    .register_safe_by_node(self.staking_safe_address)
+                    .register_safe_by_node(self.safe_module_cfg.safe_address)
                     .await
                 {
                     let db = self.chain_api.db().clone();
                     let mut db = db.write().await;
-                    db.set_staking_safe_address(&self.staking_safe_address).await?;
-                    db.set_staking_module_address(&self.staking_module_address).await?;
+                    db.set_staking_safe_address(&self.safe_module_cfg.safe_address).await?;
+                    db.set_staking_module_address(&self.safe_module_cfg.module_address)
+                        .await?;
                 } else {
                     // Intentionally ignoring the errored state
                     error!("Failed to register node with safe")
@@ -765,7 +823,7 @@ pub mod wasm_impl {
     impl Hopr {
         #[wasm_bindgen(constructor)]
         pub fn _new(
-            cfg: crate::config::HoprLibConfig,
+            cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             db: Database,
@@ -1307,42 +1365,40 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen(js_name = smartContractInfo)]
-        pub fn _smart_contract_info(&self) -> Result<ChainConfiguration, JsError> {
-            self.chain_query
-                .smartContractInfo()
-                .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
-                .and_then(|v| {
-                    serde_wasm_bindgen::from_value::<ChainConfiguration>(v)
-                        .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
-                })
+        pub async fn _smart_contract_info(&self) -> Result<ChainConfiguration, JsError> {
+            let cfg = self.hopr.chain_config();
+            Ok(ChainConfiguration {
+                hoprAnnouncementsAddress: cfg.announcements,
+                hoprTokenAddress: cfg.token,
+                hoprChannelsAddress: cfg.channels,
+                hoprNetworkRegistryAddress: cfg.network_registry,
+                hoprNodeSafeRegistryAddress: cfg.node_safe_registry,
+                hoprTicketPriceOracleAddress: cfg.ticket_price_oracle,
+                moduleAddress: self.hopr.get_safe_config().module_address.to_string(),
+                safeAddress: self.hopr.get_safe_config().safe_address.to_string(),
+                chain: cfg.chain.id,
+                noticePeriodChannelClosure: self.hopr.get_channel_closure_notice_period().await?.as_secs() as u32,
+            })
         }
 
         #[wasm_bindgen(js_name = getBalance)]
         pub async fn _balance(&self) -> Result<Balance, JsError> {
-            Ok(self.hopr.get_balance(BalanceType::HOPR)?)
+            Ok(self.hopr.get_balance(BalanceType::HOPR).await?)
         }
 
         #[wasm_bindgen(js_name = getSafeBalance)]
         pub async fn _safe_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getSafeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_safe_balance(BalanceType::HOPR).await?)
         }
 
         #[wasm_bindgen(js_name = getNativeBalance)]
         pub async fn _native_balance(&self) -> Result<Balance, JsError> {
-            Ok(self.hopr.get_balance(BalanceType::Native)?)
+            Ok(self.hopr.get_balance(BalanceType::Native).await?)
         }
 
         #[wasm_bindgen(js_name = getSafeNativeBalance)]
         pub async fn _safe_native_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getSafeNativeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_safe_balance(BalanceType::Native).await?)
         }
 
         #[wasm_bindgen(js_name = peerIdToChainKey)]

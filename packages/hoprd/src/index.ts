@@ -36,7 +36,7 @@ import { createHoprNode } from './hopr.js'
 import { decodeMessage } from './api/utils.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
 
-export { WasmChainQuery, WasmHoprMessageEmitter } from './hopr.js'
+export { WasmHoprMessageEmitter } from './hopr.js'
 
 const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
@@ -89,27 +89,6 @@ function parseCliArguments(args: string[]) {
 
   return argv
 }
-
-// TODO: Possibly not needed anymore since this used to catch unhandled promise rejections from hopr-connect and js-libp2p
-/*
-async function addUnhandledPromiseRejectionHandler() {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(
-      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
-    )
-    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
-
-    registerUnhandled()
-    setLogger((msg) => {
-      console.error(msg)
-    })
-  }
-
-  // Filter specific known promise rejection that cannot be handled for
-  // one reason or the other
-  setupPromiseRejectionFilter()
-}
-*/
 
 async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the

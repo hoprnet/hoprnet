@@ -3009,6 +3009,7 @@ dependencies = [
  "core-transport",
  "core-types",
  "futures",
+ "gloo-timers 0.3.0",
  "js-sys",
  "lazy_static",
  "real-base",

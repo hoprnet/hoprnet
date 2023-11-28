@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::pin::Pin;
+use std::time::Duration;
 
 use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
@@ -148,7 +149,7 @@ pub trait HoprRpcOperations {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
     /// Retrieves the node's account balance of the given type.
-    async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance>;
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
 
     /// Retrieves info of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
@@ -158,6 +159,9 @@ pub trait HoprRpcOperations {
 
     /// Retrieves target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
+
+    /// Retrieves the notice period of channel closure from the Channels contract.
+    async fn get_channel_closure_notice_period(&self) -> Result<Duration>;
 
     /// Sends transaction to the RPC provider.
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
