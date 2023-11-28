@@ -7,7 +7,7 @@ import { ChainConfiguration, health_to_string, Hopr } from '@hoprnet/hopr-utils'
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const scInfo: ChainConfiguration = node.smartContractInfo()
+    const scInfo: ChainConfiguration = await node.smartContractInfo()
 
     return {
       network: node.chainConfig().id,

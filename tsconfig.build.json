@@ -4,7 +4,6 @@
   "files": [],
   "references": [
     { "path": "packages/core" },
-    { "path": "packages/core-ethereum" },
     { "path": "packages/hoprd" },
     { "path": "packages/real" },
     { "path": "packages/utils" }
