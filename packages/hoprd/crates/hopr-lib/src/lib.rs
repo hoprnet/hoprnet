@@ -78,7 +78,7 @@ pub use wasm_impl::Hopr;
 #[cfg(feature = "wasm")]
 mod native {
     use crate::config::SafeModule;
-    use crate::constants::MIN_NATIVE_BALANCE;
+    use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
     use crate::errors::HoprLibError;
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
@@ -280,9 +280,15 @@ mod native {
                 ));
             }
 
-            info!("Starting hopr node...");
+            info!(
+                "Node is not started, please fund this node {} with at least {}",
+                self.me_onchain(),
+                Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
+            );
 
             self.wait_for_funds().await.expect("failed to wait for funds");
+
+            info!("Starting hopr node...");
 
             self.aliases
                 .write()

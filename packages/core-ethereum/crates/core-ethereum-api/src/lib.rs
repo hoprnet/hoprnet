@@ -24,17 +24,6 @@ use utils_types::primitives::{Address, Balance};
 
 use crate::errors::{HoprChainError, Result};
 
-#[async_trait::async_trait]
-pub trait ChainQueries {
-    async fn is_node_safe_registered(&self) -> errors::Result<bool>;
-
-    async fn can_register_with_safe(&self) -> errors::Result<bool>;
-
-    async fn wait_for_funds(&self) -> errors::Result<()>;
-
-    async fn clone(&self) -> Self;
-}
-
 #[cfg(feature = "wasm")]
 pub type JsonRpcClient =
     core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;

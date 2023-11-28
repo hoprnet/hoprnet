@@ -3,9 +3,6 @@ import retimer from 'retimer'
 
 import {
   get_package_version,
-  Balance,
-  BalanceType,
-  SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
   debug,
   MessageInbox,
@@ -223,11 +220,6 @@ async function main() {
     )
     // start API server only if API flag is true
     if (cfg.api.enable) startApiListen()
-
-    const ethAddr = node.getEthereumAddress().to_hex()
-    const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
-
-    log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
     showOnboardingInformation(node)
 
