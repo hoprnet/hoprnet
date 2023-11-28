@@ -4,13 +4,14 @@ use futures::{channel::mpsc::UnboundedSender, pin_mut, StreamExt};
 use std::{collections::VecDeque, sync::Arc};
 use utils_log::{debug, error, info};
 
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
+use utils_types::primitives::{Snapshot, U256};
+
 use crate::{
     errors::CoreEthereumIndexerError,
     traits::{ChainLogHandler, SignificantChainEvent},
 };
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
-use utils_types::primitives::{Snapshot, U256};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
@@ -219,7 +220,7 @@ where
                                 .update_latest_block_number(log.block_number as u32)
                                 .await
                             {
-                                error!("failed to write the latest block number into the database: {}", error);
+                                error!("failed to write the latest block number into the database: {error}");
                             }
 
                             #[cfg(all(feature = "prometheus", not(test)))]
@@ -232,7 +233,7 @@ where
 
                                 for log in logs.into_iter() {
                                     if let Err(error) = tx_proc.unbounded_send(log) {
-                                        error!("failed to send and process logs: {}", error)
+                                        error!("failed to send and process logs: {error}")
                                     }
                                 }
                             }

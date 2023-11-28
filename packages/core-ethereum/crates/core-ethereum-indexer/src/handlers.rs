@@ -258,6 +258,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
                         .await?;
 
+                    // TODO: we also need get the ticket based on channel_id + new_ticket_index and `mark_redeem` it here
+
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                     }
