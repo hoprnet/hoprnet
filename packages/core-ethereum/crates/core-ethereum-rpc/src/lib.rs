@@ -1,17 +1,19 @@
 use std::fmt::{Display, Formatter};
+use std::future::{Future, IntoFuture};
 use std::pin::Pin;
 use std::time::Duration;
 
 use async_trait::async_trait;
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-pub use futures::channel::mpsc::UnboundedReceiver;
-use futures::Stream;
+use futures::{FutureExt, Stream};
 use primitive_types::H256;
 
 use core_crypto::types::Hash;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
+
+use crate::errors::RpcError::ProviderError;
+pub use ethers::types::transaction::eip2718::TypedTransaction;
 
 /// Extended `JsonRpcClient` abstraction
 /// This module contains custom implementation of `ethers::providers::JsonRpcClient`
@@ -140,6 +142,42 @@ pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
 
+/// Represents a pending transaction that can be eventually
+/// resolved until confirmation, which is done by polling
+/// the respective RPC provider.
+/// The polling interval and number of confirmations are defined by the underlying provider.
+pub struct PendingTransaction<'a> {
+    tx_hash: Hash,
+    resolver: Box<dyn Future<Output = Result<()>> + 'a>,
+}
+
+impl PendingTransaction<'_> {
+    /// Hash of the pending transaction.
+    pub fn tx_hash(&self) -> Hash {
+        self.tx_hash
+    }
+}
+
+impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
+    for PendingTransaction<'a>
+{
+    fn from(value: ethers_providers::PendingTransaction<'a, P>) -> Self {
+        Self {
+            tx_hash: value.tx_hash().into(),
+            resolver: Box::new(value.map(|r| r.map(|_| ()).map_err(ProviderError))),
+        }
+    }
+}
+
+impl<'a> IntoFuture for PendingTransaction<'a> {
+    type Output = Result<()>;
+    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + 'a>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::into_pin(self.resolver)
+    }
+}
+
 /// Trait defining general set of operations an RPC provider
 /// must provide to the HOPR node.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -164,7 +202,7 @@ pub trait HoprRpcOperations {
     async fn get_channel_closure_notice_period(&self) -> Result<Duration>;
 
     /// Sends transaction to the RPC provider.
-    async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
+    async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.

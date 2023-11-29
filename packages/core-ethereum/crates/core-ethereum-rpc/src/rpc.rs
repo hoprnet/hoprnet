@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
-use core_crypto::types::Hash;
 use core_ethereum_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -15,7 +14,7 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
 use crate::errors::Result;
-use crate::HoprRpcOperations;
+use crate::{HoprRpcOperations, PendingTransaction};
 
 #[cfg(feature = "prometheus")]
 use utils_metrics::metrics::SimpleCounter;
@@ -51,6 +50,11 @@ pub struct RpcOperationsConfig {
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
     pub tx_polling_interval: Duration,
+    /// Number of confirmations to wait when performing
+    /// transaction polling.
+    /// Defaults to 8
+    #[validate(range(min = 1))]
+    pub tx_confirmations: usize,
 }
 
 impl Default for RpcOperationsConfig {
@@ -62,6 +66,7 @@ impl Default for RpcOperationsConfig {
             logs_page_size: 50,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
+            tx_confirmations: 8,
         }
     }
 }
@@ -200,30 +205,33 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(Duration::from_secs(notice_period as u64))
     }
 
-    async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
+    async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction> {
         // Also fills the transaction including the EIP1559 fee estimates from the provider
-        let sent_tx = self.provider.send_transaction(tx, None).await?;
+        let sent_tx = self
+            .provider
+            .send_transaction(tx, None)
+            .await?
+            .confirmations(self.cfg.tx_confirmations)
+            .interval(self.cfg.tx_polling_interval); // This is the default, but let's be explicit
 
         #[cfg(feature = "prometheus")]
         METRIC_COUNT_RPC_CALLS.increment();
 
-        Ok(sent_tx.0.into())
+        Ok(sent_tx.into())
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprRpcOperations, TypedTransaction};
+    use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_crypto::types::Hash;
     use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
-    use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
-    use ethers_providers::{JsonRpcClient, Middleware};
-    use futures::StreamExt;
-    use primitive_types::{H160, H256};
+    use ethers_providers::Middleware;
+    use primitive_types::H160;
+    use std::future::IntoFuture;
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
 
@@ -268,34 +276,15 @@ pub mod tests {
         tx
     }
 
-    pub async fn wait_until_tx<P: JsonRpcClient + 'static>(
-        tx_hash: Hash,
-        rpc: &RpcOperations<P>,
-        timeout: Duration,
-    ) -> ethers::types::Block<H256> {
-        let mut stream = rpc.provider.watch_blocks().await.unwrap();
-        let prov_clone = rpc.provider.clone();
-
-        tokio::time::timeout(timeout, async move {
-            while let Some(hash) = stream.next().await {
-                let block = prov_clone.get_block(BlockId::Hash(hash.into())).await.unwrap().unwrap();
-                if block
-                    .transactions
-                    .iter()
-                    .map(|tx| Hash::from(tx.0))
-                    .any(|h| h.eq(&tx_hash))
-                {
-                    return Some(block);
-                }
-            }
-            None
-        })
-        .await
-        .expect(&format!(
-            "timeout awaiting tx hash {tx_hash} after {} seconds",
-            timeout.as_secs()
-        ))
-        .expect("expected block")
+    pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
+        let tx_hash = pending.tx_hash();
+        tokio::time::timeout(timeout, pending.into_future())
+            .await
+            .expect(&format!(
+                "timeout awaiting tx hash {tx_hash} after {} seconds",
+                timeout.as_secs()
+            ))
+            .expect("expected block")
     }
 
     #[tokio::test]
@@ -308,6 +297,7 @@ pub mod tests {
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
+            tx_confirmations: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -328,7 +318,7 @@ pub mod tests {
             .await
             .expect("failed to send tx");
 
-        let _ = wait_until_tx(tx_hash, &rpc, Duration::from_secs(8)).await;
+        wait_until_tx(tx_hash, Duration::from_secs(8)).await;
     }
 
     #[tokio::test]
@@ -341,6 +331,7 @@ pub mod tests {
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
+            tx_confirmations: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -360,7 +351,7 @@ pub mod tests {
             .await
             .expect("failed to send tx");
 
-        let _ = wait_until_tx(tx_hash, &rpc, Duration::from_secs(8)).await;
+        wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
         let balance_2 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)

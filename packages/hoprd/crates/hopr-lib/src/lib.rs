@@ -16,7 +16,6 @@ use std::{pin::Pin, str::FromStr};
 use async_std::sync::RwLock;
 use futures::{Future, StreamExt};
 
-use crate::chain::ChainNetworkConfig;
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
@@ -27,10 +26,12 @@ use core_transport::{
 use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
-#[cfg(feature = "wasm")]
+use crate::chain::ChainNetworkConfig;
+
+#[cfg(all(feature = "wasm", not(test)))]
 use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport, gloo_timers::future::sleep};
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
@@ -238,6 +239,7 @@ mod native {
             self.chain_cfg.clone()
         }
 
+        // Move this single-purpose function to core-ethereum-api ?
         async fn wait_for_funds(&self) -> errors::Result<()> {
             let max_delay = Duration::from_secs(200);
             let multiplier = 1.05;

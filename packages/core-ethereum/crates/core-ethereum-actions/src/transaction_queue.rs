@@ -73,7 +73,6 @@ pub trait TransactionExecutor {
 }
 
 /// Represents a result of an Ethereum transaction after it has been confirmed.
-/// These are counterparts to the `Transaction` type.
 #[derive(Clone, Debug)]
 pub enum TransactionResult {
     TicketRedeemed { tx_hash: Hash },
@@ -164,6 +163,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
                     match &res {
                         TicketRedeemed { .. } => {
+                            // TODO: this will be moved to handler.rs in core-ethereum-indexer
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
                                 // Still declare the TX a success
                                 error!("failed to mark {ack} as redeemed: {e}");
