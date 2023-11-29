@@ -284,7 +284,7 @@ pub mod tests {
                 "timeout awaiting tx hash {tx_hash} after {} seconds",
                 timeout.as_secs()
             ))
-            .expect("expected block")
+            .expect("expected block");
     }
 
     #[tokio::test]

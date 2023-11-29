@@ -12,7 +12,7 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
 
-use crate::errors::RpcError::ProviderError;
+use crate::errors::RpcError::{ProviderError, TransactionDropped};
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 
 /// Extended `JsonRpcClient` abstraction
@@ -48,6 +48,8 @@ pub struct Log {
     pub tx_index: u64,
     /// Corresponding block number
     pub block_number: u64,
+    /// Corresponding transaction hash
+    pub tx_hash: Hash,
     /// Log index
     pub log_index: U256,
 }
@@ -61,6 +63,7 @@ impl From<ethers::types::Log> for Log {
             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
             block_number: value.block_number.expect("block id must be present").as_u64(),
             log_index: value.log_index.expect("log index must be present").into(),
+            tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
         }
     }
 }
@@ -142,13 +145,38 @@ pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
 
+/// Contains some selected fields of a receipt for a transaction that has been
+/// already included into the blockchain.
+#[derive(Debug, Clone)]
+pub struct TransactionReceipt {
+    /// Hash of the transaction.
+    pub tx_hash: Hash,
+    /// Number of the block in which the transaction has been included into the blockchain.
+    pub block_number: u64
+}
+
+impl Display for TransactionReceipt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "receipt of tx {} in block {}", self.tx_hash, self.block_number)
+    }
+}
+
+impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
+    fn from(value: ethers::prelude::TransactionReceipt) -> Self {
+        Self {
+            tx_hash: value.transaction_hash.into(),
+            block_number: value.block_number.expect("invalid transaction receipt").as_u64()
+        }
+    }
+}
+
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,
-    resolver: Box<dyn Future<Output = Result<()>> + 'a>,
+    resolver: Box<dyn Future<Output = Result<TransactionReceipt>> + 'a>,
 }
 
 impl PendingTransaction<'_> {
@@ -162,15 +190,28 @@ impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTra
     for PendingTransaction<'a>
 {
     fn from(value: ethers_providers::PendingTransaction<'a, P>) -> Self {
+        let tx_hash = Hash::from(value.tx_hash());
         Self {
-            tx_hash: value.tx_hash().into(),
-            resolver: Box::new(value.map(|r| r.map(|_| ()).map_err(ProviderError))),
+            tx_hash,
+            resolver: Box::new(value.map(move |result|
+                match result {
+                    Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
+                    Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
+                    Err(err) => Err(ProviderError(err))
+                }
+            )),
         }
     }
 }
 
+impl Display for PendingTransaction<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "pending tx {}", self.tx_hash)
+    }
+}
+
 impl<'a> IntoFuture for PendingTransaction<'a> {
-    type Output = Result<()>;
+    type Output = Result<TransactionReceipt>;
     type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + 'a>>;
 
     fn into_future(self) -> Self::IntoFuture {

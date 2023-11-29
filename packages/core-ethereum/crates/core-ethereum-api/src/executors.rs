@@ -40,15 +40,11 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
 #[async_trait(? Send)]
 impl<Rpc: HoprRpcOperations> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
     async fn post_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
-        let res = self.rpc.send_transaction(tx).await?.tx_hash();
-        Ok(res)
+        Ok(self.rpc.send_transaction(tx).await?.tx_hash())
     }
 
     async fn post_transaction_and_await_confirmation(&self, tx: TypedTransaction) -> Result<Hash> {
-        let pending_tx = self.rpc.send_transaction(tx).await?;
-        let hash = pending_tx.tx_hash();
-        pending_tx.await?;
-        Ok(hash)
+        Ok(self.rpc.send_transaction(tx).await?.await?.tx_hash)
     }
 }
 

@@ -321,6 +321,7 @@ pub mod tests {
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),
+                tx_hash: Default::default(),
                 tx_index: 0,
                 block_number,
                 log_index,

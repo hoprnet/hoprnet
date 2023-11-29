@@ -527,27 +527,27 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
 
         if address.eq(&self.addresses.announcements) {
             let event = HoprAnnouncementsEvents::decode_log(&log)?;
-            return self
+            self
                 .on_announcement_event(&mut db, event, block_number, &snapshot)
-                .await;
+                .await
         } else if address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&log)?;
-            return self.on_channel_event(&mut db, event, &snapshot).await;
+            self.on_channel_event(&mut db, event, &snapshot).await
         } else if address.eq(&self.addresses.network_registry) {
             let event = HoprNetworkRegistryEvents::decode_log(&log)?;
-            return self.on_network_registry_event(&mut db, event, &snapshot).await;
+            self.on_network_registry_event(&mut db, event, &snapshot).await
         } else if address.eq(&self.addresses.token) {
             let event = HoprTokenEvents::decode_log(&log)?;
-            return self.on_token_event(&mut db, event, &snapshot).await;
+            self.on_token_event(&mut db, event, &snapshot).await
         } else if address.eq(&self.addresses.safe_registry) {
             let event = HoprNodeSafeRegistryEvents::decode_log(&log)?;
-            return self.on_node_safe_registry_event(&mut db, event, &snapshot).await;
+            self.on_node_safe_registry_event(&mut db, event, &snapshot).await
         } else if address.eq(&self.addresses.module_implementation) {
             let event = HoprNodeManagementModuleEvents::decode_log(&log)?;
-            return self.on_node_management_module_event(&mut db, event, &snapshot).await;
+            self.on_node_management_module_event(&mut db, event, &snapshot).await
         } else if address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log)?;
-            return self.on_ticket_price_oracle_event(&mut db, event, &snapshot).await;
+            self.on_ticket_price_oracle_event(&mut db, event, &snapshot).await
         } else {
             error!(
                 "on_event error - unknown contract address: {:?} - received log: {:?}",
@@ -555,7 +555,7 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
                 log
             );
 
-            return Err(CoreEthereumIndexerError::UnknownContract(address));
+            Err(CoreEthereumIndexerError::UnknownContract(address))
         }
     }
 }
