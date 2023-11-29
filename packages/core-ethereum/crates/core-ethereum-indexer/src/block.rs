@@ -284,6 +284,7 @@ where
 pub mod tests {
     use std::pin::Pin;
 
+    use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_rpc::BlockWithLogs;
@@ -334,11 +335,15 @@ pub mod tests {
     mock! {
         HoprIndexerOps {}     // Name of the mock struct, less the "Mock" prefix
 
+        #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
-            #[allow(clippy::type_complexity,clippy::type_repetition_in_bounds)]
-            fn block_number<'life0,'async_trait>(&'life0 self) ->  ::core::pin::Pin<Box<dyn ::core::future::Future<Output = core_ethereum_rpc::errors::Result<u64> > + ::core::marker::Send+'async_trait> >where 'life0:'async_trait,Self:'async_trait;
+             async fn block_number(&self) -> core_ethereum_rpc::errors::Result<u64>;
 
-            fn try_stream_logs<'a>(&'a self,start_block_number:Option<u64> ,filter:LogFilter,) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> +'a> > >;
+            fn try_stream_logs<'a>(
+                &'a self,
+                start_block_number: Option<u64>,
+                filter: LogFilter,
+            ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
         }
     }
 
@@ -352,7 +357,7 @@ pub mod tests {
 
         let head_block = 1000;
         rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+            .return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -385,7 +390,7 @@ pub mod tests {
             .await
             .is_ok());
         rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+            .return_once(move || Ok(head_block) );
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -411,7 +416,7 @@ pub mod tests {
 
         let head_block = 1000;
         rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+            .return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -448,7 +453,7 @@ pub mod tests {
 
         let head_block = 1000;
         rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+            .return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -508,7 +513,7 @@ pub mod tests {
 
         let head_block = 1000;
         rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+            .return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
