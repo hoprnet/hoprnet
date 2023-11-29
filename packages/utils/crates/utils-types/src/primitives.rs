@@ -956,7 +956,7 @@ mod tests {
         let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
 
         assert_eq!("123000000000000000", b1.to_value_string());
-        assert_eq!("123000000000000000", b2.to_value_string());
+        assert_eq!("12300000000000000000", b2.to_value_string());
         assert_eq!("123000000000000", b3.to_value_string());
         assert_eq!("12300000000000000", b4.to_value_string());
     }
