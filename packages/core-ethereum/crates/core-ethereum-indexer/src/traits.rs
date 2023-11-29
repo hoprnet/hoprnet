@@ -2,13 +2,13 @@ use async_trait::async_trait;
 
 use core_types::channels::ChannelEntry;
 use ethers::abi::RawLog;
-use utils_types::primitives::{Address, Balance, Snapshot};
+use utils_types::primitives::{Address, Snapshot};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SignificantChainEvent {
     Announcement(String, Address, Vec<String>), // peer, address, multiaddresses
     ChannelUpdate(ChannelEntry),
-    TicketRedeem(ChannelEntry, Balance),
+    TicketRedeem(ChannelEntry),
     NetworkRegistryUpdate(Address, bool),
 }
 

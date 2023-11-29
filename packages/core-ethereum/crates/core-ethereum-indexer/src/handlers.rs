@@ -147,18 +147,13 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    let old_balance = channel.balance;
                     channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    // TODO: emit of channel update was here.
-                    // we need to infer the amount since the actual amount is not part of any event
-                    let amount = old_balance.sub(&channel.balance);
-                    return Ok(Some(SignificantChainEvent::TicketRedeem(
+                    return Ok(Some(SignificantChainEvent::ChannelUpdate(
                         channel.clone(),
-                        amount.clone(),
                     )));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
@@ -252,16 +247,20 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
+                    if let Some(ticket) = db.get_acknowledged_ticket(&channel.get_id(), channel.channel_epoch.as_u32(), ticket_redeemed.new_ticket_index).await? {
+                        db.mark_redeemed(&ticket).await?;
+                    } else {
+                        error!("could not find acknowledged ticket with idx {} in {channel}", ticket_redeemed.new_ticket_index);
+                    }
+
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
                         .await?;
                     // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
                     db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
                         .await?;
 
-                    // TODO: we also need get the ticket based on channel_id + new_ticket_index and `mark_redeem` it here
-
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
+                        return Ok(Some(SignificantChainEvent::TicketRedeem(channel)));
                     }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);

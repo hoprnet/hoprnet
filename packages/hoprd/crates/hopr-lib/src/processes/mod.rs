@@ -71,7 +71,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db>(
                         error!("Announced PeerId ({peer}) has invalid format")
                     }
                 }
-                SignificantChainEvent::ChannelUpdate(channel) | SignificantChainEvent::TicketRedeem(channel, _) => {
+                SignificantChainEvent::ChannelUpdate(channel) | SignificantChainEvent::TicketRedeem(channel) => {
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 

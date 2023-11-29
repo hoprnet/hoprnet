@@ -166,6 +166,7 @@ mod tests {
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
+            async fn get_acknowledged_ticket(&self, channel_id: &Hash, epoch: u32, index: u64) -> core_ethereum_db::errors::Result<Option<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<usize>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(

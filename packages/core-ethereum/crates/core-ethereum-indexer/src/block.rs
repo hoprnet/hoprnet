@@ -337,7 +337,7 @@ pub mod tests {
 
         #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
-             async fn block_number(&self) -> core_ethereum_rpc::errors::Result<u64>;
+            async fn block_number(&self) -> core_ethereum_rpc::errors::Result<u64>;
 
             fn try_stream_logs<'a>(
                 &'a self,

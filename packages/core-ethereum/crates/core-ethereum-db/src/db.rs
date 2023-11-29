@@ -485,6 +485,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         Ok(agg_tickets)
     }
 
+    async fn get_acknowledged_ticket(&self, channel_id: &Hash, epoch: u32, index: u64) -> Result<Option<AcknowledgedTicket>> {
+        let key = to_acknowledged_ticket_key(channel_id, epoch, index)?;
+        self.db.get_or_none::<AcknowledgedTicket>(key).await
+    }
+
     async fn get_acknowledged_tickets_range(
         &self,
         channel_id: &Hash,
@@ -783,11 +788,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        // TODO: for debugging purposes this operation has been un-batched
-        // Note that if any of the un-batched operations fail, the stats of redeemed
-        // tickets will be in an inconsistent state.
-        // Once the underlying issue is resolved, it should be batched again.
-
         debug!("start marking {acked_ticket} as redeemed");
 
         let mut ops = utils_db::db::Batch::default();

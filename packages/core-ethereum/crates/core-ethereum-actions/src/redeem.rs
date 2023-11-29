@@ -468,6 +468,8 @@ mod tests {
             .await
             .unwrap();
 
+        // TODO: Change to check the being redeemed state instead
+
         assert_eq!(
             ticket_count,
             db_acks_charlie.len(),

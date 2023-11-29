@@ -24,7 +24,7 @@ use utils_types::primitives::{Address, Balance};
 
 use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
 use crate::errors::{CoreEthereumActionsError, Result};
-use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
+use crate::transaction_queue::TransactionResult::Failure;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
@@ -161,24 +161,14 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             Action::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
-                    match &res {
-                        TicketRedeemed { .. } => {
-                            // TODO: this will be moved to handler.rs in core-ethereum-indexer
-                            if let Err(e) = db.write().await.mark_redeemed(&ack).await {
-                                // Still declare the TX a success
-                                error!("failed to mark {ack} as redeemed: {e}");
-                            }
-                        }
-                        Failure(e) => {
-                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
+                    if let Failure(e) = &res {
+                        // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
 
-                            error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
-                                error!("cannot mark {ack} as untouched: {e}");
-                            }
+                        error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
+                        ack.status = AcknowledgedTicketStatus::Untouched;
+                        if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                            error!("cannot mark {ack} as untouched: {e}");
                         }
-                        _ => panic!("invalid tx result from ticket redeem"),
                     }
                     res
                 }

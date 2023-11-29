@@ -116,6 +116,8 @@ where
         module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
     };
 
+    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+
     let (tx_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
         &me_onchain,
         chain_config,
@@ -136,7 +138,7 @@ where
     let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
-    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+
     let indexer_refreshing_loop = crate::processes::spawn_refresh_process_for_chain_events(
         me.public().to_peerid(),
         core_transport::Keypair::public(&me_onchain).to_address(),

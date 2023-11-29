@@ -63,6 +63,8 @@ pub trait HoprCoreEthereumDbActions {
         index_end: u64,
     ) -> Result<Vec<AcknowledgedTicket>>;
 
+    async fn get_acknowledged_ticket(&self, channel_id: &Hash, epoch: u32, index: u64) -> Result<Option<AcknowledgedTicket>>;
+
     async fn get_acknowledged_tickets_range(
         &self,
         channel_id: &Hash,
