@@ -6600,7 +6600,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

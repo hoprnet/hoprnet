@@ -123,12 +123,12 @@ where
     }
 
     async fn sample_size_and_evaluate_avg(&self, sample: u32) -> Option<u32> {
-        self.sma.write().await.add_sample(sample);
+        self.sma.write().await.push(sample);
         info!("evaluated qualities of {sample} peers seen in the network");
 
         let sma = self.sma.read().await;
         if sma.len() >= sma.window_size() {
-            Some(sma.get_average())
+            sma.average()
         } else {
             info!(
                 "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
