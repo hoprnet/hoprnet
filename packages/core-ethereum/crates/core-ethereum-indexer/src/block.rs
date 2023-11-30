@@ -267,7 +267,7 @@ where
                         let significant_event = SignificantChainEvent { tx_hash, event_type };
 
                         if let Err(e) = tx_significant_events.try_broadcast(significant_event) {
-                            error!("failed to generate a significant chain event: {}", e);
+                            error!("failed to pass a significant chain event further: {}", e);
                         }
                     }
                     Ok(None) => {}
@@ -289,6 +289,7 @@ pub mod tests {
 
     use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
+    use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_rpc::BlockWithLogs;
     use core_ethereum_types::chain_events::ChainEventType;
@@ -300,6 +301,7 @@ pub mod tests {
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_types::traits::PeerIdLike;
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
@@ -492,11 +494,11 @@ pub mod tests {
     }
 
     fn random_announcement_chain_event() -> ChainEventType {
-        ChainEventType::Announcement(
-            "abc".to_owned(),
-            Address::random(),
-            vec!["multiaddress/random/doesn't matter".to_owned()],
-        )
+        ChainEventType::Announcement {
+            peer: OffchainKeypair::random().public().to_peerid(),
+            address: Address::random(),
+            multiaddresses: vec![Multiaddr::empty()],
+        }
     }
 
     #[async_std::test]

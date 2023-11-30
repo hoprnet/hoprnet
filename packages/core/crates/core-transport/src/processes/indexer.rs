@@ -11,6 +11,7 @@ use utils_types::traits::PeerIdLike;
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
+use core_ethereum_types::chain_events::NetworkRegistryStatus;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
@@ -25,12 +26,11 @@ pub enum PeerEligibility {
     Ineligible,
 }
 
-impl From<bool> for PeerEligibility {
-    fn from(value: bool) -> Self {
-        if value {
-            PeerEligibility::Eligible
-        } else {
-            PeerEligibility::Ineligible
+impl From<NetworkRegistryStatus> for PeerEligibility {
+    fn from(value: NetworkRegistryStatus) -> Self {
+        match value {
+            NetworkRegistryStatus::Allowed => Self::Eligible,
+            NetworkRegistryStatus::Denied => Self::Ineligible,
         }
     }
 }

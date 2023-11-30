@@ -136,6 +136,10 @@ impl AnnouncementData {
             Err(InvalidInput)
         }
     }
+
+    pub fn multiaddress(&self) -> &Multiaddr {
+        &self.multiaddress
+    }
 }
 
 impl Display for AnnouncementData {

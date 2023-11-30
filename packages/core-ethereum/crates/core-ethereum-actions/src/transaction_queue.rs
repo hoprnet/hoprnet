@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
+use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use core_types::announcement::AnnouncementData;
 use core_types::{
@@ -14,17 +15,18 @@ use core_types::{
     },
 };
 use futures::future::Either;
-use futures::{pin_mut, FutureExt, Stream};
+use futures::{pin_mut, FutureExt, Stream, StreamExt};
+use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
-use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
-use crate::errors::{CoreEthereumActionsError, Result};
-use crate::transaction_queue::TransactionResult::Failure;
+use crate::errors::CoreEthereumActionsError::{
+    ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
+};
+use crate::errors::Result;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
@@ -32,7 +34,6 @@ use async_std::task::{sleep, spawn_local};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-use core_ethereum_types::chain_events::SignificantChainEvent;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 
@@ -41,79 +42,97 @@ use utils_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_SUCCESSFUL_TXS: SimpleCounter = SimpleCounter::new(
-        "core_ethereum_counter_successful_transactions",
-        "Number of successful transactions"
+    static ref METRIC_COUNT_SUCCESSFUL_ACTS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_successful_actions",
+        "Number of successful actions"
     )
     .unwrap();
-    static ref METRIC_COUNT_FAILED_TXS: SimpleCounter = SimpleCounter::new(
-        "core_ethereum_counter_failed_transactions",
-        "Number of failed transactions"
+    static ref METRIC_COUNT_FAILED_ACTS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_failed_actions",
+        "Number of failed actions"
     )
     .unwrap();
-    static ref METRIC_COUNT_TIMEOUT_TXS: SimpleCounter = SimpleCounter::new(
-        "core_ethereum_counter_timeout_transactions",
-        "Number of timed out transactions"
+    static ref METRIC_COUNT_TIMEOUT_ACTS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_timeout_actions",
+        "Number of timed out actions"
     )
     .unwrap();
 }
 
-/// Implements execution of each `Transaction` and also **awaits** its confirmation.
-/// Each operation must return the corresponding `TransactionResult` variant or `Failure`.
+/// Implements execution of transactions underlying each `Action`
+/// Each operation returns a transaction hash.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait TransactionExecutor {
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
-    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
-    async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
-    async fn announce(&self, data: AnnouncementData) -> TransactionResult;
-    async fn register_safe(&self, safe_address: Address) -> TransactionResult;
+    /// Executes ticket redemption transaction given a ticket.
+    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
+
+    /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
+    /// Channel funding and channel opening are both same transactions.
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> Result<Hash>;
+
+    /// Initiates closure of an outgoing channel.
+    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
+
+    /// Finalizes closure of an outgoing channel.
+    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
+
+    /// Closes incoming channel.
+    async fn close_incoming_channel(&self, src: Address) -> Result<Hash>;
+
+    /// Performs withdrawal of a certain amount from an address.
+    /// Note that this transaction is typically awaited via polling and is not tracked
+    /// by the Indexer.
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash>;
+
+    /// Announces the node on-chain given the `AnnouncementData`
+    async fn announce(&self, data: AnnouncementData) -> Result<Hash>;
+
+    /// Registers Safe with the node.
+    async fn register_safe(&self, safe_address: Address) -> Result<Hash>;
 }
 
-/// Represents a result of an Ethereum transaction after it has been confirmed.
-#[derive(Clone, Debug)]
-pub enum TransactionResult {
-    TicketRedeemed { tx_hash: Hash },
-    ChannelFunded { tx_hash: Hash },
-    ChannelClosureInitiated { tx_hash: Hash },
-    ChannelClosed { tx_hash: Hash },
-    Withdrawn { tx_hash: Hash },
-    Announced { tx_hash: Hash },
-    SafeRegistered { tx_hash: Hash },
-    Failure(String),
+/// Represents confirmation of the `Action` execution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionConfirmation {
+    /// Hash of the transaction that executed this action
+    pub tx_hash: Hash,
+
+    /// Corresponding chain event if any
+    pub event: Option<ChainEventType>,
+
+    /// Action that was executed
+    pub action: Action,
 }
 
-impl From<CoreEthereumActionsError> for TransactionResult {
-    fn from(value: CoreEthereumActionsError) -> Self {
-        Failure(format!("tx failed with local error: {value}"))
+impl Display for ActionConfirmation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} confirmed in {}", self.action, self.tx_hash)
     }
 }
 
 /// Notifies about completion of a transaction (success or failure).
-pub type TransactionCompleted = Pin<Box<dyn Future<Output = TransactionResult> + Send>>;
+pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>> + Send>>;
 
 /// Future that resolves once the transaction has been confirmed by the Indexer.
-type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
+type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct TransactionSender(Sender<(Action, TransactionFinisher)>);
+pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
-impl TransactionSender {
-    /// Delivers the future transaction into the `TransactionQueue` for processing.
-    pub async fn send(&self, transaction: Action) -> Result<TransactionCompleted> {
+impl ActionSender {
+    /// Delivers the future action into the `ActionQueue` for processing.
+    pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
         self.0
-            .send((transaction, completer.0))
+            .send((action, completer.0))
             .await
             .map(|_| {
                 completer
                     .1
-                    .map(|r| r.unwrap_or(TransactionResult::Failure("channel cancelled".into())))
+                    .map(|r| r.unwrap_or(Err(InvalidState("channel cancelled".into()))))
                     .boxed()
             })
             .map_err(|_| TransactionSubmissionFailed("ethereum tx queue is closed".into()))
@@ -123,163 +142,250 @@ impl TransactionSender {
 /// A queue of outgoing Ethereum transactions.
 /// This queue awaits new transactions to arrive and calls the corresponding
 /// method of the `TransactionExecutor` to execute it and await its confirmation.
-pub struct TransactionQueue<Db, S>
+pub struct ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions,
     S: Stream<Item = SignificantChainEvent> + Clone,
+    TxExec: TransactionExecutor,
 {
     db: Arc<RwLock<Db>>,
-    queue_send: Sender<(Action, TransactionFinisher)>,
-    queue_recv: Receiver<(Action, TransactionFinisher)>,
+    queue_send: Sender<(Action, ActionFinisher)>,
+    queue_recv: Receiver<(Action, ActionFinisher)>,
     indexer_event_stream: S,
-    tx_exec: Rc<Box<dyn TransactionExecutor>>, // TODO: Make this Arc once TransactionExecutor is Send
+    tx_exec: Arc<TxExec>,
 }
 
-impl<Db, S> TransactionQueue<Db, S>
+struct IndexerExpectation(Hash, Box<dyn Fn(&ChainEventType) -> bool>);
+
+impl IndexerExpectation {
+    fn test(&self, event: &SignificantChainEvent) -> bool {
+        event.tx_hash == self.0 && self.1(&event.event_type)
+    }
+}
+
+impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions + 'static,
     S: Stream<Item = SignificantChainEvent> + Clone + 'static,
+    TxExec: TransactionExecutor + 'static,
 {
     /// Number of pending transactions in the queue
-    pub const ETHEREUM_TX_QUEUE_SIZE: usize = 2048;
+    pub const ACTION_QUEUE_SIZE: usize = 2048;
 
-    /// Maximum time (in seconds) to wait for the transaction to be confirmed on-chain and indexed
-    pub const MAX_TX_CONFIRMATION_WAIT_SECS: usize = 180;
+    /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    pub const MAX_ACTION_CONFIRMATION_WAIT_SECS: usize = 180;
 
     /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(db: Arc<RwLock<Db>>, indexer_event_stream: S, tx_exec: Box<dyn TransactionExecutor>) -> Self {
-        let (queue_send, queue_recv) = bounded(Self::ETHEREUM_TX_QUEUE_SIZE);
+    pub fn new(db: Arc<RwLock<Db>>, indexer_event_stream: S, tx_exec: TxExec) -> Self {
+        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
         Self {
             db,
             indexer_event_stream,
             queue_send,
             queue_recv,
-            tx_exec: Rc::new(tx_exec),
+            tx_exec: Arc::new(tx_exec),
         }
     }
 
-    /// Creates a new producer of transactions for this queue.
-    pub fn new_sender(&self) -> TransactionSender {
-        TransactionSender(self.queue_send.clone())
+    /// Creates a new producer of actions for this queue.
+    pub fn new_sender(&self) -> ActionSender {
+        ActionSender(self.queue_send.clone())
     }
 
-    async fn execute_transaction(
+    async fn execute_action(
         db: Arc<RwLock<Db>>,
-        tx_exec: Rc<Box<dyn TransactionExecutor>>,
-        tx: Action,
+        tx_exec: Arc<TxExec>,
+        action: Action,
         idx_stream: S,
-    ) -> TransactionResult {
-        let tx_result = match tx {
+    ) -> Result<ActionConfirmation> {
+        let expectation = match action.clone() {
             Action::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
-                    let res = tx_exec.redeem_ticket(ack.clone()).await;
-                    if let Failure(e) = &res {
-                        // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
+                    match tx_exec.redeem_ticket(ack.clone()).await {
+                        Ok(tx_hash) => IndexerExpectation(
+                            tx_hash,
+                            Box::new(
+                                move |e| matches!(e, ChainEventType::TicketRedeem(_, Some(ticket)) if ack.eq(ticket)),
+                            ),
+                        ),
+                        Err(e) => {
+                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
 
-                        error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
-                        ack.status = AcknowledgedTicketStatus::Untouched;
-                        if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
-                            error!("cannot mark {ack} as untouched: {e}");
+                            error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
+                            ack.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                                error!("cannot mark {ack} as untouched: {e}");
+                            }
+
+                            return Err(e);
                         }
                     }
-                    res
                 }
-                _ => Failure(format!("invalid state of {ack}")),
+                _ => return Err(InvalidState(ack.to_string())),
             },
 
-            Action::OpenChannel(address, stake) => tx_exec.fund_channel(address, stake).await,
+            Action::OpenChannel(address, stake) => {
+                let tx_hash = tx_exec.fund_channel(address, stake).await?;
+                IndexerExpectation(
+                    tx_hash,
+                    Box::new(
+                        move |e| matches!(e, ChainEventType::ChannelOpened(channel) if channel.destination == address),
+                    ),
+                )
+            }
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == Open {
-                    tx_exec.fund_channel(channel.destination, amount).await
+                    let tx_hash = tx_exec.fund_channel(channel.destination, amount).await?;
+                    IndexerExpectation(
+                        tx_hash,
+                        Box::new(
+                            move |e| matches!(e, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
+                        ),
+                    )
                 } else {
-                    Failure(format!("cannot fund {channel} because it is not opened"))
+                    return Err(InvalidState(format!("cannot fund {channel} because it is not opened")));
                 }
             }
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    Open | PendingToClose => tx_exec.close_incoming_channel(channel.source).await,
+                    Open | PendingToClose => {
+                        // TODO: incoming channel closure does not have closure initiation ?
+                        let tx_hash = tx_exec.close_incoming_channel(channel.source).await?;
+                        IndexerExpectation(
+                            tx_hash,
+                            Box::new(
+                                move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
+                            ),
+                        )
+                    }
                     Closed => {
                         warn!("channel {} is already closed", channel.get_id());
-                        TransactionResult::ChannelClosed {
-                            tx_hash: Hash::default(),
-                        }
+                        return Err(ChannelAlreadyClosed);
                     }
                 },
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        tx_exec.initiate_outgoing_channel_closure(channel.destination).await
+                        let tx_hash = tx_exec.initiate_outgoing_channel_closure(channel.destination).await?;
+                        IndexerExpectation(
+                            tx_hash,
+                            Box::new(
+                                move |e| matches!(e, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
+                            ),
+                        )
                     }
 
                     PendingToClose => {
                         debug!("finalizing closure of {channel}");
-                        tx_exec.finalize_outgoing_channel_closure(channel.destination).await
+                        let tx_hash = tx_exec.finalize_outgoing_channel_closure(channel.destination).await?;
+                        IndexerExpectation(
+                            tx_hash,
+                            Box::new(
+                                move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
+                            ),
+                        )
                     }
 
                     Closed => {
                         warn!("channel {} is already closed", channel.get_id());
-                        TransactionResult::ChannelClosed {
-                            tx_hash: Hash::default(),
-                        }
+                        return Err(ChannelAlreadyClosed);
                     }
                 },
             },
 
-            Action::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
-            Action::Announce(data) => tx_exec.announce(data).await,
-            Action::RegisterSafe(safe_address) => tx_exec.register_safe(safe_address).await,
+            Action::Withdraw(recipient, amount) => {
+                // Withdrawal is not awaited via the Indexer, but polled for completion
+                // so no indexer event stream expectation awaiting is needed.
+                // So simply return once the future completes
+                return Ok(ActionConfirmation {
+                    tx_hash: tx_exec.withdraw(recipient, amount).await?,
+                    event: None,
+                    action: action.clone(),
+                });
+            }
+            Action::Announce(data) => {
+                let tx_hash = tx_exec.announce(data.clone()).await?;
+                IndexerExpectation(
+                    tx_hash,
+                    Box::new(
+                        move |e| matches!(e, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
+                    ),
+                )
+            }
+            Action::RegisterSafe(safe_address) => {
+                let tx_hash = tx_exec.register_safe(safe_address).await?;
+                IndexerExpectation(
+                    tx_hash,
+                    Box::new(
+                        move |e| matches!(e, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
+                    ),
+                )
+            }
         };
 
-        // TODO: await indexer stream on specific event in the given TX
-
-        tx_result
+        // We are looking for a single Indexer expectation
+        // The timeout for this operation is resolved at the upper layer
+        pin_mut!(idx_stream);
+        if let Some(event) = idx_stream
+            .filter(|e| futures::future::ready(expectation.test(e)))
+            .next()
+            .await
+        {
+            Ok(ActionConfirmation {
+                tx_hash: event.tx_hash,
+                event: Some(event.event_type),
+                action,
+            })
+        } else {
+            Err(InvalidState("indexer event stream has been closed".into()))
+        }
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(self) {
-        while let Ok((tx, tx_finisher)) = self.queue_recv.recv().await {
+        while let Ok((act, tx_finisher)) = self.queue_recv.recv().await {
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
-            let tx_id = tx.to_string();
+            let act_id = act.to_string();
             let idx_stream = self.indexer_event_stream.clone();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx, idx_stream).fuse();
+                let tx_fut = Self::execute_action(db_clone, tx_exec_clone, act, idx_stream).fuse();
 
                 // Put an upper bound on the transaction to get confirmed and indexed
                 let timeout = sleep(std::time::Duration::from_secs(
-                    Self::MAX_TX_CONFIRMATION_WAIT_SECS as u64,
+                    Self::MAX_ACTION_CONFIRMATION_WAIT_SECS as u64,
                 ))
                 .fuse();
 
                 pin_mut!(timeout, tx_fut);
 
-                debug!("start executing {tx_id}");
+                debug!("start executing {act_id}");
                 let tx_result = match futures::future::select(tx_fut, timeout).await {
                     Either::Left((result, _)) => {
-                        if let Failure(err) = &result {
-                            error!("{tx_id} failed: {err}");
+                        match &result {
+                            Ok(confirmation) => {
+                                info!("successful {confirmation}");
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_FAILED_TXS.increment();
-                        } else {
-                            info!("transaction {tx_id} succeeded");
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_COUNT_SUCCESSFUL_ACTS.increment();
+                            }
+                            Err(err) => {
+                                error!("{act_id} failed: {err}");
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_SUCCESSFUL_TXS.increment();
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_COUNT_FAILED_ACTS.increment();
+                            }
                         }
                         result
                     }
                     Either::Right((_, _)) => {
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_TIMEOUT_TXS.increment();
+                        METRIC_COUNT_TIMEOUT_ACTS.increment();
 
-                        Failure(format!(
-                            "awaiting for confirmation of {tx_id} timed out after {} seconds",
-                            Self::MAX_TX_CONFIRMATION_WAIT_SECS
-                        ))
+                        Err(Timeout)
                     }
                 };
 
@@ -287,5 +393,78 @@ where
             });
         }
         warn!("transaction queue has finished");
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use futures::Stream;
+    use std::marker::PhantomData;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use std::vec::IntoIter;
+
+    // futures::stream::empty() is not Clone
+    #[derive(Clone)]
+    pub struct EmptyStream<T>(PhantomData<T>);
+
+    impl<T> Default for EmptyStream<T> {
+        fn default() -> Self {
+            Self(PhantomData)
+        }
+    }
+
+    impl<T> Stream for EmptyStream<T> {
+        type Item = T;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            Poll::Ready(None)
+        }
+    }
+
+    // futures::stream::once() is not Clone
+    #[derive(Clone)]
+    pub struct OnceStream<T: Clone> {
+        value: IntoIter<T>,
+    }
+
+    impl<T: Clone> Unpin for OnceStream<T> {}
+
+    impl<T: Clone> OnceStream<T> {
+        pub fn new(value: T) -> Self {
+            Self {
+                value: vec![value].into_iter(),
+            }
+        }
+    }
+
+    impl<T: Clone> Stream for OnceStream<T> {
+        type Item = T;
+
+        fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            Poll::Ready(self.value.next())
+        }
+    }
+
+    // futures::stream::iter() is not Clone
+    #[derive(Clone)]
+    pub struct IterStream<T, I: Iterator<Item = T> + Clone> {
+        data: I,
+    }
+
+    impl<T, I: Iterator<Item = T> + Clone> Unpin for IterStream<T, I> {}
+
+    impl<T, I: Iterator<Item = T> + Clone> IterStream<T, I> {
+        pub fn new<U: IntoIterator<Item = T, IntoIter = I>>(data: U) -> Self {
+            Self { data: data.into_iter() }
+        }
+    }
+
+    impl<T, I: Iterator<Item = T> + Clone> Stream for IterStream<T, I> {
+        type Item = T;
+
+        fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            Poll::Ready(self.data.next())
+        }
     }
 }

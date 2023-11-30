@@ -3,7 +3,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use std::sync::Arc;
 use utils_types::primitives::Address;
 
-use crate::transaction_queue::TransactionSender;
+use crate::transaction_queue::ActionSender;
 
 pub mod channels;
 pub mod errors;
@@ -17,12 +17,12 @@ pub mod transaction_queue;
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
     db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
+    tx_sender: ActionSender,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone> CoreEthereumActions<Db> {
     /// Creates new instance.
-    pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: TransactionSender) -> Self {
+    pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }
     }
 

@@ -1134,7 +1134,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-actions"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1171,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-broadcast",
  "async-lock",
@@ -1313,7 +1313,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-types"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-std",
  "bindings",
@@ -1324,7 +1324,9 @@ dependencies = [
  "ethers",
  "hex",
  "hex-literal",
+ "libp2p-identity",
  "mockall",
+ "multiaddr",
  "serde",
  "tokio",
  "utils-log",
@@ -1522,6 +1524,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-actions",
  "core-ethereum-db",
+ "core-ethereum-types",
  "core-network",
  "core-protocol",
  "core-types",

@@ -85,15 +85,19 @@ mod tests {
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_crypto::random::random_bytes;
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use core_ethereum_actions::redeem::TicketRedeemActions;
-    use core_ethereum_actions::transaction_queue::{TransactionCompleted, TransactionResult};
+    use core_ethereum_actions::transaction_queue::{ActionConfirmation, PendingAction};
+    use core_ethereum_types::actions::Action;
+    use core_ethereum_types::chain_events::ChainEventType;
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use core_types::channels::{ChannelEntry, Ticket};
-    use futures::{future::ready, FutureExt};
+    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use mockall::mock;
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use utils_types::traits::BinarySerializable;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -132,18 +136,38 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait(? Send)]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
+            async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
+            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
-            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
+            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<PendingAction>;
+        }
+    }
+
+    fn mock_action_confirmation(ack: AcknowledgedTicket) -> ActionConfirmation {
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        ActionConfirmation {
+            tx_hash: random_hash,
+            event: Some(ChainEventType::TicketRedeem(
+                ChannelEntry::new(
+                    BOB.public().to_address(),
+                    ALICE.public().to_address(),
+                    Balance::new_from_str("10", BalanceType::HOPR),
+                    U256::zero(),
+                    ChannelStatus::Open,
+                    U256::zero(),
+                    U256::zero(),
+                ),
+                Some(ack.clone()),
+            )),
+            action: Action::RedeemTicket(ack.clone()),
         }
     }
 
@@ -151,18 +175,14 @@ mod tests {
     async fn test_auto_redeeming_strategy_redeem() {
         let ack_ticket = generate_random_ack_ticket(1);
         let ack_clone = ack_ticket.clone();
+        let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
         actions
             .expect_redeem_ticket()
             .times(1)
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| {
-                Ok(ready(TransactionResult::TicketRedeemed {
-                    tx_hash: Default::default(),
-                })
-                .boxed())
-            });
+            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_2)).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -178,17 +198,13 @@ mod tests {
         let ack_ticket_agg = generate_random_ack_ticket(3);
 
         let ack_clone_agg = ack_ticket_agg.clone();
+        let ack_clone_agg_2 = ack_ticket_agg.clone();
         let mut actions = MockTicketRedeemAct::new();
         actions
             .expect_redeem_ticket()
             .times(1)
             .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
-            .return_once(|_| {
-                Ok(ready(TransactionResult::TicketRedeemed {
-                    tx_hash: Default::default(),
-                })
-                .boxed())
-            });
+            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_agg_2)).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,

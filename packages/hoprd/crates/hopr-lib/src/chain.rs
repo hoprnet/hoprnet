@@ -1,8 +1,9 @@
+use std::fmt::Display;
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumActions};
+use core_ethereum_actions::{transaction_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
@@ -16,9 +17,9 @@ use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClien
 use core_ethereum_api::{build_json_rpc_client, JsonRpcClient};
 use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use core_ethereum_types::ContractAddresses;
-
 use core_ethereum_types::chain_events::SignificantChainEvent;
+use core_ethereum_types::{ContractAddresses, TypedTransaction};
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -32,14 +33,18 @@ pub enum EnvironmentType {
     Local,
 }
 
-impl ToString for EnvironmentType {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Production => "production".into(),
-            Self::Staging => "staging".into(),
-            Self::Development => "development".into(),
-            Self::Local => "local".into(),
-        }
+impl Display for EnvironmentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Production => "production",
+                Self::Staging => "staging",
+                Self::Development => "development",
+                Self::Local => "local",
+            }
+        )
     }
 }
 
@@ -330,6 +335,12 @@ impl ProtocolConfig {
     }
 }
 
+type ActiveTxExecutor = EthereumTransactionExecutor<
+    TypedTransaction,
+    RpcEthereumClient<RpcOperations<JsonRpcClient>>,
+    SafePayloadGenerator,
+>;
+
 #[cfg(feature = "wasm")]
 pub fn build_chain_components<Db, S>(
     me_onchain: &ChainKeypair,
@@ -339,7 +350,7 @@ pub fn build_chain_components<Db, S>(
     db: Arc<RwLock<Db>>,
     indexer_event_stream: S,
 ) -> (
-    TransactionQueue<Db, S>,
+    ActionQueue<Db, S, ActiveTxExecutor>,
     CoreEthereumActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
@@ -367,7 +378,7 @@ where
         SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
     );
 
-    let tx_queue = TransactionQueue::new(db.clone(), indexer_event_stream, Box::new(ethereum_tx_executor));
+    let tx_queue = ActionQueue::new(db.clone(), indexer_event_stream, ethereum_tx_executor);
 
     let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
 

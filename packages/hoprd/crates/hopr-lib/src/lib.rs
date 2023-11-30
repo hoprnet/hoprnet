@@ -81,11 +81,10 @@ mod native {
     use crate::config::SafeModule;
     use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
     use crate::errors::HoprLibError;
-    use core_ethereum_actions::{
-        channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
-    };
+    use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
     use core_ethereum_api::{can_register_with_safe, ChannelEntry};
     use core_ethereum_rpc::HoprRpcOperations;
+    use core_ethereum_types::chain_events::ChainEventType;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
     use core_types::{
@@ -590,7 +589,6 @@ mod native {
         }
 
         /// Withdraw on-chain assets to a given address
-        /// @param currency either native currency or HOPR tokens
         /// @param recipient the account where the assets should be transferred to
         /// @param amount how many tokens to be transferred
         pub async fn withdraw(&self, recipient: Address, amount: Balance) -> errors::Result<Hash> {
@@ -600,11 +598,13 @@ mod native {
                 ));
             }
 
-            let awaiter = self.chain_api.actions_ref().withdraw(recipient, amount).await?;
-            match awaiter.await {
-                TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
-                _ => Err(errors::HoprLibError::GeneralError("withdraw transaction failed".into())),
-            }
+            Ok(self
+                .chain_api
+                .actions_ref()
+                .withdraw(recipient, amount)
+                .await?
+                .await?
+                .tx_hash)
         }
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
@@ -621,12 +621,10 @@ mod native {
                 .await?;
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
-            match awaiter.await {
-                TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
-                _ => Err(errors::HoprLibError::GeneralError(
-                    "open channel transaction failed".into(),
-                )),
-            }
+            Ok(awaiter.await.map(|confirm| OpenChannelResult {
+                tx_hash: confirm.tx_hash,
+                channel_id,
+            })?)
         }
 
         pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> errors::Result<Hash> {
@@ -636,13 +634,13 @@ mod native {
                 ));
             }
 
-            let awaiter = self.chain_api.actions_ref().fund_channel(*channel_id, *amount).await?;
-            match awaiter.await {
-                TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
-                _ => Err(errors::HoprLibError::GeneralError(
-                    "fund channel transaction failed".into(),
-                )),
-            }
+            Ok(self
+                .chain_api
+                .actions_ref()
+                .fund_channel(*channel_id, *amount)
+                .await?
+                .await
+                .map(|confirm| confirm.tx_hash)?)
         }
 
         pub async fn close_channel(
@@ -657,18 +655,23 @@ mod native {
                 ));
             }
 
-            let awaiter = self
+            let confirmation = self
                 .chain_api
                 .actions_ref()
                 .close_channel(*counterparty, direction, redeem_before_close)
+                .await?
                 .await?;
-            match awaiter.await {
-                TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
-                    tx_hash,
+
+            match confirmation
+                .event
+                .expect("channel close action confirmation must have associated chain event")
+            {
+                ChainEventType::ChannelClosureInitiated(_) => Ok(CloseChannelResult {
+                    tx_hash: confirmation.tx_hash,
                     status: ChannelStatus::PendingToClose,
                 }),
-                TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
-                    tx_hash,
+                ChainEventType::ChannelClosed(_) => Ok(CloseChannelResult {
+                    tx_hash: confirmation.tx_hash,
                     status: ChannelStatus::Closed,
                 }),
                 _ => Err(errors::HoprLibError::GeneralError(

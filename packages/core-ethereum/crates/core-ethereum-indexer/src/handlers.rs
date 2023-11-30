@@ -9,7 +9,7 @@ use bindings::{
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_types::chain_events::ChainEventType;
+use core_ethereum_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use core_ethereum_types::ContractAddresses;
 use core_types::{
     account::{AccountEntry, AccountType},
@@ -78,11 +78,11 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_account_and_snapshot(&account, snapshot).await?;
 
                     if let Some(ma) = account.get_multiaddr() {
-                        return Ok(Some(ChainEventType::Announcement(
-                            account.public_key.to_peerid().to_string(),
-                            account.chain_addr,
-                            vec![ma.to_string()],
-                        )));
+                        return Ok(Some(ChainEventType::Announcement {
+                            peer: account.public_key.to_peerid(),
+                            address: account.chain_addr,
+                            multiaddresses: vec![ma],
+                        }));
                     }
                 } else {
                     return Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding);
@@ -143,35 +143,39 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
-                    channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
+                return if let Some(mut channel) = maybe_channel {
+                    let new_balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
+                    let diff = channel.balance.sub(&new_balance);
+                    channel.balance = new_balance;
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.clone(), diff)))
                 } else {
-                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-                }
+                    Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                };
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
-                    channel.balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
+                return if let Some(mut channel) = maybe_channel {
+                    let new_balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
+                    let diff = new_balance.sub(&channel.balance);
+                    channel.balance = new_balance;
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.clone(), diff)))
                 } else {
-                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-                }
+                    Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                };
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
+                return if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
@@ -191,10 +195,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
                             .await?;
                     }
-                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
+                    Ok(Some(ChainEventType::ChannelClosed(channel.clone())))
                 } else {
-                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-                }
+                    Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                };
             }
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
                 let source: Address = channel_opened.source.0.into();
@@ -203,12 +207,9 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let channel_id = generate_channel_id(&source, &destination);
 
                 let maybe_channel = db.get_channel(&channel_id).await?;
+                let is_reopen = maybe_channel.is_some();
                 debug!(
-                    "on_open_channel_event - source: {:?} - destination: {:?} - channel_id: {:?}, channel known: {:?}",
-                    source.to_string(),
-                    destination.to_string(),
-                    channel_id.to_string(),
-                    maybe_channel.is_some()
+                    "on_open_channel_event - source: {source} - destination: {destination} - channel_id: {channel_id}, channel known: {is_reopen}"
                 );
 
                 let channel = maybe_channel
@@ -233,62 +234,83 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                 if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                     db.set_current_ticket_index(&channel_id, U256::zero()).await?;
+
+                    // Cleanup tickets from previous epochs on channel re-opening
+                    if is_reopen {
+                        db.cleanup_invalid_channel_tickets(&channel).await?;
+                    }
                 }
-                return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
+                return Ok(Some(ChainEventType::ChannelOpened(channel.clone())));
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
+                return if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
-
-                    if let Some(ticket) = db
-                        .get_acknowledged_ticket(
-                            &channel.get_id(),
-                            channel.channel_epoch.as_u32(),
-                            ticket_redeemed.new_ticket_index,
-                        )
-                        .await?
-                    {
-                        db.mark_redeemed(&ticket).await?;
-                    } else {
-                        error!(
-                            "could not find acknowledged ticket with idx {} in {channel}",
-                            ticket_redeemed.new_ticket_index
-                        );
-                    }
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
                         .await?;
+
                     // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
                     db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        return Ok(Some(ChainEventType::TicketRedeem(channel)));
+                        // For channels that destination is us, it means that our ticket
+                        // has been redeemed, so mark it in the DB as redeemed
+                        let ack_ticket = if channel.destination.eq(&self.chain_key) {
+                            // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
+                            // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
+                            if let Some(ticket) = db
+                                .get_acknowledged_tickets(Some(channel))
+                                .await? // TODO: optimize this DB query
+                                .into_iter()
+                                .find(|ticket| {
+                                    ticket.ticket.index - ticket.ticket.index_offset as u64 - 1
+                                        == ticket_redeemed.new_ticket_index - 1
+                                })
+                            {
+                                db.mark_redeemed(&ticket).await?;
+                                Some(ticket)
+                            } else {
+                                error!(
+                                    "could not find acknowledged ticket with idx {} in {channel}",
+                                    ticket_redeemed.new_ticket_index
+                                );
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        Ok(Some(ChainEventType::TicketRedeem(channel, ack_ticket)))
+                    } else {
+                        Ok(Some(ChainEventType::TicketRedeem(channel, None)))
                     }
                 } else {
-                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-                }
+                    Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                };
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
                 let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
+                return if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::PendingToClose;
                     channel.closure_time = closure_initiated.closure_time.into();
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel.clone())))
                 } else {
-                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-                }
+                    Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                };
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
                 db.set_channels_domain_separator(&domain_separator_updated.domain_separator.into(), snapshot)
                     .await?;
+
+                Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
                 db.set_channels_ledger_domain_separator(
@@ -296,10 +318,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     snapshot,
                 )
                 .await?;
-            }
-        };
 
-        Ok(None)
+                Ok(None)
+            }
+        }
     }
 
     async fn on_token_event(
@@ -336,8 +358,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let spender: Address = approved.spender.0.into();
 
                 debug!(
-                    "on_token_approval_event - address_to_monitor: {:?} - owner: {:?} - spender: {:?}, allowance: {:?}",
-                    &self.safe_address, owner, spender, approved.value
+                    "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
+                    &self.safe_address, approved.value
                 );
 
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
@@ -348,7 +370,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     return Ok(None);
                 }
             }
-            _ => debug!("Implement all the other filters for HoprTokenEvents"),
+            _ => error!("Implement all the other filters for HoprTokenEvents"),
         }
 
         Ok(None)
@@ -367,22 +389,34 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, false)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
+                    *node_address,
+                    NetworkRegistryStatus::Denied,
+                )));
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, false)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
+                    *node_address,
+                    NetworkRegistryStatus::Denied,
+                )));
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, true)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
+                    *node_address,
+                    NetworkRegistryStatus::Allowed,
+                )));
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, true)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
+                    *node_address,
+                    NetworkRegistryStatus::Allowed,
+                )));
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.0.into();
@@ -417,6 +451,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 if self.chain_key.eq(&registered.node_address.0.into()) {
                     db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.into()), snapshot)
                         .await?;
+
+                    return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {

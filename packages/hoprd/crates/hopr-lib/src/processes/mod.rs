@@ -1,4 +1,4 @@
-use std::{pin::Pin, str::FromStr, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 
 use async_std::sync::RwLock;
 use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
@@ -10,12 +10,14 @@ use futures::{
     Stream, StreamExt,
 };
 
-use core_transport::{libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, TransportOutput};
+use core_transport::{
+    libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, PeerEligibility, TransportOutput,
+};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use utils_log::{debug, error};
+use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
@@ -37,42 +39,42 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     spawn_local(async move {
         while let Some(event) = event_stream.next().await {
             match event.event_type {
-                ChainEventType::Announcement(peer, address, multiaddresses) => {
-                    if let Ok(peer) = PeerId::from_str(&peer) {
-                        if peer != me {
-                            // decapsulate the `p2p/<peer_id>` to remove duplicities
-                            let mas = multiaddresses
-                                .into_iter()
-                                .filter_map(|ma_str| core_transport::Multiaddr::from_str(&ma_str).ok())
-                                .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
-                                .filter(|v| !v.is_empty())
-                                .collect::<Vec<_>>();
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    if peer != me {
+                        // decapsulate the `p2p/<peer_id>` to remove duplicities
+                        let mas = multiaddresses
+                            .into_iter()
+                            .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
+                            .filter(|v| !v.is_empty())
+                            .collect::<Vec<_>>();
 
-                            if mas.len() > 0 {
+                        if mas.len() > 0 {
+                            transport_indexer_actions
+                                .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                .await;
+
+                            if db
+                                .read()
+                                .await
+                                .is_allowed_to_access_network(&address)
+                                .await
+                                .unwrap_or(false)
+                            {
                                 transport_indexer_actions
-                                    .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
                                     .await;
-
-                                if db
-                                    .read()
-                                    .await
-                                    .is_allowed_to_access_network(&address)
-                                    .await
-                                    .unwrap_or(false)
-                                {
-                                    transport_indexer_actions
-                                        .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, true.into()))
-                                        .await;
-                                }
                             }
-                        } else {
-                            debug!("Skipping announcements for myself ({peer})");
                         }
                     } else {
-                        error!("Announced PeerId ({peer}) has invalid format")
+                        debug!("Skipping announcements for myself ({peer})");
                     }
                 }
-                ChainEventType::ChannelUpdate(channel) | ChainEventType::TicketRedeem(channel) => {
+                ChainEventType::ChannelOpened(channel) |
+                ChainEventType::ChannelClosureInitiated(channel) |
+                ChainEventType::ChannelClosed(channel) |
+                ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
+                ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
+                ChainEventType::TicketRedeem(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 
@@ -87,12 +89,6 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                                     channel_change,
                                 )
                                 .await;
-
-                                // Cleanup invalid tickets from the DB if epoch has changed
-                                // TODO: this should be moved somewhere else once event broadcasts are implemented
-                                if let core_types::channels::ChannelChange::Epoch { .. } = channel_change {
-                                    let _ = db.write().await.cleanup_invalid_channel_tickets(&channel).await;
-                                }
                             }
                         } else if channel.status == core_types::channels::ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
@@ -116,7 +112,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
                                         pk.to_peerid(),
-                                        allowed.into(),
+                                        allowed.into()
                                     ))
                                     .await;
                             }
@@ -124,6 +120,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                         Err(e) => error!("on_network_registry_node_allowed failed with: {}", e),
                     }
                 }
+                ChainEventType::NodeSafeRegistered(safe_address) => info!("node safe registered {safe_address}"),
             }
         }
 

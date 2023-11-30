@@ -1,5 +1,5 @@
 use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
-use crate::transaction_queue::TransactionCompleted;
+use crate::transaction_queue::PendingAction;
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use core_crypto::keypairs::OffchainKeypair;
@@ -14,17 +14,18 @@ use utils_types::primitives::{Address, Balance};
 #[async_trait(? Send)]
 pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted>;
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction>;
 
     /// Announces node on-chain with key binding
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted>;
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction>;
 
-    async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
+    /// Registers the safe address with the node
+    async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction>;
 }
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<Db> {
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted> {
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
         }
@@ -35,14 +36,14 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted> {
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
 
         info!("initiating announcement {announcement_data}");
         self.tx_sender.send(Action::Announce(announcement_data)).await
     }
 
-    async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted> {
+    async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction> {
         info!("initiating safe address registration of {safe_address}");
         self.tx_sender.send(Action::RegisterSafe(safe_address)).await
     }
@@ -52,12 +53,14 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
 mod tests {
     use crate::errors::CoreEthereumActionsError;
     use crate::node::NodeActions;
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
+    use crate::transaction_queue::tests::EmptyStream;
+    use crate::transaction_queue::{ActionQueue, MockTransactionExecutor};
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_types::actions::Action;
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
@@ -83,9 +86,9 @@ mod tests {
             .expect_withdraw()
             .times(1)
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
+            .returning(move |_, _| Ok(random_hash));
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -93,14 +96,22 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.withdraw(bob, stake).await.unwrap().await;
+        let tx_res = actions
+            .withdraw(bob, stake)
+            .await
+            .unwrap()
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::Withdrawn { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::Withdraw(_, _)),
+            "must be withdraw action"
+        );
+        assert!(
+            matches!(tx_res.event, None),
+            "withdraw tx must not connect to any chain event"
+        );
     }
 
     #[async_std::test]
@@ -114,7 +125,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
 
         assert!(

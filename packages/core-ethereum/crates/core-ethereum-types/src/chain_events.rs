@@ -1,7 +1,9 @@
 use core_crypto::types::Hash;
+use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
-use std::fmt::{Display, Formatter};
-use utils_types::primitives::Address;
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
+use utils_types::primitives::{Address, Balance};
 
 /// Contains TX hash along with the Chain Event data.
 /// This could be used to pair up some events with `Action`
@@ -13,16 +15,42 @@ pub struct SignificantChainEvent {
     pub event_type: ChainEventType,
 }
 
-impl Display for SignificantChainEvent {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} in tx {}", self.event_type, self.tx_hash)
-    }
+/// Status of a node in network registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NetworkRegistryStatus {
+    /// Connections to the node are allowed.
+    Allowed,
+    /// Connections to the node are not allowed.
+    Denied,
 }
 
+/// Enumeration of HOPR chain events.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChainEventType {
-    Announcement(String, Address, Vec<String>), // peer, address, multiaddresses
-    ChannelUpdate(ChannelEntry),
-    TicketRedeem(ChannelEntry),
-    NetworkRegistryUpdate(Address, bool),
+    /// Peer on-chain announcement event.
+    Announcement {
+        /// Announced peer id
+        peer: PeerId,
+        /// Announced on-chain address
+        address: Address,
+        /// Multiaddresses
+        multiaddresses: Vec<Multiaddr>,
+    },
+    /// New channel has been opened
+    ChannelOpened(ChannelEntry),
+    /// Channel closure has been initiated.
+    ChannelClosureInitiated(ChannelEntry),
+    /// Channel closure has been finalized.
+    ChannelClosed(ChannelEntry),
+    /// Channel balance has increased by an amount.
+    ChannelBalanceIncreased(ChannelEntry, Balance),
+    /// Channel balance has decreased by an amount.
+    ChannelBalanceDecreased(ChannelEntry, Balance),
+    /// Ticket has been redeemed on a channel.
+    /// If the channel is own, also contains the ticket that has been redeemed.
+    TicketRedeem(ChannelEntry, Option<AcknowledgedTicket>),
+    /// Safe has been registered with the node.
+    NodeSafeRegistered(Address),
+    /// Network registry update for a node.
+    NetworkRegistryUpdate(Address, NetworkRegistryStatus),
 }

@@ -334,7 +334,7 @@ mod tests {
         types::{Hash, Response},
     };
     use core_ethereum_actions::redeem::TicketRedeemActions;
-    use core_ethereum_actions::transaction_queue::TransactionCompleted;
+    use core_ethereum_actions::transaction_queue::PendingAction;
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
@@ -380,18 +380,18 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait(? Send)]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
+            async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
+            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<TransactionCompleted>>;
-            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
+            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<PendingAction>;
         }
     }
 
