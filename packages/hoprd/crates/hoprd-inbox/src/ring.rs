@@ -49,6 +49,7 @@ where
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
+    M: Copy
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
@@ -117,6 +118,57 @@ where
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
+                let mut all = self
+                    .buffers
+                    .drain()
+                    .flat_map(|(_, buf)| buf.into_iter())
+                    .collect::<Vec<_>>();
+
+                // NOTE: this approach is due to the requirement of considering
+                // messages with equal payload and timestamp to be distinct
+                // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
+                all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
+
+                all.into_iter().map(|w| (w.payload, w.ts)).collect()
+            }
+        }
+    }
+
+    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
+        let specific_tag = match tag {
+            // If no tag was given, we need to find a tag which has the oldest entry in it
+            None => self
+                .buffers
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    // Compare timestamps of the oldest entries in buckets
+                    // Empty buckets are moved away
+                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    ts_a.cmp(&ts_b)
+                })
+                .map(|(t, _)| *t)?,
+
+            // If a tag was given, just use it
+            Some(t) => t,
+        };
+
+        self.buffers
+            .get_mut(&specific_tag)
+            .and_then(|buf| buf.peek().map(|w| (w.payload, w.ts)))
+    } 
+
+    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
+        match tag {
+            Some(specific_tag) => {
+                // Peek only all messages of a specific tag
+                self.buffers
+                    .get_mut(&specific_tag)
+                    .map(|buf| buf.iter().map(|w| (w.payload, w.ts)).collect::<Vec<_>>())
+                    .unwrap_or_else(Vec::<(M, Duration)>::new)
+            }
+            None => {
+                // Peek across all the tags, need to sort again based on the timestamp
                 let mut all = self
                     .buffers
                     .drain()
