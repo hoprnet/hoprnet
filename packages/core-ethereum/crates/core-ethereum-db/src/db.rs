@@ -649,7 +649,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
     // core-ethereum only part
     async fn mark_acknowledged_tickets_neglected(&mut self, channel: ChannelEntry) -> Result<()> {
-        let acknowledged_tickets: Vec<AcknowledgedTicket> = self.get_acknowledged_tickets(Some(channel)).await?.into_iter().filter(|ack| U256::from(ack.ticket.channel_epoch) <= channel.channel_epoch).collect();
+        let acknowledged_tickets: Vec<AcknowledgedTicket> = self
+            .get_acknowledged_tickets(Some(channel))
+            .await?
+            .into_iter()
+            .filter(|ack| U256::from(ack.ticket.channel_epoch) <= channel.channel_epoch)
+            .collect();
 
         let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
         let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;

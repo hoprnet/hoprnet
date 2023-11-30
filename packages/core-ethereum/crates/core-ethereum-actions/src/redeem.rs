@@ -154,7 +154,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
             .get_acknowledged_tickets(Some(*channel))
             .await?
             .iter()
-            .filter(|t| t.status == Untouched && channel.channel_epoch == U256::from(t.ticket.channel_epoch) && (!only_aggregated || t.ticket.is_aggregated()))
+            .filter(|t| {
+                t.status == Untouched
+                    && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
+                    && (!only_aggregated || t.ticket.is_aggregated())
+            })
             .count();
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
@@ -174,7 +178,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
                 .get_acknowledged_tickets(Some(*channel))
                 .await?
                 .into_iter()
-                .filter(|t| Untouched == t.status && channel.channel_epoch == U256::from(t.ticket.channel_epoch) && (!only_aggregated || t.ticket.is_aggregated()));
+                .filter(|t| {
+                    Untouched == t.status
+                        && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
+                        && (!only_aggregated || t.ticket.is_aggregated())
+                });
 
             for mut avail_to_redeem in redeemable {
                 if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
@@ -332,7 +340,8 @@ mod tests {
         let rdb = RustyLevelDbShim::new_in_memory();
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
-        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_bob, bob_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
         let (channel_from_charlie, charlie_tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
@@ -422,8 +431,10 @@ mod tests {
         let rdb = RustyLevelDbShim::new_in_memory();
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
-        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
-        let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
+        let (channel_from_bob, bob_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_charlie, _) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -499,7 +510,8 @@ mod tests {
         let ticket_count = 3;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -565,9 +577,17 @@ mod tests {
         let rdb = RustyLevelDbShim::new_in_memory();
 
         // Make the first ticket from the previous epoch
-        let (_, mut tickets_from_previous_epoch) = create_channel_with_ack_tickets(rdb.clone(), ticket_from_previous_epoch_count, &BOB, U256::from(3u32)).await;
+        let (_, mut tickets_from_previous_epoch) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_from_previous_epoch_count, &BOB, U256::from(3u32))
+                .await;
         // remaining tickets are from the current epoch
-        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(rdb.clone(), ticket_count - ticket_from_previous_epoch_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
+            rdb.clone(),
+            ticket_count - ticket_from_previous_epoch_count,
+            &BOB,
+            U256::from(4u32),
+        )
+        .await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -583,7 +603,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_previous_epoch_count)
-            .withf(move |t| tickets_clone[ticket_from_previous_epoch_count..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| {
+                tickets_clone[ticket_from_previous_epoch_count..]
+                    .iter()
+                    .find(|tk| tk.ticket.eq(&t.ticket))
+                    .is_some()
+            })
             .returning(|_| TransactionResult::RedeemTicket {
                 tx_hash: Hash::default(),
             });
@@ -621,9 +646,16 @@ mod tests {
         let rdb = RustyLevelDbShim::new_in_memory();
 
         // Make the first few tickets from the next epoch
-        let (_, mut tickets_from_next_epoch) = create_channel_with_ack_tickets(rdb.clone(), ticket_from_next_epoch_count, &BOB, U256::from(5u32)).await;
+        let (_, mut tickets_from_next_epoch) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_from_next_epoch_count, &BOB, U256::from(5u32)).await;
         // remaining tickets are from the current epoch
-        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(rdb.clone(), ticket_count - ticket_from_next_epoch_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
+            rdb.clone(),
+            ticket_count - ticket_from_next_epoch_count,
+            &BOB,
+            U256::from(4u32),
+        )
+        .await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -639,7 +671,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_next_epoch_count)
-            .withf(move |t| tickets_clone[ticket_from_next_epoch_count..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| {
+                tickets_clone[ticket_from_next_epoch_count..]
+                    .iter()
+                    .find(|tk| tk.ticket.eq(&t.ticket))
+                    .is_some()
+            })
             .returning(|_| TransactionResult::RedeemTicket {
                 tx_hash: Hash::default(),
             });
@@ -662,9 +699,12 @@ mod tests {
         )
         .await;
 
-        for unredeemable_index  in 0..ticket_from_next_epoch_count {
+        for unredeemable_index in 0..ticket_from_next_epoch_count {
             assert!(
-                actions.redeem_ticket(tickets[unredeemable_index].clone()).await.is_err(),
+                actions
+                    .redeem_ticket(tickets[unredeemable_index].clone())
+                    .await
+                    .is_err(),
                 "cannot redeem a ticket that's from the next epoch"
             );
         }
