@@ -1,12 +1,11 @@
 pub mod errors;
 pub mod executors;
 
-pub use core_ethereum_indexer::traits::SignificantChainEvent;
+pub use core_ethereum_types::chain_events::SignificantChainEvent;
 pub use core_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
-use futures::channel::mpsc::UnboundedSender;
 use std::sync::Arc;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -94,7 +93,7 @@ impl HoprChain {
         db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
         contract_addresses: ContractAddresses,
         safe_address: Address,
-        indexer_events_tx: UnboundedSender<SignificantChainEvent>,
+        indexer_events_tx: async_broadcast::Sender<SignificantChainEvent>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,

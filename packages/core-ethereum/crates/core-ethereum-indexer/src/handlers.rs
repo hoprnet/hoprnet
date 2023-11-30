@@ -1,6 +1,5 @@
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
-    traits::SignificantChainEvent,
 };
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -16,12 +15,12 @@ use core_ethereum_types::ContractAddresses;
 use core_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
+    channels::{ChannelEntry, ChannelStatus, generate_channel_id},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use ethnum::u256;
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
+use core_ethereum_types::chain_events::ChainEventType;
 use utils_log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -56,7 +55,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         event: HoprAnnouncementsEvents,
         block_number: u32,
         snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>> {
+    ) -> Result<Option<ChainEventType>> {
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 let maybe_account = db.get_account(&address_announcement.node.into()).await?;
@@ -81,7 +80,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_account_and_snapshot(&account, snapshot).await?;
 
                     if let Some(ma) = account.get_multiaddr() {
-                        return Ok(Some(SignificantChainEvent::Announcement(
+                        return Ok(Some(ChainEventType::Announcement(
                             account.public_key.to_peerid().to_string(),
                             account.chain_addr,
                             vec![ma.to_string()],
@@ -141,7 +140,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         db: &mut U,
         event: HoprChannelsEvents,
         snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>> {
+    ) -> Result<Option<ChainEventType>> {
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
@@ -152,7 +151,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(SignificantChainEvent::ChannelUpdate(
+                    return Ok(Some(ChainEventType::ChannelUpdate(
                         channel.clone(),
                     )));
                 } else {
@@ -168,7 +167,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
+                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -196,7 +195,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
                             .await?;
                     }
-                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
+                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -239,7 +238,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                     db.set_current_ticket_index(&channel_id, U256::zero()).await?;
                 }
-                return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
+                return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
@@ -260,7 +259,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        return Ok(Some(SignificantChainEvent::TicketRedeem(channel)));
+                        return Ok(Some(ChainEventType::TicketRedeem(channel)));
                     }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
@@ -276,7 +275,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
+                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -302,7 +301,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         db: &mut U,
         event: HoprTokenEvents,
         snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>>
+    ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
@@ -311,22 +310,18 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let from: Address = transfered.from.0.into();
                 let to: Address = transfered.to.0.into();
 
-                let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
-
                 debug!(
-                    "on_token_transfer_event - address_to_monitor: {:?} - to: {:?} - from: {:?}",
-                    &self.safe_address.to_string(),
-                    to.to_string(),
-                    from.to_string()
+                    "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
+                    &self.safe_address,
                 );
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
-                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                    db.add_hopr_balance(&Balance::new(transfered.value.into(), BalanceType::HOPR), snapshot)
                         .await?;
                 } else if from.eq(&self.safe_address) {
-                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                    db.sub_hopr_balance(&Balance::new(transfered.value.into(), BalanceType::HOPR), snapshot)
                         .await?;
                 }
             }
@@ -334,19 +329,17 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let owner: Address = approved.owner.0.into();
                 let spender: Address = approved.spender.0.into();
 
-                let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
-
                 debug!(
                     "on_token_approval_event - address_to_monitor: {:?} - owner: {:?} - spender: {:?}, allowance: {:?}",
-                    &self.safe_address.to_string(),
-                    owner.to_string(),
-                    spender.to_string(),
-                    allowance.to_string()
+                    &self.safe_address,
+                    owner,
+                    spender,
+                    approved.value
                 );
 
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
+                    db.set_staking_safe_allowance(&Balance::new(approved.value.into(), BalanceType::HOPR), snapshot)
                         .await?;
                 } else {
                     return Ok(None);
@@ -363,7 +356,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         db: &mut U,
         event: HoprNetworkRegistryEvents,
         snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>>
+    ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
@@ -371,22 +364,22 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                return Ok(Some(SignificantChainEvent::NetworkRegistryUpdate(*node_address, false)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, false)));
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                return Ok(Some(SignificantChainEvent::NetworkRegistryUpdate(*node_address, false)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, false)));
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
-                return Ok(Some(SignificantChainEvent::NetworkRegistryUpdate(*node_address, true)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, true)));
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
-                return Ok(Some(SignificantChainEvent::NetworkRegistryUpdate(*node_address, true)));
+                return Ok(Some(ChainEventType::NetworkRegistryUpdate(*node_address, true)));
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.0.into();
@@ -412,7 +405,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         db: &mut U,
         event: HoprNodeSafeRegistryEvents,
         snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>>
+    ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
@@ -449,7 +442,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         _db: &mut U,
         event: HoprNodeManagementModuleEvents,
         _snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>>
+    ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
@@ -467,22 +460,19 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
         db: &mut U,
         event: HoprTicketPriceOracleEvents,
         _snapshot: &Snapshot,
-    ) -> Result<Option<SignificantChainEvent>>
+    ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
-                let old_price: U256 = u256::from_be_bytes(update.0.into()).into();
-                let new_price: U256 = u256::from_be_bytes(update.1.into()).into();
-
                 debug!(
                     "on_ticket_price_updated - old: {:?} - new: {:?}",
-                    old_price.to_string(),
-                    new_price.to_string()
+                    update.0.to_string(),
+                    update.1.to_string()
                 );
 
-                db.set_ticket_price(&new_price).await?;
+                db.set_ticket_price(&update.1.into()).await?;
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -512,7 +502,7 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
         block_number: u32,
         log: RawLog,
         snapshot: Snapshot,
-    ) -> Result<Option<SignificantChainEvent>> {
+    ) -> Result<Option<ChainEventType>> {
         debug!(
             "on_event - address: {:?} - received log: {:?}",
             address.to_string(),
@@ -591,10 +581,10 @@ pub mod tests {
     use core_types::{
         account::{AccountEntry, AccountType},
         announcement::KeyBinding,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
+        channels::{ChannelEntry, ChannelStatus, generate_channel_id},
     };
     use ethers::{
-        abi::{encode, Address as EthereumAddress, RawLog, Token},
+        abi::{Address as EthereumAddress, encode, RawLog, Token},
         prelude::*,
         types::U256 as EthU256,
     };
@@ -1696,7 +1686,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        // TODO: check for Vec<SignificantChainEvent> content here
+        // TODO: check for Vec<ChainEventType> content here
 
         let channel = db.read().await.get_channel(&channel_id).await.unwrap().unwrap();
 
@@ -1729,7 +1719,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        // TODO: check for Vec<SignificantChainEvent> content here
+        // TODO: check for Vec<ChainEventType> content here
 
         assert_eq!(
             db.read().await.is_mfa_protected().await.unwrap(),
@@ -1768,7 +1758,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        // TODO: check for Vec<SignificantChainEvent> content here
+        // TODO: check for Vec<ChainEventType> content here
 
         assert_eq!(db.read().await.is_mfa_protected().await.unwrap(), None);
     }
@@ -1791,7 +1781,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        // TODO: check for Vec<SignificantChainEvent> content here
+        // TODO: check for Vec<ChainEventType> content here
 
         assert_eq!(
             db.read().await.get_ticket_price().await.unwrap(),

@@ -68,6 +68,8 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
+const INDEXER_EVENTS_QUEUE_SIZE: usize = 4096;
+
 /// Main builder of the hopr lib components
 #[cfg(feature = "wasm")]
 pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
@@ -91,7 +93,6 @@ where
     FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
 {
-    use core_ethereum_api::SignificantChainEvent;
     use utils_types::traits::PeerIdLike;
 
     let identity: libp2p_identity::Keypair = (&me).into();
@@ -116,7 +117,9 @@ where
         module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
     };
 
-    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+    //let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+    let (mut tx_indexer_events, rx_indexer_events) = async_broadcast::broadcast(INDEXER_EVENTS_QUEUE_SIZE);
+    tx_indexer_events.set_overflow(true); // behave as ring-buffer when the capacity is reached
 
     let (tx_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
         &me_onchain,
@@ -124,6 +127,7 @@ where
         contract_addrs,
         cfg.safe_module.module_address,
         db.clone(),
+        rx_indexer_events.clone(),
     );
 
     let multi_strategy = Arc::new(MultiStrategy::new(

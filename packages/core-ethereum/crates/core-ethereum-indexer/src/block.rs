@@ -1,16 +1,17 @@
 use async_lock::RwLock;
 use core_crypto::types::Hash;
-use futures::{channel::mpsc::UnboundedSender, pin_mut, StreamExt};
+use futures::{pin_mut, StreamExt};
 use std::{collections::VecDeque, sync::Arc};
 use utils_log::{debug, error, info};
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
+use core_ethereum_types::chain_events::SignificantChainEvent;
 use utils_types::primitives::{Snapshot, U256};
 
 use crate::{
     errors::CoreEthereumIndexerError,
-    traits::{ChainLogHandler, SignificantChainEvent},
+    traits::ChainLogHandler,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -101,7 +102,7 @@ where
     db_processor: Option<U>,
     db: Arc<RwLock<V>>,
     cfg: IndexerConfig,
-    egress: UnboundedSender<SignificantChainEvent>,
+    egress: async_broadcast::Sender<SignificantChainEvent>,
 }
 
 impl<T, U, V> Indexer<T, U, V>
@@ -115,7 +116,7 @@ where
         db_processor: U,
         db: Arc<RwLock<V>>,
         cfg: IndexerConfig,
-        egress: UnboundedSender<SignificantChainEvent>,
+        egress: async_broadcast::Sender<SignificantChainEvent>,
     ) -> Self {
         Self {
             rpc: Some(rpc),
@@ -258,12 +259,17 @@ where
                     U256::from(log.log_index),
                 );
 
+                let tx_hash = log.tx_hash;
+
                 match db_processor
                     .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
                     .await
                 {
-                    Ok(Some(event)) => {
-                        if let Err(e) = tx_significant_events.unbounded_send(event.clone()) {
+                    Ok(Some(event_type)) => {
+                        // Pair the event type with the TX hash here
+                        let significant_event = SignificantChainEvent { tx_hash, event_type };
+
+                        if let Err(e) = tx_significant_events.try_broadcast(significant_event) {
                             error!("failed to generate a significant chain event: {}", e);
                         }
                     }
@@ -295,6 +301,7 @@ pub mod tests {
     use futures::{join, Stream};
     use mockall::mock;
     use multiaddr::Multiaddr;
+    use core_ethereum_types::chain_events::ChainEventType;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
@@ -364,7 +371,7 @@ pub mod tests {
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let (tx_events, _) = async_broadcast::broadcast(1024);
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -397,7 +404,7 @@ pub mod tests {
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == Some(latest_block))
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let (tx_events, _) = async_broadcast::broadcast(1024);
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -433,7 +440,7 @@ pub mod tests {
 
         assert!(tx.start_send(expected.clone()).is_ok());
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let (tx_events, _) = async_broadcast::broadcast(1024);
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -483,7 +490,7 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let (tx_events, _) = async_broadcast::broadcast(1024);
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -491,8 +498,8 @@ pub mod tests {
         });
     }
 
-    fn random_announcement_chain_event() -> SignificantChainEvent {
-        SignificantChainEvent::Announcement(
+    fn random_announcement_chain_event() -> ChainEventType {
+        ChainEventType::Announcement(
             "abc".to_owned(),
             Address::random(),
             vec!["multiaddress/random/doesn't matter".to_owned()],
@@ -543,7 +550,7 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, rx_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let (tx_events, rx_events) = async_broadcast::broadcast(1024);
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         assert!(indexer.start().await.is_ok());
 

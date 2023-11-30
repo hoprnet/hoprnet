@@ -1,7 +1,7 @@
 use std::{pin::Pin, str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_api::SignificantChainEvent;
+use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use core_strategy::strategy::MultiStrategy;
 use core_types::acknowledgement::AcknowledgedTicket;
 use futures::{
@@ -22,21 +22,22 @@ use wasm_bindgen_futures::spawn_local;
 
 /// Helper process responsible for refreshing the state of HOPR components
 /// from the chain events confirmed by the indexer.
-pub async fn spawn_refresh_process_for_chain_events<Db>(
+pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     me: PeerId,
     me_onchain: Address,
     db: Arc<RwLock<Db>>,
     multi_strategy: Arc<MultiStrategy>,
-    mut event_stream: UnboundedReceiver<SignificantChainEvent>,
+    mut event_stream: S,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
 ) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
+    S: Stream<Item = SignificantChainEvent> + Unpin + 'static
 {
     spawn_local(async move {
         while let Some(event) = event_stream.next().await {
-            match event {
-                SignificantChainEvent::Announcement(peer, address, multiaddresses) => {
+            match event.event_type {
+                ChainEventType::Announcement(peer, address, multiaddresses) => {
                     if let Ok(peer) = PeerId::from_str(&peer) {
                         if peer != me {
                             // decapsulate the `p2p/<peer_id>` to remove duplicities
@@ -71,7 +72,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db>(
                         error!("Announced PeerId ({peer}) has invalid format")
                     }
                 }
-                SignificantChainEvent::ChannelUpdate(channel) | SignificantChainEvent::TicketRedeem(channel) => {
+                ChainEventType::ChannelUpdate(channel) | ChainEventType::TicketRedeem(channel) => {
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 
@@ -108,7 +109,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db>(
                         }
                     }
                 }
-                SignificantChainEvent::NetworkRegistryUpdate(address, allowed) => {
+                ChainEventType::NetworkRegistryUpdate(address, allowed) => {
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {

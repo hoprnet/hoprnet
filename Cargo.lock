@@ -1173,6 +1173,7 @@ dependencies = [
 name = "core-ethereum-api"
 version = "0.1.0"
 dependencies = [
+ "async-broadcast",
  "async-lock",
  "async-trait",
  "console_error_panic_hook",
@@ -1235,6 +1236,7 @@ dependencies = [
 name = "core-ethereum-indexer"
 version = "0.1.0"
 dependencies = [
+ "async-broadcast",
  "async-lock",
  "async-std",
  "async-trait",
@@ -1247,7 +1249,6 @@ dependencies = [
  "core-types",
  "env_logger",
  "ethers",
- "ethnum",
  "futures",
  "hex",
  "hex-literal",

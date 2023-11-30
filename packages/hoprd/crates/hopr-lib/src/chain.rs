@@ -6,7 +6,7 @@ use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumAct
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use futures::channel::mpsc::UnboundedSender;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
@@ -18,7 +18,7 @@ use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::ContractAddresses;
 
-use core_ethereum_indexer::traits::SignificantChainEvent;
+use core_ethereum_types::chain_events::SignificantChainEvent;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -331,19 +331,21 @@ impl ProtocolConfig {
 }
 
 #[cfg(feature = "wasm")]
-pub fn build_chain_components<Db>(
+pub fn build_chain_components<Db, S>(
     me_onchain: &ChainKeypair,
     chain_config: ChainNetworkConfig,
     contract_addrs: ContractAddresses,
     module_address: Address,
     db: Arc<RwLock<Db>>,
+    indexer_event_stream: S,
 ) -> (
-    TransactionQueue<Db>,
+    TransactionQueue<Db, S>,
     CoreEthereumActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
+    S: Stream<Item = SignificantChainEvent> + Clone + 'static
 {
     let rpc_client = build_json_rpc_client(
         &chain_config.chain.default_provider, // TODO: is this the right value ?
@@ -365,7 +367,7 @@ where
         SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
     );
 
-    let tx_queue = TransactionQueue::new(db.clone(), Box::new(ethereum_tx_executor));
+    let tx_queue = TransactionQueue::new(db.clone(), indexer_event_stream, Box::new(ethereum_tx_executor));
 
     let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
 
@@ -377,7 +379,7 @@ pub fn build_chain_api(
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
-    indexer_events_tx: UnboundedSender<SignificantChainEvent>,
+    indexer_events_tx: async_broadcast::Sender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,

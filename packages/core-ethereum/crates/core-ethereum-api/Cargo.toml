@@ -21,6 +21,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
 [dependencies]
+async-broadcast = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 ethers = { workspace = true }

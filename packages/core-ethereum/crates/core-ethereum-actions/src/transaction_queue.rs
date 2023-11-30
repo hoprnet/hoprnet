@@ -14,7 +14,7 @@ use core_types::{
     },
 };
 use futures::future::Either;
-use futures::{pin_mut, FutureExt};
+use futures::{pin_mut, FutureExt, Stream};
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -34,6 +34,7 @@ use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use core_ethereum_types::chain_events::SignificantChainEvent;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -122,14 +123,17 @@ impl TransactionSender {
 /// A queue of outgoing Ethereum transactions.
 /// This queue awaits new transactions to arrive and calls the corresponding
 /// method of the `TransactionExecutor` to execute it and await its confirmation.
-pub struct TransactionQueue<Db: HoprCoreEthereumDbActions> {
+pub struct TransactionQueue<Db, S>
+where Db: HoprCoreEthereumDbActions, S: Stream<Item = SignificantChainEvent> + Clone {
     db: Arc<RwLock<Db>>,
     queue_send: Sender<(Action, TransactionFinisher)>,
     queue_recv: Receiver<(Action, TransactionFinisher)>,
+    indexer_event_stream: S,
     tx_exec: Rc<Box<dyn TransactionExecutor>>, // TODO: Make this Arc once TransactionExecutor is Send
 }
 
-impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
+impl<Db,S> TransactionQueue<Db,S>
+where Db: HoprCoreEthereumDbActions + 'static, S: Stream<Item = SignificantChainEvent> + Clone + 'static {
     /// Number of pending transactions in the queue
     pub const ETHEREUM_TX_QUEUE_SIZE: usize = 2048;
 
@@ -137,10 +141,11 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
     pub const MAX_TX_CONFIRMATION_WAIT_SECS: usize = 180;
 
     /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(db: Arc<RwLock<Db>>, tx_exec: Box<dyn TransactionExecutor>) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, indexer_event_stream: S, tx_exec: Box<dyn TransactionExecutor>) -> Self {
         let (queue_send, queue_recv) = bounded(Self::ETHEREUM_TX_QUEUE_SIZE);
         Self {
             db,
+            indexer_event_stream,
             queue_send,
             queue_recv,
             tx_exec: Rc::new(tx_exec),
@@ -156,8 +161,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         db: Arc<RwLock<Db>>,
         tx_exec: Rc<Box<dyn TransactionExecutor>>,
         tx: Action,
+        idx_stream: S,
     ) -> TransactionResult {
-        match tx {
+        let tx_result = match tx {
             Action::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
@@ -218,7 +224,11 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             Action::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
             Action::Announce(data) => tx_exec.announce(data).await,
             Action::RegisterSafe(safe_address) => tx_exec.register_safe(safe_address).await,
-        }
+        };
+
+        // TODO: await indexer stream on specific event in the given TX
+
+        tx_result
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
@@ -227,9 +237,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
             let tx_id = tx.to_string();
+            let idx_stream = self.indexer_event_stream.clone();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx).fuse();
+                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx, idx_stream).fuse();
 
                 // Put an upper bound on the transaction to get confirmed and indexed
                 let timeout = sleep(std::time::Duration::from_secs(
