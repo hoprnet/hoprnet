@@ -147,6 +147,19 @@ where
         return db.peek(tag).await;
     }
 
+    /// Peeks all the messages with the given `tag` (ordered oldest to latest) or
+    /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
+    pub async fn peek_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
+        if self.is_excluded_tag(&tag) {
+            return Vec::new();
+        }
+
+        let mut db = self.backend.lock().await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
+            .await;
+        db.peek_all(tag).await
+    }
+
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
     pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
@@ -297,6 +310,21 @@ pub mod wasm {
             ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
         }
 
+        pub async fn peek(&self, tag: Option<u16>) -> Option<MessageInboxEntry> {
+            self.w.peek(tag).await.map(MessageInboxEntry::from)
+        }
+
+        pub async fn peek_all(&self, tag: Option<u16>) -> JsResult<JsValue> {
+            let all = self
+                .w
+                .peek_all(tag)
+                .await
+                .into_iter()
+                .map(MessageInboxEntry::from)
+                .collect::<Vec<MessageInboxEntry>>();
+
+            ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
+        }
         pub async fn size(&self, tag: Option<u16>) -> u32 {
             self.w.size(tag).await as u32
         }

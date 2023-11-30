@@ -49,7 +49,6 @@ where
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Copy
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
@@ -155,7 +154,7 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf| buf.peek().map(|w| (w.payload, w.ts)))
+            .and_then(|buf| buf.peek().map(|w| (  w.payload, w.ts)))
     } 
 
     async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
