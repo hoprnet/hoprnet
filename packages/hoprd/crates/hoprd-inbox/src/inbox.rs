@@ -12,7 +12,7 @@ pub type TimestampFn = fn() -> Duration;
 /// Represents a generic backend trait for the message inbox.
 /// Messages `M` can be tagged or untagged via the type `T`
 #[async_trait(?Send)]
-pub trait InboxBackend<T: Copy + Default, M> {
+pub trait InboxBackend<T: Copy + Default, M: Clone> {
     /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
 
