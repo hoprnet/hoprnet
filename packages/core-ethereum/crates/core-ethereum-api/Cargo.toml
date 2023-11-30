@@ -13,25 +13,34 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
-    "core-ethereum-db/wasm", "core-ethereum-actions/wasm",
+    "dep:js-sys", "dep:serde-wasm-bindgen",
+    "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
-prometheus = ["dep:utils-metrics"]
+prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
+primitive-types = "0.12"
+hex = { workspace = true }
+serde = { workspace = true }
 gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 thiserror = { workspace = true }
+
+js-sys = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-rpc = { workspace = true, default-features = false }
+core-ethereum-types = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }

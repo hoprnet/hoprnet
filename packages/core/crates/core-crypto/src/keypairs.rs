@@ -1,4 +1,11 @@
+use digest::Digest;
+use generic_array::{ArrayLength, GenericArray};
+use sha2::Sha512;
 use std::fmt::Debug;
+use subtle::{Choice, ConstantTimeEq};
+use utils_types::traits::PeerIdLike;
+use utils_types::{primitives::Address, traits::BinarySerializable};
+use zeroize::ZeroizeOnDrop;
 
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
@@ -6,12 +13,6 @@ use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
-use digest::Digest;
-use generic_array::{ArrayLength, GenericArray};
-use sha2::Sha512;
-use subtle::{Choice, ConstantTimeEq};
-use utils_types::{primitives::Address, traits::BinarySerializable};
-use zeroize::ZeroizeOnDrop;
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
@@ -109,6 +110,12 @@ impl From<&OffchainKeypair> for libp2p_identity::Keypair {
     }
 }
 
+impl From<&OffchainKeypair> for libp2p_identity::PeerId {
+    fn from(value: &OffchainKeypair) -> Self {
+        value.1.to_peerid()
+    }
+}
+
 /// Represents a keypair consisting of a secp256k1 private and public key
 #[derive(Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -143,6 +150,7 @@ impl Keypair for ChainKeypair {
 
 impl Debug for ChainKeypair {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Do not expose the private key
         f.debug_tuple("ChainKeypair").field(&self.1).finish()
     }
 }

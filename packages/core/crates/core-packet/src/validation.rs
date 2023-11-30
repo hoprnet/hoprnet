@@ -6,7 +6,7 @@ use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use utils_log::{debug, info};
-use utils_types::primitives::{Address, Balance, BalanceType};
+use utils_types::primitives::{Address, Balance};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
@@ -63,28 +63,38 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     }
 
     if check_unrealized_balance {
-        info!("checking unrealized balances for channel {}", channel.get_id());
+        // ticket's channelEpoch MUST match the current DB channel's epoch
+        match db.get_channel_epoch(&ticket.channel_id).await? {
+            Some(epoch) => {
+                if !epoch.eq(&ticket.channel_epoch.into()) {
+                    return Err(TicketValidation(format!(
+                        "ticket was created for a different channel iteration than is present in the DB {} != {} of channel {}",
+                        ticket.channel_epoch,
+                        epoch,
+                        channel.get_id()
+                    )));
+                }
 
-        let unrealized_balance = db
-            .get_tickets(Some(*sender))
-            .await? // all tickets from sender
-            .into_iter()
-            .filter(|t| channel.channel_epoch.eq(&t.channel_epoch.into()))
-            .fold(Some(channel.balance), |result, t| {
-                result
-                    .and_then(|b| b.value().value().checked_sub(*t.amount.value().value()))
-                    .map(|u| Balance::new(u.into(), channel.balance.balance_type()))
-            });
+                info!("checking unrealized balances for channel {}", channel.get_id());
 
-        debug!(
-            "channel balance of {} after subtracting unrealized balance: {}",
-            channel.get_id(),
-            unrealized_balance.unwrap_or(Balance::zero(BalanceType::HOPR))
-        );
+                let unrealized_balance = db.get_unrealized_balance(&ticket.channel_id).await?;
 
-        // ensure sender has enough funds
-        if unrealized_balance.is_none() || ticket.amount.gt(&unrealized_balance.unwrap()) {
-            return Err(OutOfFunds(channel.get_id().to_string()));
+                debug!(
+                    "channel balance of {} after subtracting unrealized balance: {unrealized_balance}",
+                    channel.get_id()
+                );
+
+                // ensure sender has enough funds
+                if ticket.amount.gt(&unrealized_balance) {
+                    return Err(OutOfFunds(channel.get_id().to_string()));
+                }
+            }
+            None => {
+                return Err(TicketValidation(format!(
+                    "no such channel {} available in the database",
+                    ticket.channel_id,
+                )));
+            }
         }
     }
 
@@ -135,7 +145,11 @@ mod tests {
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
+            async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> core_ethereum_db::errors::Result<()>;
+            async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
+            async fn get_unrealized_balance(&self, signer: &Hash) -> core_ethereum_db::errors::Result<Balance>;
+            async fn get_channel_epoch(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> core_ethereum_db::errors::Result<()>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_acknowledgement(
@@ -273,10 +287,16 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_validation_should_pass_if_ticket_ok() {
         let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let ticket = create_valid_ticket();
         let channel = create_channel_entry();
+
+        let more_than_ticket_balance = ticket.amount.add(&Balance::new(U256::from(500u128), BalanceType::HOPR));
+        let channel_epoch = U256::from(ticket.channel_epoch);
+        db.expect_get_channel_epoch()
+            .returning(move |_| Ok(Some(channel_epoch)));
+        db.expect_get_unrealized_balance()
+            .returning(move |_| Ok(more_than_ticket_balance));
 
         let ret = validate_unacknowledged_ticket(
             &db,
@@ -435,66 +455,19 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_validation_ok_if_ticket_index_smaller_than_channel_index() {
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
-
-        let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
-        channel.ticket_index = 2u32.into();
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
-            true,
-            &Hash::default(),
-        )
-        .await;
-
-        assert!(ret.is_ok());
-    }
-
-    #[async_std::test]
-    async fn test_ticket_validation_ok_if_ticket_idx_smaller_than_channel_idx_unredeemed() {
-        let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::new_from_str("100", BalanceType::HOPR);
-        db_ticket.index = 2u32.into();
-        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
-
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
-
-        let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
-        channel.balance = Balance::new_from_str("200", BalanceType::HOPR);
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
-            true,
-            &Hash::default(),
-        )
-        .await;
-
-        assert!(ret.is_ok());
-    }
-
-    #[async_std::test]
     async fn test_ticket_validation_fail_if_does_not_have_funds() {
         let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
         channel.balance = Balance::zero(BalanceType::HOPR);
+        channel.channel_epoch = U256::from(ticket.channel_epoch);
+
+        let channel_epoch = U256::from(ticket.channel_epoch);
+        db.expect_get_channel_epoch()
+            .returning(move |_| Ok(Some(channel_epoch)));
+        db.expect_get_unrealized_balance()
+            .returning(move |_| Ok(Balance::zero(BalanceType::HOPR)));
 
         let ret = validate_unacknowledged_ticket(
             &db,
@@ -509,68 +482,11 @@ mod tests {
         .await;
 
         assert!(ret.is_err());
+        // assert_eq!(ret.unwrap_err().to_string(), "");
         match ret.unwrap_err() {
             PacketError::OutOfFunds(_) => {}
             _ => panic!("invalid error type"),
         }
-    }
-
-    #[async_std::test]
-    async fn test_ticket_validation_fail_if_does_not_have_funds_including_unredeemed() {
-        let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::new(200u64.into(), BalanceType::HOPR);
-        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
-
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
-
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
-            true,
-            &Hash::default(),
-        )
-        .await;
-
-        assert!(ret.is_err());
-        match ret.unwrap_err() {
-            PacketError::OutOfFunds(_) => {}
-            _ => panic!("invalid error type"),
-        }
-    }
-
-    #[async_std::test]
-    async fn test_ticket_validation_ok_if_does_not_have_funds_including_unredeemed() {
-        let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::new(200u64.into(), BalanceType::HOPR);
-        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
-
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
-
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
-            false,
-            &Hash::default(),
-        )
-        .await;
-
-        assert!(ret.is_ok());
     }
 
     #[async_std::test]
@@ -634,5 +550,55 @@ mod tests {
             .expect("db must contain ticket index");
 
         assert_eq!(dummy_index, idx, "ticket index mismatch");
+    }
+
+    #[async_std::test]
+    async fn test_db_should_increase_ticket_index() {
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
+
+        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
+
+        // increase current ticket index of a non-existing channel, the result should be 1
+        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, U256::one(), "ticket index mismatch. Expecting 1");
+
+        // increase current ticket index of an existing channel where previous value is 1, the result should be 2
+        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, U256::new("2"), "ticket index mismatch. Expecting 2");
+    }
+
+    #[async_std::test]
+    async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
+
+        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
+        let dummy_index = U256::new("123");
+
+        // the ticket index should be equal or greater than the given dummy index
+        db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)
+            .await
+            .unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, dummy_index, "ticket index mismatch. Expecting 2");
     }
 }

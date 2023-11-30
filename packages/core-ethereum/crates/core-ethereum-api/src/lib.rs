@@ -1,4 +1,7 @@
 pub mod errors;
+pub mod executors;
+
+pub use core_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
@@ -7,8 +10,6 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::SinkExt;
 use std::sync::Arc;
 use utils_log::info;
-
-pub use core_types::channels::ChannelEntry;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
@@ -39,7 +40,7 @@ pub struct ChannelEventEmitter {
 impl ChannelEventEmitter {
     pub async fn send_event(&self, channel: &ChannelEntry) {
         let mut sender = self.tx.clone();
-        let _ = sender.send(channel.clone()).await;
+        let _ = sender.send(*channel).await;
     }
 }
 
@@ -79,11 +80,10 @@ impl HoprChain {
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
-        Ok(self
-            .db
+        self.db
             .read()
             .await
-            .get_channel_x(&src, &dest)
+            .get_channel_x(src, dest)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {
@@ -91,15 +91,15 @@ impl HoprChain {
                     "Channel entry not available {}-{}",
                     src, dest
                 )))
-            })?)
+            })
     }
 
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_from(&src).await?)
+        Ok(self.db.read().await.get_channels_from(src).await?)
     }
 
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_to(&dest).await?)
+        Ok(self.db.read().await.get_channels_to(dest).await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {

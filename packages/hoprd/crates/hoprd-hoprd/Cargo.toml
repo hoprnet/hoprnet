@@ -35,7 +35,7 @@ core-network = { workspace = true }
 core-strategy = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-indexer = { workspace = true }
-core-ethereum-misc = { workspace = true }
+core-ethereum-types = { workspace = true }
 hopr-lib = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
@@ -73,7 +73,7 @@ wasm = [
     "core-strategy/wasm",
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",
-    "core-ethereum-misc/wasm",
+    "core-ethereum-types/wasm",
     "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",

@@ -1,20 +1,20 @@
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, InvalidState};
+use core_ethereum_types::actions::Action;
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::CoreEthereumActionsError::{
-    BalanceTooLow, ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied,
+    BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
 use crate::redeem::TicketRedeemActions;
-use crate::transaction_queue::{Transaction, TransactionCompleted};
+use crate::transaction_queue::TransactionCompleted;
 use crate::CoreEthereumActions;
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -45,11 +45,11 @@ pub trait ChannelActions {
 impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
         if self.me == destination {
-            return Err(InvalidArguments("cannot open channel to self".into()).into());
+            return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+            return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
         let allowance = self.db.read().await.get_staking_safe_allowance().await?;
@@ -80,12 +80,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         }
 
         info!("initiating channel open to {destination} with {amount}");
-        self.tx_sender.send(Transaction::OpenChannel(destination, amount)).await
+        self.tx_sender.send(Action::OpenChannel(destination, amount)).await
     }
 
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted> {
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+            return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
         let allowance = self.db.read().await.get_staking_safe_allowance().await?;
@@ -105,9 +105,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
                     info!("initiating funding of {channel} with {amount}");
-                    self.tx_sender.send(Transaction::FundChannel(channel, amount)).await
+                    self.tx_sender.send(Action::FundChannel(channel, amount)).await
                 } else {
-                    Err(InvalidState(format!("channel {channel_id} is not opened")).into())
+                    Err(InvalidState(format!("channel {channel_id} is not opened")))
                 }
             }
             None => Err(ChannelDoesNotExist),
@@ -136,7 +136,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                         );
                         if channel.closure_time_passed(current_timestamp()) {
                             info!("initiating finalization of channel closure of {channel} in {direction}");
-                            self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
+                            self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                         } else {
                             Err(ClosureTimeHasNotElapsed(
                                 channel
@@ -154,7 +154,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                         }
 
                         info!("initiating channel closure of {channel} in {direction}");
-                        self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
+                        self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }
                 }
             }
@@ -333,7 +333,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(*ALICE, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
         );
@@ -366,7 +366,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -376,7 +376,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -589,7 +589,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -598,7 +598,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );

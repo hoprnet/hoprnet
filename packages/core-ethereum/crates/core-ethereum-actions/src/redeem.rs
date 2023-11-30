@@ -3,7 +3,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
+use core_ethereum_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
@@ -15,10 +15,10 @@ use utils_types::primitives::Address;
 
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
+    CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
+use crate::transaction_queue::{TransactionCompleted, TransactionSender};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -70,7 +70,7 @@ where
         BeingRedeemed { tx_hash: txh } => {
             // If there's already some hash set for this ticket, do not allow unsetting it
             if txh != Hash::default() && tx_hash == Hash::default() {
-                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")).into());
+                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
             }
         }
     }
@@ -92,7 +92,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Transaction::RedeemTicket(ack_ticket)).await
+    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
 #[async_trait(? Send)]

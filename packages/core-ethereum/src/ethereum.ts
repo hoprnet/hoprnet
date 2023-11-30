@@ -10,7 +10,6 @@ import {
   type DeferType,
   create_counter,
   ChainKeypair,
-  CORE_ETHEREUM_CONSTANTS,
   SmartContractConfig
 } from '@hoprnet/hopr-utils'
 
@@ -32,7 +31,7 @@ import {
 import { SafeModuleOptions } from './index.js'
 
 // Exported from Rust
-const constants = CORE_ETHEREUM_CONSTANTS()
+//const constants = CORE_ETHEREUM_CONSTANTS()
 
 const log = debug('hopr:core-ethereum:ethereum')
 
@@ -70,7 +69,7 @@ export async function createChainWrapper(
     network: string
   },
   keypair: ChainKeypair,
-  txTimeout = constants.TX_CONFIRMATION_WAIT
+  txTimeout = 60_000 // 60 seconds
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
   const provider = networkInfo.provider.startsWith('http')

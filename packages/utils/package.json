@@ -28,13 +28,14 @@
   "dependencies": {
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@multiformats/multiaddr": "10.3.3",
+    "axios": "1.5.1",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
     "ethers": "5.7.2"
   },
   "devDependencies": {
     "@types/chai": "4.3.5",
-    "@types/mocha": "10.0.2",
+    "@types/mocha": "10.0.6",
     "mocha": "10.2.0",
     "sinon": "16.1.0",
     "typedoc": "0.24.8",

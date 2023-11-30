@@ -1,6 +1,5 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
-use primitive_types::{H160, U256 as EthereumU256};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -13,10 +12,17 @@ use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::Pars
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
+}
+
+impl Debug for Address {
+    // Intentionally same as Display
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
 }
 
 impl Display for Address {
@@ -26,6 +32,7 @@ impl Display for Address {
 }
 
 impl Default for Address {
+    /// Defaults to all zeroes.
     fn default() -> Self {
         Self {
             addr: [0u8; Self::SIZE],
@@ -43,10 +50,6 @@ impl Address {
         ret
     }
 
-    pub fn is_null(&self) -> bool {
-        self.addr == [0u8; Self::SIZE]
-    }
-
     pub fn to_bytes32(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(12 + Self::SIZE);
         ret.extend_from_slice(&[0u8; 12]);
@@ -56,10 +59,16 @@ impl Address {
 
     /// Creates a random Ethereum address, mostly used for testing
     pub fn random() -> Self {
+        // Uses getrandom, because it cannot bring in dependency on core-crypto
         let mut addr = [0u8; Self::SIZE];
         getrandom(&mut addr[..]).unwrap();
 
         Self { addr }
+    }
+
+    /// Checks if the address is all zeroes.
+    pub fn is_zero(&self) -> bool {
+        self.addr.iter().all(|e| 0_u8.eq(e))
     }
 }
 
@@ -89,15 +98,15 @@ impl From<[u8; Address::SIZE]> for Address {
     }
 }
 
-impl From<H160> for Address {
-    fn from(value: H160) -> Self {
+impl From<primitive_types::H160> for Address {
+    fn from(value: primitive_types::H160) -> Self {
         Address { addr: value.0 }
     }
 }
 
-impl From<Address> for H160 {
+impl From<Address> for primitive_types::H160 {
     fn from(value: Address) -> Self {
-        H160::from_slice(&value.to_bytes())
+        primitive_types::H160::from_slice(&value.addr)
     }
 }
 
@@ -322,6 +331,10 @@ impl Balance {
 
     pub fn to_formatted_string(&self) -> String {
         format!("{} {}", self.amount_base_units(), self.balance_type)
+    }
+
+    pub fn to_value_string(&self) -> String {
+        self.value.to_string()
     }
 }
 
@@ -736,14 +749,14 @@ impl From<u8> for U256 {
     }
 }
 
-impl From<EthereumU256> for U256 {
-    fn from(value: EthereumU256) -> Self {
+impl From<primitive_types::U256> for U256 {
+    fn from(value: primitive_types::U256) -> Self {
         U256::from(&value)
     }
 }
 
-impl From<&EthereumU256> for U256 {
-    fn from(value: &EthereumU256) -> Self {
+impl From<&primitive_types::U256> for U256 {
+    fn from(value: &primitive_types::U256) -> Self {
         let mut tmp = [0u8; 32];
         value.to_big_endian(&mut tmp);
 
@@ -753,15 +766,15 @@ impl From<&EthereumU256> for U256 {
     }
 }
 
-impl From<U256> for EthereumU256 {
+impl From<U256> for primitive_types::U256 {
     fn from(value: U256) -> Self {
-        EthereumU256::from(&value)
+        primitive_types::U256::from(&value)
     }
 }
 
-impl From<&U256> for EthereumU256 {
+impl From<&U256> for primitive_types::U256 {
     fn from(value: &U256) -> Self {
-        EthereumU256::from_big_endian(&value.value.to_be_bytes())
+        primitive_types::U256::from_big_endian(&value.value.to_be_bytes())
     }
 }
 
@@ -826,7 +839,6 @@ impl AuthorizationToken {
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use primitive_types::U256 as EthereumU256;
     use std::cmp::Ordering;
     use std::str::FromStr;
 
@@ -932,6 +944,24 @@ mod tests {
     }
 
     #[test]
+    fn balance_test_value_string() {
+        let mut base = "123".to_string();
+        for _ in 0..Balance::SCALE - 3 {
+            base += "0";
+        }
+
+        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
+        let b2 = b1.imul(100);
+        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
+        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
+
+        assert_eq!("123000000000000000", b1.to_value_string());
+        assert_eq!("12300000000000000000", b2.to_value_string());
+        assert_eq!("123000000000000", b3.to_value_string());
+        assert_eq!("12300000000000000", b4.to_value_string());
+    }
+
+    #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
         let e_2 = EthereumChallenge::from_bytes(&e_1.to_bytes()).unwrap();
@@ -985,7 +1015,8 @@ mod tests {
     #[test]
     fn u256_conversions() {
         let u256_ethereum =
-            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957")
+                .unwrap();
 
         assert_eq!(
             U256::from(u256_ethereum),
@@ -995,8 +1026,9 @@ mod tests {
         let u256 = U256::from_hex("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
 
         assert_eq!(
-            EthereumU256::from(u256),
-            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
+            primitive_types::U256::from(u256),
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957")
+                .unwrap()
         );
     }
 }
@@ -1073,7 +1105,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "to_string")]
         pub fn _to_string(&self) -> String {
-            format!("{} {}", self.value.to_string(), self.balance_type)
+            format!("{} {}", self.value, self.balance_type)
         }
 
         #[wasm_bindgen]

@@ -1,15 +1,16 @@
+use async_lock::RwLock;
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use std::sync::Arc;
+use utils_types::primitives::Address;
+
+use crate::transaction_queue::TransactionSender;
+
 pub mod channels;
 pub mod errors;
 pub mod node;
 pub mod payload;
 pub mod redeem;
 pub mod transaction_queue;
-
-use crate::transaction_queue::TransactionSender;
-use async_lock::RwLock;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use std::sync::Arc;
-use utils_types::primitives::Address;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Clone)]

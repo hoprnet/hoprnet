@@ -461,7 +461,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@types/bn.js": ^5.1.1
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     async-mutex: 0.4.0
     bn.js: 5.2.1
     debug: 4.3.4
@@ -480,7 +480,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     mocha: 10.2.0
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
@@ -492,7 +492,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-real@workspace:packages/real"
   dependencies:
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     mocha: 10.2.0
     semver: 7.5.4
     typedoc: 0.24.8
@@ -508,7 +508,8 @@ __metadata:
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.5
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
+    axios: 1.5.1
     bn.js: 5.2.1
     debug: 4.3.4
     ethers: 5.7.2
@@ -537,7 +538,7 @@ __metadata:
     "@types/cors": 2.8.14
     "@types/debug": 4.1.9
     "@types/express": ^4.17.17
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     "@types/morgan": ^1
     "@types/supertest": ^2.0.11
     "@types/swagger-ui-express": ^4.1.3
@@ -857,14 +858,14 @@ __metadata:
   linkType: hard
 
 "@types/express@npm:*, @types/express@npm:^4.17.17":
-  version: 4.17.19
-  resolution: "@types/express@npm:4.17.19"
+  version: 4.17.21
+  resolution: "@types/express@npm:4.17.21"
   dependencies:
     "@types/body-parser": "*"
     "@types/express-serve-static-core": ^4.17.33
     "@types/qs": "*"
     "@types/serve-static": "*"
-  checksum: 3d39d0655eb0825d96fec100985a38737767ddd6da2dbda1e330a3adf36c98a9b7cd8d9539db32876d1fbb47a09343cad7b38c30c8dd7c291271fcb9b85cb21b
+  checksum: fb238298630370a7392c7abdc80f495ae6c716723e114705d7e3fb67e3850b3859bbfd29391463a3fb8c0b32051847935933d99e719c0478710f8098ee7091c5
   languageName: node
   linkType: hard
 
@@ -889,19 +890,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:10.0.2":
-  version: 10.0.2
-  resolution: "@types/mocha@npm:10.0.2"
-  checksum: a78a02691f102beb02f9ec435458107d21b518fc477c3b2f37c90b8e70b67bff888351715ae173bd31ede25ee5e0d688aefb0faf4284034d08ba63027c8b0c01
+"@types/mocha@npm:10.0.6":
+  version: 10.0.6
+  resolution: "@types/mocha@npm:10.0.6"
+  checksum: f7c836cf6cf27dc0f5970d262591b56f2a3caeaec8cfdc612c12e1cfbb207f601f710ece207e935164d4e3343b93be5054d0db5544f31f453b3923775d82099f
   languageName: node
   linkType: hard
 
 "@types/morgan@npm:^1":
-  version: 1.9.6
-  resolution: "@types/morgan@npm:1.9.6"
+  version: 1.9.9
+  resolution: "@types/morgan@npm:1.9.9"
   dependencies:
     "@types/node": "*"
-  checksum: 6525248325a74342f929c958be69c0840c8f3a288e003a8904319cae92e531f17a8aa2700701e66775adcca7f9506dd630fec2f95dc04a3e73add04fde42aab8
+  checksum: 54bcb432f6ddb82b94bc1970204bedb3465a9afdcced6c2c6b481cf5f276266663ba3edc2b728b0118aa9720bfe5d8561c0259daaad6b027017e35936b107db0
   languageName: node
   linkType: hard
 
@@ -1329,6 +1330,17 @@ __metadata:
   version: 1.0.0
   resolution: "at-least-node@npm:1.0.0"
   checksum: 463e2f8e43384f1afb54bc68485c436d7622acec08b6fad269b421cb1d29cebb5af751426793d0961ed243146fe4dc983402f6d5a51b720b277818dbf6f2e49e
+  languageName: node
+  linkType: hard
+
+"axios@npm:1.5.1":
+  version: 1.5.1
+  resolution: "axios@npm:1.5.1"
+  dependencies:
+    follow-redirects: ^1.15.0
+    form-data: ^4.0.0
+    proxy-from-env: ^1.1.0
+  checksum: 4444f06601f4ede154183767863d2b8e472b4a6bfc5253597ed6d21899887e1fd0ee2b3de792ac4f8459fe2e359d2aa07c216e45fd8b9e4e0688a6ebf48a5a8d
   languageName: node
   linkType: hard
 
@@ -2528,6 +2540,16 @@ __metadata:
     debug:
       optional: true
   checksum: faa66059b66358ba65c234c2f2a37fcec029dc22775f35d9ad6abac56003268baf41e55f9ee645957b32c7d9f62baf1f0b906e68267276f54ec4b4c597c2b190
+  languageName: node
+  linkType: hard
+
+"follow-redirects@npm:^1.15.0":
+  version: 1.15.3
+  resolution: "follow-redirects@npm:1.15.3"
+  peerDependenciesMeta:
+    debug:
+      optional: true
+  checksum: 584da22ec5420c837bd096559ebfb8fe69d82512d5585004e36a3b4a6ef6d5905780e0c74508c7b72f907d1fa2b7bd339e613859e9c304d0dc96af2027fd0231
   languageName: node
   linkType: hard
 
@@ -4367,6 +4389,13 @@ __metadata:
     forwarded: 0.2.0
     ipaddr.js: 1.9.1
   checksum: 29c6990ce9364648255454842f06f8c46fcd124d3e6d7c5066df44662de63cdc0bad032e9bf5a3d653ff72141cc7b6019873d685708ac8210c30458ad99f2b74
+  languageName: node
+  linkType: hard
+
+"proxy-from-env@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "proxy-from-env@npm:1.1.0"
+  checksum: ed7fcc2ba0a33404958e34d95d18638249a68c430e30fcb6c478497d72739ba64ce9810a24f53a7d921d0c065e5b78e3822759800698167256b04659366ca4d4
   languageName: node
   linkType: hard
 
