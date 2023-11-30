@@ -1,0 +1,78 @@
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils.js'
+
+const GET: Operation = [
+  async (req, res, _next) => {
+    const tag: number = req.body.tag
+    const msg = await req.context.inbox.peek(tag)
+
+    if (msg) {
+      return res.status(200).send({
+        tag: msg.data.application_tag,
+        body: new TextDecoder().decode(msg.data.plain_text),
+        receivedAt: Number(msg.ts_seconds)
+      })
+    }
+    return res.status(404).send()
+  }
+]
+
+GET.apiDoc = {
+  description:
+    'Get oldest message currently present in the nodes message inbox.',
+  tags: ['Messages'],
+  operationId: 'messagesPeekMessage',
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          required: ['tag'],
+          properties: {
+            tag: {
+              $ref: '#/components/schemas/MessageTag'
+            }
+          }
+        }
+      }
+    }
+  },
+  responses: {
+    '200': {
+      description: 'Returns a message.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/ReceivedMessage'
+          }
+        }
+      }
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
+    },
+    '422': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
+    }
+  }
+}
+
+export default { GET }
