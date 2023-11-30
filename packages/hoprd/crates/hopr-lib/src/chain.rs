@@ -345,7 +345,7 @@ pub fn build_chain_components<Db, S>(
 )
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
-    S: Stream<Item = SignificantChainEvent> + Clone + 'static
+    S: Stream<Item = SignificantChainEvent> + Clone + 'static,
 {
     let rpc_client = build_json_rpc_client(
         &chain_config.chain.default_provider, // TODO: is this the right value ?

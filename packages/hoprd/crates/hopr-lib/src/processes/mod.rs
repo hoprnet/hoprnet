@@ -32,7 +32,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     transport_indexer_actions: core_transport::IndexerActions,
 ) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
-    S: Stream<Item = SignificantChainEvent> + Unpin + 'static
+    S: Stream<Item = SignificantChainEvent> + Unpin + 'static,
 {
     spawn_local(async move {
         while let Some(event) = event_stream.next().await {

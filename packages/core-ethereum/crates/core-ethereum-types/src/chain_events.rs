@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
 use core_crypto::types::Hash;
 use core_types::channels::ChannelEntry;
+use std::fmt::{Display, Formatter};
 use utils_types::primitives::Address;
 
 /// Contains TX hash along with the Chain Event data.
@@ -10,7 +10,7 @@ pub struct SignificantChainEvent {
     /// TX hash
     pub tx_hash: Hash,
     /// Chain event of interest
-    pub event_type: ChainEventType
+    pub event_type: ChainEventType,
 }
 
 impl Display for SignificantChainEvent {
@@ -26,4 +26,3 @@ pub enum ChainEventType {
     TicketRedeem(ChannelEntry),
     NetworkRegistryUpdate(Address, bool),
 }
-

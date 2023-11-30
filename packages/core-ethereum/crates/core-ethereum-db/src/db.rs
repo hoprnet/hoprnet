@@ -485,7 +485,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         Ok(agg_tickets)
     }
 
-    async fn get_acknowledged_ticket(&self, channel_id: &Hash, epoch: u32, index: u64) -> Result<Option<AcknowledgedTicket>> {
+    async fn get_acknowledged_ticket(
+        &self,
+        channel_id: &Hash,
+        epoch: u32,
+        index: u64,
+    ) -> Result<Option<AcknowledgedTicket>> {
         let key = to_acknowledged_ticket_key(channel_id, epoch, index)?;
         self.db.get_or_none::<AcknowledgedTicket>(key).await
     }

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use ethers::abi::RawLog;
 use core_ethereum_types::chain_events::ChainEventType;
+use ethers::abi::RawLog;
 use utils_types::primitives::{Address, Snapshot};
 
 #[cfg_attr(test, mockall::automock)]

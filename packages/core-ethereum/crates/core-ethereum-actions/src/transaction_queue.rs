@@ -32,9 +32,9 @@ use async_std::task::{sleep, spawn_local};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
+use core_ethereum_types::chain_events::SignificantChainEvent;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
-use core_ethereum_types::chain_events::SignificantChainEvent;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -124,7 +124,10 @@ impl TransactionSender {
 /// This queue awaits new transactions to arrive and calls the corresponding
 /// method of the `TransactionExecutor` to execute it and await its confirmation.
 pub struct TransactionQueue<Db, S>
-where Db: HoprCoreEthereumDbActions, S: Stream<Item = SignificantChainEvent> + Clone {
+where
+    Db: HoprCoreEthereumDbActions,
+    S: Stream<Item = SignificantChainEvent> + Clone,
+{
     db: Arc<RwLock<Db>>,
     queue_send: Sender<(Action, TransactionFinisher)>,
     queue_recv: Receiver<(Action, TransactionFinisher)>,
@@ -132,8 +135,11 @@ where Db: HoprCoreEthereumDbActions, S: Stream<Item = SignificantChainEvent> + C
     tx_exec: Rc<Box<dyn TransactionExecutor>>, // TODO: Make this Arc once TransactionExecutor is Send
 }
 
-impl<Db,S> TransactionQueue<Db,S>
-where Db: HoprCoreEthereumDbActions + 'static, S: Stream<Item = SignificantChainEvent> + Clone + 'static {
+impl<Db, S> TransactionQueue<Db, S>
+where
+    Db: HoprCoreEthereumDbActions + 'static,
+    S: Stream<Item = SignificantChainEvent> + Clone + 'static,
+{
     /// Number of pending transactions in the queue
     pub const ETHEREUM_TX_QUEUE_SIZE: usize = 2048;
 

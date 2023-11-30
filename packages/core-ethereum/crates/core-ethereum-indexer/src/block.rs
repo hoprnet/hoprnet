@@ -9,10 +9,7 @@ use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use utils_types::primitives::{Snapshot, U256};
 
-use crate::{
-    errors::CoreEthereumIndexerError,
-    traits::ChainLogHandler,
-};
+use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
@@ -294,6 +291,7 @@ pub mod tests {
     use bindings::hopr_announcements::AddressAnnouncementFilter;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_rpc::BlockWithLogs;
+    use core_ethereum_types::chain_events::ChainEventType;
     use ethers::{
         abi::{encode, Token},
         contract::EthEvent,
@@ -301,7 +299,6 @@ pub mod tests {
     use futures::{join, Stream};
     use mockall::mock;
     use multiaddr::Multiaddr;
-    use core_ethereum_types::chain_events::ChainEventType;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
@@ -363,8 +360,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Ok(head_block));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -396,8 +392,7 @@ pub mod tests {
             .update_latest_block_number(latest_block as u32)
             .await
             .is_ok());
-        rpc.expect_block_number()
-            .return_once(move || Ok(head_block) );
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -422,8 +417,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Ok(head_block));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -459,8 +453,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Ok(head_block));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -519,8 +512,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Ok(head_block));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()

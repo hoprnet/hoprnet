@@ -1,6 +1,4 @@
-use crate::{
-    errors::{CoreEthereumIndexerError, Result},
-};
+use crate::errors::{CoreEthereumIndexerError, Result};
 use async_lock::RwLock;
 use async_trait::async_trait;
 use bindings::{
@@ -11,16 +9,16 @@ use bindings::{
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_types::chain_events::ChainEventType;
 use core_ethereum_types::ContractAddresses;
 use core_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
-    channels::{ChannelEntry, ChannelStatus, generate_channel_id},
+    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use core_ethereum_types::chain_events::ChainEventType;
 use utils_log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -151,9 +149,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    return Ok(Some(ChainEventType::ChannelUpdate(
-                        channel.clone(),
-                    )));
+                    return Ok(Some(ChainEventType::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -246,10 +242,20 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
-                    if let Some(ticket) = db.get_acknowledged_ticket(&channel.get_id(), channel.channel_epoch.as_u32(), ticket_redeemed.new_ticket_index).await? {
+                    if let Some(ticket) = db
+                        .get_acknowledged_ticket(
+                            &channel.get_id(),
+                            channel.channel_epoch.as_u32(),
+                            ticket_redeemed.new_ticket_index,
+                        )
+                        .await?
+                    {
                         db.mark_redeemed(&ticket).await?;
                     } else {
-                        error!("could not find acknowledged ticket with idx {} in {channel}", ticket_redeemed.new_ticket_index);
+                        error!(
+                            "could not find acknowledged ticket with idx {} in {channel}",
+                            ticket_redeemed.new_ticket_index
+                        );
                     }
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
@@ -331,10 +337,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                 debug!(
                     "on_token_approval_event - address_to_monitor: {:?} - owner: {:?} - spender: {:?}, allowance: {:?}",
-                    &self.safe_address,
-                    owner,
-                    spender,
-                    approved.value
+                    &self.safe_address, owner, spender, approved.value
                 );
 
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
@@ -516,8 +519,7 @@ impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEv
 
         if address.eq(&self.addresses.announcements) {
             let event = HoprAnnouncementsEvents::decode_log(&log)?;
-            self
-                .on_announcement_event(&mut db, event, block_number, &snapshot)
+            self.on_announcement_event(&mut db, event, block_number, &snapshot)
                 .await
         } else if address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&log)?;
@@ -581,10 +583,10 @@ pub mod tests {
     use core_types::{
         account::{AccountEntry, AccountType},
         announcement::KeyBinding,
-        channels::{ChannelEntry, ChannelStatus, generate_channel_id},
+        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
     };
     use ethers::{
-        abi::{Address as EthereumAddress, encode, RawLog, Token},
+        abi::{encode, Address as EthereumAddress, RawLog, Token},
         prelude::*,
         types::U256 as EthU256,
     };

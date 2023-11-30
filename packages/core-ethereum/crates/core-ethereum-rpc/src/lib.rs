@@ -152,7 +152,7 @@ pub struct TransactionReceipt {
     /// Hash of the transaction.
     pub tx_hash: Hash,
     /// Number of the block in which the transaction has been included into the blockchain.
-    pub block_number: u64
+    pub block_number: u64,
 }
 
 impl Display for TransactionReceipt {
@@ -165,7 +165,7 @@ impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
     fn from(value: ethers::prelude::TransactionReceipt) -> Self {
         Self {
             tx_hash: value.transaction_hash.into(),
-            block_number: value.block_number.expect("invalid transaction receipt").as_u64()
+            block_number: value.block_number.expect("invalid transaction receipt").as_u64(),
         }
     }
 }
@@ -193,13 +193,11 @@ impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTra
         let tx_hash = Hash::from(value.tx_hash());
         Self {
             tx_hash,
-            resolver: Box::new(value.map(move |result|
-                match result {
-                    Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
-                    Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
-                    Err(err) => Err(ProviderError(err))
-                }
-            )),
+            resolver: Box::new(value.map(move |result| match result {
+                Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
+                Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
+                Err(err) => Err(ProviderError(err)),
+            })),
         }
     }
 }
