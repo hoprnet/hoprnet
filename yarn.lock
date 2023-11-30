@@ -898,11 +898,11 @@ __metadata:
   linkType: hard
 
 "@types/morgan@npm:^1":
-  version: 1.9.6
-  resolution: "@types/morgan@npm:1.9.6"
+  version: 1.9.9
+  resolution: "@types/morgan@npm:1.9.9"
   dependencies:
     "@types/node": "*"
-  checksum: 6525248325a74342f929c958be69c0840c8f3a288e003a8904319cae92e531f17a8aa2700701e66775adcca7f9506dd630fec2f95dc04a3e73add04fde42aab8
+  checksum: 54bcb432f6ddb82b94bc1970204bedb3465a9afdcced6c2c6b481cf5f276266663ba3edc2b728b0118aa9720bfe5d8561c0259daaad6b027017e35936b107db0
   languageName: node
   linkType: hard
 
@@ -985,21 +985,21 @@ __metadata:
   linkType: hard
 
 "@types/supertest@npm:^2.0.11":
-  version: 2.0.14
-  resolution: "@types/supertest@npm:2.0.14"
+  version: 2.0.16
+  resolution: "@types/supertest@npm:2.0.16"
   dependencies:
     "@types/superagent": "*"
-  checksum: 9f6850a22b8f0fd4c26a6dfd9b64771a66476b1a4f841a3b84a9da843ce69463efbf37594fe107297dd14a225d199b802464d48d70e9413238c637903d392137
+  checksum: 2fc998ea698e0467cdbe3bea0ebce2027ea3a45a13e51a6cecb0435f44b486faecf99c34d8702d2d7fe033e6e09fdd2b374af52ecc8d0c69a1deec66b8c0dd52
   languageName: node
   linkType: hard
 
 "@types/swagger-ui-express@npm:^4.1.3":
-  version: 4.1.4
-  resolution: "@types/swagger-ui-express@npm:4.1.4"
+  version: 4.1.6
+  resolution: "@types/swagger-ui-express@npm:4.1.6"
   dependencies:
     "@types/express": "*"
     "@types/serve-static": "*"
-  checksum: b3fd981bf95514da2fa113f56d4f04a32ebcc208ec51ba49e1350c52c90fb7bd3d6651f889b1c12d0264f3ddd745e6fca29664c55882b3fb8740452c2c7ffbca
+  checksum: c1c4b58b12f9261af70b6a7e6420649b4f0a0343071ae8b98483c5885cd596f4c25015991f91f3f7c7a0baa461e2d76029d64de79108a89d03f3f83abbe6bc58
   languageName: node
   linkType: hard
 

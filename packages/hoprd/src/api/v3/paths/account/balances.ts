@@ -16,11 +16,11 @@ export const getBalances = async (node: Hopr) => {
   ])
 
   return {
-    native: nativeBalance.to_string(),
-    hopr: hoprBalance.to_string(),
-    safeNative: safeNativeBalance.to_string(),
-    safeHopr: safeHoprBalance.to_string(),
-    safeHoprAllowance: safeHoprAllowance.to_string()
+    native: nativeBalance.to_value_string(),
+    hopr: hoprBalance.to_value_string(),
+    safeNative: safeNativeBalance.to_value_string(),
+    safeHopr: safeHoprBalance.to_value_string(),
+    safeHoprAllowance: safeHoprAllowance.to_value_string()
   }
 }
 
