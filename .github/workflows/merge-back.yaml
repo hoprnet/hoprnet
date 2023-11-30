@@ -45,14 +45,14 @@ jobs:
           fi
 
           # Resolve conflicts for package.json
-          packages=(connect hoprd real utils)
+          packages=(hoprd real utils)
           for package in "${packages[@]}"; do
             if [ `git diff packages/$package/package.json | wc -l` -gt "0" ]; then 
               if [ `git diff packages/$package/package.json  | grep @@ | wc -l` -eq "1" ]; then
                 git checkout --theirs packages/$package/package.json
                 git add packages/$package/package.json
               else
-                echo "Review changes manully for ./packages/$package/package.json"
+                echo "Review changes manually for ./packages/$package/package.json"
                 echo exit 1
               fi
             fi
