@@ -17,7 +17,7 @@ pub struct RegisterInNetworkRegistryArgs {
     network: String,
 
     #[clap(
-        help = "Comma sperated node peer ids",
+        help = "Comma separated node peer ids",
         long,
         short,
         default_value = None
