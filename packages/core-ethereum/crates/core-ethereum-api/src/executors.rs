@@ -1,13 +1,22 @@
 use async_trait::async_trait;
 use core_crypto::types::Hash;
+use core_ethereum_actions::action_queue::TransactionExecutor;
 use core_ethereum_actions::payload::PayloadGenerator;
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
-use core_ethereum_rpc::HoprRpcOperations;
+use core_ethereum_rpc::errors::RpcError;
+use core_ethereum_rpc::{HoprRpcOperations, PendingTransaction};
 use core_ethereum_types::TypedTransaction;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt};
 use std::marker::PhantomData;
 use utils_types::primitives::{Address, Balance};
+
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.
@@ -30,22 +39,41 @@ pub struct RpcEthereumClient<Rpc: HoprRpcOperations> {
 }
 
 impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
+    /// Maximum time to wait for the TX to get submitted.
+    pub const MAX_TX_SUBMISSION_WAIT_SECS: u64 = 30;
+
     pub fn new(rpc: Rpc) -> Self {
         Self { rpc }
+    }
+
+    async fn post_tx_with_timeout(
+        &self,
+        tx: TypedTransaction,
+    ) -> core_ethereum_rpc::errors::Result<PendingTransaction> {
+        let submit_tx = self.rpc.send_transaction(tx).fuse();
+        let timeout = sleep(std::time::Duration::from_secs(Self::MAX_TX_SUBMISSION_WAIT_SECS)).fuse();
+        pin_mut!(submit_tx, timeout);
+
+        match futures::future::select(submit_tx, timeout).await {
+            Either::Left((res, _)) => res,
+            Either::Right(_) => Err(RpcError::Timeout),
+        }
     }
 }
 
 #[async_trait(? Send)]
 impl<Rpc: HoprRpcOperations> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
     async fn post_transaction(&self, tx: TypedTransaction) -> core_ethereum_rpc::errors::Result<Hash> {
-        Ok(self.rpc.send_transaction(tx).await?.tx_hash())
+        self.post_tx_with_timeout(tx).await.map(|t| t.tx_hash())
     }
 
     async fn post_transaction_and_await_confirmation(
         &self,
         tx: TypedTransaction,
     ) -> core_ethereum_rpc::errors::Result<Hash> {
-        Ok(self.rpc.send_transaction(tx).await?.await?.tx_hash)
+        // Polling for completion has internal retry amount set to max 3
+        // so it does not need an additional timeout set.
+        Ok(self.post_tx_with_timeout(tx).await?.await?.tx_hash)
     }
 }
 

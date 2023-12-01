@@ -87,8 +87,8 @@ mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use core_ethereum_actions::action_queue::{ActionConfirmation, PendingAction};
     use core_ethereum_actions::redeem::TicketRedeemActions;
-    use core_ethereum_actions::transaction_queue::{ActionConfirmation, PendingAction};
     use core_ethereum_types::actions::Action;
     use core_ethereum_types::chain_events::ChainEventType;
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};

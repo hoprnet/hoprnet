@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-std = { workspace = true }
-async-broadcast = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }
 lazy_static = { workspace = true }

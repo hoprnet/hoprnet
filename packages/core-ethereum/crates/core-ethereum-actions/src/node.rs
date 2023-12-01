@@ -1,5 +1,5 @@
+use crate::action_queue::PendingAction;
 use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
-use crate::transaction_queue::PendingAction;
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use core_crypto::keypairs::OffchainKeypair;
@@ -51,10 +51,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
 
 #[cfg(test)]
 mod tests {
+    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
+    use crate::action_state::MockActionState;
     use crate::errors::CoreEthereumActionsError;
     use crate::node::NodeActions;
-    use crate::transaction_queue::tests::EmptyStream;
-    use crate::transaction_queue::{ActionQueue, MockTransactionExecutor};
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::random::random_bytes;
@@ -88,7 +88,10 @@ mod tests {
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), tx_exec);
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker.expect_register_expectation().never();
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -125,7 +128,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
 
         assert!(

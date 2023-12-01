@@ -68,8 +68,6 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
-const INDEXER_EVENTS_QUEUE_SIZE: usize = 4096;
-
 /// Main builder of the hopr lib components
 #[cfg(feature = "wasm")]
 pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
@@ -117,16 +115,14 @@ where
         module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
     };
 
-    let (mut tx_indexer_events, rx_indexer_events) = async_broadcast::broadcast(INDEXER_EVENTS_QUEUE_SIZE);
-    tx_indexer_events.set_overflow(true); // behave as ring-buffer when the capacity is reached
+    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
 
-    let (tx_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
+    let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
         &me_onchain,
         chain_config,
         contract_addrs,
         cfg.safe_module.module_address,
         db.clone(),
-        rx_indexer_events.clone(),
     );
 
     let multi_strategy = Arc::new(MultiStrategy::new(
@@ -150,6 +146,7 @@ where
         rx_indexer_events,
         channel_graph.clone(),
         indexer_updater.clone(),
+        action_queue.action_state(),
     );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
@@ -251,7 +248,7 @@ where
                 .await
         }),
         Box::pin(async move {
-            tx_queue
+            action_queue
                 .transaction_loop()
                 .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
                 .await

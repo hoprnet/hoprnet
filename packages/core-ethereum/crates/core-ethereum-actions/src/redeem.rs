@@ -13,12 +13,12 @@ use utils_db::errors::DbError;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::Address;
 
+use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
     CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
-use crate::transaction_queue::{ActionSender, PendingAction};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -223,9 +223,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
 
 #[cfg(test)]
 mod tests {
+    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
+    use crate::action_state::MockActionState;
     use crate::redeem::TicketRedeemActions;
-    use crate::transaction_queue::tests::{IterStream, OnceStream};
-    use crate::transaction_queue::{ActionQueue, MockTransactionExecutor};
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -238,6 +238,7 @@ mod tests {
     use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use futures::FutureExt;
     use hex_literal::hex;
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
@@ -343,22 +344,37 @@ mod tests {
             ALICE.public().to_address(),
         )));
 
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = mockall::Sequence::new();
+
+        for tkt in bob_tickets.iter().cloned() {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .in_sequence(&mut seq2)
+                .returning(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
+                    })
+                    .boxed())
+                });
+        }
+
+        for tkt in charlie_tickets.iter().cloned() {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .in_sequence(&mut seq2)
+                .returning(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeem(channel_from_charlie, Some(tkt.clone())),
+                    })
+                    .boxed())
+                });
+        }
+
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = mockall::Sequence::new();
-
-        let indexer_stream = IterStream::new(
-            bob_tickets
-                .iter()
-                .map(|tkt| SignificantChainEvent {
-                    tx_hash: random_hash,
-                    event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
-                })
-                .chain(charlie_tickets.iter().map(|tkt| SignificantChainEvent {
-                    tx_hash: random_hash,
-                    event_type: TicketRedeem(channel_from_charlie, Some(tkt.clone())),
-                }))
-                .collect::<Vec<_>>(),
-        );
 
         // Expect all Bob's tickets get redeemed first
         tx_exec
@@ -377,7 +393,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -441,15 +457,21 @@ mod tests {
             ALICE.public().to_address(),
         )));
 
-        let indexer_stream = IterStream::new(
-            bob_tickets
-                .iter()
-                .map(|tkt| SignificantChainEvent {
-                    tx_hash: random_hash,
-                    event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
-                })
-                .collect::<Vec<_>>(),
-        );
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = mockall::Sequence::new();
+
+        for tkt in bob_tickets.iter().cloned() {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .in_sequence(&mut seq2)
+                .returning(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
+                    })
+                    .boxed())
+                });
+        }
 
         // Expect only Bob's tickets to get redeemed
         let mut tx_exec = MockTransactionExecutor::new();
@@ -460,7 +482,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -542,13 +564,21 @@ mod tests {
             .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
             .returning(move |_| Ok(random_hash));
 
-        let indexer_stream = OnceStream::new(SignificantChainEvent {
-            tx_hash: random_hash,
-            event_type: TicketRedeem(channel_from_bob, Some(tickets[3].clone())),
-        });
+        let mut indexer_action_tracker = MockActionState::new();
+        let t_3 = tickets[3].clone();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .return_once(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: TicketRedeem(channel_from_bob, Some(t_3)),
+                })
+                .boxed())
+            });
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;

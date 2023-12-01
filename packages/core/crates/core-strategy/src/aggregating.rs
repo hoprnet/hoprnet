@@ -333,8 +333,8 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
+    use core_ethereum_actions::action_queue::PendingAction;
     use core_ethereum_actions::redeem::TicketRedeemActions;
-    use core_ethereum_actions::transaction_queue::PendingAction;
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,

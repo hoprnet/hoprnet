@@ -99,7 +99,7 @@ where
     db_processor: Option<U>,
     db: Arc<RwLock<V>>,
     cfg: IndexerConfig,
-    egress: async_broadcast::Sender<SignificantChainEvent>,
+    egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
 }
 
 impl<T, U, V> Indexer<T, U, V>
@@ -113,7 +113,7 @@ where
         db_processor: U,
         db: Arc<RwLock<V>>,
         cfg: IndexerConfig,
-        egress: async_broadcast::Sender<SignificantChainEvent>,
+        egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     ) -> Self {
         Self {
             rpc: Some(rpc),
@@ -266,7 +266,7 @@ where
                         // Pair the event type with the TX hash here
                         let significant_event = SignificantChainEvent { tx_hash, event_type };
 
-                        if let Err(e) = tx_significant_events.try_broadcast(significant_event) {
+                        if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
                             error!("failed to pass a significant chain event further: {}", e);
                         }
                     }
@@ -369,8 +369,13 @@ pub mod tests {
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = async_broadcast::broadcast(1024);
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
+        );
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -401,8 +406,13 @@ pub mod tests {
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == Some(latest_block))
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = async_broadcast::broadcast(1024);
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
+        );
         let (indexing, _) = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -436,8 +446,13 @@ pub mod tests {
 
         assert!(tx.start_send(expected.clone()).is_ok());
 
-        let (tx_events, _) = async_broadcast::broadcast(1024);
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
+        );
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -485,8 +500,7 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, _) = async_broadcast::broadcast(1024);
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, futures::channel::mpsc::unbounded().0);
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -544,8 +558,8 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, rx_events) = async_broadcast::broadcast(1024);
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
+        let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events.into());
         assert!(indexer.start().await.is_ok());
 
         tx.close_channel();

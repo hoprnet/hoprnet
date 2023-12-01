@@ -3,11 +3,10 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_actions::{transaction_queue::ActionQueue, CoreEthereumActions};
+use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use futures::Stream;
 use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
@@ -20,6 +19,7 @@ use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
 
+use core_ethereum_actions::action_state::IndexerActionTracker;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -342,21 +342,19 @@ type ActiveTxExecutor = EthereumTransactionExecutor<
 >;
 
 #[cfg(feature = "wasm")]
-pub fn build_chain_components<Db, S>(
+pub fn build_chain_components<Db>(
     me_onchain: &ChainKeypair,
     chain_config: ChainNetworkConfig,
     contract_addrs: ContractAddresses,
     module_address: Address,
     db: Arc<RwLock<Db>>,
-    indexer_event_stream: S,
 ) -> (
-    ActionQueue<Db, S, ActiveTxExecutor>,
+    ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
     CoreEthereumActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
-    S: Stream<Item = SignificantChainEvent> + Clone + 'static,
 {
     let rpc_client = build_json_rpc_client(
         &chain_config.chain.default_provider, // TODO: is this the right value ?
@@ -378,7 +376,7 @@ where
         SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
     );
 
-    let tx_queue = ActionQueue::new(db.clone(), indexer_event_stream, ethereum_tx_executor);
+    let tx_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), ethereum_tx_executor);
 
     let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
 
@@ -390,7 +388,7 @@ pub fn build_chain_api(
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
-    indexer_events_tx: async_broadcast::Sender<SignificantChainEvent>,
+    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
-use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
+use core_ethereum_types::chain_events::ChainEventType;
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use core_types::announcement::AnnouncementData;
 use core_types::{
@@ -15,7 +15,7 @@ use core_types::{
     },
 };
 use futures::future::Either;
-use futures::{pin_mut, FutureExt, Stream, StreamExt};
+use futures::{pin_mut, FutureExt};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -23,6 +23,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
+use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::CoreEthereumActionsError::{
     ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
 };
@@ -32,10 +33,10 @@ use crate::errors::Result;
 use async_std::task::{sleep, spawn_local};
 
 #[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use gloo_timers::future::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
+use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -60,7 +61,7 @@ lazy_static::lazy_static! {
 }
 
 /// Implements execution of transactions underlying each `Action`
-/// Each operation returns a transaction hash.
+/// Each operation returns a transaction hash and may timeout.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait TransactionExecutor {
@@ -145,42 +146,34 @@ impl ActionSender {
 pub struct ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions,
-    S: Stream<Item = SignificantChainEvent> + Clone,
+    S: ActionState,
     TxExec: TransactionExecutor,
 {
     db: Arc<RwLock<Db>>,
     queue_send: Sender<(Action, ActionFinisher)>,
     queue_recv: Receiver<(Action, ActionFinisher)>,
-    indexer_event_stream: S,
+    action_state: Arc<S>,
     tx_exec: Arc<TxExec>,
-}
-
-struct IndexerExpectation(Hash, Box<dyn Fn(&ChainEventType) -> bool>);
-
-impl IndexerExpectation {
-    fn test(&self, event: &SignificantChainEvent) -> bool {
-        event.tx_hash == self.0 && self.1(&event.event_type)
-    }
 }
 
 impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions + 'static,
-    S: Stream<Item = SignificantChainEvent> + Clone + 'static,
     TxExec: TransactionExecutor + 'static,
+    S: ActionState + 'static,
 {
     /// Number of pending transactions in the queue
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
-    pub const MAX_ACTION_CONFIRMATION_WAIT_SECS: usize = 180;
+    pub const MAX_ACTION_CONFIRMATION_WAIT_SECS: u64 = 150;
 
     /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(db: Arc<RwLock<Db>>, indexer_event_stream: S, tx_exec: TxExec) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec) -> Self {
         let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
         Self {
             db,
-            indexer_event_stream,
+            action_state: Arc::new(action_state),
             queue_send,
             queue_recv,
             tx_exec: Arc::new(tx_exec),
@@ -192,21 +185,24 @@ where
         ActionSender(self.queue_send.clone())
     }
 
+    /// Clones the `ActionState` implementation.
+    pub fn action_state(&self) -> Arc<S> {
+        self.action_state.clone()
+    }
+
     async fn execute_action(
         db: Arc<RwLock<Db>>,
         tx_exec: Arc<TxExec>,
         action: Action,
-        idx_stream: S,
+        action_state: Arc<S>,
     ) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
             Action::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     match tx_exec.redeem_ticket(ack.clone()).await {
-                        Ok(tx_hash) => IndexerExpectation(
+                        Ok(tx_hash) => IndexerExpectation::new(
                             tx_hash,
-                            Box::new(
-                                move |e| matches!(e, ChainEventType::TicketRedeem(_, Some(ticket)) if ack.eq(ticket)),
-                            ),
+                            move |e| matches!(e, ChainEventType::TicketRedeem(_, Some(ticket)) if ack.eq(ticket)),
                         ),
                         Err(e) => {
                             // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
@@ -226,22 +222,18 @@ where
 
             Action::OpenChannel(address, stake) => {
                 let tx_hash = tx_exec.fund_channel(address, stake).await?;
-                IndexerExpectation(
+                IndexerExpectation::new(
                     tx_hash,
-                    Box::new(
-                        move |e| matches!(e, ChainEventType::ChannelOpened(channel) if channel.destination == address),
-                    ),
+                    move |e| matches!(e, ChainEventType::ChannelOpened(channel) if channel.destination == address),
                 )
             }
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == Open {
                     let tx_hash = tx_exec.fund_channel(channel.destination, amount).await?;
-                    IndexerExpectation(
+                    IndexerExpectation::new(
                         tx_hash,
-                        Box::new(
-                            move |e| matches!(e, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
-                        ),
+                        move |e| matches!(e, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
                     )
                 } else {
                     return Err(InvalidState(format!("cannot fund {channel} because it is not opened")));
@@ -251,13 +243,10 @@ where
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     Open | PendingToClose => {
-                        // TODO: incoming channel closure does not have closure initiation ?
                         let tx_hash = tx_exec.close_incoming_channel(channel.source).await?;
-                        IndexerExpectation(
+                        IndexerExpectation::new(
                             tx_hash,
-                            Box::new(
-                                move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
-                            ),
+                            move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
                     Closed => {
@@ -269,22 +258,18 @@ where
                     Open => {
                         debug!("initiating closure of {channel}");
                         let tx_hash = tx_exec.initiate_outgoing_channel_closure(channel.destination).await?;
-                        IndexerExpectation(
+                        IndexerExpectation::new(
                             tx_hash,
-                            Box::new(
-                                move |e| matches!(e, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
-                            ),
+                            move |e| matches!(e, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
 
                     PendingToClose => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = tx_exec.finalize_outgoing_channel_closure(channel.destination).await?;
-                        IndexerExpectation(
+                        IndexerExpectation::new(
                             tx_hash,
-                            Box::new(
-                                move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
-                            ),
+                            move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
 
@@ -307,39 +292,42 @@ where
             }
             Action::Announce(data) => {
                 let tx_hash = tx_exec.announce(data.clone()).await?;
-                IndexerExpectation(
+                IndexerExpectation::new(
                     tx_hash,
-                    Box::new(
-                        move |e| matches!(e, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
-                    ),
+                    move |e| matches!(e, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
                 )
             }
             Action::RegisterSafe(safe_address) => {
                 let tx_hash = tx_exec.register_safe(safe_address).await?;
-                IndexerExpectation(
+                IndexerExpectation::new(
                     tx_hash,
-                    Box::new(
-                        move |e| matches!(e, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
-                    ),
+                    move |e| matches!(e, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
                 )
             }
         };
 
-        // We are looking for a single Indexer expectation
-        // The timeout for this operation is resolved at the upper layer
-        pin_mut!(idx_stream);
-        if let Some(event) = idx_stream
-            .filter(|e| futures::future::ready(expectation.test(e)))
-            .next()
-            .await
-        {
-            Ok(ActionConfirmation {
-                tx_hash: event.tx_hash,
-                event: Some(event.event_type),
+        let tx_hash = expectation.tx_hash;
+
+        // Register new expectation and await it with timeout
+        let confirmation = action_state.register_expectation(expectation).await?.fuse();
+        let timeout = sleep(std::time::Duration::from_secs(Self::MAX_ACTION_CONFIRMATION_WAIT_SECS)).fuse();
+
+        pin_mut!(confirmation, timeout);
+
+        match futures::future::select(confirmation, timeout).await {
+            Either::Left((Ok(chain_event), _)) => Ok(ActionConfirmation {
+                tx_hash: chain_event.tx_hash,
+                event: Some(chain_event.event_type),
                 action,
-            })
-        } else {
-            Err(InvalidState("indexer event stream has been closed".into()))
+            }),
+            Either::Left((Err(_), _)) => {
+                action_state.unregister_expectation(tx_hash).await;
+                Err(InvalidState("action expectation was removed before resolving".into()))
+            }
+            Either::Right(_) => {
+                action_state.unregister_expectation(tx_hash).await;
+                Err(Timeout)
+            }
         }
     }
 
@@ -349,122 +337,35 @@ where
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
             let act_id = act.to_string();
-            let idx_stream = self.indexer_event_stream.clone();
+            let action_state = self.action_state.clone();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_action(db_clone, tx_exec_clone, act, idx_stream).fuse();
-
-                // Put an upper bound on the transaction to get confirmed and indexed
-                let timeout = sleep(std::time::Duration::from_secs(
-                    Self::MAX_ACTION_CONFIRMATION_WAIT_SECS as u64,
-                ))
-                .fuse();
-
-                pin_mut!(timeout, tx_fut);
-
                 debug!("start executing {act_id}");
-                let tx_result = match futures::future::select(tx_fut, timeout).await {
-                    Either::Left((result, _)) => {
-                        match &result {
-                            Ok(confirmation) => {
-                                info!("successful {confirmation}");
+                let tx_result = Self::execute_action(db_clone, tx_exec_clone, act, action_state).await;
+                match &tx_result {
+                    Ok(confirmation) => {
+                        info!("successful {confirmation}");
 
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_COUNT_SUCCESSFUL_ACTS.increment();
-                            }
-                            Err(err) => {
-                                error!("{act_id} failed: {err}");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_COUNT_FAILED_ACTS.increment();
-                            }
-                        }
-                        result
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_SUCCESSFUL_ACTS.increment();
                     }
-                    Either::Right((_, _)) => {
+                    Err(Timeout) => {
+                        error!("timeout while waiting for confirmation of {act_id}");
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_COUNT_TIMEOUT_ACTS.increment();
-
-                        Err(Timeout)
                     }
-                };
+                    Err(err) => {
+                        error!("{act_id} failed: {err}");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_FAILED_ACTS.increment();
+                    }
+                }
 
                 let _ = tx_finisher.send(tx_result);
             });
         }
         warn!("transaction queue has finished");
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use futures::Stream;
-    use std::marker::PhantomData;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-    use std::vec::IntoIter;
-
-    // futures::stream::empty() is not Clone
-    #[derive(Clone)]
-    pub struct EmptyStream<T>(PhantomData<T>);
-
-    impl<T> Default for EmptyStream<T> {
-        fn default() -> Self {
-            Self(PhantomData)
-        }
-    }
-
-    impl<T> Stream for EmptyStream<T> {
-        type Item = T;
-
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            Poll::Ready(None)
-        }
-    }
-
-    // futures::stream::once() is not Clone
-    #[derive(Clone)]
-    pub struct OnceStream<T: Clone> {
-        value: IntoIter<T>,
-    }
-
-    impl<T: Clone> Unpin for OnceStream<T> {}
-
-    impl<T: Clone> OnceStream<T> {
-        pub fn new(value: T) -> Self {
-            Self {
-                value: vec![value].into_iter(),
-            }
-        }
-    }
-
-    impl<T: Clone> Stream for OnceStream<T> {
-        type Item = T;
-
-        fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            Poll::Ready(self.value.next())
-        }
-    }
-
-    // futures::stream::iter() is not Clone
-    #[derive(Clone)]
-    pub struct IterStream<T, I: Iterator<Item = T> + Clone> {
-        data: I,
-    }
-
-    impl<T, I: Iterator<Item = T> + Clone> Unpin for IterStream<T, I> {}
-
-    impl<T, I: Iterator<Item = T> + Clone> IterStream<T, I> {
-        pub fn new<U: IntoIterator<Item = T, IntoIter = I>>(data: U) -> Self {
-            Self { data: data.into_iter() }
-        }
-    }
-
-    impl<T, I: Iterator<Item = T> + Clone> Stream for IterStream<T, I> {
-        type Item = T;
-
-        fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            Poll::Ready(self.data.next())
-        }
     }
 }

@@ -21,6 +21,9 @@ pub enum RpcError {
     #[error("transaction {0} has not been included on-chain")]
     TransactionDropped(String),
 
+    #[error("transaction submission to the RPC provider timed out")]
+    Timeout,
+
     #[error("non-specific RPC error occurred: {0}")]
     GeneralError(String),
 

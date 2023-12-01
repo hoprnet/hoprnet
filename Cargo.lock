@@ -214,24 +214,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-broadcast"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "334d75cf09b33bede6cbc20e52515853ae7bee3d4eadd9540e13ce92af983d34"
-dependencies = [
- "event-listener 3.1.0",
- "event-listener-strategy",
- "futures-core",
-]
-
-[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81953c529336010edd6d8e358f886d9581267795c61b19475b71314bffa46d35"
 dependencies = [
  "concurrent-queue",
- "event-listener 2.5.3",
+ "event-listener",
  "futures-core",
 ]
 
@@ -302,7 +291,7 @@ version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "287272293e9d8c41773cec55e365490fe034813a2f172f502d6ddcf75b2f582b"
 dependencies = [
- "event-listener 2.5.3",
+ "event-listener",
 ]
 
 [[package]]
@@ -328,7 +317,7 @@ dependencies = [
  "autocfg",
  "blocking",
  "cfg-if",
- "event-listener 2.5.3",
+ "event-listener",
  "futures-lite",
  "rustix 0.37.23",
  "signal-hook",
@@ -1173,8 +1162,8 @@ dependencies = [
 name = "core-ethereum-api"
 version = "0.2.0"
 dependencies = [
- "async-broadcast",
  "async-lock",
+ "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
@@ -1236,7 +1225,6 @@ dependencies = [
 name = "core-ethereum-indexer"
 version = "0.1.0"
 dependencies = [
- "async-broadcast",
  "async-lock",
  "async-std",
  "async-trait",
@@ -2492,27 +2480,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
-name = "event-listener"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d93877bcde0eb80ca09131a08d23f0a5c18a620b01db137dba666d18cd9b30c2"
-dependencies = [
- "concurrent-queue",
- "parking",
- "pin-project-lite",
-]
-
-[[package]]
-name = "event-listener-strategy"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c97b4e30ea7e4b7e7b429d6e2d8510433ba8cee4e70dfb3243794e539d29fd"
-dependencies = [
- "event-listener 3.1.0",
- "pin-project-lite",
-]
-
-[[package]]
 name = "eyre"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3031,7 +2998,6 @@ dependencies = [
 name = "hopr-lib"
 version = "2.1.0-rc.1"
 dependencies = [
- "async-broadcast",
  "async-std",
  "console_error_panic_hook",
  "const_format",

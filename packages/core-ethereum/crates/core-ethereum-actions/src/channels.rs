@@ -6,6 +6,7 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
+use crate::action_queue::PendingAction;
 use crate::errors::CoreEthereumActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
@@ -14,7 +15,6 @@ use crate::errors::{
     Result,
 };
 use crate::redeem::TicketRedeemActions;
-use crate::transaction_queue::PendingAction;
 use crate::CoreEthereumActions;
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -164,10 +164,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
 }
 #[cfg(test)]
 mod tests {
+    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
+    use crate::action_state::MockActionState;
     use crate::channels::ChannelActions;
     use crate::errors::CoreEthereumActionsError;
-    use crate::transaction_queue::tests::{EmptyStream, IterStream, OnceStream};
-    use crate::transaction_queue::{ActionQueue, MockTransactionExecutor};
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::{random::random_bytes, types::Hash};
@@ -175,6 +175,7 @@ mod tests {
     use core_ethereum_types::actions::Action;
     use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
     use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
+    use futures::FutureExt;
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::Sequence;
@@ -243,12 +244,19 @@ mod tests {
             U256::zero(),
         );
 
-        let indexer_stream = OnceStream::new(SignificantChainEvent {
-            tx_hash: random_hash,
-            event_type: ChainEventType::ChannelOpened(new_channel),
-        });
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelOpened(new_channel),
+                })
+                .boxed())
+            });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
 
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
@@ -284,7 +292,8 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         let channel = ChannelEntry::new(
             *ALICE,
@@ -344,7 +353,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -377,7 +386,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -421,7 +430,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -452,7 +461,8 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -530,12 +540,19 @@ mod tests {
             .withf(move |dest, balance| channel.destination.eq(&dest) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let indexer_stream = OnceStream::new(SignificantChainEvent {
-            tx_hash: random_hash,
-            event_type: ChainEventType::ChannelBalanceIncreased(channel, stake),
-        });
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelBalanceIncreased(channel, stake),
+                })
+                .boxed())
+            });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -573,7 +590,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -613,7 +630,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -656,7 +673,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -687,7 +704,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         db.write()
             .await
@@ -759,18 +776,31 @@ mod tests {
             .withf(move |dst| BOB.eq(dst))
             .returning(move |_| Ok(random_hash));
 
-        let indexer_stream = IterStream::new(vec![
-            SignificantChainEvent {
-                tx_hash: random_hash,
-                event_type: ChainEventType::ChannelClosureInitiated(channel),
-            },
-            SignificantChainEvent {
-                tx_hash: random_hash,
-                event_type: ChainEventType::ChannelClosed(channel),
-            },
-        ]);
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosureInitiated(channel),
+                })
+                .boxed())
+            });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        indexer_action_tracker
+            .expect_register_expectation()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -863,12 +893,18 @@ mod tests {
             .withf(move |dst| BOB.eq(dst))
             .returning(move |_| Ok(random_hash));
 
-        let indexer_stream = OnceStream::new(SignificantChainEvent {
-            tx_hash: random_hash,
-            event_type: ChainEventType::ChannelClosed(channel),
-        });
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel),
+                })
+                .boxed())
+            });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_stream, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -924,7 +960,7 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -949,7 +985,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
@@ -975,7 +1011,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), EmptyStream::default(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(

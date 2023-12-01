@@ -397,7 +397,7 @@ mod tests {
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
-    use core_ethereum_actions::transaction_queue::{ActionConfirmation, PendingAction};
+    use core_ethereum_actions::action_queue::{ActionConfirmation, PendingAction};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_types::actions::Action;
     use core_ethereum_types::chain_events::ChainEventType;

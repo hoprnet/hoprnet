@@ -213,6 +213,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .await?
             .confirmations(self.cfg.tx_confirmations)
             .interval(self.cfg.tx_polling_interval); // This is the default, but let's be explicit
+                                                     // This has built-in max polling retries set to 3
 
         #[cfg(feature = "prometheus")]
         METRIC_COUNT_RPC_CALLS.increment();

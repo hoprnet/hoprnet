@@ -7,7 +7,7 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver},
     future::poll_fn,
-    Stream, StreamExt,
+    pin_mut, Stream, StreamExt,
 };
 
 use core_transport::{
@@ -17,6 +17,7 @@ use core_transport::{
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
+use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
 use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
 #[cfg(all(feature = "wasm", not(test)))]
@@ -29,15 +30,19 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     me_onchain: Address,
     db: Arc<RwLock<Db>>,
     multi_strategy: Arc<MultiStrategy>,
-    mut event_stream: S,
+    event_stream: S,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
+    indexer_action_tracker: IndexerActionTracker,
 ) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
-    S: Stream<Item = SignificantChainEvent> + Unpin + 'static,
+    S: Stream<Item = SignificantChainEvent> + 'static,
 {
     spawn_local(async move {
+        pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
+            indexer_action_tracker.match_and_resolve(&event).await;
+
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
                     if peer != me {
