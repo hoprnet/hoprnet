@@ -500,12 +500,6 @@ pub struct U256 {
 }
 
 impl U256 {
-    pub fn from_big_endian(bytes: &[u8]) -> Self {
-        Self {
-            value: u256::from_be_bytes(bytes.try_into().expect("invalid input size")),
-        }
-    }
-
     pub fn as_u128(&self) -> u128 {
         self.value.as_u128()
     }

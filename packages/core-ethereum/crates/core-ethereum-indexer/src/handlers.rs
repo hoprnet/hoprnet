@@ -263,7 +263,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                             // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
                             if let Some(ticket) = db
                                 .get_acknowledged_tickets(Some(channel))
-                                .await? // TODO: optimize this DB query
+                                .await? // TODO: optimize this DB query and iteration
                                 .into_iter()
                                 .find(|ticket| {
                                     ticket.ticket.index - ticket.ticket.index_offset as u64 - 1
