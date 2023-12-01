@@ -23,7 +23,7 @@ pub struct FaucetArgs {
     network: String,
 
     #[clap(
-        help = "Ethereum address of node that will receive funds",
+        help = "Comma-separated Ethereum addresses of nodes that will receive funds",
         long,
         short,
         default_value = None
@@ -84,20 +84,11 @@ impl FaucetArgs {
 
         // Include provided address
         let mut addresses_all = Vec::new();
-        if let Some(addr) = address {
-            // parse provided address string into `Address` type
-            let parsed_addr = if addr.starts_with("0x") {
-                addr.strip_prefix("0x").unwrap_or(&addr)
-            } else {
-                &addr
-            };
 
-            match Address::from_str(parsed_addr) {
-                // match addr.parse::<Address>() {
-                Ok(checksumed_addr) => addresses_all.push(checksumed_addr.to_checksum()),
-                // TODO: Consider accept peer id here
-                Err(_) => return Err(HelperErrors::UnableToParseAddress(addr.to_string())),
-            }
+        // validate and arrayfy provided list of addresses
+        if let Some(addresses) = address {
+            let provided_addresses: Vec<String> = addresses.split(',').map(|addr| Address::from_str(addr).unwrap().to_checksum()).collect();
+            addresses_all.extend(provided_addresses);
         }
 
         // if local identity dirs/path is provided, read files

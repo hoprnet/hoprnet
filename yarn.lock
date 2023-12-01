@@ -461,7 +461,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@types/bn.js": ^5.1.1
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     async-mutex: 0.4.0
     bn.js: 5.2.1
     debug: 4.3.4
@@ -480,7 +480,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     mocha: 10.2.0
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
@@ -492,7 +492,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-real@workspace:packages/real"
   dependencies:
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     mocha: 10.2.0
     semver: 7.5.4
     typedoc: 0.24.8
@@ -508,7 +508,7 @@ __metadata:
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.5
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     axios: 1.5.1
     bn.js: 5.2.1
     debug: 4.3.4
@@ -538,7 +538,7 @@ __metadata:
     "@types/cors": 2.8.14
     "@types/debug": 4.1.9
     "@types/express": ^4.17.17
-    "@types/mocha": 10.0.2
+    "@types/mocha": 10.0.6
     "@types/morgan": ^1
     "@types/supertest": ^2.0.11
     "@types/swagger-ui-express": ^4.1.3
@@ -890,19 +890,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:10.0.2":
-  version: 10.0.2
-  resolution: "@types/mocha@npm:10.0.2"
-  checksum: a78a02691f102beb02f9ec435458107d21b518fc477c3b2f37c90b8e70b67bff888351715ae173bd31ede25ee5e0d688aefb0faf4284034d08ba63027c8b0c01
+"@types/mocha@npm:10.0.6":
+  version: 10.0.6
+  resolution: "@types/mocha@npm:10.0.6"
+  checksum: f7c836cf6cf27dc0f5970d262591b56f2a3caeaec8cfdc612c12e1cfbb207f601f710ece207e935164d4e3343b93be5054d0db5544f31f453b3923775d82099f
   languageName: node
   linkType: hard
 
 "@types/morgan@npm:^1":
-  version: 1.9.6
-  resolution: "@types/morgan@npm:1.9.6"
+  version: 1.9.9
+  resolution: "@types/morgan@npm:1.9.9"
   dependencies:
     "@types/node": "*"
-  checksum: 6525248325a74342f929c958be69c0840c8f3a288e003a8904319cae92e531f17a8aa2700701e66775adcca7f9506dd630fec2f95dc04a3e73add04fde42aab8
+  checksum: 54bcb432f6ddb82b94bc1970204bedb3465a9afdcced6c2c6b481cf5f276266663ba3edc2b728b0118aa9720bfe5d8561c0259daaad6b027017e35936b107db0
   languageName: node
   linkType: hard
 
@@ -985,21 +985,21 @@ __metadata:
   linkType: hard
 
 "@types/supertest@npm:^2.0.11":
-  version: 2.0.14
-  resolution: "@types/supertest@npm:2.0.14"
+  version: 2.0.16
+  resolution: "@types/supertest@npm:2.0.16"
   dependencies:
     "@types/superagent": "*"
-  checksum: 9f6850a22b8f0fd4c26a6dfd9b64771a66476b1a4f841a3b84a9da843ce69463efbf37594fe107297dd14a225d199b802464d48d70e9413238c637903d392137
+  checksum: 2fc998ea698e0467cdbe3bea0ebce2027ea3a45a13e51a6cecb0435f44b486faecf99c34d8702d2d7fe033e6e09fdd2b374af52ecc8d0c69a1deec66b8c0dd52
   languageName: node
   linkType: hard
 
 "@types/swagger-ui-express@npm:^4.1.3":
-  version: 4.1.4
-  resolution: "@types/swagger-ui-express@npm:4.1.4"
+  version: 4.1.6
+  resolution: "@types/swagger-ui-express@npm:4.1.6"
   dependencies:
     "@types/express": "*"
     "@types/serve-static": "*"
-  checksum: b3fd981bf95514da2fa113f56d4f04a32ebcc208ec51ba49e1350c52c90fb7bd3d6651f889b1c12d0264f3ddd745e6fca29664c55882b3fb8740452c2c7ffbca
+  checksum: c1c4b58b12f9261af70b6a7e6420649b4f0a0343071ae8b98483c5885cd596f4c25015991f91f3f7c7a0baa461e2d76029d64de79108a89d03f3f83abbe6bc58
   languageName: node
   linkType: hard
 
@@ -1011,9 +1011,9 @@ __metadata:
   linkType: hard
 
 "@types/uuid@npm:^9":
-  version: 9.0.5
-  resolution: "@types/uuid@npm:9.0.5"
-  checksum: 7577940949619768303c0bf0a7cc235fac3cfae1c0bb4a2e85bfb87b2eb1024955ab446f775394d259442cd769b663b6ce43c39bdfc955d946bf833804ddb421
+  version: 9.0.7
+  resolution: "@types/uuid@npm:9.0.7"
+  checksum: c7321194aeba9ea173efd1e721403bdf4e7ae6945f8f8cdbc87c791f4b505ccf3dbc4a8883d90b394ef13b7c2dc778045792b05dbb23b3c746f8ea347804d448
   languageName: node
   linkType: hard
 

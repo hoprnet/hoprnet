@@ -6444,7 +6444,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
