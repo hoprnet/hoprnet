@@ -44,6 +44,9 @@ pub enum CoreEthereumActionsError {
     #[error("timeout waiting for action confirmation")]
     Timeout,
 
+    #[error("indexer expectation has been unregistered")]
+    ExpectationUnregistered,
+
     #[error(transparent)]
     DbError(#[from] DbError),
 

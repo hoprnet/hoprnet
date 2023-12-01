@@ -350,11 +350,12 @@ mod tests {
         for tkt in bob_tickets.iter().cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
+                .once()
                 .in_sequence(&mut seq2)
-                .returning(move |_| {
+                .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
+                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -363,11 +364,12 @@ mod tests {
         for tkt in charlie_tickets.iter().cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
+                .once()
                 .in_sequence(&mut seq2)
-                .returning(move |_| {
+                .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_charlie, Some(tkt.clone())),
+                        event_type: TicketRedeem(channel_from_charlie, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -463,11 +465,12 @@ mod tests {
         for tkt in bob_tickets.iter().cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
+                .once()
                 .in_sequence(&mut seq2)
-                .returning(move |_| {
+                .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_bob, Some(tkt.clone())),
+                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -565,17 +568,18 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        let t_3 = tickets[3].clone();
-        indexer_action_tracker
-            .expect_register_expectation()
-            .once()
-            .return_once(move |_| {
-                Ok(futures::future::ok(SignificantChainEvent {
-                    tx_hash: random_hash,
-                    event_type: TicketRedeem(channel_from_bob, Some(t_3)),
-                })
-                .boxed())
-            });
+        for tkt in tickets.iter().cloned().skip(2) {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .once()
+                .return_once(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
+                    })
+                    .boxed())
+                });
+        }
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);

@@ -108,7 +108,7 @@ pub struct ActionConfirmation {
 
 impl Display for ActionConfirmation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} confirmed in {}", self.action, self.tx_hash)
+        write!(f, "{} confirmed in tx {}", self.action, self.tx_hash)
     }
 }
 
@@ -307,6 +307,7 @@ where
         };
 
         let tx_hash = expectation.tx_hash;
+        debug!("action {action} submitted via tx {tx_hash}, registering expectation");
 
         // Register new expectation and await it with timeout
         let confirmation = action_state.register_expectation(expectation).await?.fuse();

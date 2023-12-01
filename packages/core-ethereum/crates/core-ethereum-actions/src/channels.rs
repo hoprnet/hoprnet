@@ -780,6 +780,7 @@ mod tests {
         let mut seq2 = Sequence::new();
         indexer_action_tracker
             .expect_register_expectation()
+            .once()
             .in_sequence(&mut seq2)
             .returning(move |_| {
                 Ok(futures::future::ok(SignificantChainEvent {
@@ -791,6 +792,7 @@ mod tests {
 
         indexer_action_tracker
             .expect_register_expectation()
+            .once()
             .in_sequence(&mut seq2)
             .returning(move |_| {
                 Ok(futures::future::ok(SignificantChainEvent {

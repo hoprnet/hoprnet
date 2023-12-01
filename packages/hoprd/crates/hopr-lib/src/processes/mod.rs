@@ -33,7 +33,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     event_stream: S,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
-    indexer_action_tracker: IndexerActionTracker,
+    indexer_action_tracker: Arc<IndexerActionTracker>,
 ) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
     S: Stream<Item = SignificantChainEvent> + 'static,

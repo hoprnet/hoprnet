@@ -93,8 +93,6 @@ export {
   SimpleTimer,
   Snapshot,
   Ticket,
-  WasmTransactionPayload,
-  WasmSendTransactionResult,
   U256,
   WasmVecAccountEntry,
   WasmVecAcknowledgedTicket,
