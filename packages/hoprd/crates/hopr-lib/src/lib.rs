@@ -534,6 +534,11 @@ mod native {
             Ok(self.transport_api.ticket_statistics().await?)
         }
 
+        /// Get ticket price
+        pub async fn get_ticket_price(&self) -> errors::Result<U256> {
+            Ok(self.transport_api.get_ticket_price().await?)
+        }
+        
         // Chain =========
         pub fn me_onchain(&self) -> Address {
             self.chain_api.me_onchain()
@@ -1299,6 +1304,11 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = getTicketStatistics)]
         pub async fn _ticket_statistics(&self) -> Result<TicketStatistics, JsError> {
             self.hopr.ticket_statistics().await.map_err(JsError::from)
+        }
+
+        #[wasm_bindgen(js_name = getTicketPrice)]
+        pub async fn _get_ticket_price(&self) -> Result<U256, JsError>{
+            self.hopr.get_ticket_price().await.map_err(JsError::from)
         }
 
         // Chain =========
