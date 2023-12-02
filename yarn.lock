@@ -536,7 +536,7 @@ __metadata:
     "@types/chai-as-promised": 7.1.5
     "@types/cookie": ^0.5.1
     "@types/cors": 2.8.14
-    "@types/debug": 4.1.9
+    "@types/debug": 4.1.12
     "@types/express": ^4.17.17
     "@types/mocha": 10.0.6
     "@types/morgan": ^1
@@ -836,12 +836,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:4.1.9":
-  version: 4.1.9
-  resolution: "@types/debug@npm:4.1.9"
+"@types/debug@npm:4.1.12":
+  version: 4.1.12
+  resolution: "@types/debug@npm:4.1.12"
   dependencies:
     "@types/ms": "*"
-  checksum: e88ee8b19d106f33eb0d3bc58bacff9702e98d821fd1ebd1de8942e6b97419e19a1ccf39370f1764a1dc66f79fd4619f3412e1be6eeb9f0b76412f5ffe4ead93
+  checksum: 47876a852de8240bfdaf7481357af2b88cb660d30c72e73789abf00c499d6bc7cd5e52f41c915d1b9cd8ec9fef5b05688d7b7aef17f7f272c2d04679508d1053
   languageName: node
   linkType: hard
 
