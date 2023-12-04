@@ -534,15 +534,15 @@ mod native {
             Ok(self.transport_api.ticket_statistics().await?)
         }
 
-        /// Get ticket price
-        pub async fn get_ticket_price(&self) -> errors::Result<U256> {
-            // Ok(self.transport_api.get_ticket_price().await?)
-            Ok(self.chain_api.get_ticket_price().await?)
-        }
-        
         // Chain =========
         pub fn me_onchain(&self) -> Address {
             self.chain_api.me_onchain()
+        }
+
+        /// Get ticket price
+        pub async fn get_ticket_price(&self) -> errors::Result<U256> {
+            // Ok(self.transport_api.get_ticket_price().await?)
+            Ok(self.chain_api.ticket_price().await)
         }
 
         /// List of all accounts announced on the chain

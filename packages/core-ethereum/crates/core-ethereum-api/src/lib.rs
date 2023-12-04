@@ -106,7 +106,7 @@ impl HoprChain {
         Ok(self.db.read().await.get_channels().await?)
     }
 
-    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
+    pub async fn ticket_price(&self) -> errors::Result<U256> {
         Ok(self.db.read().await.get_ticket_price().await?)
     }
 
