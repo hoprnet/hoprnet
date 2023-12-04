@@ -1,10 +1,11 @@
-use std::{pin::Pin, sync::Arc, time::Duration};
-
 use async_std::sync::RwLock;
 use futures::{channel::mpsc::unbounded, FutureExt};
+use std::str::FromStr;
+use std::{pin::Pin, sync::Arc, time::Duration};
 
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::db::CoreEthereumDb;
+use core_ethereum_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
@@ -17,11 +18,12 @@ use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{debug, info};
 use utils_types::traits::BinarySerializable;
 
+use crate::chain::ChainNetworkConfig;
 use crate::{config::HoprLibConfig, constants};
 
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
 use core_transport::wasm_impls::HoprTransport;
+use utils_types::primitives::Address;
 
 /// Enum differentiator for loop component futures.
 ///
@@ -68,8 +70,9 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// Main builder of the hopr lib components
 #[cfg(feature = "wasm")]
-pub fn build_components<FOnReceived, FOnSent, FSaveTbf, TxExec>(
+pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     cfg: HoprLibConfig,
+    chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
@@ -77,7 +80,6 @@ pub fn build_components<FOnReceived, FOnSent, FSaveTbf, TxExec>(
     on_final_packet: FOnReceived,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
-    tx_executor: TxExec,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (
     HoprTransport,
@@ -88,9 +90,7 @@ where
     FOnReceived: Fn(ApplicationData) + 'static,
     FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
-    TxExec: TransactionExecutor + 'static,
 {
-    use core_ethereum_api::SignificantChainEvent;
     use utils_types::traits::PeerIdLike;
 
     let identity: libp2p_identity::Keypair = (&me).into();
@@ -102,8 +102,28 @@ where
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
-    let (tx_queue, chain_actions) =
-        crate::chain::build_chain_components(me_onchain.public().to_address(), db.clone(), tx_executor);
+    // TODO: this needs refactoring of the config structures
+    let contract_addrs = ContractAddresses {
+        announcements: Address::from_str(&chain_config.announcements).unwrap(),
+        channels: Address::from_str(&chain_config.channels).unwrap(),
+        token: Address::from_str(&chain_config.token).unwrap(),
+        price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
+        network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
+        network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
+        stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
+        safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
+        module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
+    };
+
+    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
+
+    let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
+        &me_onchain,
+        chain_config,
+        contract_addrs,
+        cfg.safe_module.module_address,
+        db.clone(),
+    );
 
     let multi_strategy = Arc::new(MultiStrategy::new(
         cfg.strategy,
@@ -117,22 +137,26 @@ where
     let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
-    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-    let indexer_refreshing_loop =
-        crate::processes::spawn_refresh_process_for_chain_events(
-            me.public().to_peerid(),
-            core_transport::Keypair::public(&me_onchain).to_address(),
-            db.clone(),
-            multi_strategy.clone(),
-            rx_indexer_events,
-            channel_graph.clone(),
-            indexer_updater.clone()
-        );
+
+    let indexer_refreshing_loop = crate::processes::spawn_refresh_process_for_chain_events(
+        me.public().to_peerid(),
+        core_transport::Keypair::public(&me_onchain).to_address(),
+        db.clone(),
+        multi_strategy.clone(),
+        rx_indexer_events,
+        channel_graph.clone(),
+        indexer_updater.clone(),
+        action_queue.action_state(),
+    );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
         me_onchain.clone(),
         db.clone(),
+        contract_addrs,
+        cfg.safe_module.safe_address,
+        tx_indexer_events,
         chain_actions.clone(),
+        rpc_operations.clone(),
         channel_graph.clone(),
     );
 
@@ -149,7 +173,6 @@ where
         addr_resolver.clone(),
         channel_graph.clone(),
     );
-
 
     let (mut heartbeat, hb_ping_rx, hb_pong_tx) = build_heartbeat(
         cfg.protocol,
@@ -225,7 +248,7 @@ where
                 .await
         }),
         Box::pin(async move {
-            tx_queue
+            action_queue
                 .transaction_loop()
                 .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
                 .await

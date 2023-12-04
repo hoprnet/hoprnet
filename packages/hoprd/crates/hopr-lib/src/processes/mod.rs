@@ -1,81 +1,85 @@
-use std::{pin::Pin, sync::Arc, str::FromStr};
+use std::{pin::Pin, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_api::SignificantChainEvent;
-use core_path::channel_graph::ChannelGraph;
+use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use core_strategy::strategy::MultiStrategy;
-use core_types::{acknowledgement::AcknowledgedTicket, channels::ChannelEntry};
+use core_types::acknowledgement::AcknowledgedTicket;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver},
     future::poll_fn,
-    Stream, StreamExt,
+    pin_mut, Stream, StreamExt,
 };
 
-use core_transport::{ApplicationData, HalfKeyChallenge, TransportOutput, libp2p_identity::PeerId, IndexerToProcess};
+use core_transport::{
+    libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, PeerEligibility, TransportOutput,
+};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use utils_log::{error, debug, info};
+use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
+use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-
 /// Helper process responsible for refreshing the state of HOPR components
 /// from the chain events confirmed by the indexer.
-pub async fn spawn_refresh_process_for_chain_events<Db>(
+pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     me: PeerId,
     me_onchain: Address,
     db: Arc<RwLock<Db>>,
     multi_strategy: Arc<MultiStrategy>,
-    mut event_stream: UnboundedReceiver<SignificantChainEvent>,
+    event_stream: S,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
-)
-where
+    indexer_action_tracker: Arc<IndexerActionTracker>,
+) where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
+    S: Stream<Item = SignificantChainEvent> + 'static,
 {
     spawn_local(async move {
+        pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
-            match event {
-                SignificantChainEvent::Announcement(peer, address, multiaddresses) => {
-                    if let Ok(peer) = PeerId::from_str(&peer) {
-                        if peer != me {
-                            // decapsulate the `p2p/<peer_id>` to remove duplicities
-                            let mas = multiaddresses
-                                .into_iter()
-                                .filter_map(|ma_str| core_transport::Multiaddr::from_str(&ma_str).ok())
-                                .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
-                                .filter(|v| !v.is_empty())
-                                .collect::<Vec<_>>();
-            
-                            if mas.len() > 0 {
+            indexer_action_tracker.match_and_resolve(&event).await;
+
+            match event.event_type {
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    if peer != me {
+                        // decapsulate the `p2p/<peer_id>` to remove duplicities
+                        let mas = multiaddresses
+                            .into_iter()
+                            .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
+                            .filter(|v| !v.is_empty())
+                            .collect::<Vec<_>>();
+
+                        if mas.len() > 0 {
+                            transport_indexer_actions
+                                .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                .await;
+
+                            if db
+                                .read()
+                                .await
+                                .is_allowed_to_access_network(&address)
+                                .await
+                                .unwrap_or(false)
+                            {
                                 transport_indexer_actions
-                                    .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
                                     .await;
-            
-                                if db
-                                    .read()
-                                    .await
-                                    .is_allowed_to_access_network(&address)
-                                    .await
-                                    .unwrap_or(false)
-                                {
-                                    transport_indexer_actions
-                                        .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, true.into()))
-                                        .await;
-                                }
                             }
-                        } else {
-                            debug!("Skipping announcements for myself ({peer})");
                         }
                     } else {
-                        error!("Announced PeerId ({peer}) has invalid format")
+                        debug!("Skipping announcements for myself ({peer})");
                     }
-                },
-                SignificantChainEvent::ChannelUpdate(channel) |
-                SignificantChainEvent::TicketRedeem(channel, _) => {
+                }
+                ChainEventType::ChannelOpened(channel) |
+                ChainEventType::ChannelClosureInitiated(channel) |
+                ChainEventType::ChannelClosed(channel) |
+                ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
+                ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
+                ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 
@@ -90,12 +94,6 @@ where
                                     channel_change,
                                 )
                                 .await;
-
-                                // Cleanup invalid tickets from the DB if epoch has changed
-                                // TODO: this should be moved somewhere else once event broadcasts are implemented
-                                if let core_types::channels::ChannelChange::Epoch { .. } = channel_change {
-                                    let _ = db.write().await.cleanup_invalid_channel_tickets(&channel).await;
-                                }
                             }
                         } else if channel.status == core_types::channels::ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
@@ -111,19 +109,23 @@ where
                             .await;
                         }
                     }
-                },
-                SignificantChainEvent::NetworkRegistryUpdate(address, allowed) => {
+                }
+                ChainEventType::NetworkRegistryUpdate(address, allowed) => {
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 transport_indexer_actions
-                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(pk.to_peerid(), allowed.into()))
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
+                                        pk.to_peerid(),
+                                        allowed.into()
+                                    ))
                                     .await;
                             }
                         }
                         Err(e) => error!("on_network_registry_node_allowed failed with: {}", e),
                     }
-                },
+                }
+                ChainEventType::NodeSafeRegistered(safe_address) => info!("node safe registered {safe_address}"),
             }
         }
 

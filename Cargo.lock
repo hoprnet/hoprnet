@@ -1123,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-actions"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1160,9 +1160,10 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-lock",
+ "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
@@ -1173,6 +1174,7 @@ dependencies = [
  "core-ethereum-types",
  "core-path",
  "core-types",
+ "ethers",
  "futures",
  "gloo-timers 0.3.0",
  "hex",
@@ -1231,10 +1233,10 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-rpc",
+ "core-ethereum-types",
  "core-types",
  "env_logger",
  "ethers",
- "ethnum",
  "futures",
  "hex",
  "hex-literal",
@@ -1299,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-types"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-std",
  "bindings",
@@ -1310,7 +1312,9 @@ dependencies = [
  "ethers",
  "hex",
  "hex-literal",
+ "libp2p-identity",
  "mockall",
+ "multiaddr",
  "serde",
  "tokio",
  "utils-log",
@@ -1508,6 +1512,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-actions",
  "core-ethereum-db",
+ "core-ethereum-types",
  "core-network",
  "core-protocol",
  "core-types",
@@ -1544,6 +1549,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-ethereum-rpc",
  "core-ethereum-types",
  "core-network",
  "core-p2p",
@@ -2999,12 +3005,14 @@ dependencies = [
  "core-ethereum-api",
  "core-ethereum-db",
  "core-ethereum-indexer",
+ "core-ethereum-rpc",
  "core-ethereum-types",
  "core-path",
  "core-strategy",
  "core-transport",
  "core-types",
  "futures",
+ "gloo-timers 0.3.0",
  "js-sys",
  "lazy_static",
  "real-base",

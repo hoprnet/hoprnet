@@ -9,7 +9,7 @@ export type HttpConfig = {
   max_redirects: number
 }
 
-export async function post(url: string, json_data: string, config: HttpConfig): Promise<string> {
+export async function http_post(url: string, json_data: string, config: HttpConfig): Promise<string> {
   try {
     let response = await axios.post(url, json_data, {
       timeout: config.timeout_seconds * 1000,

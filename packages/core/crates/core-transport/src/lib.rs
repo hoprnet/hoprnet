@@ -13,6 +13,11 @@ pub enum TransportOutput {
 }
 
 pub use {
+    crate::{
+        multiaddrs::decapsulate_p2p_protocol,
+        processes::indexer::IndexerProcessed,
+        processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
+    },
     core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -20,16 +25,11 @@ pub use {
     core_network::network::{Health, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
-    crate::{
-        multiaddrs::decapsulate_p2p_protocol,
-        processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
-    },
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::UniversalTimer,
 };
 
-use crate::processes::indexer::IndexerProcessed;
 use async_lock::RwLock;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{
@@ -45,7 +45,11 @@ use core_protocol::{
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
-use core_types::{channels::Ticket, protocol::TagBloomFilter};
+use core_types::{
+    acknowledgement::AcknowledgedTicket,
+    channels::{ChannelEntry, Ticket},
+    protocol::TagBloomFilter,
+};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::poll_fn;
 use futures::{
@@ -57,9 +61,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{error, info};
 use utils_types::primitives::Address;
-
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::ChannelEntry;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -481,7 +482,7 @@ pub mod wasm_impls {
                             vec![ma]
                         } else {
                             vec![]
-                        }
+                        },
                     ))
                 }
             }

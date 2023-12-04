@@ -39,7 +39,8 @@ utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true, features = ["attributes"] }
+async-std = { workspace = true }
+core-ethereum-types = { workspace = true }
 env_logger = "0.10.0"
 mockall = "0.11.4"
 hex-literal = "0.4.1"

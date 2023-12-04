@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -21,8 +21,10 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
 [dependencies]
+async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+ethers = { workspace = true }
 futures = { workspace = true }
 primitive-types = "0.12"
 hex = { workspace = true }

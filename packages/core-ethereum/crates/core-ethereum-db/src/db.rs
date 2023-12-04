@@ -783,11 +783,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        // TODO: for debugging purposes this operation has been un-batched
-        // Note that if any of the un-batched operations fail, the stats of redeemed
-        // tickets will be in an inconsistent state.
-        // Once the underlying issue is resolved, it should be batched again.
-
         debug!("start marking {acked_ticket} as redeemed");
 
         let mut ops = utils_db::db::Batch::default();

@@ -1,16 +1,8 @@
 use async_trait::async_trait;
 
-use core_types::channels::ChannelEntry;
+use core_ethereum_types::chain_events::ChainEventType;
 use ethers::abi::RawLog;
-use utils_types::primitives::{Address, Balance, Snapshot};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum SignificantChainEvent {
-    Announcement(String, Address, Vec<String>), // peer, address, multiaddresses
-    ChannelUpdate(ChannelEntry),
-    TicketRedeem(ChannelEntry, Balance),
-    NetworkRegistryUpdate(Address, bool),
-}
+use utils_types::primitives::{Address, Snapshot};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
@@ -23,5 +15,5 @@ pub trait ChainLogHandler {
         block_number: u32,
         log: RawLog,
         snapshot: Snapshot,
-    ) -> crate::errors::Result<Option<SignificantChainEvent>>;
+    ) -> crate::errors::Result<Option<ChainEventType>>;
 }

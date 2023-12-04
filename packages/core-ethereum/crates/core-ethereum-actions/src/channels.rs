@@ -6,6 +6,7 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
+use crate::action_queue::PendingAction;
 use crate::errors::CoreEthereumActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
@@ -14,7 +15,6 @@ use crate::errors::{
     Result,
 };
 use crate::redeem::TicketRedeemActions;
-use crate::transaction_queue::TransactionCompleted;
 use crate::CoreEthereumActions;
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -27,10 +27,10 @@ use utils_misc::time::native::current_timestamp;
 #[async_trait(? Send)]
 pub trait ChannelActions {
     /// Opens a channel to the given `destination` with the given `amount` staked.
-    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted>;
+    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction>;
 
     /// Funds the given channel with the given `amount`
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted>;
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction>;
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel.
     async fn close_channel(
@@ -38,12 +38,12 @@ pub trait ChannelActions {
         counterparty: Address,
         direction: ChannelDirection,
         redeem_before_close: bool,
-    ) -> Result<TransactionCompleted>;
+    ) -> Result<PendingAction>;
 }
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
-    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
+    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
@@ -83,7 +83,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
     }
 
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted> {
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
@@ -119,7 +119,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         counterparty: Address,
         direction: ChannelDirection,
         redeem_before_close: bool,
-    ) -> Result<TransactionCompleted> {
+    ) -> Result<PendingAction> {
         let maybe_channel = match direction {
             ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
             ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
@@ -164,14 +164,18 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
 }
 #[cfg(test)]
 mod tests {
+    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
+    use crate::action_state::MockActionState;
     use crate::channels::ChannelActions;
     use crate::errors::CoreEthereumActionsError;
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::{random::random_bytes, types::Hash};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_ethereum_types::actions::Action;
+    use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
     use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
+    use futures::FutureExt;
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::Sequence;
@@ -228,9 +232,32 @@ mod tests {
             .expect_fund_channel()
             .times(1)
             .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::ChannelFunded { tx_hash: random_hash });
+            .returning(move |_, _| Ok(random_hash));
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let new_channel = ChannelEntry::new(
+            *ALICE,
+            *BOB,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+            U256::zero(),
+        );
+
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelOpened(new_channel),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -238,14 +265,22 @@ mod tests {
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.open_channel(*BOB, stake).await.unwrap().await;
+        let tx_res = actions
+            .open_channel(*BOB, stake)
+            .await
+            .unwrap()
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::ChannelFunded { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::OpenChannel(_, _)),
+            "must be open channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelOpened(_))),
+            "must correspond to open channel chain event"
+        );
     }
 
     #[async_std::test]
@@ -257,7 +292,13 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         let channel = ChannelEntry::new(
             *ALICE,
@@ -317,7 +358,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -350,7 +396,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -394,7 +445,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -425,7 +481,13 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -501,9 +563,21 @@ mod tests {
             .expect_fund_channel()
             .times(1)
             .withf(move |dest, balance| channel.destination.eq(&dest) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::ChannelFunded { tx_hash: random_hash });
+            .returning(move |_, _| Ok(random_hash));
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelBalanceIncreased(channel, stake),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -511,14 +585,22 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.fund_channel(channel.get_id(), stake).await.unwrap().await;
+        let tx_res = actions
+            .fund_channel(channel.get_id(), stake)
+            .await
+            .unwrap()
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::ChannelFunded { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::FundChannel(_, _)),
+            "must be open channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelBalanceIncreased(_, _))),
+            "must correspond to channel chain event"
+        );
     }
 
     #[async_std::test]
@@ -533,7 +615,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -573,7 +660,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -616,7 +708,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -647,7 +744,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -710,16 +812,42 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .withf(move |dst| BOB.eq(dst))
-            .returning(move |_| TransactionResult::ChannelClosureInitiated { tx_hash: random_hash });
+            .returning(move |_| Ok(random_hash));
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
             .withf(move |dst| BOB.eq(dst))
-            .returning(move |_| TransactionResult::ChannelClosed { tx_hash: random_hash });
+            .returning(move |_| Ok(random_hash));
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosureInitiated(channel),
+                })
+                .boxed())
+            });
+
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -731,14 +859,18 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
-            .await;
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::ChannelClosureInitiated { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosureInitiated(_))),
+            "must correspond to channel chain event"
+        );
 
         // Transition the channel to the PendingToClose state with the closure time already elapsed
         channel.status = ChannelStatus::PendingToClose;
@@ -759,14 +891,18 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
-            .await;
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::ChannelClosed { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
     }
 
     #[async_std::test]
@@ -802,9 +938,20 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .withf(move |dst| BOB.eq(dst))
-            .returning(move |_| TransactionResult::ChannelClosed { tx_hash: random_hash });
+            .returning(move |_| Ok(random_hash));
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -816,14 +963,18 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Incoming, false)
             .await
             .unwrap()
-            .await;
+            .await
+            .expect("must resolve confirmation");
 
-        match tx_res {
-            TransactionResult::ChannelClosed { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
     }
 
     #[async_std::test]
@@ -856,7 +1007,12 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -881,7 +1037,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
@@ -907,7 +1068,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(

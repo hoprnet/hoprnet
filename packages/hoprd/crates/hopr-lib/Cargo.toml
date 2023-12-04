@@ -24,6 +24,7 @@ validator = { workspace = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { workspace = true, optional = true }
+gloo-timers = { workspace = true, optional = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
@@ -34,6 +35,7 @@ core-types = { workspace = true }
 core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
 core-ethereum-actions = { workspace = true }
 core-ethereum-api = { workspace = true }
+core-ethereum-rpc = { workspace = true }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true }
 core-ethereum-indexer = { workspace = true }
@@ -61,6 +63,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:js-sys",
+    "dep:gloo-timers",
     "dep:serde-wasm-bindgen",
     "dep:wasm-bindgen",
     "dep:wasm-bindgen-futures",
@@ -72,6 +75,7 @@ wasm = [
     "core-ethereum-api/wasm",
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",
+    "core-ethereum-rpc/wasm",
     "real-base/wasm",
     "utils-db/wasm",
     "utils-log/wasm",

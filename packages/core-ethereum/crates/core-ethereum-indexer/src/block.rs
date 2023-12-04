@@ -1,13 +1,15 @@
 use async_lock::RwLock;
 use core_crypto::types::Hash;
-use futures::{channel::mpsc::UnboundedSender, pin_mut, StreamExt};
+use futures::{pin_mut, StreamExt};
 use std::{collections::VecDeque, sync::Arc};
 use utils_log::{debug, error, info};
 
-use crate::{traits::{ChainLogHandler, SignificantChainEvent}, errors::CoreEthereumIndexerError};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
+use core_ethereum_types::chain_events::SignificantChainEvent;
 use utils_types::primitives::{Snapshot, U256};
+
+use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
@@ -97,7 +99,7 @@ where
     db_processor: Option<U>,
     db: Arc<RwLock<V>>,
     cfg: IndexerConfig,
-    egress: UnboundedSender<SignificantChainEvent>,
+    egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
 }
 
 impl<T, U, V> Indexer<T, U, V>
@@ -111,9 +113,15 @@ where
         db_processor: U,
         db: Arc<RwLock<V>>,
         cfg: IndexerConfig,
-        egress: UnboundedSender<SignificantChainEvent>,
+        egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     ) -> Self {
-        Self { rpc: Some(rpc), db_processor: Some(db_processor), db, cfg, egress }
+        Self {
+            rpc: Some(rpc),
+            db_processor: Some(db_processor),
+            db,
+            cfg,
+            egress,
+        }
     }
 
     pub async fn start(&mut self) -> crate::errors::Result<()>
@@ -123,9 +131,13 @@ where
         V: HoprCoreEthereumDbActions + 'static,
     {
         if let None = self.rpc {
-            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+            return Err(CoreEthereumIndexerError::ProcessError(
+                "indexer is already started".into(),
+            ));
         } else if let None = self.db_processor {
-            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+            return Err(CoreEthereumIndexerError::ProcessError(
+                "indexer is already started".into(),
+            ));
         }
 
         info!("Starting indexer...");
@@ -165,7 +177,7 @@ where
         spawn_local(async move {
             let mut tx = Some(tx);
 
-            let block_stream = rpc
+            let mut block_stream = rpc
                 .try_stream_logs(latest_block_in_db.clone(), log_filter)
                 .expect("block stream should be constructible");
 
@@ -173,7 +185,6 @@ where
             let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
             let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
 
-            pin_mut!(block_stream);
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
 
@@ -207,7 +218,7 @@ where
                                 .update_latest_block_number(log.block_number as u32)
                                 .await
                             {
-                                error!("failed to write the latest block number into the database: {}", error);
+                                error!("failed to write the latest block number into the database: {error}");
                             }
 
                             #[cfg(all(feature = "prometheus", not(test)))]
@@ -220,7 +231,7 @@ where
 
                                 for log in logs.into_iter() {
                                     if let Err(error) = tx_proc.unbounded_send(log) {
-                                        error!("failed to send and process logs: {}", error)
+                                        error!("failed to send and process logs: {error}")
                                     }
                                 }
                             }
@@ -245,16 +256,21 @@ where
                     U256::from(log.log_index),
                 );
 
+                let tx_hash = log.tx_hash;
+
                 match db_processor
                     .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
                     .await
                 {
-                    Ok(Some(event)) => {
-                        if let Err(e) = tx_significant_events.unbounded_send(event.clone()) {
-                            error!("failed to generate a significant chain event: {}", e);
+                    Ok(Some(event_type)) => {
+                        // Pair the event type with the TX hash here
+                        let significant_event = SignificantChainEvent { tx_hash, event_type };
+
+                        if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
+                            error!("failed to pass a significant chain event further: {}", e);
                         }
-                    },
-                    Ok(None) => {},
+                    }
+                    Ok(None) => {}
                     Err(_) => {
                         error!("failed to process logs");
                     }
@@ -271,9 +287,12 @@ where
 pub mod tests {
     use std::pin::Pin;
 
+    use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
+    use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_rpc::BlockWithLogs;
+    use core_ethereum_types::chain_events::ChainEventType;
     use ethers::{
         abi::{encode, Token},
         contract::EthEvent,
@@ -282,6 +301,7 @@ pub mod tests {
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_types::traits::PeerIdLike;
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
@@ -295,7 +315,7 @@ pub mod tests {
         )))
     }
 
-    fn build_announcment_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
+    fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
         let mut logs: Vec<Log> = vec![];
 
         for i in 0..size {
@@ -308,6 +328,7 @@ pub mod tests {
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),
+                tx_hash: Default::default(),
                 tx_index: 0,
                 block_number,
                 log_index,
@@ -320,11 +341,15 @@ pub mod tests {
     mock! {
         HoprIndexerOps {}     // Name of the mock struct, less the "Mock" prefix
 
+        #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
-            #[allow(clippy::type_complexity,clippy::type_repetition_in_bounds)]
-            fn block_number<'life0,'async_trait>(&'life0 self) ->  ::core::pin::Pin<Box<dyn ::core::future::Future<Output = core_ethereum_rpc::errors::Result<u64> > + ::core::marker::Send+'async_trait> >where 'life0:'async_trait,Self:'async_trait;
+            async fn block_number(&self) -> core_ethereum_rpc::errors::Result<u64>;
 
-            fn try_stream_logs<'a>(&'a self,start_block_number:Option<u64> ,filter:LogFilter,) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> +'a> > >;
+            fn try_stream_logs<'a>(
+                &'a self,
+                start_block_number: Option<u64>,
+                filter: LogFilter,
+            ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
         }
     }
 
@@ -337,23 +362,24 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let (indexing, _) = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
         );
+        let (indexing, _) = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
         assert!(indexing.is_err()) // terminated by the close channel
     }
 
@@ -373,23 +399,24 @@ pub mod tests {
             .update_latest_block_number(latest_block as u32)
             .await
             .is_ok());
-        rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == Some(latest_block))
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let (indexing, _) = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
         );
+        let (indexing, _) = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
         assert!(indexing.is_err()) // terminated by the close channel
     }
 
@@ -402,8 +429,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -420,15 +446,17 @@ pub mod tests {
 
         assert!(tx.start_send(expected.clone()).is_ok());
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
-        let _ = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
+        let mut indexer = Indexer::new(
+            rpc,
+            handlers,
+            db.clone(),
+            IndexerConfig::default(),
+            futures::channel::mpsc::unbounded().0,
         );
+        let _ = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
     }
 
     #[async_std::test]
@@ -442,8 +470,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -453,7 +480,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
-            logs: build_announcment_logs(
+            logs: build_announcement_logs(
                 Address::random(),
                 4,
                 head_block - cfg.finalization - 1,
@@ -473,23 +500,19 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
-        let _ = join!(
-            indexer.start(),
-            async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-                tx.close_channel()
-            }
-        );
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, futures::channel::mpsc::unbounded().0);
+        let _ = join!(indexer.start(), async move {
+            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tx.close_channel()
+        });
     }
 
-    fn random_announcement_chain_event() -> SignificantChainEvent {
-        SignificantChainEvent::Announcement(
-            "abc".to_owned(),
-            Address::random(),
-            vec!["multiaddress/random/doesn't matter".to_owned()],
-        )
+    fn random_announcement_chain_event() -> ChainEventType {
+        ChainEventType::Announcement {
+            peer: OffchainKeypair::random().public().to_peerid(),
+            address: Address::random(),
+            multiaddresses: vec![Multiaddr::empty()],
+        }
     }
 
     #[async_std::test]
@@ -505,8 +528,7 @@ pub mod tests {
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let head_block = 1000;
-        rpc.expect_block_number()
-            .return_once(move || Box::pin(async move { Ok(head_block) }));
+        rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -516,7 +538,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
-            logs: build_announcment_logs(
+            logs: build_announcement_logs(
                 Address::random(),
                 expected_finalized_event_count,
                 head_block - cfg.finalization - 1,
@@ -536,8 +558,8 @@ pub mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let (tx_events, rx_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
+        let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events.into());
         assert!(indexer.start().await.is_ok());
 
         tx.close_channel();

@@ -3,9 +3,6 @@ import retimer from 'retimer'
 
 import {
   get_package_version,
-  Balance,
-  BalanceType,
-  SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
   debug,
   MessageInbox,
@@ -36,7 +33,7 @@ import { createHoprNode } from './hopr.js'
 import { decodeMessage } from './api/utils.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
 
-export { WasmChainQuery, WasmHoprMessageEmitter } from './hopr.js'
+export { WasmHoprMessageEmitter } from './hopr.js'
 
 const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
@@ -89,27 +86,6 @@ function parseCliArguments(args: string[]) {
 
   return argv
 }
-
-// TODO: Possibly not needed anymore since this used to catch unhandled promise rejections from hopr-connect and js-libp2p
-/*
-async function addUnhandledPromiseRejectionHandler() {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(
-      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
-    )
-    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
-
-    registerUnhandled()
-    setLogger((msg) => {
-      console.error(msg)
-    })
-  }
-
-  // Filter specific known promise rejection that cannot be handled for
-  // one reason or the other
-  setupPromiseRejectionFilter()
-}
-*/
 
 async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the
@@ -217,7 +193,8 @@ async function main() {
     // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
     // if safe address or module address is not provided, replace with values stored in the db
     const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
-    let { node, loops } = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    let node = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    let loops = await node.run()
 
     // Subscribe to node events
     log('Subscribing incoming messages to inbox')
@@ -244,11 +221,6 @@ async function main() {
     )
     // start API server only if API flag is true
     if (cfg.api.enable) startApiListen()
-
-    const ethAddr = node.getEthereumAddress().to_hex()
-    const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
-
-    log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
     showOnboardingInformation(node)
 

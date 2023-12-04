@@ -395,20 +395,24 @@ where
 mod tests {
     use super::*;
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
+    use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
-    use core_ethereum_actions::transaction_queue::{TransactionCompleted, TransactionResult};
+    use core_ethereum_actions::action_queue::{ActionConfirmation, PendingAction};
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_types::actions::Action;
+    use core_ethereum_types::chain_events::ChainEventType;
     use core_network::{
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
     use core_types::channels::{ChannelEntry, ChannelStatus};
-    use futures::{future::ready, FutureExt};
+    use futures::{future::ok, FutureExt};
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
+    use utils_types::traits::BinarySerializable;
 
     lazy_static! {
         static ref PEERS: Vec<(Address, PeerId)> = (0..10)
@@ -421,14 +425,14 @@ mod tests {
         ChannelAct { }
         #[async_trait(? Send)]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
-            ) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            ) -> core_ethereum_actions::errors::Result<PendingAction>;
         }
     }
 
@@ -504,6 +508,32 @@ mod tests {
         }
     }
 
+    fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        ActionConfirmation {
+            tx_hash: random_hash,
+            event: Some(ChainEventType::ChannelClosureInitiated(channel)),
+            action: Action::CloseChannel(channel, ChannelDirection::Outgoing),
+        }
+    }
+
+    fn mock_action_confirmation_opening(address: Address, balance: Balance) -> ActionConfirmation {
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        ActionConfirmation {
+            tx_hash: random_hash,
+            event: Some(ChainEventType::ChannelOpened(ChannelEntry::new(
+                PEERS[0].0,
+                address,
+                balance,
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::zero(),
+                U256::zero(),
+            ))),
+            action: Action::OpenChannel(address, balance),
+        }
+    }
+
     #[async_std::test]
     async fn test_promiscuous_strategy_tick_decisions() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -529,7 +559,7 @@ mod tests {
 
         mock_channel(db.clone(), PEERS[1].0, balance).await;
         mock_channel(db.clone(), PEERS[2].0, balance).await;
-        mock_channel(db.clone(), PEERS[5].0, balance).await;
+        let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels
@@ -549,24 +579,14 @@ mod tests {
             .expect_close_channel()
             .times(1)
             .withf(|dst, dir, _| PEERS[5].0.eq(dst) && ChannelDirection::Outgoing.eq(dir))
-            .return_once(|_, _, _| {
-                Ok(ready(TransactionResult::ChannelClosureInitiated {
-                    tx_hash: Default::default(),
-                })
-                .boxed())
-            });
+            .return_once(move |_, _, _| Ok(ok(mock_action_confirmation_closure(for_closing)).boxed()));
 
         let new_stake = strat_cfg.new_channel_stake;
         actions
             .expect_open_channel()
             .times(1)
             .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
-            .return_once(|_, _| {
-                Ok(ready(TransactionResult::ChannelFunded {
-                    tx_hash: Default::default(),
-                })
-                .boxed())
-            });
+            .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
 

@@ -172,6 +172,25 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native {
+    use async_trait::async_trait;
+
+    use crate::errors::HttpRequestError;
+    use crate::HttpPostRequestor;
+
+    /// HTTP client that uses a non-Tokio HTTP client library, such as `surf`.
+    #[derive(Clone, Debug, Default)]
+    pub struct SurfHttpPostRequestor;
+
+    #[async_trait]
+    impl HttpPostRequestor for SurfHttpPostRequestor {
+        async fn http_post(&self, _url: &str, _json_data: &str) -> Result<String, HttpRequestError> {
+            todo!("SurfHttpPostRequestor needs implementing once fully native!")
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use async_trait::async_trait;
@@ -185,6 +204,7 @@ pub mod tests {
     use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
     use crate::{HttpPostRequestor, MockHttpPostRequestor};
 
+    // TODO: replace this with SurfHttpPostRequestor once implemented, and ditch tokio from dev-dependencies
     #[derive(Debug)]
     pub struct ReqwestRequestor(reqwest::Client);
 

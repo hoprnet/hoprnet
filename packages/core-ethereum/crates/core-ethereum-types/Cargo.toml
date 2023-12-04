@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-types"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -13,6 +13,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
+libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
 ethers = { workspace = true }
 hex-literal = "0.4.1"
 serde = "1.0"

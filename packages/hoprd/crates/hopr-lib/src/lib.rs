@@ -16,7 +16,6 @@ use std::{pin::Pin, str::FromStr};
 use async_std::sync::RwLock;
 use futures::{Future, StreamExt};
 
-use crate::chain::ChainNetworkConfig;
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
@@ -27,7 +26,9 @@ use core_transport::{
 use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
-#[cfg(feature = "wasm")]
+use crate::chain::ChainNetworkConfig;
+
+#[cfg(all(feature = "wasm", not(test)))]
 use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
@@ -74,11 +75,11 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
-    use core_ethereum_actions::transaction_queue::TransactionExecutor;
-    use core_ethereum_actions::{
-        channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
-    };
-    use core_ethereum_api::ChannelEntry;
+    use crate::config::SafeModule;
+    use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
+    use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
+    use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry};
+    use core_ethereum_types::chain_events::ChainEventType;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
     use core_types::{
@@ -86,6 +87,7 @@ mod native {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
+    use std::time::Duration;
     use utils_log::debug;
     use utils_types::traits::PeerIdLike;
 
@@ -105,14 +107,12 @@ mod native {
         chain_api: HoprChain,
         processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
         chain_cfg: ChainNetworkConfig,
-        #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery,   // TODO: remove once the entire construction happens in the new() method
-        staking_safe_address: Address,
-        staking_module_address: Address,
+        safe_module_cfg: SafeModule,
     }
 
     impl Hopr {
-        pub fn new<FOnReceived, FOnSent, FSaveTbf, TxExec>(
-            cfg: crate::config::HoprLibConfig,
+        pub fn new<FOnReceived, FOnSent, FSaveTbf>(
+            cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             my_addresses: Vec<Multiaddr>,
@@ -120,8 +120,6 @@ mod native {
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
-            tx_executor: TxExec,
-            #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self
@@ -129,7 +127,6 @@ mod native {
             FOnReceived: Fn(ApplicationData) + 'static,
             FOnSent: Fn(HalfKeyChallenge) + 'static,
             FSaveTbf: Fn(Box<[u8]>) + 'static,
-            TxExec: TransactionExecutor + 'static,
         {
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
@@ -138,6 +135,7 @@ mod native {
 
             let (transport_api, chain_api, processes) = components::build_components(
                 cfg.clone(),
+                chain_config.clone(),
                 me.clone(),
                 me_onchain.clone(),
                 db,
@@ -145,7 +143,6 @@ mod native {
                 on_received,
                 tbf,
                 save_tbf,
-                tx_executor,
                 my_addresses,
             );
 
@@ -172,9 +169,7 @@ mod native {
                 chain_api,
                 processes: Some(processes),
                 chain_cfg: chain_config,
-                chain_query,
-                staking_safe_address: cfg.safe_module.safe_address,
-                staking_module_address: cfg.safe_module.module_address,
+                safe_module_cfg: cfg.safe_module,
             }
         }
 
@@ -206,6 +201,21 @@ mod native {
             self.aliases.read().await.clone()
         }
 
+        pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+            Ok(self.chain_api.get_balance(balance_type).await?)
+        }
+
+        pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+            Ok(self
+                .chain_api
+                .get_safe_balance(self.safe_module_cfg.safe_address, balance_type)
+                .await?)
+        }
+
+        pub fn get_safe_config(&self) -> SafeModule {
+            self.safe_module_cfg.clone()
+        }
+
         pub fn chain_config(&self) -> ChainNetworkConfig {
             self.chain_cfg.clone()
         }
@@ -219,11 +229,22 @@ mod native {
                 ));
             }
 
-            info!("Starting hopr node...");
+            info!(
+                "Node is not started, please fund this node {} with at least {}",
+                self.me_onchain(),
+                Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
+            );
 
-            if let Err(_) = self.chain_query.waitForFunds().await {
-                panic!("Failed to wait for the funds")
-            }
+            wait_for_funds(
+                self.me_onchain(),
+                Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native),
+                Duration::from_secs(200),
+                self.chain_api.rpc(),
+            )
+            .await
+            .expect("failed to wait for funds");
+
+            info!("Starting hopr node...");
 
             self.aliases
                 .write()
@@ -232,15 +253,7 @@ mod native {
 
             self.state = State::Initializing;
 
-            let balance = self
-                .chain_query
-                .getNativeBalance()
-                .await
-                .map_err(|_| errors::HoprLibError::GeneralError("Failed to fetch own balance".to_owned()))
-                .map(|v| {
-                    info!("{}", v.as_string().unwrap().as_str());
-                    Balance::from_str(v.as_string().unwrap().as_str()).expect("balance should be deserializable")
-                })?;
+            let balance = self.get_balance(BalanceType::Native).await?;
 
             let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
 
@@ -266,18 +279,20 @@ mod native {
                 .await
                 .map_err(core_transport::errors::HoprTransportError::from)?;
 
-
             info!("Loading initial peers");
             let index_updater = self.transport_api.index_updater();
             for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
                 if self.transport_api.is_allowed_to_access_network(&peer_id).await {
                     debug!("Using initial public node '{peer_id}'");
-                    index_updater.emit_indexer_update(
-                        core_transport::IndexerToProcess::EligibilityUpdate(peer_id.clone(), PeerEligibility::Eligible)
-                    ).await;
-                    index_updater.emit_indexer_update(
-                        core_transport::IndexerToProcess::Announce(peer_id, multiaddresses)
-                    ).await;
+                    index_updater
+                        .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
+                            peer_id.clone(),
+                            PeerEligibility::Eligible,
+                        ))
+                        .await;
+                    index_updater
+                        .emit_indexer_update(core_transport::IndexerToProcess::Announce(peer_id, multiaddresses))
+                        .await;
                 }
             }
 
@@ -289,16 +304,16 @@ mod native {
 
             // Possibly register node-safe pair to NodeSafeRegistry. Following that the
             // connector is set to use safe tx variants.
-            if self
-                .chain_query
-                .canRegisterWithSafe()
-                .await
-                .map(|v| v.as_bool().unwrap_or(false))
-                .unwrap_or(false)
+            if can_register_with_safe(
+                self.me_onchain(),
+                self.safe_module_cfg.safe_address,
+                self.chain_api.rpc(),
+            )
+            .await?
             {
                 info!("Registering safe by node");
 
-                if self.me_onchain() == self.staking_safe_address {
+                if self.me_onchain() == self.safe_module_cfg.safe_address {
                     return Err(errors::HoprLibError::GeneralError(
                         "cannot self as staking safe address".into(),
                     ));
@@ -307,13 +322,14 @@ mod native {
                 if let Ok(_) = self
                     .chain_api
                     .actions_ref()
-                    .register_safe_by_node(self.staking_safe_address)
+                    .register_safe_by_node(self.safe_module_cfg.safe_address)
                     .await
                 {
                     let db = self.chain_api.db().clone();
                     let mut db = db.write().await;
-                    db.set_staking_safe_address(&self.staking_safe_address).await?;
-                    db.set_staking_module_address(&self.staking_module_address).await?;
+                    db.set_staking_safe_address(&self.safe_module_cfg.safe_address).await?;
+                    db.set_staking_module_address(&self.safe_module_cfg.module_address)
+                        .await?;
                 } else {
                     // Intentionally ignoring the errored state
                     error!("Failed to register node with safe")
@@ -528,7 +544,6 @@ mod native {
         }
 
         /// Withdraw on-chain assets to a given address
-        /// @param currency either native currency or HOPR tokens
         /// @param recipient the account where the assets should be transferred to
         /// @param amount how many tokens to be transferred
         pub async fn withdraw(&self, recipient: Address, amount: Balance) -> errors::Result<Hash> {
@@ -538,11 +553,13 @@ mod native {
                 ));
             }
 
-            let awaiter = self.chain_api.actions_ref().withdraw(recipient, amount).await?;
-            match awaiter.await {
-                TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
-                _ => Err(errors::HoprLibError::GeneralError("withdraw transaction failed".into())),
-            }
+            Ok(self
+                .chain_api
+                .actions_ref()
+                .withdraw(recipient, amount)
+                .await?
+                .await?
+                .tx_hash)
         }
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
@@ -559,12 +576,10 @@ mod native {
                 .await?;
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
-            match awaiter.await {
-                TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
-                _ => Err(errors::HoprLibError::GeneralError(
-                    "open channel transaction failed".into(),
-                )),
-            }
+            Ok(awaiter.await.map(|confirm| OpenChannelResult {
+                tx_hash: confirm.tx_hash,
+                channel_id,
+            })?)
         }
 
         pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> errors::Result<Hash> {
@@ -574,13 +589,13 @@ mod native {
                 ));
             }
 
-            let awaiter = self.chain_api.actions_ref().fund_channel(*channel_id, *amount).await?;
-            match awaiter.await {
-                TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
-                _ => Err(errors::HoprLibError::GeneralError(
-                    "fund channel transaction failed".into(),
-                )),
-            }
+            Ok(self
+                .chain_api
+                .actions_ref()
+                .fund_channel(*channel_id, *amount)
+                .await?
+                .await
+                .map(|confirm| confirm.tx_hash)?)
         }
 
         pub async fn close_channel(
@@ -595,24 +610,33 @@ mod native {
                 ));
             }
 
-            let awaiter = self
+            let confirmation = self
                 .chain_api
                 .actions_ref()
                 .close_channel(*counterparty, direction, redeem_before_close)
+                .await?
                 .await?;
-            match awaiter.await {
-                TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
-                    tx_hash,
+
+            match confirmation
+                .event
+                .expect("channel close action confirmation must have associated chain event")
+            {
+                ChainEventType::ChannelClosureInitiated(_) => Ok(CloseChannelResult {
+                    tx_hash: confirmation.tx_hash,
                     status: ChannelStatus::PendingToClose,
                 }),
-                TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
-                    tx_hash,
+                ChainEventType::ChannelClosed(_) => Ok(CloseChannelResult {
+                    tx_hash: confirmation.tx_hash,
                     status: ChannelStatus::Closed,
                 }),
                 _ => Err(errors::HoprLibError::GeneralError(
                     "close channel transaction failed".into(),
                 )),
             }
+        }
+
+        pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
+            Ok(self.chain_api.get_channel_closure_notice_period().await?)
         }
 
         pub async fn redeem_all_tickets(&self, only_aggregated: bool) -> errors::Result<()> {
@@ -706,18 +730,14 @@ mod native {
 pub mod wasm_impl {
     use super::*;
 
-    use core_ethereum_actions::payload::SafePayloadGenerator;
-    use core_transport::wasm_impls::PublicNodesResult;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use js_sys::{Array, JsString};
+    use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
 
-    use core_ethereum_api::executors::wasm::{
-        WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator,
-    };
     use core_ethereum_api::ChannelEntry;
-    use core_ethereum_types::ContractAddresses;
+    use core_transport::wasm_impls::PublicNodesResult;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -725,7 +745,7 @@ pub mod wasm_impl {
         traits::ToHex,
     };
 
-    use crate::{chain::wasm::ChainConfiguration, processes::wasm::WasmHoprMessageEmitter};
+    use crate::processes::wasm::WasmHoprMessageEmitter;
 
     #[wasm_bindgen]
     pub struct HoprProcesses {
@@ -736,6 +756,21 @@ pub mod wasm_impl {
         pub fn new(processes: Vec<Pin<Box<dyn Future<Output = components::HoprLoopComponents>>>>) -> Self {
             Self { processes }
         }
+    }
+
+    #[wasm_bindgen(getter_with_clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct SmartContractInfo {
+        pub chain: String,
+        pub hopr_announcements: String,
+        pub hopr_token: String,
+        pub hopr_channels: String,
+        pub hopr_network_registry: String,
+        pub hopr_node_safe_registry: String,
+        pub hopr_ticket_price_oracle: String,
+        pub module_address: String,
+        pub safe_address: String,
+        pub notice_period_channel_closure: u32,
     }
 
     /// Helper object to make sure that the HOPR node remains non-mutable
@@ -766,8 +801,6 @@ pub mod wasm_impl {
     #[wasm_bindgen]
     pub struct Hopr {
         hopr: super::native::Hopr,
-        /// object for querying chain through WASM
-        chain_query: chain::wasm::WasmChainQuery,
         /// Message emitting for WASM environments
         msg_emitter: processes::wasm::WasmHoprMessageEmitter,
     }
@@ -776,15 +809,13 @@ pub mod wasm_impl {
     impl Hopr {
         #[wasm_bindgen(constructor)]
         pub fn _new(
-            cfg: crate::config::HoprLibConfig,
+            cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             db: Database,
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: js_sys::Function,
-            send_eth_tx: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
-            chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: js_sys::Function,           // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self {
@@ -802,30 +833,6 @@ pub mod wasm_impl {
                 cfg.chain.provider.clone().as_ref().map(|v| v.as_str()),
             )
             .expect("Valid configuration leads to valid network");
-
-            // TODO: this needs refactoring of the config structures
-            let contract_addrs = ContractAddresses {
-                announcements: Address::from_str(&chain_config.announcements).unwrap(),
-                channels: Address::from_str(&chain_config.channels).unwrap(),
-                token: Address::from_str(&chain_config.token).unwrap(),
-                price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
-                network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
-                network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
-                stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
-                safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
-                module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
-            };
-
-            // Replace this with an EthereumTransactionExecutor with RpcEthereumClient with NodeJs HTTP requestor
-            // and after the full migration with Native HTTP requestor.
-            let tx_exec = WasmEthereumTransactionExecutor::new(
-                WasmEthereumClient::new(send_eth_tx),
-                WasmTaggingPayloadGenerator(SafePayloadGenerator::new(
-                    &me_onchain,
-                    contract_addrs,
-                    cfg.safe_module.module_address,
-                )),
-            );
 
             Self {
                 hopr: super::native::Hopr::new(
@@ -846,8 +853,6 @@ pub mod wasm_impl {
                         }
                     },
                     chain_config,
-                    tx_exec,
-                    chain_query.clone(),
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {
                             error!("failed to call on_received_packet closure: {:?}", e.as_string());
@@ -862,7 +867,6 @@ pub mod wasm_impl {
                         }
                     },
                 ),
-                chain_query,
                 msg_emitter,
             }
         }
@@ -936,22 +940,20 @@ pub mod wasm_impl {
         /// Get the list of all announced public nodes in the network
         #[wasm_bindgen(js_name = getPublicNodes)]
         pub async fn _get_public_nodes(&self) -> Result<js_sys::Array, JsError> {
-            Ok(js_sys::Array::from_iter(self
-                .hopr
-                .get_public_nodes()
-                .await?
-                .into_iter()
-                .map(|(peer_id, address, multiaddresses)| {
-                    PublicNodesResult {
+            Ok(js_sys::Array::from_iter(
+                self.hopr
+                    .get_public_nodes()
+                    .await?
+                    .into_iter()
+                    .map(|(peer_id, address, multiaddresses)| PublicNodesResult {
                         id: peer_id.to_string().into(),
-                        address: address,
+                        address,
                         multiaddrs: multiaddresses
                             .into_iter()
                             .map(|ma| JsString::from(ma.to_string()))
                             .collect(),
-                    }
-                })
-                .map(JsValue::from)
+                    })
+                    .map(JsValue::from),
             ))
         }
 
@@ -1142,7 +1144,7 @@ pub mod wasm_impl {
                 }
             }
         }
-        
+
         /// List all peers connected to this
         #[wasm_bindgen(js_name = getConnectedPeers)]
         pub async fn _network_connected_peers(&self) -> js_sys::Array {
@@ -1349,50 +1351,40 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen(js_name = smartContractInfo)]
-        pub fn _smart_contract_info(&self) -> Result<ChainConfiguration, JsError> {
-            self.chain_query
-                .smartContractInfo()
-                .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
-                .and_then(|v| {
-                    serde_wasm_bindgen::from_value::<ChainConfiguration>(v)
-                        .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
-                })
+        pub async fn _smart_contract_info(&self) -> Result<SmartContractInfo, JsError> {
+            let cfg = self.hopr.chain_config();
+            Ok(SmartContractInfo {
+                hopr_announcements: cfg.announcements,
+                hopr_token: cfg.token,
+                hopr_channels: cfg.channels,
+                hopr_network_registry: cfg.network_registry,
+                hopr_node_safe_registry: cfg.node_safe_registry,
+                hopr_ticket_price_oracle: cfg.ticket_price_oracle,
+                module_address: self.hopr.get_safe_config().module_address.to_string(),
+                safe_address: self.hopr.get_safe_config().safe_address.to_string(),
+                chain: cfg.chain.id,
+                notice_period_channel_closure: self.hopr.get_channel_closure_notice_period().await?.as_secs() as u32,
+            })
         }
 
         #[wasm_bindgen(js_name = getBalance)]
         pub async fn _balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_balance(BalanceType::HOPR).await?)
         }
 
         #[wasm_bindgen(js_name = getSafeBalance)]
         pub async fn _safe_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getSafeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_safe_balance(BalanceType::HOPR).await?)
         }
 
         #[wasm_bindgen(js_name = getNativeBalance)]
         pub async fn _native_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getNativeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_balance(BalanceType::Native).await?)
         }
 
         #[wasm_bindgen(js_name = getSafeNativeBalance)]
         pub async fn _safe_native_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getSafeNativeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_safe_balance(BalanceType::Native).await?)
         }
 
         #[wasm_bindgen(js_name = peerIdToChainKey)]

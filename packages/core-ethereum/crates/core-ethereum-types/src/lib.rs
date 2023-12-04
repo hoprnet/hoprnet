@@ -18,6 +18,7 @@ use std::sync::Arc;
 use utils_types::primitives::Address;
 
 pub mod actions;
+pub mod chain_events;
 pub mod constants;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;
