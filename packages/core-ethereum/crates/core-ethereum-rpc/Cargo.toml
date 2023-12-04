@@ -26,9 +26,11 @@ js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 primitive-types = "0.12.1"
 pin-project = "1.1.3"
+reqwest = { version = "0.11.22", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde-wasm-bindgen = { workspace = true, optional = true }
+surf = {version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding", "middleware-logger"]}
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
@@ -50,6 +52,7 @@ async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 env_logger = "0.10"
 hex-literal = "0.4"
 mockall = "0.11.4"
+
 reqwest = "0.11.22"
 tokio = { version = "1", features = ["macros"] }
 
@@ -61,3 +64,4 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 prometheus = ["dep:utils-metrics"]
+reqwest = ["dep:reqwest"]

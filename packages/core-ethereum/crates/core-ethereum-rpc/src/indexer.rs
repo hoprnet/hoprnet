@@ -109,12 +109,12 @@ mod test {
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
+    use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
     use utils_log::debug;
     use utils_types::primitives::Address;
 
-    use crate::client::tests::ReqwestRequestor;
-    use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::client::native::ReqwestRequestor;
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
@@ -170,7 +170,7 @@ mod test {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0)
                 .await
                 .expect("could not deploy contracts")
@@ -278,7 +278,7 @@ mod test {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0)
                 .await
                 .expect("could not deploy contracts")

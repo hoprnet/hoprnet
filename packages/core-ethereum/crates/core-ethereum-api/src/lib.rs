@@ -34,7 +34,7 @@ use async_std::task::sleep;
 pub type DefaultHttpPostRequestor = core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfHttpPostRequestor;
+pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfRequestor;
 
 pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;
 

@@ -547,17 +547,16 @@ pub mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractInstances};
+    use core_ethereum_rpc::client::create_rpc_client_to_anvil;
+    use core_ethereum_rpc::client::native::ReqwestRequestor;
+    use core_ethereum_types::{create_anvil, ContractInstances};
     use core_types::{
         acknowledgement::AcknowledgedTicket,
         announcement::{AnnouncementData, KeyBinding},
         channels::Ticket,
     };
     use ethers::{
-        middleware::SignerMiddleware,
-        prelude::k256::ecdsa::SigningKey,
-        providers::{Http, Middleware, Provider},
-        signers::Wallet,
+        providers::Middleware,
         types::{Bytes, Eip1559TransactionRequest, H160, U256},
     };
     use hex_literal::hex;
@@ -587,12 +586,12 @@ pub mod tests {
             .unwrap();
     }
 
-    async fn fund_node(
+    async fn fund_node<M: Middleware>(
         node: &HoprAddress,
         native_token: &U256,
         hopr_token: &U256,
-        hopr_token_contract: HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
-        client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        hopr_token_contract: HoprToken<M>,
+        client: Arc<M>,
     ) -> () {
         let node_address = H160::from_slice(&node.to_bytes());
         let native_transfer_tx = Eip1559TransactionRequest::new().to(node_address).value(native_token);
@@ -612,10 +611,10 @@ pub mod tests {
             .unwrap();
     }
 
-    async fn fund_channel(
+    async fn fund_channel<M: Middleware>(
         counterparty: Address,
-        hopr_token: HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
-        hopr_channels: HoprChannels<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        hopr_token: HoprToken<M>,
+        hopr_channels: HoprChannels<M>,
     ) {
         hopr_token
             .approve(hopr_channels.address(), 1u128.into())
@@ -640,7 +639,7 @@ pub mod tests {
 
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
@@ -687,7 +686,7 @@ pub mod tests {
         let anvil = create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice)
@@ -752,7 +751,7 @@ pub mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",
             client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
