@@ -16,6 +16,9 @@ pub trait InboxBackend<T: Copy + Default, M: Clone> {
     /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
 
+    /// Either returns the tag, or get the tag of the oldest entry in the queue.
+    fn tag_resolution(&mut self, tag: Option<T>) -> Option<T>;
+
     /// Push a new entry with an optional `tag`.
     async fn push(&mut self, tag: Option<T>, payload: M);
 

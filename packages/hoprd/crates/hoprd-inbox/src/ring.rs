@@ -18,6 +18,7 @@ struct PayloadWrapper<M> {
 pub struct RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
+    M: Copy,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
@@ -27,6 +28,7 @@ where
 impl<T, M> RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
+    M: Copy
 {
     /// Creates new backend with default timestamping function from std::time.
     /// This is incompatible with WASM runtimes.
@@ -49,7 +51,7 @@ where
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone,
+    M: Clone + Copy,
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
@@ -58,6 +60,28 @@ where
             buffers: HashMap::new(),
             ts,
         }
+    }
+
+    fn tag_resolution(&mut self, tag: Option<T>) -> Option<T>{
+        let specific_tag = match tag {
+            // If no tag was given, we need to find a tag which has the oldest entry in it
+            None => self
+                .buffers
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    // Compare timestamps of the oldest entries in buckets
+                    // Empty buckets are moved away
+                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    ts_a.cmp(&ts_b)
+                })
+                .map(|(t, _)| *t)?,
+
+            // If a tag was given, just use it
+            Some(t) => t,
+        };
+
+        Some(specific_tag)
     }
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
@@ -84,23 +108,7 @@ where
     }
 
     async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
-        let specific_tag = match tag {
-            // If no tag was given, we need to find a tag which has the oldest entry in it
-            None => self
-                .buffers
-                .iter()
-                .min_by(|(_, a), (_, b)| {
-                    // Compare timestamps of the oldest entries in buckets
-                    // Empty buckets are moved away
-                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    ts_a.cmp(&ts_b)
-                })
-                .map(|(t, _)| *t)?,
-
-            // If a tag was given, just use it
-            Some(t) => t,
-        };
+        let specific_tag = self.tag_resolution(tag).unwrap();
 
         self.buffers
             .get_mut(&specific_tag)
@@ -134,24 +142,10 @@ where
         }
     }
 
-    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
-        let specific_tag = match tag {
-            // If no tag was given, we need to find a tag which has the oldest entry in it
-            None => self
-                .buffers
-                .iter()
-                .min_by(|(_, a), (_, b)| {
-                    // Compare timestamps of the oldest entries in buckets
-                    // Empty buckets are moved away
-                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    ts_a.cmp(&ts_b)
-                })
-                .map(|(t, _)| *t)?,
+    
 
-            // If a tag was given, just use it
-            Some(t) => t,
-        };
+    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
+        let specific_tag = self.tag_resolution(tag).unwrap();
 
         self.buffers
             .get_mut(&specific_tag)
@@ -171,7 +165,7 @@ where
                 // Peek across all the tags, need to sort again based on the timestamp
                 let mut all = self
                     .buffers
-                    .drain()
+                    .into_iter()
                     .flat_map(|(_, buf)| buf.into_iter())
                     .collect::<Vec<_>>();
 
