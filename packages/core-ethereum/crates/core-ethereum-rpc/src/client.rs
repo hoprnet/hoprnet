@@ -180,10 +180,11 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native {
     use async_trait::async_trait;
-    use reqwest::header::{HeaderValue, CONTENT_TYPE};
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
-    use utils_log::debug;
+
+    #[cfg(feature = "reqwest")]
+    use reqwest::header::{HeaderValue, CONTENT_TYPE};
 
     use crate::errors::HttpRequestError;
     use crate::HttpPostRequestor;
@@ -230,7 +231,7 @@ pub mod native {
             let mut body = surf::Body::from_string(json_data.to_owned());
             body.set_mime("application/json");
 
-            debug!("-> http post {url}: {json_data}");
+            //debug!("-> http post {url}: {json_data}");
 
             let mut response = self
                 .0
@@ -246,18 +247,18 @@ pub mod native {
                 .await
                 .map_err(|e| HttpRequestError::HttpError(e.status().into()))?;
 
-            debug!("<- http post response len={}", data.len());
+            //debug!("<- http post response len={}", data.len());
 
             Ok(data)
         }
     }
 
     /// HTTP client that uses a Tokio-runtime based HTTP client library, such as `reqwest`.
-    #[cfg(any(feature = "reqwest", test))]
+    #[cfg(feature = "reqwest")]
     #[derive(Debug)]
     pub struct ReqwestRequestor(reqwest::Client);
 
-    #[cfg(any(feature = "reqwest", test))]
+    #[cfg(feature = "reqwest")]
     impl ReqwestRequestor {
         pub fn new(cfg: GeneralHttpPostRequestorConfig) -> Self {
             Self(
@@ -269,18 +270,18 @@ pub mod native {
         }
     }
 
-    #[cfg(any(feature = "reqwest", test))]
+    #[cfg(feature = "reqwest")]
     impl Default for ReqwestRequestor {
         fn default() -> Self {
             Self::new(GeneralHttpPostRequestorConfig::default())
         }
     }
 
-    #[cfg(any(feature = "reqwest", test))]
+    #[cfg(feature = "reqwest")]
     #[async_trait]
     impl HttpPostRequestor for ReqwestRequestor {
         async fn http_post(&self, url: &str, json_data: &str) -> Result<String, HttpRequestError> {
-            debug!("-> http post {url}: {json_data}");
+            //debug!("-> http post {url}: {json_data}");
 
             let resp = self
                 .0
@@ -304,7 +305,7 @@ pub mod native {
                 .await
                 .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))?;
 
-            debug!("<- http post response with {}", data.len());
+            //debug!("<- http post response with {}", data.len());
 
             Ok(data)
         }
@@ -335,17 +336,17 @@ pub mod tests {
     use std::time::Duration;
     use utils_types::primitives::Address;
 
-    use crate::client::native::ReqwestRequestor;
+    use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient};
     use crate::errors::JsonRpcProviderClientError;
     use crate::MockHttpPostRequestor;
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_client_should_deploy_contracts() {
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
         let contract_addrs = ContractAddresses::from(
             &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
@@ -361,17 +362,17 @@ pub mod tests {
         assert_ne!(contract_addrs.price_oracle, Address::default());
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_client_should_get_block_number() {
         let block_time = Duration::from_secs(1);
 
         let anvil = create_anvil(Some(block_time));
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let mut last_number = 0;
 
         for _ in 0..3 {
-            tokio::time::sleep(block_time).await;
+            async_std::task::sleep(block_time).await;
 
             let number: ethers::types::U64 = client
                 .request("eth_blockNumber", ())
@@ -383,10 +384,10 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_client_should_fail_on_malformed_request() {
         let anvil = create_anvil(None);
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let err = client
             .request::<_, ethers::types::U64>("eth_blockNumber_bla", ())
@@ -395,7 +396,7 @@ pub mod tests {
         assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(..)));
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_client_should_fail_on_malformed_response() {
         let mut mock_requestor = MockHttpPostRequestor::new();
 

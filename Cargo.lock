@@ -1286,7 +1286,7 @@ dependencies = [
  "env_logger",
  "ethers",
  "futures",
- "gloo-timers 0.3.0",
+ "futures-timer",
  "hex",
  "hex-literal",
  "js-sys",
@@ -1297,7 +1297,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "thiserror",
- "tokio",
  "utils-db",
  "utils-log",
  "utils-metrics",
@@ -1424,7 +1423,7 @@ dependencies = [
  "ethers-providers",
  "ethnum",
  "futures",
- "gloo-timers 0.3.0",
+ "futures-timer",
  "hex",
  "hex-literal",
  "js-sys",
@@ -1438,7 +1437,6 @@ dependencies = [
  "serde_json",
  "surf",
  "thiserror",
- "tokio",
  "utils-db",
  "utils-log",
  "utils-metrics",
@@ -6617,19 +6615,7 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2 0.5.3",
- "tokio-macros",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "630bdcf245f78637c13ec01ffae6187cca34625e8c63150d424b59e55af2675e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.29",
 ]
 
 [[package]]

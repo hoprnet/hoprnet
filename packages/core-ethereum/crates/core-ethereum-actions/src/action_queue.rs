@@ -16,6 +16,7 @@ use core_types::{
 };
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -31,11 +32,10 @@ use crate::errors::CoreEthereumActionsError::{
 use crate::errors::Result;
 
 #[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::{sleep, spawn_local};
-use serde::{Deserialize, Serialize};
+use async_std::task::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
+use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -311,7 +311,7 @@ where
 
         // Register new expectation and await it with timeout
         let confirmation = self.action_state.register_expectation(expectation).await?.fuse();
-        let timeout = sleep(self.cfg.max_action_confirmation_wait).fuse();
+        let timeout = futures_timer::Delay::new(self.cfg.max_action_confirmation_wait).fuse();
 
         pin_mut!(confirmation, timeout);
 

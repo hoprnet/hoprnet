@@ -548,7 +548,7 @@ pub mod tests {
         types::{Hash, Response},
     };
     use core_ethereum_rpc::client::create_rpc_client_to_anvil;
-    use core_ethereum_rpc::client::native::ReqwestRequestor;
+    use core_ethereum_rpc::client::native::SurfRequestor;
     use core_ethereum_types::{create_anvil, ContractInstances};
     use core_types::{
         acknowledgement::AcknowledgedTicket,
@@ -633,13 +633,13 @@ pub mod tests {
             .unwrap();
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_announce() {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
 
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
@@ -681,12 +681,12 @@ pub mod tests {
             .is_some());
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn redeem_ticket() {
         let anvil = create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
-        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice)
@@ -751,7 +751,7 @@ pub mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
-        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_bob);
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",
             client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
