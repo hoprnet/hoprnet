@@ -229,10 +229,10 @@ pub fn build_p2p_network(
     mplex_config.set_max_num_streams(512);
 
     // libp2p default is 32 Bytes
-    // we use 2MB, just above the uniform hopr message size, trade off memory for less scheduler
+    // we use 2KB, just above the uniform hopr message size, trade off memory for less scheduler
     // switching
     // FIXME: benchmark and find appropriate values
-    mplex_config.set_max_buffer_size(2 * 1024 * 1024);
+    mplex_config.set_max_buffer_size(2 * 1024);
 
     // libp2p default is 8 KBytes
     // we use the allowed max 1MB, trade off memory for less scheduler
@@ -242,7 +242,7 @@ pub fn build_p2p_network(
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
         .authenticate(libp2p_noise::Config::new(&me).expect("signing libp2p-noise static keypair"))
-        .multiplex(mplex_config.clone())
+        .multiplex(mplex_config)
         .timeout(std::time::Duration::from_secs(60))
         .boxed();
 
