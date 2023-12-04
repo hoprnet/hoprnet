@@ -9,10 +9,10 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
 use utils_types::primitives::{Address, Balance};
-use serde::{Deserialize, Serialize};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
