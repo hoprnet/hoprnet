@@ -79,7 +79,7 @@ PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --network anvil-localhost \
     --use-local-identities --identity-directory "/app/.hoprd-db" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts" \
     --hopr-amount 10 --native-amount 0.1
 ```
@@ -216,7 +216,7 @@ PRIVATE_KEY=<bank_private_key> \
 IDENTITY_PASSWORD=local \
     cargo run -- faucet --network anvil-localhost \
     --use-local-identities --identity-directory "/tmp" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts"  \
     --hopr-amount 10 --native-amount 0.1
 ```
