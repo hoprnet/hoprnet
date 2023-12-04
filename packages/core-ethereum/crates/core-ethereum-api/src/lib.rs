@@ -16,7 +16,7 @@ use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_types::primitives::{Address, Balance};
+use utils_types::primitives::{Address, Balance, U256};
 
 use crate::errors::HoprChainError;
 
@@ -104,6 +104,10 @@ impl HoprChain {
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.db.read().await.get_channels().await?)
+    }
+
+    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
+        Ok(self.db.read().await.get_ticket_price().await?)
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {

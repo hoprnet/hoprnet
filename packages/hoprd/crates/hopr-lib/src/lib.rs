@@ -536,7 +536,8 @@ mod native {
 
         /// Get ticket price
         pub async fn get_ticket_price(&self) -> errors::Result<U256> {
-            Ok(self.transport_api.get_ticket_price().await?)
+            // Ok(self.transport_api.get_ticket_price().await?)
+            Ok(self.chain_api.get_ticket_price().await?)
         }
         
         // Chain =========

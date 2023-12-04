@@ -6,6 +6,7 @@ import { Hopr } from '@hoprnet/hopr-utils'
 const GET: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
+    req.context.node.getTicketStatistics
 
     try {
       const ticket_price = await node.getTicketPrice()

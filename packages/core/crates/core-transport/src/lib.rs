@@ -52,15 +52,10 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{error, info};
-use utils_types::primitives::{Address, U256};
+use utils_types::primitives::Address;
 
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
-
-lazy_static::lazy_static! {
-    /// Fixed price per packet to 0.01 HOPR
-    static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
-}
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -271,7 +266,7 @@ pub mod wasm_impls {
     use futures::pin_mut;
     use js_sys::JsString;
     use utils_log::debug;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
@@ -644,12 +639,6 @@ pub mod wasm_impls {
                 rejected: db.get_rejected_tickets_count().await? as u32,
                 rejected_value: db.get_rejected_tickets_value().await?,
             })
-        }
-
-        pub async fn get_ticket_price(&self) -> errors::Result<U256> {
-            let db = self.db.read().await;
-
-            Ok(db.get_ticket_price().await?.unwrap_or(*DEFAULT_PRICE_PER_PACKET))
         }
 
         pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
