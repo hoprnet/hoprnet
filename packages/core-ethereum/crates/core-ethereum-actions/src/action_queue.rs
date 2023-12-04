@@ -20,6 +20,7 @@ use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
@@ -31,29 +32,27 @@ use crate::errors::Result;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
+use serde::{Deserialize, Serialize};
 
 #[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_SUCCESSFUL_ACTS: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_COUNT_SUCCESSFUL_ACTIONS: SimpleCounter = SimpleCounter::new(
         "core_ethereum_counter_successful_actions",
         "Number of successful actions"
     )
     .unwrap();
-    static ref METRIC_COUNT_FAILED_ACTS: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_COUNT_FAILED_ACTIONS: SimpleCounter = SimpleCounter::new(
         "core_ethereum_counter_failed_actions",
         "Number of failed actions"
     )
     .unwrap();
-    static ref METRIC_COUNT_TIMEOUT_ACTS: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_COUNT_TIMEOUT_ACTIONS: SimpleCounter = SimpleCounter::new(
         "core_ethereum_counter_timeout_actions",
         "Number of timed out actions"
     )
@@ -140,76 +139,71 @@ impl ActionSender {
     }
 }
 
-/// A queue of outgoing Ethereum transactions.
-/// This queue awaits new transactions to arrive and calls the corresponding
-/// method of the `TransactionExecutor` to execute it and await its confirmation.
-pub struct ActionQueue<Db, S, TxExec>
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActionQueueConfig {
+    /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    /// Defaults to 150 seconds.
+    pub max_action_confirmation_wait: Duration,
+}
+
+impl Default for ActionQueueConfig {
+    fn default() -> Self {
+        Self {
+            max_action_confirmation_wait: Duration::from_secs(150),
+        }
+    }
+}
+
+struct ExecutionContext<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
     db: Arc<RwLock<Db>>,
-    queue_send: Sender<(Action, ActionFinisher)>,
-    queue_recv: Receiver<(Action, ActionFinisher)>,
     action_state: Arc<S>,
     tx_exec: Arc<TxExec>,
+    cfg: ActionQueueConfig,
 }
 
-impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
+// Needs manual implementation, so we don't need to impose Clone restrictions on the generic args
+impl<Db, S, TxExec> Clone for ExecutionContext<Db, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + 'static,
-    TxExec: TransactionExecutor + 'static,
-    S: ActionState + 'static,
+    Db: HoprCoreEthereumDbActions,
+    S: ActionState,
+    TxExec: TransactionExecutor,
 {
-    /// Number of pending transactions in the queue
-    pub const ACTION_QUEUE_SIZE: usize = 2048;
-
-    /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
-    pub const MAX_ACTION_CONFIRMATION_WAIT_SECS: u64 = 150;
-
-    /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec) -> Self {
-        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
+    fn clone(&self) -> Self {
         Self {
-            db,
-            action_state: Arc::new(action_state),
-            queue_send,
-            queue_recv,
-            tx_exec: Arc::new(tx_exec),
+            db: self.db.clone(),
+            action_state: self.action_state.clone(),
+            tx_exec: self.tx_exec.clone(),
+            cfg: self.cfg.clone(),
         }
     }
+}
 
-    /// Creates a new producer of actions for this queue.
-    pub fn new_sender(&self) -> ActionSender {
-        ActionSender(self.queue_send.clone())
-    }
-
-    /// Clones the `ActionState` implementation.
-    pub fn action_state(&self) -> Arc<S> {
-        self.action_state.clone()
-    }
-
-    async fn execute_action(
-        db: Arc<RwLock<Db>>,
-        tx_exec: Arc<TxExec>,
-        action: Action,
-        action_state: Arc<S>,
-    ) -> Result<ActionConfirmation> {
+impl<Db, S, TxExec> ExecutionContext<Db, S, TxExec>
+where
+    Db: HoprCoreEthereumDbActions,
+    S: ActionState,
+    TxExec: TransactionExecutor,
+{
+    pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(mut ack) => match &ack.status {
+            Action::RedeemTicket(mut ack) => match ack.status {
                 BeingRedeemed { .. } => {
-                    match tx_exec.redeem_ticket(ack.clone()).await {
+                    match self.tx_exec.redeem_ticket(ack.clone()).await {
                         Ok(tx_hash) => IndexerExpectation::new(
                             tx_hash,
-                            move |e| matches!(e, ChainEventType::TicketRedeem(_, Some(ticket)) if ack.eq(ticket)),
+                            move |event| matches!(event, ChainEventType::TicketRedeemed(_, Some(ticket)) if ack.eq(ticket)),
                         ),
                         Err(e) => {
                             // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
 
                             error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                            if let Err(e) = self.db.write().await.update_acknowledged_ticket(&ack).await {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
 
@@ -221,19 +215,19 @@ where
             },
 
             Action::OpenChannel(address, stake) => {
-                let tx_hash = tx_exec.fund_channel(address, stake).await?;
+                let tx_hash = self.tx_exec.fund_channel(address, stake).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |e| matches!(e, ChainEventType::ChannelOpened(channel) if channel.destination == address),
+                    move |event| matches!(event, ChainEventType::ChannelOpened(channel) if channel.destination == address),
                 )
             }
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == Open {
-                    let tx_hash = tx_exec.fund_channel(channel.destination, amount).await?;
+                    let tx_hash = self.tx_exec.fund_channel(channel.destination, amount).await?;
                     IndexerExpectation::new(
                         tx_hash,
-                        move |e| matches!(e, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
+                        move |event| matches!(event, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
                     )
                 } else {
                     return Err(InvalidState(format!("cannot fund {channel} because it is not opened")));
@@ -243,10 +237,10 @@ where
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     Open | PendingToClose => {
-                        let tx_hash = tx_exec.close_incoming_channel(channel.source).await?;
+                        let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
-                            move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
+                            move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
                     Closed => {
@@ -257,19 +251,25 @@ where
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        let tx_hash = tx_exec.initiate_outgoing_channel_closure(channel.destination).await?;
+                        let tx_hash = self
+                            .tx_exec
+                            .initiate_outgoing_channel_closure(channel.destination)
+                            .await?;
                         IndexerExpectation::new(
                             tx_hash,
-                            move |e| matches!(e, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
+                            move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
 
                     PendingToClose => {
                         debug!("finalizing closure of {channel}");
-                        let tx_hash = tx_exec.finalize_outgoing_channel_closure(channel.destination).await?;
+                        let tx_hash = self
+                            .tx_exec
+                            .finalize_outgoing_channel_closure(channel.destination)
+                            .await?;
                         IndexerExpectation::new(
                             tx_hash,
-                            move |e| matches!(e, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
+                            move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
 
@@ -285,23 +285,23 @@ where
                 // so no indexer event stream expectation awaiting is needed.
                 // So simply return once the future completes
                 return Ok(ActionConfirmation {
-                    tx_hash: tx_exec.withdraw(recipient, amount).await?,
+                    tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
                     action: action.clone(),
                 });
             }
             Action::Announce(data) => {
-                let tx_hash = tx_exec.announce(data.clone()).await?;
+                let tx_hash = self.tx_exec.announce(data.clone()).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |e| matches!(e, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
+                    move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
                 )
             }
             Action::RegisterSafe(safe_address) => {
-                let tx_hash = tx_exec.register_safe(safe_address).await?;
+                let tx_hash = self.tx_exec.register_safe(safe_address).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |e| matches!(e, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
+                    move |event| matches!(event, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
                 )
             }
         };
@@ -310,8 +310,8 @@ where
         debug!("action {action} submitted via tx {tx_hash}, registering expectation");
 
         // Register new expectation and await it with timeout
-        let confirmation = action_state.register_expectation(expectation).await?.fuse();
-        let timeout = sleep(std::time::Duration::from_secs(Self::MAX_ACTION_CONFIRMATION_WAIT_SECS)).fuse();
+        let confirmation = self.action_state.register_expectation(expectation).await?.fuse();
+        let timeout = sleep(self.cfg.max_action_confirmation_wait).fuse();
 
         pin_mut!(confirmation, timeout);
 
@@ -322,45 +322,92 @@ where
                 action,
             }),
             Either::Left((Err(_), _)) => {
-                action_state.unregister_expectation(tx_hash).await;
+                self.action_state.unregister_expectation(tx_hash).await;
                 Err(InvalidState("action expectation was removed before resolving".into()))
             }
             Either::Right(_) => {
-                action_state.unregister_expectation(tx_hash).await;
+                self.action_state.unregister_expectation(tx_hash).await;
                 Err(Timeout)
             }
         }
+    }
+}
+
+/// A queue of outgoing Ethereum transactions.
+/// This queue awaits new transactions to arrive and calls the corresponding
+/// method of the `TransactionExecutor` to execute it and await its confirmation.
+pub struct ActionQueue<Db, S, TxExec>
+where
+    Db: HoprCoreEthereumDbActions,
+    S: ActionState,
+    TxExec: TransactionExecutor,
+{
+    queue_send: Sender<(Action, ActionFinisher)>,
+    queue_recv: Receiver<(Action, ActionFinisher)>,
+    ctx: ExecutionContext<Db, S, TxExec>,
+}
+
+impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
+where
+    Db: HoprCoreEthereumDbActions + 'static,
+    TxExec: TransactionExecutor + 'static,
+    S: ActionState + 'static,
+{
+    /// Number of pending transactions in the queue
+    pub const ACTION_QUEUE_SIZE: usize = 2048;
+
+    /// Creates a new instance with the given `TransactionExecutor` implementation.
+    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
+        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
+        Self {
+            ctx: ExecutionContext {
+                db,
+                action_state: Arc::new(action_state),
+                tx_exec: Arc::new(tx_exec),
+                cfg,
+            },
+            queue_send,
+            queue_recv,
+        }
+    }
+
+    /// Creates a new producer of actions for this queue.
+    pub fn new_sender(&self) -> ActionSender {
+        ActionSender(self.queue_send.clone())
+    }
+
+    /// Clones the `ActionState` implementation.
+    pub fn action_state(&self) -> Arc<S> {
+        self.ctx.action_state.clone()
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(self) {
         while let Ok((act, tx_finisher)) = self.queue_recv.recv().await {
-            let db_clone = self.db.clone();
-            let tx_exec_clone = self.tx_exec.clone();
-            let act_id = act.to_string();
-            let action_state = self.action_state.clone();
-
+            let exec_context = self.ctx.clone();
             spawn_local(async move {
+                let act_id = act.to_string();
                 debug!("start executing {act_id}");
-                let tx_result = Self::execute_action(db_clone, tx_exec_clone, act, action_state).await;
+
+                let tx_result = exec_context.execute_action(act).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!("successful {confirmation}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_SUCCESSFUL_ACTS.increment();
+                        METRIC_COUNT_SUCCESSFUL_ACTIONS.increment();
                     }
                     Err(Timeout) => {
                         error!("timeout while waiting for confirmation of {act_id}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_TIMEOUT_ACTS.increment();
+                        METRIC_COUNT_TIMEOUT_ACTIONS.increment();
                     }
                     Err(err) => {
                         error!("{act_id} failed: {err}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_FAILED_ACTS.increment();
+                        METRIC_COUNT_FAILED_ACTIONS.increment();
                     }
                 }
 

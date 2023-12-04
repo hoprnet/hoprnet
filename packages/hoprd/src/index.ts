@@ -193,7 +193,8 @@ async function main() {
     // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
     // if safe address or module address is not provided, replace with values stored in the db
     const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
-    let { node, loops } = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    let node = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    let loops = await node.run()
 
     // Subscribe to node events
     log('Subscribing incoming messages to inbox')

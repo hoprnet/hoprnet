@@ -256,7 +256,7 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
 
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
@@ -293,7 +293,12 @@ mod tests {
             *ALICE,
         )));
 
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         let channel = ChannelEntry::new(
             *ALICE,
@@ -353,7 +358,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -386,7 +396,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -430,7 +445,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -462,7 +482,12 @@ mod tests {
             self_addr,
         )));
 
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -552,7 +577,7 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -590,7 +615,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -630,7 +660,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -673,7 +708,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -704,7 +744,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             self_addr,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         db.write()
             .await
@@ -802,7 +847,7 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -906,7 +951,7 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -962,7 +1007,12 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -987,7 +1037,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
@@ -1013,7 +1068,12 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             *ALICE,
         )));
-        let tx_queue = ActionQueue::new(db.clone(), MockActionState::new(), MockTransactionExecutor::new());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(

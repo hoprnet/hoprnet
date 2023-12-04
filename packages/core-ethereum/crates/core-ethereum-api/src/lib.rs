@@ -7,6 +7,7 @@ pub use core_types::channels::ChannelEntry;
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
 use std::sync::Arc;
+use std::time::Duration;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
@@ -18,33 +19,24 @@ use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::info;
-use utils_types::primitives::{Address, Balance};
+use utils_log::{error, info, warn};
+use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::{HoprChainError, Result};
 
-#[cfg(feature = "wasm")]
-pub type JsonRpcClient =
-    core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
-// Alternatively, core_ethereum_rpc::client::JsonRpcProviderClient<ReqwestHttpPostRequestor>
-// if more customizability is needed.
-#[cfg(not(feature = "wasm"))]
-pub type JsonRpcClient = ethers::providers::Http;
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep;
 
-#[cfg(feature = "wasm")]
-pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
-    core_ethereum_rpc::client::JsonRpcProviderClient::new(
-        base_url,
-        core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor::default(),
-    )
-}
+#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
+pub type DefaultHttpPostRequestor = core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor;
 
-#[cfg(not(feature = "wasm"))]
-pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
-    use std::str::FromStr;
-    ethers::providers::Http::from_str(base_url).expect("invalid provider URL")
-}
+#[cfg(not(target_arch = "wasm32"))]
+pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfHttpPostRequestor;
+
+pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;
 
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     me: Address,
@@ -54,7 +46,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     let target_address = rpc.get_module_target_address().await?;
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
-        return Err(HoprChainError::Api("safe is not a target of module".into()));
+        return Err(HoprChainError::Api("safe is not the module target".into()));
     }
 
     let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
@@ -71,6 +63,38 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
         info!("Node is associated with correct Safe in NodeSafeRegistry");
         Ok(false)
     }
+}
+
+/// Waits until the given address is funded.
+/// This is done by querying the RPC provider for balance with backoff until `max_delay`
+pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
+    address: Address,
+    min_balance: Balance,
+    max_delay: Duration,
+    rpc: &Rpc,
+) -> Result<()> {
+    let multiplier = 1.05;
+    let mut current_delay = Duration::from_secs(2).min(max_delay);
+
+    while current_delay <= max_delay {
+        match rpc.get_balance(address, min_balance.balance_type()).await {
+            Ok(current_balance) => {
+                info!("current balance is {}", current_balance.to_formatted_string());
+                if current_balance.gte(&min_balance) {
+                    info!("node is funded");
+                    return Ok(());
+                } else {
+                    warn!("still unfunded, trying again soon");
+                }
+            }
+            Err(e) => error!("failed to fetch balance from the chain: {e}"),
+        }
+
+        sleep(current_delay).await;
+        current_delay = current_delay.mul_f64(multiplier);
+    }
+
+    Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -180,6 +204,18 @@ impl HoprChain {
 
     pub fn rpc(&self) -> &RpcOperations<JsonRpcClient> {
         &self.rpc_operations
+    }
+
+    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_balance(self.me_onchain(), balance_type).await?)
+    }
+
+    pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    }
+
+    pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
+        Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
     }
 }
 

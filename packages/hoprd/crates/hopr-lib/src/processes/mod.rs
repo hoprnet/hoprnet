@@ -79,7 +79,7 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                 ChainEventType::ChannelClosed(channel) |
                 ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
                 ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
-                ChainEventType::TicketRedeem(channel, _) => {   // needed ?
+                ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
                     let change = channel_graph.write().await.update_channel(channel);
 

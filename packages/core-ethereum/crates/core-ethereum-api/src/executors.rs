@@ -10,7 +10,9 @@ use core_types::announcement::AnnouncementData;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
 use std::marker::PhantomData;
+use std::time::Duration;
 use utils_types::primitives::{Address, Balance};
+use serde::{Deserialize, Serialize};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
@@ -32,18 +34,32 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
     async fn post_transaction_and_await_confirmation(&self, tx: T) -> core_ethereum_rpc::errors::Result<Hash>;
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RpcEthereumClientConfig {
+    /// Maximum time to wait for the TX to get submitted.
+    /// This must be strictly greater than any timeouts in the underlying `HoprRpcOperations`
+    /// Defaults to 30 seconds.
+    pub max_tx_submission_wait: Duration,
+}
+
+impl Default for RpcEthereumClientConfig {
+    fn default() -> Self {
+        Self {
+            max_tx_submission_wait: Duration::from_secs(30),
+        }
+    }
+}
+
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.
 #[derive(Clone)]
 pub struct RpcEthereumClient<Rpc: HoprRpcOperations> {
     rpc: Rpc,
+    cfg: RpcEthereumClientConfig,
 }
 
 impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
-    /// Maximum time to wait for the TX to get submitted.
-    pub const MAX_TX_SUBMISSION_WAIT_SECS: u64 = 30;
-
-    pub fn new(rpc: Rpc) -> Self {
-        Self { rpc }
+    pub fn new(rpc: Rpc, cfg: RpcEthereumClientConfig) -> Self {
+        Self { rpc, cfg }
     }
 
     async fn post_tx_with_timeout(
@@ -51,7 +67,7 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
         tx: TypedTransaction,
     ) -> core_ethereum_rpc::errors::Result<PendingTransaction> {
         let submit_tx = self.rpc.send_transaction(tx).fuse();
-        let timeout = sleep(std::time::Duration::from_secs(Self::MAX_TX_SUBMISSION_WAIT_SECS)).fuse();
+        let timeout = sleep(self.cfg.max_tx_submission_wait).fuse();
         pin_mut!(submit_tx, timeout);
 
         match futures::future::select(submit_tx, timeout).await {

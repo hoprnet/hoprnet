@@ -15,7 +15,6 @@ import {
 import EventEmitter from 'events'
 import path from 'path'
 import { rmSync, readFileSync, writeFileSync } from 'fs'
-import { HoprProcesses } from '../lib/hoprd_hoprd.js'
 
 const log = debug(`hopr-lib:create-components`)
 
@@ -48,7 +47,7 @@ export async function createHoprNode(
   chainKeypair: ChainKeypair,
   packetKeypair: OffchainKeypair,
   cfg: HoprLibConfig
-): Promise<{ node: Hopr; loops: HoprProcesses }> {
+): Promise<Hopr> {
   // pre-flight checks
   if (!cfg.chain.announce) {
     throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
@@ -122,7 +121,5 @@ export async function createHoprNode(
     onAcknowledgement
   )
 
-  let processes = await hopr.run()
-
-  return { node: hopr, loops: processes }
+  return hopr
 }

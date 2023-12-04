@@ -91,6 +91,7 @@ export {
   SimpleGauge,
   SimpleHistogram,
   SimpleTimer,
+  SmartContractInfo,
   Snapshot,
   Ticket,
   U256,

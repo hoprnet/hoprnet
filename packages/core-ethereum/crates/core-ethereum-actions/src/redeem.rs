@@ -233,7 +233,7 @@ mod tests {
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_types::chain_events::ChainEventType::TicketRedeem;
+    use core_ethereum_types::chain_events::ChainEventType::TicketRedeemed;
     use core_ethereum_types::chain_events::SignificantChainEvent;
     use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
@@ -355,7 +355,7 @@ mod tests {
                 .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
+                        event_type: TicketRedeemed(channel_from_bob, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -369,7 +369,7 @@ mod tests {
                 .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_charlie, Some(tkt)),
+                        event_type: TicketRedeemed(channel_from_charlie, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -395,7 +395,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -470,7 +470,7 @@ mod tests {
                 .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
+                        event_type: TicketRedeemed(channel_from_bob, Some(tkt)),
                     })
                     .boxed())
                 });
@@ -485,7 +485,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
@@ -575,14 +575,14 @@ mod tests {
                 .return_once(move |_| {
                     Ok(futures::future::ok(SignificantChainEvent {
                         tx_hash: random_hash,
-                        event_type: TicketRedeem(channel_from_bob, Some(tkt)),
+                        event_type: TicketRedeemed(channel_from_bob, Some(tkt)),
                     })
                     .boxed())
                 });
         }
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec);
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;

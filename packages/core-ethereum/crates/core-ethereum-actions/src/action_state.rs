@@ -5,6 +5,7 @@ use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use utils_log::{debug, error};
@@ -36,7 +37,15 @@ pub trait ActionState {
 pub struct IndexerExpectation {
     /// Required TX hash
     pub tx_hash: Hash,
-    event_expectation: Box<dyn Fn(&ChainEventType) -> bool>,
+    predicate: Box<dyn Fn(&ChainEventType) -> bool>,
+}
+
+impl Debug for IndexerExpectation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndexerExpectation")
+            .field("tx_hash", &self.tx_hash)
+            .finish_non_exhaustive()
+    }
 }
 
 impl IndexerExpectation {
@@ -47,18 +56,19 @@ impl IndexerExpectation {
     {
         Self {
             tx_hash,
-            event_expectation: Box::new(expectation),
+            predicate: Box::new(expectation),
         }
     }
 
     /// Evaluates if the given event satisfies this expectation.
     pub fn test(&self, event: &SignificantChainEvent) -> bool {
-        event.tx_hash == self.tx_hash && (self.event_expectation)(&event.event_type)
+        event.tx_hash == self.tx_hash && (self.predicate)(&event.event_type)
     }
 }
 
 type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sender<SignificantChainEvent>)>;
 
+#[derive(Debug)]
 pub struct IndexerActionTracker {
     expectations: RwLock<ExpectationTable>,
 }
@@ -90,23 +100,24 @@ impl ActionState for IndexerActionTracker {
         matched_keys
             .into_iter()
             .filter_map(|key| {
-                let (exp, sender) = db.remove(&key).unwrap();
-                match sender.send(event.clone()) {
-                    Ok(_) => {
-                        debug!("expectation resolved in {:?}", event);
-                        Some(exp)
-                    }
-                    Err(_) => {
-                        error!(
-                            "failed to resolve actions in {:?}, because the action confirmation already timed out",
-                            event
-                        );
-                        None
-                    }
-                }
+                db.remove(&key)
+                    .and_then(|(exp, sender)| match sender.send(event.clone()) {
+                        Ok(_) => {
+                            debug!("expectation resolved in {:?}", event);
+                            Some(exp)
+                        }
+                        Err(_) => {
+                            error!(
+                                "failed to resolve actions in {:?}, because the action confirmation already timed out",
+                                event
+                            );
+                            None
+                        }
+                    })
             })
             .collect()
     }
+
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
         match self.expectations.write().await.entry(exp.tx_hash) {
             Entry::Occupied(_) => {
@@ -125,6 +136,7 @@ impl ActionState for IndexerActionTracker {
             }
         }
     }
+
     async fn unregister_expectation(&self, tx_hash: Hash) {
         self.expectations.write().await.remove(&tx_hash);
     }

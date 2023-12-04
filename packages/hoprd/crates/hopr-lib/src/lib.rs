@@ -29,10 +29,7 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 use crate::chain::ChainNetworkConfig;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport, gloo_timers::future::sleep};
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
+use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -80,10 +77,8 @@ pub use wasm_impl::Hopr;
 mod native {
     use crate::config::SafeModule;
     use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
-    use crate::errors::HoprLibError;
     use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
-    use core_ethereum_api::{can_register_with_safe, ChannelEntry};
-    use core_ethereum_rpc::HoprRpcOperations;
+    use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry};
     use core_ethereum_types::chain_events::ChainEventType;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
@@ -93,7 +88,7 @@ mod native {
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
     use std::time::Duration;
-    use utils_log::{debug, warn};
+    use utils_log::debug;
     use utils_types::traits::PeerIdLike;
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
@@ -207,69 +202,22 @@ mod native {
         }
 
         pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-            self.chain_api
-                .rpc()
-                .get_balance(self.me_onchain(), balance_type)
-                .await
-                .map_err(|e| HoprLibError::ChainApi(e.into()))
+            Ok(self.chain_api.get_balance(balance_type).await?)
         }
 
         pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-            self.chain_api
-                .rpc()
-                .get_balance(self.safe_module_cfg.safe_address, balance_type)
-                .await
-                .map_err(|e| HoprLibError::ChainApi(e.into()))
+            Ok(self
+                .chain_api
+                .get_safe_balance(self.safe_module_cfg.safe_address, balance_type)
+                .await?)
         }
 
         pub fn get_safe_config(&self) -> SafeModule {
             self.safe_module_cfg.clone()
         }
 
-        pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
-            self.chain_api
-                .rpc()
-                .get_channel_closure_notice_period()
-                .await
-                .map_err(|e| HoprLibError::ChainApi(e.into()))
-        }
-
         pub fn chain_config(&self) -> ChainNetworkConfig {
             self.chain_cfg.clone()
-        }
-
-        // Move this single-purpose function to core-ethereum-api ?
-        async fn wait_for_funds(&self) -> errors::Result<()> {
-            let max_delay = Duration::from_secs(200);
-            let multiplier = 1.05;
-            let min_native_balance = Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native);
-
-            let mut current_delay = Duration::from_secs(2);
-
-            while current_delay <= max_delay {
-                match self
-                    .chain_api
-                    .rpc()
-                    .get_balance(self.me_onchain(), BalanceType::Native)
-                    .await
-                {
-                    Ok(current_balance) => {
-                        info!("current balance is {}", current_balance.to_formatted_string());
-                        if current_balance.gte(&min_native_balance) {
-                            info!("node is funded");
-                            return Ok(());
-                        } else {
-                            warn!("still unfunded, trying again soon");
-                        }
-                    }
-                    Err(e) => error!("error while querying for balance: {e}"),
-                }
-
-                sleep(current_delay).await;
-                current_delay = current_delay.mul_f64(multiplier);
-            }
-
-            Err(HoprLibError::GeneralError("timeout waiting for balance".into()))
         }
 
         pub async fn run(
@@ -287,7 +235,14 @@ mod native {
                 Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::HOPR).to_formatted_string()
             );
 
-            self.wait_for_funds().await.expect("failed to wait for funds");
+            wait_for_funds(
+                self.me_onchain(),
+                Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native),
+                Duration::from_secs(200),
+                self.chain_api.rpc(),
+            )
+            .await
+            .expect("failed to wait for funds");
 
             info!("Starting hopr node...");
 
@@ -680,6 +635,10 @@ mod native {
             }
         }
 
+        pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
+            Ok(self.chain_api.get_channel_closure_notice_period().await?)
+        }
+
         pub async fn redeem_all_tickets(&self, only_aggregated: bool) -> errors::Result<()> {
             if self.status() != State::Running {
                 return Err(crate::errors::HoprLibError::GeneralError(
@@ -773,6 +732,7 @@ pub mod wasm_impl {
 
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use js_sys::{Array, JsString};
+    use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
 
@@ -785,7 +745,7 @@ pub mod wasm_impl {
         traits::ToHex,
     };
 
-    use crate::{chain::wasm::ChainConfiguration, processes::wasm::WasmHoprMessageEmitter};
+    use crate::processes::wasm::WasmHoprMessageEmitter;
 
     #[wasm_bindgen]
     pub struct HoprProcesses {
@@ -796,6 +756,21 @@ pub mod wasm_impl {
         pub fn new(processes: Vec<Pin<Box<dyn Future<Output = components::HoprLoopComponents>>>>) -> Self {
             Self { processes }
         }
+    }
+
+    #[wasm_bindgen(getter_with_clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct SmartContractInfo {
+        pub chain: String,
+        pub hopr_announcements: String,
+        pub hopr_token: String,
+        pub hopr_channels: String,
+        pub hopr_network_registry: String,
+        pub hopr_node_safe_registry: String,
+        pub hopr_ticket_price_oracle: String,
+        pub module_address: String,
+        pub safe_address: String,
+        pub notice_period_channel_closure: u32,
     }
 
     /// Helper object to make sure that the HOPR node remains non-mutable
@@ -1376,19 +1351,19 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen(js_name = smartContractInfo)]
-        pub async fn _smart_contract_info(&self) -> Result<ChainConfiguration, JsError> {
+        pub async fn _smart_contract_info(&self) -> Result<SmartContractInfo, JsError> {
             let cfg = self.hopr.chain_config();
-            Ok(ChainConfiguration {
-                hoprAnnouncementsAddress: cfg.announcements,
-                hoprTokenAddress: cfg.token,
-                hoprChannelsAddress: cfg.channels,
-                hoprNetworkRegistryAddress: cfg.network_registry,
-                hoprNodeSafeRegistryAddress: cfg.node_safe_registry,
-                hoprTicketPriceOracleAddress: cfg.ticket_price_oracle,
-                moduleAddress: self.hopr.get_safe_config().module_address.to_string(),
-                safeAddress: self.hopr.get_safe_config().safe_address.to_string(),
+            Ok(SmartContractInfo {
+                hopr_announcements: cfg.announcements,
+                hopr_token: cfg.token,
+                hopr_channels: cfg.channels,
+                hopr_network_registry: cfg.network_registry,
+                hopr_node_safe_registry: cfg.node_safe_registry,
+                hopr_ticket_price_oracle: cfg.ticket_price_oracle,
+                module_address: self.hopr.get_safe_config().module_address.to_string(),
+                safe_address: self.hopr.get_safe_config().safe_address.to_string(),
                 chain: cfg.chain.id,
-                noticePeriodChannelClosure: self.hopr.get_channel_closure_notice_period().await?.as_secs() as u32,
+                notice_period_channel_closure: self.hopr.get_channel_closure_notice_period().await?.as_secs() as u32,
             })
         }
 

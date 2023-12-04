@@ -33,12 +33,10 @@ export {
   WasmVecAccountEntry,
   get_contract_data,
   resolve_network,
-  ChainNetworkConfig,
   Hopr,
   peer_metadata_protocol_version_name,
   WasmHealth,
-  HoprdPersistentDatabase,
-  ChainConfiguration
+  HoprdPersistentDatabase
 } from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string

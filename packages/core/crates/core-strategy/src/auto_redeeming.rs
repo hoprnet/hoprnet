@@ -155,7 +155,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
-            event: Some(ChainEventType::TicketRedeem(
+            event: Some(ChainEventType::TicketRedeemed(
                 ChannelEntry::new(
                     BOB.public().to_address(),
                     ALICE.public().to_address(),

@@ -283,9 +283,9 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                             None
                         };
 
-                        Ok(Some(ChainEventType::TicketRedeem(channel, ack_ticket)))
+                        Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                     } else {
-                        Ok(Some(ChainEventType::TicketRedeem(channel, None)))
+                        Ok(Some(ChainEventType::TicketRedeemed(channel, None)))
                     }
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
