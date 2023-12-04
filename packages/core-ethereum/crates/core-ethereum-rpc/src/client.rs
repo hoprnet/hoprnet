@@ -1,14 +1,9 @@
 use async_trait::async_trait;
-use core_crypto::keypairs::{ChainKeypair, Keypair};
-use ethers::middleware::SignerMiddleware;
-use ethers::prelude::{LocalWallet, Wallet};
-use ethers::signers::Signer;
-use ethers_providers::{JsonRpcClient, JsonRpcError, Provider, RetryPolicy};
+use ethers_providers::{JsonRpcClient, JsonRpcError, RetryPolicy};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
@@ -313,18 +308,29 @@ pub mod native {
 }
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
-    signer: &ChainKeypair,
-) -> Arc<SignerMiddleware<Provider<JsonRpcProviderClient<R>>, Wallet<ethers::core::k256::ecdsa::SigningKey>>> {
-    let wallet: LocalWallet = LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
+    signer: &core_crypto::keypairs::ChainKeypair,
+) -> std::sync::Arc<
+    ethers::middleware::SignerMiddleware<
+        ethers::providers::Provider<JsonRpcProviderClient<R>>,
+        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+    >,
+> {
+    use core_crypto::keypairs::Keypair;
+    use ethers::signers::Signer;
 
+    let wallet =
+        ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
     let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend);
+    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10u64));
 
-    let provider = Provider::new(json_client).interval(Duration::from_millis(10u64));
-
-    Arc::new(SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id())))
+    std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
+        provider,
+        wallet.with_chain_id(anvil.chain_id()),
+    ))
 }
 
 #[cfg(test)]

@@ -30,7 +30,6 @@ reqwest = { version = "0.11.22", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde-wasm-bindgen = { workspace = true, optional = true }
-surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding", "middleware-logger"] }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
@@ -46,6 +45,9 @@ utils-log = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, default-features = false, optional = true }
 utils-types = { workspace = true, default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding", "middleware-logger"] }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
