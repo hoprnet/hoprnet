@@ -18,7 +18,7 @@ struct PayloadWrapper<M> {
 pub struct RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Copy,
+    M: Clone,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
@@ -28,7 +28,7 @@ where
 impl<T, M> RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Copy
+    M: Clone
 {
     /// Creates new backend with default timestamping function from std::time.
     /// This is incompatible with WASM runtimes.
@@ -51,7 +51,7 @@ where
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone + Copy,
+    M: Clone,
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
@@ -165,7 +165,7 @@ where
                 // Peek across all the tags, need to sort again based on the timestamp
                 let mut all = self
                     .buffers
-                    .into_iter()
+                    .iter()
                     .flat_map(|(_, buf)| buf.into_iter())
                     .collect::<Vec<_>>();
 
@@ -174,7 +174,7 @@ where
                 // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
                 all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
-                all.into_iter().map(|w| (w.payload, w.ts)).collect()
+                all.into_iter().map(|w| (w.payload.clone(), w.ts)).collect()
             }
         }
     }
