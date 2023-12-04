@@ -73,7 +73,7 @@ services:
       - /dev/kmsg:/dev/kmsg
 
   nodeexporter:
-    image: prom/node-exporter:v1.6.1@sha256:81f94e50ea37a88dfee849d0f4acad25b96b397061f59e5095905f6bc5829637
+    image: prom/node-exporter:v1.7.0@sha256:4cb2b9019f1757be8482419002cb7afe028fdba35d47958829e4cfeaf6246d80
     container_name: nodeexporter
     hostname: nodeexporter
     volumes:
