@@ -30,7 +30,7 @@
     "prettier": "2.8.8",
     "solhint-community": "3.6.1",
     "ts-node": "10.9.1",
-    "typescript": "5.2.2"
+    "typescript": "5.3.2"
   },
   "resolutions": {
     "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/v5.7.0-fixed-memory-leak.tar.gz",
