@@ -1,14 +1,17 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { Hopr } from '@hoprnet/hopr-utils'
+import { debug, Hopr } from '@hoprnet/hopr-utils'
 
 
 const GET: Operation = [
   async (req, res, _next) => {
+    const log = debug('hoprd:api:v3:get-ticket-price')
     const { node }: { node: Hopr } = req.context
 
     try {
       const ticket_price = await node.getTicketPrice()
+      log(`retrieved ticket price ${ticket_price}`)
+
       return res.status(200).send({price: ticket_price})
     } catch (err) {
       return res
@@ -19,7 +22,7 @@ const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get the latest ticket price.',
+  description: 'Get the latest ticket price in wei',
   tags: ['Tickets'],
   operationId: 'ticketsGetTicketPrice',
   responses: {

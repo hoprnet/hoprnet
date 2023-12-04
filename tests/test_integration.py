@@ -14,6 +14,7 @@ from conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
+from tests.hopr import HoprdAPI
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
@@ -665,3 +666,12 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     native_balance=$(echo ${balances} | jq -r .native)
     """
     assert True
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
+    api: HoprdAPI = swarm7[peer]["api"]
+    
+    price = await api.get_ticket_price()
+
+    assert price == TICKET_PRICE_PER_HOP

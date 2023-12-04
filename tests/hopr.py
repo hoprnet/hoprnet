@@ -214,6 +214,7 @@ class HoprdAPI:
         status, response = self.__call_api(ChannelsApi, "channels_get_tickets", channel_id)
         return response if status else []
 
+    
     async def all_channels(self, include_closed: bool):
         """
         Returns all channels.
@@ -272,6 +273,14 @@ class HoprdAPI:
         :return: statistics: dict
         """
         _, response = self.__call_api(TicketsApi, "tickets_get_statistics")
+        return response
+    
+    async def get_ticket_price(self):
+        """
+        Returns the ticket price in wei.
+        :return: price: int
+        """
+        _, response = self.__call_api(TicketsApi, "tickets_get_price")
         return response
 
     async def get_address(self, address: str):
