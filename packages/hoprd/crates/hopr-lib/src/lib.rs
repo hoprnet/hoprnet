@@ -258,7 +258,7 @@ mod native {
             let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
 
             info!(
-                "Ethereum account {} has {}. Mininum balance is {}",
+                "Ethereum account {} has {}. Minimum balance is {}",
                 self.chain_api.me_onchain(),
                 balance.to_formatted_string(),
                 minimum_balance.to_formatted_string()

@@ -10,6 +10,7 @@ use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryCl
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use utils_log::debug;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -89,6 +90,8 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
                 .nonce_manager(chain_key.public().to_address().into()),
         );
 
+        debug!("{:?}", cfg.contract_addrs);
+
         Ok(Self {
             contract_instances: Arc::new(ContractInstances::new(
                 &cfg.contract_addrs,
@@ -156,7 +159,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 
     async fn get_module_target_address(&self) -> Result<Address> {
         let owner = self.contract_instances.module_implementation.owner().call().await?;
-
         Ok(owner.into())
     }
 
