@@ -1,8 +1,9 @@
 import logging
-from hoprd_sdk import Configuration, ApiClient
-from hoprd_sdk.models import AliasesBody, MessagesBody, MessagesPopBody, ChannelsBody, ChannelidFundBody
+
+from hoprd_sdk import ApiClient, Configuration
+from hoprd_sdk.api import AccountApi, AliasesApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.models import AliasesBody, ChannelidFundBody, ChannelsBody, MessagesBody, MessagesPopBody
 from hoprd_sdk.rest import ApiException
-from hoprd_sdk.api import AliasesApi, NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
 from urllib3.exceptions import MaxRetryError
 
 
@@ -313,6 +314,29 @@ class HoprdAPI:
         body = MessagesPopBody(tag=tag)
         _, response = self.__call_api(MessagesApi, "messages_pop_message", body=body)
         return response
+    
+    async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Peek next message from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        
+        body = MessagesPopBody(tag=tag)
+        _, response = self.__call_api(MessagesApi, "messages_peek_message", body=body)
+        return response
+    
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Peek all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+
+        body = MessagesPopBody(tag=tag)
+        _, response = self.__call_api(MessagesApi, "messages_peek_all_messages", body=body)
+        return response
+    
 
     async def tickets_redeem(self):
         """

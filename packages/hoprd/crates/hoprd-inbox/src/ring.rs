@@ -45,22 +45,6 @@ where
     pub fn count_untagged(&self) -> usize {
         self.buffers.get(&T::default()).map(|buf| buf.len()).unwrap_or(0)
     }
-}
-
-#[async_trait(? Send)]
-impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
-where
-    T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone,
-{
-    fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
-        assert!(capacity.is_power_of_two(), "capacity must be a power of two");
-        Self {
-            capacity,
-            buffers: HashMap::new(),
-            ts,
-        }
-    }
 
     fn tag_resolution(&mut self, tag: Option<T>) -> Option<T>{
         let specific_tag = match tag {
@@ -82,6 +66,22 @@ where
         };
 
         Some(specific_tag)
+    }
+}
+
+#[async_trait(? Send)]
+impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
+where
+    T: Copy + Default + PartialEq + Eq + Hash,
+    M: Clone,
+{
+    fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
+        assert!(capacity.is_power_of_two(), "capacity must be a power of two");
+        Self {
+            capacity,
+            buffers: HashMap::new(),
+            ts,
+        }
     }
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
@@ -335,6 +335,84 @@ mod test {
         assert_eq!(0, rb.count(Some(2)).await);
         assert_eq!(0, rb.count(None).await);
     }
+
+    #[async_std::test]
+    async fn test_peek_oldest() {
+        let mut rb = make_backend(2);
+
+        rb.push(Some(3), 10).await;
+
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 2).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        assert_eq!(5, rb.count(None).await);
+
+        assert_eq!(10, rb.peek(None).await.unwrap().0);
+
+        assert_eq!(5, rb.count(None).await);
+    }
+
+    #[async_std::test]
+    async fn test_peek_oldest_specific() {
+        let mut rb = make_backend(2);
+
+        rb.push(Some(3), 10).await;
+
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 2).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        assert_eq!(5, rb.count(None).await);
+        assert_eq!(1, rb.count(Some(3)).await);
+        assert_eq!(2, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+
+        assert_eq!(10, rb.peek(Some(3)).await.unwrap().0);
+        assert_eq!(1, rb.peek(Some(1)).await.unwrap().0);
+        assert_eq!(3, rb.peek(Some(2)).await.unwrap().0);
+
+        assert_eq!(5, rb.count(None).await);
+        assert_eq!(1, rb.count(Some(3)).await);
+        assert_eq!(2, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+    }
+
+    #[async_std::test]
+    async fn test_peek_all() {
+
+    }
+
+    #[async_std::test]
+    async fn test_peek_all_specific() {
+        let mut rb = make_backend(4);
+
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 2).await;
+        rb.push(Some(1), 1).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        rb.push(None, 5).await;
+
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.pop_all(Some(1))
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(3, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+        assert_eq!(3, rb.count(None).await);
+    }
+    
 
     #[async_std::test]
     async fn test_purge() {
