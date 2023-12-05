@@ -21,7 +21,7 @@ export async function http_post(url: string, json_data: string, config: HttpConf
       }
     })
 
-    return response.data.toString()
+    return JSON.stringify(response.data)
   } catch (err) {
     if (err instanceof AxiosError) {
       let error = err as AxiosError

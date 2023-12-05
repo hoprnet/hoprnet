@@ -19,7 +19,7 @@ use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::{error, info, warn};
+use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::{HoprChainError, Result};
@@ -44,6 +44,10 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     rpc: &Rpc,
 ) -> Result<bool> {
     let target_address = rpc.get_module_target_address().await?;
+    debug!("-- node address: {me}");
+    debug!("-- safe address: {safe_address}");
+    debug!("-- module target address: {target_address}");
+
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
         return Err(HoprChainError::Api("safe is not the module target".into()));
