@@ -41,6 +41,7 @@ ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
+futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
 js-sys = "0.3.64"

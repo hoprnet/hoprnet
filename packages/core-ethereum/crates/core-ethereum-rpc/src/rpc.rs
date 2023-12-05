@@ -16,18 +16,6 @@ use validator::Validate;
 use crate::errors::Result;
 use crate::{HoprRpcOperations, PendingTransaction};
 
-#[cfg(feature = "prometheus")]
-use utils_metrics::metrics::SimpleCounter;
-
-#[cfg(feature = "prometheus")]
-lazy_static::lazy_static! {
-     pub(crate) static ref METRIC_COUNT_RPC_CALLS: SimpleCounter = SimpleCounter::new(
-        "core_ethereum_counter_rpc_calls",
-        "Number of RPC calls"
-    )
-    .unwrap();
-}
-
 /// Configuration of the RPC related parameters.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
@@ -123,9 +111,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .await?
             .map(|b| b.timestamp.as_u64());
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(ts)
     }
 
@@ -137,16 +122,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                     .get_balance(NameOrAddress::Address(address.into()), None)
                     .await?;
 
-                #[cfg(feature = "prometheus")]
-                METRIC_COUNT_RPC_CALLS.increment();
-
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
                 let token_balance = self.contract_instances.token.balance_of(address.into()).call().await?;
-
-                #[cfg(feature = "prometheus")]
-                METRIC_COUNT_RPC_CALLS.increment();
 
                 Ok(Balance::new(token_balance.into(), BalanceType::HOPR))
             }
@@ -161,9 +140,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .call()
             .await?;
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(exists.then_some(target.into()))
     }
 
@@ -175,17 +151,11 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .call()
             .await?;
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(addr.into())
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         let owner = self.contract_instances.module_implementation.owner().call().await?;
-
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
 
         Ok(owner.into())
     }
@@ -198,9 +168,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .notice_period_channel_closure()
             .call()
             .await?;
-
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
 
         Ok(Duration::from_secs(notice_period as u64))
     }
@@ -215,9 +182,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .interval(self.cfg.tx_polling_interval); // This is the default, but let's be explicit
                                                      // This has built-in max polling retries set to 3
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(sent_tx.into())
     }
 }
@@ -226,9 +190,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
+    use async_std::prelude::FutureExt;
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
+    use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
     use primitive_types::H160;
@@ -236,8 +201,8 @@ pub mod tests {
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
 
-    use crate::client::tests::ReqwestRequestor;
-    use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::client::native::SurfRequestor;
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     pub async fn mint_tokens<M: Middleware + 'static>(
         hopr_token: HoprToken<M>,
@@ -279,16 +244,13 @@ pub mod tests {
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
-        tokio::time::timeout(timeout, pending.into_future())
-            .await
-            .expect(&format!(
-                "timeout awaiting tx hash {tx_hash} after {} seconds",
-                timeout.as_secs()
-            ))
-            .expect("expected block");
+        pending.into_future().delay(timeout).await.expect(&format!(
+            "timeout awaiting tx hash {tx_hash} after {} seconds",
+            timeout.as_secs()
+        ));
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -302,7 +264,7 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
@@ -322,7 +284,7 @@ pub mod tests {
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -336,7 +298,7 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
@@ -361,7 +323,7 @@ pub mod tests {
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_get_balance_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -370,7 +332,7 @@ pub mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0)
                 .await
                 .expect("could not deploy contracts")
@@ -391,7 +353,7 @@ pub mod tests {
         )
         .await;
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 

@@ -11,28 +11,11 @@ use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
-#[cfg(feature = "prometheus")]
-use crate::rpc::METRIC_COUNT_RPC_CALLS;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(test)]
-use tokio::time::sleep;
-
-#[cfg(all(not(feature = "wasm"), not(test)))]
-use async_std::task::sleep;
-
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
-        let r = self.provider.get_block_number().await?;
-
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
-        Ok(r.as_u64())
+        Ok(self.provider.get_block_number().await?.as_u64())
     }
 
     fn try_stream_logs<'a>(
@@ -65,10 +48,6 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
 
-                        // This will be only approximate, since we have no way of tracking how does the Stream internally make additional queries
-                        #[cfg(feature = "prometheus")]
-                        METRIC_COUNT_RPC_CALLS.increment();
-
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {
                             let log = Log::from(log);
@@ -92,7 +71,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
 
-                sleep(self.cfg.expected_block_time).await;
+                futures_timer::Delay::new(self.cfg.expected_block_time).await;
             }
         }))
     }
@@ -100,6 +79,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
+    use async_std::prelude::FutureExt;
     use std::time::Duration;
 
     use ethers::contract::EthEvent;
@@ -109,12 +89,12 @@ mod test {
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
+    use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
     use utils_log::debug;
     use utils_types::primitives::Address;
 
-    use crate::client::tests::ReqwestRequestor;
-    use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::client::native::SurfRequestor;
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
@@ -141,24 +121,24 @@ mod test {
             .unwrap();
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_should_get_block_number() {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let rpc = RpcOperations::new(client, &chain_key_0, Default::default(), SimpleJsonRpcRetryPolicy)
             .expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        async_std::task::sleep(Duration::from_secs(2)).await;
         let b2 = rpc.block_number().await.expect("should get block number");
 
         assert!(b2 > b1, "block number should increase");
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -170,7 +150,7 @@ mod test {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0)
                 .await
                 .expect("could not deploy contracts")
@@ -188,7 +168,7 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
@@ -206,34 +186,28 @@ mod test {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        let local = tokio::task::LocalSet::new();
-
         // Spawn channel funding
-        local.spawn_local(async move {
-            tokio::time::sleep(block_time * 2).await;
+        async_std::task::spawn_local(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
             )
+            .delay(block_time * 2)
             .await;
         });
 
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let run = local.run_until(async move {
-            rpc.try_stream_logs(Some(1), log_filter)
-                .expect("must create stream")
-                .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-                .take(1)
-                .collect::<Vec<BlockWithLogs>>()
-                .await
-        });
-
-        // Everything must complete within 30 seconds
-        let retrieved_logs = tokio::time::timeout(Duration::from_secs(30), run)
+        let retrieved_logs = rpc
+            .try_stream_logs(Some(1), log_filter)
+            .expect("must create stream")
+            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+            .take(1)
+            .collect::<Vec<BlockWithLogs>>()
+            .timeout(Duration::from_secs(30))
             .await
-            .expect("timeout");
+            .expect("timeout"); // Everything must complete within 30 seconds
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().unwrap().clone().logs;
@@ -266,7 +240,7 @@ mod test {
         );
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -278,7 +252,7 @@ mod test {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0)
                 .await
                 .expect("could not deploy contracts")
@@ -296,7 +270,7 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
@@ -312,34 +286,28 @@ mod test {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        let local = tokio::task::LocalSet::new();
-
         // Spawn channel funding
-        local.spawn_local(async move {
-            tokio::time::sleep(block_time * 2).await;
+        async_std::task::spawn_local(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
             )
+            .delay(block_time * 2)
             .await;
         });
 
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let run = local.run_until(async move {
-            rpc.try_stream_logs(Some(1), log_filter)
-                .expect("must create stream")
-                .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-                .take(1)
-                .collect::<Vec<BlockWithLogs>>()
-                .await
-        });
-
-        // Everything must complete within 30 seconds
-        let retrieved_logs = tokio::time::timeout(Duration::from_secs(30), run)
+        let retrieved_logs = rpc
+            .try_stream_logs(Some(1), log_filter)
+            .expect("must create stream")
+            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+            .take(1)
+            .collect::<Vec<BlockWithLogs>>()
+            .timeout(Duration::from_secs(30))
             .await
-            .expect("timeout");
+            .expect("timeout"); // Everything must complete within 30 seconds
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs.first().unwrap().clone().logs;
