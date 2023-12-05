@@ -235,7 +235,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(core_ethereum_types::utils::create_native_transfer(Address::random(), 1000000_u32.into()))
+            .send_transaction(core_ethereum_types::utils::create_native_transfer(
+                Address::random(),
+                1000000_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -268,7 +271,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(core_ethereum_types::utils::create_native_transfer(Address::random(), 1_u32.into()))
+            .send_transaction(core_ethereum_types::utils::create_native_transfer(
+                Address::random(),
+                1_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -304,11 +310,7 @@ pub mod tests {
         };
 
         let amount = 1024_u64;
-        core_ethereum_types::utils::mint_tokens(
-            contract_instances.token,
-            amount.into(),
-        )
-        .await;
+        core_ethereum_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
 
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
         let rpc =

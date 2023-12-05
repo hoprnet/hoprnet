@@ -80,9 +80,9 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 #[cfg(test)]
 mod test {
     use async_std::prelude::FutureExt;
-    use std::time::Duration;
     use ethers::contract::EthEvent;
     use futures::StreamExt;
+    use std::time::Duration;
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
@@ -130,7 +130,8 @@ mod test {
                 .expect("could not deploy contracts")
         };
 
-        let tokens_minted_at = core_ethereum_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        let tokens_minted_at =
+            core_ethereum_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -166,7 +167,7 @@ mod test {
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
-                1_u128.into()
+                1_u128.into(),
             )
             .delay(block_time * 2)
             .await;
@@ -233,7 +234,8 @@ mod test {
                 .expect("could not deploy contracts")
         };
 
-        let tokens_minted_at = core_ethereum_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        let tokens_minted_at =
+            core_ethereum_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -267,7 +269,7 @@ mod test {
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
-                1_u128.into()
+                1_u128.into(),
             )
             .delay(block_time * 2)
             .await;

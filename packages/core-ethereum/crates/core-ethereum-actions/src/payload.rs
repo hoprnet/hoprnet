@@ -554,17 +554,15 @@ pub mod tests {
         announcement::{AnnouncementData, KeyBinding},
         channels::Ticket,
     };
-    use ethers::{
-        providers::Middleware,
-    };
+    use ethers::providers::Middleware;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
+    use utils_types::primitives::U256;
     use utils_types::{
         primitives::{Balance, BalanceType},
         traits::BinarySerializable,
     };
-    use utils_types::primitives::U256;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
@@ -647,7 +645,7 @@ pub mod tests {
             (&chain_key_bob).into(),
             contract_instances.token.clone(),
             contract_instances.channels.clone(),
-            1_u128.into()
+            1_u128.into(),
         )
         .await;
 
