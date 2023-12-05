@@ -384,7 +384,21 @@ mod test {
 
     #[async_std::test]
     async fn test_peek_all() {
+        let mut rb = make_backend(4);
 
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 2).await;
+        rb.push(Some(1), 1).await;
+
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.peek_all(None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(3, rb.count(Some(1)).await);
     }
 
     #[async_std::test]
