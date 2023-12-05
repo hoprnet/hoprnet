@@ -4,17 +4,21 @@ use bindings::hopr_dummy_proxy_for_network_registry::HoprDummyProxyForNetworkReg
 use bindings::hopr_network_registry::HoprNetworkRegistry;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
-use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
+use bindings::hopr_node_stake_factory::{
+    HoprNodeStakeFactory, NewHoprNodeStakeModuleFilter, NewHoprNodeStakeSafeFilter,
+};
 use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
-use ethers::abi::Token;
+use ethers::abi::{encode_packed, Token};
 use ethers::prelude::*;
+use ethers::utils::keccak256;
 use hex_literal::hex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
+use utils_log::debug;
 use utils_types::primitives::Address;
 
 pub mod actions;
@@ -207,6 +211,82 @@ impl<M: Middleware> ContractInstances<M> {
             module_implementation,
         })
     }
+
+    /// Deploy a safe instance and a module instance
+    /// Notice that to complete the on-boarding process,
+    /// 1) node should be included to the module
+    /// 2) announcement contract should be a target in the module
+    /// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract
+    pub async fn deploy_one_safe_one_module_and_setup_for_testing(
+        &self,
+        provider: Arc<M>,
+        deployer: &ChainKeypair,
+    ) -> Result<(Address, Address), ContractError<M>> {
+        // Get deployer address
+        let self_address: types::Address = deployer.public().to_address().into();
+
+        // create a salt from the nonce
+        let curr_nonce = provider
+            .get_transaction_count(self_address, Some(BlockNumber::Pending.into()))
+            .await
+            .unwrap();
+        let nonce = keccak256(encode_packed(&[Token::Address(self_address), Token::Uint(curr_nonce)]).unwrap());
+        let default_target = format!("{:?}010103020202020202020202", self.channels.address());
+
+        // deploy one safe and one module
+        let instance_deployment_tx_logs = self
+            .stake_factory
+            .clone(
+                self.module_implementation.address(),
+                vec![self_address],
+                nonce.into(),
+                U256::from_str(&default_target).unwrap().into(),
+            )
+            .send()
+            .await?
+            .await?
+            .unwrap()
+            .logs;
+
+        // decode the log.
+        let module_log = instance_deployment_tx_logs
+            .iter()
+            .find(|log| {
+                log.topics[0]
+                    .to_string()
+                    .eq("0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206")
+            })
+            .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeModule(address,address)"
+        let safe_log = instance_deployment_tx_logs
+            .iter()
+            .find(|log| {
+                log.topics[0]
+                    .to_string()
+                    .eq("0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386")
+            })
+            .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeSafe(address)"
+        let decoded_module_log: NewHoprNodeStakeModuleFilter = self
+            .stake_factory
+            .decode_event(
+                "NewHoprNodeStakeModule",
+                module_log.topics.clone(),
+                module_log.data.clone(),
+            )
+            .unwrap();
+        let decoded_safe_log: NewHoprNodeStakeSafeFilter = self
+            .stake_factory
+            .decode_event("NewHoprNodeStakeSafe", safe_log.topics.clone(), safe_log.data.clone())
+            .unwrap();
+
+        // get address of deployed instances
+        let deployed_module_address: Address = decoded_module_log.module_implementation.into();
+        let deployed_safe_address: Address = decoded_safe_log.instance.into();
+
+        debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
+        debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
+
+        Ok((deployed_module_address, deployed_safe_address))
+    }
 }
 
 impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
@@ -279,5 +359,25 @@ mod tests {
         assert_ne!(contract_addrs.network_registry, Address::default());
         assert_ne!(contract_addrs.safe_registry, Address::default());
         assert_ne!(contract_addrs.price_oracle, Address::default());
+    }
+
+    #[tokio::test]
+    async fn test_deploy_one_safe_one_module_and_setup() {
+        let anvil = create_anvil(None);
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+
+        let contract_instances = &ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("failed to deploy");
+
+        // deploy instance
+        let result = contract_instances
+            .deploy_one_safe_one_module_and_setup_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("failed to deploy safe and module");
+        assert_ne!(result.0, Address::default());
+        assert_ne!(result.1, Address::default());
     }
 }
