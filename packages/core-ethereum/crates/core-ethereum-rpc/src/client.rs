@@ -10,6 +10,21 @@ use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
 use crate::HttpPostRequestor;
 
+#[cfg(feature = "prometheus")]
+use utils_metrics::metrics::MultiCounter;
+
+#[cfg(feature = "prometheus")]
+lazy_static::lazy_static! {
+     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
+        "core_ethereum_counter_rpc_calls",
+        "Number of successful RPC calls over HTTP",
+        &["eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
+          "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
+          "eth_getTransactionByHash", "eth_getLogs"]
+    )
+    .unwrap();
+}
+
 /// Modified implementation of `ethers::providers::Http` so that it can
 /// operate with any `HttpPostRequestor`.
 #[derive(Debug)]
@@ -80,6 +95,9 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req
             err,
             text: raw.to_string(),
         })?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment(&[method]);
 
         Ok(res)
     }

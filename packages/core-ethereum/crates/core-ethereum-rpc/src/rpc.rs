@@ -16,18 +16,6 @@ use validator::Validate;
 use crate::errors::Result;
 use crate::{HoprRpcOperations, PendingTransaction};
 
-#[cfg(feature = "prometheus")]
-use utils_metrics::metrics::SimpleCounter;
-
-#[cfg(feature = "prometheus")]
-lazy_static::lazy_static! {
-     pub(crate) static ref METRIC_COUNT_RPC_CALLS: SimpleCounter = SimpleCounter::new(
-        "core_ethereum_counter_rpc_calls",
-        "Number of RPC calls"
-    )
-    .unwrap();
-}
-
 /// Configuration of the RPC related parameters.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
@@ -123,9 +111,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .await?
             .map(|b| b.timestamp.as_u64());
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(ts)
     }
 
@@ -137,16 +122,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                     .get_balance(NameOrAddress::Address(address.into()), None)
                     .await?;
 
-                #[cfg(feature = "prometheus")]
-                METRIC_COUNT_RPC_CALLS.increment();
-
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
                 let token_balance = self.contract_instances.token.balance_of(address.into()).call().await?;
-
-                #[cfg(feature = "prometheus")]
-                METRIC_COUNT_RPC_CALLS.increment();
 
                 Ok(Balance::new(token_balance.into(), BalanceType::HOPR))
             }
@@ -161,9 +140,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .call()
             .await?;
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(exists.then_some(target.into()))
     }
 
@@ -175,17 +151,11 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .call()
             .await?;
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(addr.into())
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         let owner = self.contract_instances.module_implementation.owner().call().await?;
-
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
 
         Ok(owner.into())
     }
@@ -199,9 +169,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .call()
             .await?;
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
-
         Ok(Duration::from_secs(notice_period as u64))
     }
 
@@ -214,9 +181,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .confirmations(self.cfg.tx_confirmations)
             .interval(self.cfg.tx_polling_interval); // This is the default, but let's be explicit
                                                      // This has built-in max polling retries set to 3
-
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment();
 
         Ok(sent_tx.into())
     }
