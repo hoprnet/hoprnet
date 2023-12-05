@@ -47,6 +47,7 @@ utils-misc = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
+async-std = { workspace = true, features = ["attributes", "unstable"] }
 serde_yaml = { version = "0.9" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

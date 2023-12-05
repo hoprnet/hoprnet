@@ -354,7 +354,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 #[cfg(test)]
 pub mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
+    use core_ethereum_types::{ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;
     use std::time::Duration;
@@ -367,7 +367,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn test_client_should_deploy_contracts() {
-        let anvil = create_anvil(None);
+        let anvil = core_ethereum_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
@@ -390,7 +390,7 @@ pub mod tests {
     async fn test_client_should_get_block_number() {
         let block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(block_time));
+        let anvil = core_ethereum_types::utils::create_anvil(Some(block_time));
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let mut last_number = 0;
@@ -410,7 +410,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn test_client_should_fail_on_malformed_request() {
-        let anvil = create_anvil(None);
+        let anvil = core_ethereum_types::utils::create_anvil(None);
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
 
         let err = client
