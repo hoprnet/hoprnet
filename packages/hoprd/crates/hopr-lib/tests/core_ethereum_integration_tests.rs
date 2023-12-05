@@ -15,7 +15,7 @@ use core_ethereum_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClien
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::ChainEventType;
 use core_ethereum_types::{ContractAddresses, ContractInstances};
-use core_transport::{ChainKeypair, Keypair};
+use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
 use core_types::channels::ChannelDirection;
 use futures::StreamExt;
 use std::sync::Arc;
@@ -24,6 +24,7 @@ use utils_db::db::DB;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::debug;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use utils_types::traits::PeerIdLike;
 
 #[async_std::test]
 async fn integration_test_indexer() {
@@ -132,6 +133,26 @@ async fn integration_test_indexer() {
     assert!(
         matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_addr),
         "confirmed safe address must match"
+    );
+
+    // Announce the node
+    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
+    let offchain_key = OffchainKeypair::random();
+    let confirmation = actions
+        .announce(&maddr, &offchain_key)
+        .await
+        .expect("should submit announcement tx")
+        .await
+        .expect("should confirm announcement");
+
+    assert!(
+        matches!(confirmation.event,
+            Some(ChainEventType::Announcement{ peer, address, multiaddresses })
+            if peer == offchain_key.public().to_peerid() &&
+            address == node_chain_key.public().to_address() &&
+            multiaddresses.contains(&maddr)
+        ),
+        "confirmed announcement must match"
     );
 
     // Open channel
