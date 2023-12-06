@@ -323,6 +323,7 @@ mod native {
                     .chain_api
                     .actions_ref()
                     .register_safe_by_node(self.safe_module_cfg.safe_address)
+                    .await?
                     .await
                 {
                     let db = self.chain_api.db().clone();
