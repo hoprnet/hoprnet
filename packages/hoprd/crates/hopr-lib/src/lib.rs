@@ -323,7 +323,7 @@ mod native {
                     .chain_api
                     .actions_ref()
                     .register_safe_by_node(self.safe_module_cfg.safe_address)
-                    .await?
+                    //.await? TODO: add back this await once action queue is started
                     .await
                 {
                     let db = self.chain_api.db().clone();
