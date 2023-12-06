@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 
 export class HttpError {
-  constructor(public msg: string, public httpStatus: number) {}
+  constructor(public msg: string, public status: number) {}
 }
 
 export type HttpConfig = {

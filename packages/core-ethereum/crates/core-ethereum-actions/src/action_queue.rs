@@ -382,7 +382,7 @@ where
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
-    pub async fn transaction_loop(self) {
+    pub async fn action_loop(self) {
         while let Ok((act, tx_finisher)) = self.queue_recv.recv().await {
             let exec_context = self.ctx.clone();
             spawn_local(async move {

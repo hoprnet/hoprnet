@@ -250,7 +250,7 @@ where
         }),
         Box::pin(async move {
             action_queue
-                .transaction_loop()
+                .action_loop()
                 .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
                 .await
         }),

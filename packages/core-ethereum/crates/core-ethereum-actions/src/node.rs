@@ -94,7 +94,7 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
-            tx_queue.transaction_loop().await;
+            tx_queue.action_loop().await;
         });
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
