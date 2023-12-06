@@ -66,7 +66,7 @@ impl Default for RpcOperationsConfig {
 }
 
 pub(crate) type HoprMiddleware<P> =
-    NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
+    SignerMiddleware<NonceManagerMiddleware<Provider<RetryClient<P>>>, Wallet<SigningKey>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -100,12 +100,13 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             .initial_backoff(Duration::from_millis(500))
             .build(json_rpc, Box::new(retry_policy));
 
-        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
+        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
+
         let provider = Arc::new(
             Provider::new(provider_client)
                 .interval(cfg.tx_polling_interval)
-                .with_signer(wallet.with_chain_id(cfg.chain_id))
-                .nonce_manager(chain_key.public().to_address().into()),
+                .nonce_manager(chain_key.public().to_address().into())
+                .with_signer(wallet),
         );
 
         debug!("{:?}", cfg.contract_addrs);

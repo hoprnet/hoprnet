@@ -74,11 +74,11 @@ pub struct IndexerConfig {
     /// successfully joined to the chain.
     pub finalization: u64,
     /// The block at which the indexer should start
-    /// 
+    ///
     /// It typically makes little sense to start indexing from the beginning
-    /// of the chain, all that is sufficient is to start indexing since the 
+    /// of the chain, all that is sufficient is to start indexing since the
     /// relevant smart contracts were introduced into the chain.
-    /// 
+    ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
     pub start_block_number: u64,
     /// Fetch token transactions
@@ -244,8 +244,9 @@ where
                                 METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
                             }
 
+                            let bn = log.block_number;
                             if let Some(logs) = unconfirmed_events.pop_front() {
-                                debug!("processing logs: {:?}", logs);
+                                debug!("processing logs from block #{}: {:?}", bn, logs);
 
                                 for log in logs.into_iter() {
                                     if let Err(error) = tx_proc.unbounded_send(log) {
