@@ -199,8 +199,6 @@ where
                 .try_stream_logs(latest_block_in_db, log_filter)
                 .expect("block stream should be constructible");
 
-            let chain_head_on_indexing_start = rpc.block_number().await.unwrap_or(0);
-            let indexing_scope = chain_head_on_indexing_start - latest_block_in_db;
             let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
 
             while let Some(block_with_logs) = block_stream.next().await {
@@ -215,14 +213,17 @@ where
                 }
 
                 let current_block = block_with_logs.block_id;
+
+                let chain_head = rpc.block_number().await.unwrap_or(0);
+                let indexing_scope = chain_head - latest_block_in_db;
                 if tx.is_some() {
                     info!(
                         "Sync progress {:.2}% @ block {}",
-                        (chain_head_on_indexing_start - current_block) as f64 / (indexing_scope as f64),
+                        (chain_head - current_block) as f64 / (indexing_scope as f64),
                         current_block
                     );
 
-                    if current_block == chain_head_on_indexing_start {
+                    if current_block >= chain_head {
                         let _ = tx.take().expect("tx should be present").send(());
                     }
                 }
