@@ -64,7 +64,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         debug!("retrieved complete {current_block_log}");
 
                         yield current_block_log;
-                        from_block = latest_block;
+                        from_block = latest_block + 1;
                     }
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
