@@ -229,11 +229,12 @@ where
                     let indexing_scope = chain_head - latest_block_in_db;
                     info!(
                         "Sync progress {:.2}% @ block {}",
-                        (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64)) * 100f64) ,
+                        (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64))) * 100f64 ,
                         current_block
                     );
 
                     if current_block >= chain_head {
+                        info!("Indexer sync successfully completed");
                         let _ = tx.take().expect("tx should be present").send(());
                     }
                 }
