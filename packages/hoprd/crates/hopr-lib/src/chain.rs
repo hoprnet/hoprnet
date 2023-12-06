@@ -5,6 +5,7 @@ use std::{str::FromStr, sync::Arc};
 use async_std::sync::RwLock;
 use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use core_ethereum_indexer::block::IndexerConfig;
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
@@ -399,16 +400,21 @@ pub fn build_chain_api(
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
+    indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
+    let mut indexer_cfg = IndexerConfig::default();
+    indexer_cfg.start_block_number = indexer_start_block;
+
     core_ethereum_api::HoprChain::new(
         me_onchain,
         db,
         contract_addrs,
         safe_address,
+        indexer_cfg,
         indexer_events_tx,
         chain_actions,
         rpc_operations,

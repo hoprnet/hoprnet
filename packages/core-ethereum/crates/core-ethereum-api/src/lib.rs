@@ -121,6 +121,7 @@ impl HoprChain {
         db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
         contract_addresses: ContractAddresses,
         safe_address: Address,
+        indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
         rpc_operations: RpcOperations<JsonRpcClient>,
@@ -128,11 +129,14 @@ impl HoprChain {
     ) -> Self {
         let db_processor =
             ContractEventHandlers::new(contract_addresses, safe_address, (&me_onchain).into(), db.clone());
+        
+
+        
         let indexer = Indexer::new(
             rpc_operations.clone(),
             db_processor,
             db.clone(),
-            IndexerConfig::default(), // TODO: pass down indexer configuration
+            indexer_cfg,
             indexer_events_tx,
         );
         Self {

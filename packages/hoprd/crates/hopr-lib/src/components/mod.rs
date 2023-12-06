@@ -119,7 +119,7 @@ where
 
     let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
         &me_onchain,
-        chain_config,
+        chain_config.clone(),
         contract_addrs,
         cfg.safe_module.module_address,
         db.clone(),
@@ -154,6 +154,7 @@ where
         db.clone(),
         contract_addrs,
         cfg.safe_module.safe_address,
+        chain_config.channel_contract_deploy_block as u64,
         tx_indexer_events,
         chain_actions.clone(),
         rpc_operations.clone(),

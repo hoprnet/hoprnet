@@ -832,7 +832,7 @@ pub mod wasm_impl {
                 &cfg.chain.network,
                 cfg.chain.provider.clone().as_ref().map(|v| v.as_str()),
             )
-            .expect("Valid configuration leads to valid network");
+            .expect("Valid configuration leads to a valid network");
 
             Self {
                 hopr: super::native::Hopr::new(

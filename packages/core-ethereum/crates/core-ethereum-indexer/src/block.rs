@@ -73,6 +73,14 @@ pub struct IndexerConfig {
     /// that the logs will be buffered for before being considered
     /// successfully joined to the chain.
     pub finalization: u64,
+    /// The block at which the indexer should start
+    /// 
+    /// It typically makes little sense to start indexing from the beginning
+    /// of the chain, all that is sufficient is to start indexing since the 
+    /// relevant smart contracts were introduced into the chain.
+    /// 
+    /// This value makes sure that indexing is relevant and as minimal as possible.
+    pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
@@ -83,6 +91,7 @@ impl Default for IndexerConfig {
     fn default() -> Self {
         Self {
             finalization: 8,
+            start_block_number: 0,
             fetch_token_transactions: true,
         }
     }
@@ -154,7 +163,7 @@ where
             .get_latest_block_number()
             .await?
             .map(|v| v as u64)
-            .unwrap_or(0); // TODO: take from protocol-config
+            .unwrap_or(self.cfg.start_block_number);
 
         info!("Latest saved block {:?}", latest_block_in_db);
 
@@ -164,11 +173,13 @@ where
         topics.extend(crate::constants::topics::node_safe_registry());
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
-        // TODO: if (fetchTokenTransactions)
-        // // Actively query for logs to prevent polling done by Ethers.js
-        // // that don't retry on failed attempts and thus makes the indexer
-        // // handle errors produced by internal Ethers.js provider calls
-        topics.extend(crate::constants::topics::token());
+        if self.cfg.fetch_token_transactions {
+            // TODO: Still needed?
+            // Actively query for logs to prevent polling done by Ethers.js
+            // that don't retry on failed attempts and thus makes the indexer
+            // handle errors produced by internal Ethers.js provider calls
+            topics.extend(crate::constants::topics::token());
+        }
 
         let log_filter = LogFilter {
             address: db_processor.contract_addresses(),
