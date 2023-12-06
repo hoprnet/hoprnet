@@ -215,11 +215,18 @@ where
 
                 let current_block = block_with_logs.block_id;
 
-                if let Ok(current_chain_block_number) = rpc.block_number().await {
-                    chain_head = current_chain_block_number;
+                match rpc.block_number().await {
+                    Ok(current_chain_block_number) => {
+                        chain_head = current_chain_block_number;
+                    },
+                    Err(error) => {
+                        error!("failed to fetch block number from RPC: {error}");
+                        chain_head = chain_head.max(current_block);
+                    }
                 }
-                let indexing_scope = chain_head - latest_block_in_db;
+
                 if tx.is_some() {
+                    let indexing_scope = chain_head - latest_block_in_db;
                     info!(
                         "Sync progress {:.2}% @ block {}",
                         (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64)) * 100f64) ,
