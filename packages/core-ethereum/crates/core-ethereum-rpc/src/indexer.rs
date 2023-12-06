@@ -43,7 +43,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             .from_block(BlockNumber::Number(from_block.into()))
                             .to_block(BlockNumber::Number(current_block.into()));
 
-                        debug!("polling logs between {} - {}", from_block, current_block);
+                        debug!("polling logs from {}", if from_block != current_block { format!("#{from_block} - #{current_block}") } else { format!("#{from_block}") });
 
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);

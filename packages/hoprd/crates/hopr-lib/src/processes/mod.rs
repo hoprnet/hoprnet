@@ -41,7 +41,8 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     spawn_local(async move {
         pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
-            indexer_action_tracker.match_and_resolve(&event).await;
+            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+            info!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
 
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {

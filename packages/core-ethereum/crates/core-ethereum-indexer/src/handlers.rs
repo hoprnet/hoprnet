@@ -201,8 +201,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 };
             }
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
-                let source: Address = channel_opened.source.0.into();
-                let destination: Address = channel_opened.destination.0.into();
+                let source: Address = channel_opened.source.into();
+                let destination: Address = channel_opened.destination.into();
 
                 let channel_id = generate_channel_id(&source, &destination);
 
@@ -335,8 +335,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     {
         match event {
             HoprTokenEvents::TransferFilter(transfered) => {
-                let from: Address = transfered.from.0.into();
-                let to: Address = transfered.to.0.into();
+                let from: Address = transfered.from.into();
+                let to: Address = transfered.to.into();
 
                 debug!(
                     "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
@@ -354,8 +354,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 }
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
-                let owner: Address = approved.owner.0.into();
-                let spender: Address = approved.spender.0.into();
+                let owner: Address = approved.owner.into();
+                let spender: Address = approved.spender.into();
 
                 debug!(
                     "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
@@ -387,7 +387,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     {
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.into();
+                let node_address = &deregistered.node_address.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     *node_address,
@@ -395,7 +395,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 )));
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.into();
+                let node_address = &deregistered.node_address.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     *node_address,
@@ -403,7 +403,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 )));
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-                let node_address = &registered.node_address.0.into();
+                let node_address = &registered.node_address.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     *node_address,
@@ -411,7 +411,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 )));
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-                let node_address = &registered.node_address.0.into();
+                let node_address = &registered.node_address.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     *node_address,
@@ -419,7 +419,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 )));
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-                let account: Address = eligibility_updated.staking_account.0.into();
+                let account: Address = eligibility_updated.staking_account.into();
                 db.set_eligible(&account, eligibility_updated.eligibility, snapshot)
                     .await?;
             }
@@ -448,15 +448,15 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     {
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
-                if self.chain_key.eq(&registered.node_address.0.into()) {
-                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.into()), snapshot)
+                if self.chain_key.eq(&registered.node_address.into()) {
+                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.into()), snapshot)
                         .await?;
 
                     return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
-                if self.chain_key.eq(&deregistered.node_address.0.into()) {
+                if self.chain_key.eq(&deregistered.node_address.into()) {
                     if db.is_mfa_protected().await?.is_some() {
                         db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
                     } else {
