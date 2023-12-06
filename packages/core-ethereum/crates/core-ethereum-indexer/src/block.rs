@@ -147,7 +147,14 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let latest_block_in_db = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
+        let latest_block_in_db = self
+            .db
+            .read()
+            .await
+            .get_latest_block_number()
+            .await?
+            .map(|v| v as u64)
+            .unwrap_or(0); // TODO: take from protocol-config
 
         info!("Latest saved block {:?}", latest_block_in_db);
 
@@ -178,11 +185,11 @@ where
             let mut tx = Some(tx);
 
             let mut block_stream = rpc
-                .try_stream_logs(latest_block_in_db.clone(), log_filter)
+                .try_stream_logs(latest_block_in_db, log_filter)
                 .expect("block stream should be constructible");
 
             let chain_head_on_indexing_start = rpc.block_number().await.unwrap_or(0);
-            let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
+            let indexing_scope = chain_head_on_indexing_start - latest_block_in_db;
             let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
 
             while let Some(block_with_logs) = block_stream.next().await {
@@ -347,7 +354,7 @@ pub mod tests {
 
             fn try_stream_logs<'a>(
                 &'a self,
-                start_block_number: Option<u64>,
+                start_block_number: u64,
                 filter: LogFilter,
             ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
         }
@@ -366,7 +373,7 @@ pub mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
@@ -403,7 +410,7 @@ pub mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == Some(latest_block))
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == latest_block)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
@@ -434,7 +441,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let expected = BlockWithLogs {
@@ -475,7 +482,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let finalized_block = BlockWithLogs {
@@ -533,7 +540,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let finalized_block = BlockWithLogs {

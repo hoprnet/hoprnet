@@ -285,7 +285,7 @@ pub trait HoprIndexerRpcOperations {
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
     fn try_stream_logs<'a>(
         &'a self,
-        start_block_number: Option<u64>,
+        start_block_number: u64,
         filter: LogFilter,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
 }
