@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
@@ -26,6 +27,9 @@ pub struct RpcOperationsConfig {
     /// Addresses of all deployed contracts
     /// Default contains empty (null) addresses.
     pub contract_addrs: ContractAddresses,
+    /// Address of the node's module.
+    /// Defaults to null address.
+    pub module_address: Address,
     /// Number of HTTP retries on retry-able failures
     /// Defaults to 5
     pub max_http_retries: u32,
@@ -51,6 +55,7 @@ impl Default for RpcOperationsConfig {
         Self {
             chain_id: 100,
             contract_addrs: Default::default(),
+            module_address: Default::default(),
             max_http_retries: 5,
             logs_page_size: 50,
             expected_block_time: Duration::from_secs(5),
@@ -64,11 +69,24 @@ pub(crate) type HoprMiddleware<P> =
     NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
     contract_instances: Arc<ContractInstances<HoprMiddleware<P>>>,
+    node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
+}
+
+// Needs manual impl not to impose Clone requirements on P
+impl<P: JsonRpcClient> Clone for RpcOperations<P> {
+    fn clone(&self) -> Self {
+        Self {
+            provider: self.provider.clone(),
+            cfg: self.cfg.clone(),
+            contract_instances: self.contract_instances.clone(),
+            node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
+        }
+    }
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
@@ -99,6 +117,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
                 cfg!(test),
             )),
             cfg,
+            node_module: HoprNodeManagementModule::new(cfg.module_address, provider.clone()),
             provider,
         })
     }
@@ -136,12 +155,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
-        let (exists, target) = self
-            .contract_instances
-            .module_implementation
-            .try_get_target(target.into())
-            .call()
-            .await?;
+        let (exists, target) = self.node_module.try_get_target(target.into()).call().await?;
 
         Ok(exists.then_some(target.into()))
     }
@@ -158,7 +172,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
-        let owner = self.contract_instances.module_implementation.owner().call().await?;
+        let owner = self.node_module.owner().call().await?;
         Ok(owner.into())
     }
 

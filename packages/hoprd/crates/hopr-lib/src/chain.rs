@@ -366,6 +366,7 @@ where
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_config.chain.chain_id as u64,
         contract_addrs,
+        module_address,
         max_http_retries: 10,
         expected_block_time: Duration::from_secs(7),
         ..RpcOperationsConfig::default()
