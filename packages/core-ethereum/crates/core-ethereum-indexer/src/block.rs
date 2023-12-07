@@ -233,7 +233,7 @@ where
                         current_block
                     );
 
-                    if current_block >= chain_head {
+                    if current_block + finalization >= chain_head {
                         info!("Indexer sync successfully completed");
                         let _ = tx.take().expect("tx should be present").send(());
                     }
