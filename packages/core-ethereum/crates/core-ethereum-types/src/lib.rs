@@ -5,7 +5,7 @@ use bindings::hopr_network_registry::HoprNetworkRegistry;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
 use bindings::hopr_node_stake_factory::{
-    HoprNodeStakeFactory, NewHoprNodeStakeModuleFilter, NewHoprNodeStakeSafeFilter,
+    HoprNodeStakeFactory
 };
 use bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
 use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
