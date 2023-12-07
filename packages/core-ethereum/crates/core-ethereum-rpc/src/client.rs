@@ -387,6 +387,27 @@ pub mod tests {
     }
 
     #[async_std::test]
+    async fn test_client_should_deploy_one_safe_one_module_and_setup() {
+        let anvil = core_ethereum_types::utils::create_anvil(None);
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+
+        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("failed to deploy");
+
+        // deploy instance
+        let result = contract_instances
+            .deploy_one_safe_one_module_and_setup_for_testing(client.clone(), &chain_key_0)
+            .await
+            .expect("failed to deploy safe and module");
+
+        assert_ne!(result.0, Address::default());
+        assert_ne!(result.1, Address::default());
+    }
+
+    #[async_std::test]
     async fn test_client_should_get_block_number() {
         let block_time = Duration::from_secs(1);
 
