@@ -225,6 +225,34 @@ function create_local_safes() {
   done
 }
 
+# read various identity files located at $id_path
+# create one safe and one module for all the identity files
+function create_local_safe_for_multi_nodes() {
+  log "Create safe"
+
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
+
+  # create one safe for all the nodes
+  # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `${node_prefix}_all_nodes.safe.log`
+  # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
+  env \
+    ETHERSCAN_API_KEY="" \
+    IDENTITY_PASSWORD="${password}" \
+    PRIVATE_KEY="${deployer_private_key}" \
+    DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
+    hopli create-safe-module \
+      --network anvil-localhost \
+      --identity-directory "${tmp_dir}" \
+      --identity-prefix "${node_prefix}" \
+      --contracts-root "./packages/ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
+
+  # store safe arguments in separate file for later use (as in `create_local_safes` function)
+  for id_file in ${id_files[@]}; do
+    grep -oE "\--safeAddress.*--moduleAddress.*" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
+  done
+  rm "${node_prefix}_all_nodes.safe.log"
+}
+
 # --- Log setup info {{{
 log "Node files and directories"
 log "\tanvil"
@@ -259,7 +287,7 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
+make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log} -p"
 
 log "Wait for anvil local node to complete startup"
 wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:8545"
@@ -275,6 +303,8 @@ generate_local_identities
 
 # create safe and modules for all the ids, store them in args files
 create_local_safes
+# or running the following command to attach all the nodes to one safe
+# create_local_safe_for_multi_nodes
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do
