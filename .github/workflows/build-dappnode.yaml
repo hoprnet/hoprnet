@@ -69,10 +69,13 @@ jobs:
           dappnode_patch_bumped_patch_version=$((dappnode_patch_version + 1))
           dappnode_version="${dappnode_minor_version}.${dappnode_patch_version}"
           dappnode_bumped_version="${dappnode_minor_version}.${dappnode_patch_bumped_patch_version}"
+          hopr_admin_latest_tag=$(curl -s "https://api.github.com/repos/hoprnet/hopr-admin/releases/latest" | jq -r '.tag_name')
 
           cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
           yq -i e ".services.node.image |= \"node.hopr.public.dappnode.eth:${dappnode_bumped_version}\"" docker-compose.yml
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" docker-compose.yml
+          yq -i e ".services.admin.image |= \"europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin:{hopr_admin_latest_tag}\"" docker-compose.yml
+
         working-directory: "./DAppNodePackage-Hopr"
 
       - name: Create Pull Request

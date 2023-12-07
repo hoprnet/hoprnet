@@ -570,7 +570,7 @@ run-docker-dev: ## start a local development Docker container
 		develop
 
 .PHONY: run-hopr-admin
-run-hopr-admin: version=07aec21b
+run-hopr-admin: version=latest
 run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
 	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
