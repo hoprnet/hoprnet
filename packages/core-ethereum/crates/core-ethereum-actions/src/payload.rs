@@ -388,6 +388,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         let mut tx = create_eip1559_transaction();
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
+        tx.set_gas(400_000u64);
         Ok(tx)
     }
 
