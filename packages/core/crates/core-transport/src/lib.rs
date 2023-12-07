@@ -225,7 +225,7 @@ pub struct ChannelEventEmitter {
 impl ChannelEventEmitter {
     pub async fn send_event(&self, channel: &ChannelEntry) {
         let mut sender = self.tx.clone();
-        let _ = sender.send(channel.clone()).await;
+        let _ = sender.send(*channel).await;
     }
 }
 
@@ -327,12 +327,12 @@ impl HoprTransport {
 
         // TODO: add timeout on the p2p transport layer
         let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
-        let ping = (*pinger).ping(vec![peer.clone()]).fuse();
+        let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
 
-        if !self.network.read().await.has(&peer) {
-            self.network.write().await.add(&peer, PeerOrigin::ManualPing)
+        if !self.network.read().await.has(peer) {
+            self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
         let start = current_timestamp();
@@ -345,7 +345,7 @@ impl HoprTransport {
         self.network
             .read()
             .await
-            .get_peer_status(&peer)
+            .get_peer_status(peer)
             .map(|status| std::time::Duration::from_millis(status.last_seen - start))
     }
 
@@ -361,11 +361,11 @@ impl HoprTransport {
 
         let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
             let mut full_path = intermediate_path;
-            full_path.push(destination.clone());
+            full_path.push(destination);
 
             let cg = self.channel_graph.read().await;
 
-            TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &*cg)
+            TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
@@ -375,7 +375,7 @@ impl HoprTransport {
                 let selector = LegacyPathSelector::default();
                 let cp = {
                     let cg = self.channel_graph.read().await;
-                    selector.select_path(&cg, cg.my_address(), chain_key.clone(), hops as usize)?
+                    selector.select_path(&cg, cg.my_address(), chain_key, hops as usize)?
                 };
 
                 cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
@@ -414,7 +414,7 @@ impl HoprTransport {
             .db
             .read()
             .await
-            .get_channel(&channel)
+            .get_channel(channel)
             .await
             .map_err(errors::HoprTransportError::from)
             .and_then(|c| {
@@ -460,7 +460,7 @@ impl HoprTransport {
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
         let db = self.db.read().await;
 
-        if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
+        if let Ok(pk) = OffchainPublicKey::from_peerid(peer) {
             if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
                 return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
             }
@@ -506,11 +506,11 @@ impl HoprTransport {
     }
 
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(&peer)
+        self.network.read().await.get_peer_multiaddresses(peer)
     }
 
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(&peer)
+        self.network.read().await.get_peer_multiaddresses(peer)
     }
 
     pub async fn network_health(&self) -> Health {
@@ -521,7 +521,7 @@ impl HoprTransport {
         let mut change_notifier = self.network_change_notifier.clone();
 
         match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
-            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(peer.clone())) {
+            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(*peer)) {
                 Ok(_) => {}
                 Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
             },
@@ -534,7 +534,7 @@ impl HoprTransport {
     }
 
     pub async fn network_peer_info(&self, peer: &PeerId) -> Option<PeerStatus> {
-        self.network.read().await.get_peer_status(&peer)
+        self.network.read().await.get_peer_status(peer)
     }
 
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
@@ -572,7 +572,7 @@ impl HoprTransport {
     pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
         let db = self.db.read().await;
 
-        let channel = db.get_channel(&channel).await?;
+        let channel = db.get_channel(channel).await?;
 
         if let Some(channel) = channel {
             if channel.destination == self.me_onchain {

@@ -31,14 +31,11 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 fn parse_host(s: &str) -> Result<HostConfig, String> {
-    let host = s.split_once(":").map_or(s, |(h, _)| h);
+    let host = s.split_once(':').map_or(s, |(h, _)| h);
     if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
-        return Err(format!(
-            "Given string {} is not a valid host, Example: {}:{}",
-            s,
-            DEFAULT_HOST.to_string(),
-            DEFAULT_PORT.to_string()
-        ));
+        return Err(
+            "Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into()
+        );
     }
 
     HostConfig::from_str(s)
@@ -60,30 +57,28 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
 
         Ok(Box::new(decoded))
     } else {
-        Err(format!(
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        ))
+        Err(
+            "Given string is not a private key. A private key must contain 128 hex chars.".into()
+        )
     }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
     if s.len() < MINIMAL_API_TOKEN_LENGTH {
         return Err(format!(
-            "Length of API token is too short, minimally required {} but given {}",
-            MINIMAL_API_TOKEN_LENGTH.to_string(),
-            s.len()
+            "Length of API token is too short, minimally required {MINIMAL_API_TOKEN_LENGTH} but given {}", s.len()
         ));
     }
 
-    match (s.starts_with("'"), s.ends_with("'")) {
+    match (s.starts_with('\''), s.ends_with('\'')) {
         (true, true) => {
-            s = s.strip_prefix("'").unwrap();
-            s = s.strip_suffix("'").unwrap();
+            s = s.strip_prefix('\'').unwrap();
+            s = s.strip_suffix('\'').unwrap();
 
             Ok(s.into())
         }
-        (true, false) => Err(format!("Found leading quote but no trailing quote")),
-        (false, true) => Err(format!("Found trailing quote but no leading quote")),
+        (true, false) => Err("Found leading quote but no trailing quote".into()),
+        (false, true) => Err("Found trailing quote but no leading quote".into()),
         (false, false) => Ok(s.into()),
     }
 }
@@ -417,7 +412,7 @@ impl CliArgs {
             .about("HOPRd")
             .bin_name("index.cjs")
             .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-            .version(&hopr_lib::constants::APP_VERSION_COERCED);
+            .version(hopr_lib::constants::APP_VERSION_COERCED);
 
         cmd = Self::augment_args(cmd);
 
@@ -515,9 +510,9 @@ pub mod wasm {
         let mut env_map: HashMap<OsString, OsString> = HashMap::new();
         for (ref k, ref v) in string_envs {
             let key = OsString::from_str(k)
-                .map_err(|e| JsError::new(format!("Could not convert key {} to OsString: {}", k, e.to_string()).as_str()))?;
+                .map_err(|e| JsError::new(format!("Could not convert key {k} to OsString: {e}").as_str()))?;
             let value = OsString::from_str(v)
-                .map_err(|e| JsError::new(format!("Could not convert value {} to OsString: {}", v, e.to_string()).as_str()))?;
+                .map_err(|e| JsError::new(format!("Could not convert value {v} to OsString: {e}").as_str()))?;
 
             env_map.insert(key, value);
         }

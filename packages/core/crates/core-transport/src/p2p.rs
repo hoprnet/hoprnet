@@ -115,7 +115,7 @@ pub async fn p2p_loop(
     for multiaddress in my_multiaddresses.iter() {
         // NOTE: Due to lack of STUN the passed in multiaddresses are believed to be correct after
         // the first successful listen. Relevant for Providence, but not beyond.
-        if valid_mas.len() > 0 {
+        if ! valid_mas.is_empty() {
             valid_mas.push(multiaddress.clone());
             continue;
         }
@@ -249,7 +249,7 @@ pub async fn p2p_loop(
                     },
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
                         info!("Ticket aggregation: serving request from {peer}");
-                        if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
+                        if swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket).is_err() {
                             error!("Ticket aggregation: Failed to send reply to {peer}");
                         }
                     },
@@ -323,11 +323,11 @@ pub async fn p2p_loop(
                 })) => {
                     debug!("Message protocol: Received a message from {}", &peer);
 
-                    if let Err(e) = pkt_writer.receive_packet(request, peer.clone()) {
+                    if let Err(e) = pkt_writer.receive_packet(request, peer) {
                         error!("Message protocol: Failed to process a message from {}: {} (#{})", &peer, e, request_id);
                     };
 
-                    if let Err(_) = swarm.behaviour_mut().msg.send_response(channel, ()) {
+                    if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
                         error!("Message protocol: Failed to send a response to {}, likely a timeout", &peer);
                     };
                 },
@@ -360,11 +360,11 @@ pub async fn p2p_loop(
                 })) => {
                     debug!("Ack protocol: Received an acknowledgment from {}", &peer);
 
-                    if let Err(e) = ack_writer.receive_acknowledgement(peer.clone(), request) {
+                    if let Err(e) = ack_writer.receive_acknowledgement(peer, request) {
                         error!("Ack protocol: Failed to process an acknowledgement from {}: {} (#{})", &peer, e, request_id);
                     };
 
-                    if let Err(_) = swarm.behaviour_mut().ack.send_response(channel, ()) {
+                    if swarm.behaviour_mut().ack.send_response(channel, ()).is_err() {
                         error!("Ack protocol: Failed to send a response to {}, likely a timeout", &peer);
                     };
                 },

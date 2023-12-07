@@ -55,9 +55,9 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                             .filter(|v| !v.is_empty())
                             .collect::<Vec<_>>();
 
-                        if mas.len() > 0 {
+                        if ! mas.is_empty() {
                             transport_indexer_actions
-                                .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                .emit_indexer_update(IndexerToProcess::Announce(peer, mas))
                                 .await;
 
                             if db

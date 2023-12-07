@@ -47,11 +47,7 @@ pub enum HoprLoopComponents {
 
 impl HoprLoopComponents {
     pub fn can_finish(&self) -> bool {
-        if let HoprLoopComponents::Indexing = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, HoprLoopComponents::Indexing)
     }
 }
 

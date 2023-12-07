@@ -5,7 +5,6 @@ use std::{str::FromStr, sync::Arc};
 use async_std::sync::RwLock;
 use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_ethereum_indexer::block::IndexerConfig;
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
@@ -375,12 +374,12 @@ where
     let rpc_client_cfg = RpcEthereumClientConfig::default();
     let action_queue_cfg = ActionQueueConfig::default();
 
-    let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
+    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
         .expect("failed to initialize RPC");
 
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
-        SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
+        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
     );
 
     let tx_queue = ActionQueue::new(
@@ -406,8 +405,10 @@ pub fn build_chain_api(
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
-    let mut indexer_cfg = IndexerConfig::default();
-    indexer_cfg.start_block_number = indexer_start_block;
+    let indexer_cfg = core_ethereum_indexer::block::IndexerConfig {
+        start_block_number: indexer_start_block,
+        ..Default::default()
+    };
 
     core_ethereum_api::HoprChain::new(
         me_onchain,
@@ -435,7 +436,7 @@ pub mod wasm {
         custom_provider: Option<String>,
     ) -> Result<SmartContractConfig, JsError> {
         let resolved_environment =
-            super::ChainNetworkConfig::new(&network_id, custom_provider.as_ref().map(|c| c.as_str()))
+            super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
                 .map_err(|e| JsError::new(e.as_str()))?;
 
         Ok(SmartContractConfig::from(&resolved_environment))
@@ -444,7 +445,7 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn resolve_network(id: &str, maybe_custom_provider: Option<String>) -> JsResult<JsValue> {
         let resolved_environment =
-            super::ChainNetworkConfig::new(id, maybe_custom_provider.as_ref().map(|c| c.as_str()))?;
+            super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&resolved_environment))
     }

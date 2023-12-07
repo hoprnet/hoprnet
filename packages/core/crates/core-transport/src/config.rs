@@ -38,18 +38,12 @@ impl HostConfig {
 impl HostConfig {
     #[wasm_bindgen::prelude::wasm_bindgen]
     pub fn is_ipv4(&self) -> bool {
-        match &self.address {
-            HostType::IPv4(_) => true,
-            _ => false,
-        }
+        matches!(self.address, HostType::IPv4(_))
     }
 
     #[wasm_bindgen::prelude::wasm_bindgen]
     pub fn is_domain(&self) -> bool {
-        match &self.address {
-            HostType::Domain(_) => true,
-            _ => false,
-        }
+        matches!(self.address, HostType::Domain(_))
     }
 
     #[wasm_bindgen::prelude::wasm_bindgen(js_name=address)]
@@ -74,8 +68,8 @@ impl FromStr for HostConfig {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (ip_or_dns, str_port) = match s.split_once(":") {
-            None => return Err(format!("Invalid host, is not in the '<host>:<port>' format")),
+        let (ip_or_dns, str_port) = match s.split_once(':') {
+            None => return Err("Invalid host, is not in the '<host>:<port>' format".into()),
             Some(split) => split,
         };
 
@@ -92,7 +86,7 @@ impl FromStr for HostConfig {
                 port,
             })
         } else {
-            Err(format!("Not a valid IPv4 or domain host"))
+            Err("Not a valid IPv4 or domain host".into())
         }
     }
 }

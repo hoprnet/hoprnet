@@ -247,7 +247,7 @@ mod native {
         }
 
         pub async fn get_alias(&self, alias: &String) -> Option<PeerId> {
-            self.aliases.read().await.get(alias).map(|v| v.clone())
+            self.aliases.read().await.get(alias).copied()
         }
 
         pub async fn get_aliases(&self) -> HashMap<String, PeerId> {
@@ -302,7 +302,7 @@ mod native {
             self.aliases
                 .write()
                 .await
-                .insert("me".to_owned(), self.transport_api.me().clone());
+                .insert("me".to_owned(), *self.transport_api.me());
 
             self.state = State::Initializing;
 
@@ -328,7 +328,7 @@ mod native {
                 .db()
                 .write()
                 .await
-                .link_chain_and_packet_keys(&self.chain_api.me_onchain(), &self.me.public(), &Snapshot::default())
+                .link_chain_and_packet_keys(&self.chain_api.me_onchain(), self.me.public(), &Snapshot::default())
                 .await
                 .map_err(core_transport::errors::HoprTransportError::from)?;
 
@@ -339,7 +339,7 @@ mod native {
                     debug!("Using initial public node '{peer_id}'");
                     index_updater
                         .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
-                            peer_id.clone(),
+                            peer_id,
                             PeerEligibility::Eligible,
                         ))
                         .await;
@@ -372,12 +372,13 @@ mod native {
                     ));
                 }
 
-                if let Ok(_) = self
+                if self
                     .chain_api
                     .actions_ref()
                     .register_safe_by_node(self.safe_module_cfg.safe_address)
                     .await?
                     .await
+                    .is_ok()
                 {
                     let db = self.chain_api.db().clone();
                     let mut db = db.write().await;
@@ -397,11 +398,11 @@ mod native {
                 // TODO: allow announcing all addresses once that option is supported
                 let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
                 info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-                if let Err(_) = self
-                    .chain_api
+                if self.chain_api
                     .actions_ref()
                     .announce(&multiaddresses_to_announce[0], &self.me)
                     .await
+                    .is_err()
                 {
                     // If the announcement fails we keep going to prevent the node from retrying
                     // after restart. Functionality is limited and users must check the logs for
@@ -441,7 +442,7 @@ mod native {
 
         /// Test whether the peer with PeerId is allowed to access the network
         pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
-            self.transport_api.is_allowed_to_access_network(&peer).await
+            self.transport_api.is_allowed_to_access_network(peer).await
         }
 
         /// Ping another node in the network based on the PeerId
@@ -452,7 +453,7 @@ mod native {
                 ));
             }
 
-            Ok(self.transport_api.ping(&peer).await)
+            Ok(self.transport_api.ping(peer).await)
         }
 
         /// Send a message to another peer in the network
@@ -524,7 +525,7 @@ mod native {
 
         /// Unregister a peer from the network
         pub async fn unregister(&self, peer: &PeerId) {
-            self.transport_api.network_unregister(&peer).await
+            self.transport_api.network_unregister(peer).await
         }
 
         /// List all peers connected to this
@@ -584,7 +585,7 @@ mod native {
 
         /// List all channels open to a specified address
         pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-            Ok(self.chain_api.channels_to(&dest).await?)
+            Ok(self.chain_api.channels_to(dest).await?)
         }
 
         /// List all channels
@@ -626,7 +627,7 @@ mod native {
             let awaiter = self
                 .chain_api
                 .actions_ref()
-                .open_channel(destination.clone(), *amount)
+                .open_channel(*destination, *amount)
                 .await?;
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
@@ -749,6 +750,7 @@ mod native {
             Ok(())
         }
 
+
         pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
             if self.status() != State::Running {
                 return Err(crate::errors::HoprLibError::GeneralError(
@@ -757,6 +759,7 @@ mod native {
             }
 
             // We do not await the on-chain confirmation
+            #[allow(clippy::let_underscore_future)]
             let _ = self.chain_api.actions_ref().redeem_ticket(ack_ticket).await?;
 
             Ok(())
@@ -901,7 +904,7 @@ pub mod wasm_impl {
 
             let chain_config = chain::ChainNetworkConfig::new(
                 &cfg.chain.network,
-                cfg.chain.provider.clone().as_ref().map(|v| v.as_str()),
+                cfg.chain.provider.clone().as_deref(),
             )
             .expect("Valid configuration leads to a valid network");
 
@@ -956,7 +959,8 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = removeAlias)]
         pub async fn _remove_alias(&self, alias: String) -> Result<(), JsError> {
-            Ok(self.hopr.remove_alias(&alias).await)
+            self.hopr.remove_alias(&alias).await;
+            Ok(())
         }
 
         #[wasm_bindgen(js_name = getAlias)]
@@ -984,7 +988,7 @@ pub mod wasm_impl {
             self.hopr
                 .run()
                 .await
-                .map(|processes| HoprProcesses::new(processes))
+                .map(HoprProcesses::new)
                 .map_err(JsError::from)
         }
 
@@ -1021,7 +1025,7 @@ pub mod wasm_impl {
         pub async fn _is_allowed_to_access_network(&self, peer: JsString) -> bool {
             let x: String = peer.into();
 
-            if let Some(peer) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(peer) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 self.hopr.is_allowed_to_access_network(&peer).await
             } else {
                 false
@@ -1032,7 +1036,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = ping)]
         pub async fn _ping(&self, peer: JsString) -> Result<Option<u32>, JsError> {
             let x: String = peer.into();
-            if let Some(converted) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(converted) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 Ok(self.hopr.ping(&converted).await?.map(|v| v.as_millis() as u32))
             } else {
                 Ok(None)
@@ -1057,7 +1061,7 @@ pub mod wasm_impl {
             application_tag: Option<u16>,
         ) -> Result<JsString, JsError> {
             let x: String = destination.into();
-            if let Some(destination) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(destination) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 let (path, hops) = {
                     if let Some(intermediate_path) = intermediate_path {
                         let full_path = intermediate_path
@@ -1088,20 +1092,17 @@ pub mod wasm_impl {
                     }
                 };
 
-                let result = self
-                    .hopr
+                self.hopr
                     .send_message(msg, destination, path, hops, application_tag)
                     .await
                     .map(|v| JsString::from(v.to_hex()))
-                    .map_err(JsError::from);
-
-                result
+                    .map_err(JsError::from)
             } else {
                 // TODO: Should this really be counted?
                 #[cfg(all(feature = "prometheus", not(test)))]
                 SimpleCounter::increment(&METRIC_MESSAGE_FAIL_COUNT);
 
-                return Err(JsError::new("send msg: invalid destination peer id supplied"));
+                Err(JsError::new("send msg: invalid destination peer id supplied"))
             }
         }
 
@@ -1344,7 +1345,7 @@ pub mod wasm_impl {
         #[wasm_bindgen]
         pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> Result<Hash, JsError> {
             self.hopr
-                .withdraw(recipient.clone(), amount.clone())
+                .withdraw(*recipient, *amount)
                 .await
                 .map_err(JsError::from)
         }
@@ -1399,7 +1400,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = redeemTicketsInChannel)]
         pub async fn _redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> Result<(), JsError> {
             self.hopr
-                .redeem_tickets_in_channel(&channel, only_aggregated)
+                .redeem_tickets_in_channel(channel, only_aggregated)
                 .await
                 .map_err(JsError::from)
         }
