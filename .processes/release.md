@@ -183,6 +183,7 @@ There should be a correspondence between the dappNode version an the upstream ve
 8. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
 9. Click `Publish release` to publish the signed release (confirm transaction in MM).
 10. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
+11. Publish in Element channel `releases` the IPFS hash of the new dappNode package
 
 ### Promote release
 
@@ -196,6 +197,8 @@ The process of promoting the named release (bratislava, providence, etc) consist
 
 The process of merge back consists of bringing all the changes made in the release branch back to the master branch.
 
-1. Execute the manual workflow named [Merge Back](https://github.com/hoprnet/hoprnet/actions/workflows/merge-back.yaml)
-2. Review the new PR created by this workflow and approve it if the changes provided are correct.
-3. Remind that the release must be merged-back periodically to minimise conflicts whenever we want to merge a hotfix back to master.
+1. Execute the script `./scripts/merge-back.sh <release_name>`
+2. The workspace should be clean
+3. The release name is the name from which it will take the changes `release/<release_name>`
+4. If there are unresolvable conflicts the script will stop and you will need to continue manually
+5. The github cli should be installed to create the PR.
