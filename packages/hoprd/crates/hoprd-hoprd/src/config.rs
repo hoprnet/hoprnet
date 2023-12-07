@@ -375,8 +375,6 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
-        // TODO: resolve CLI configuration of strategies
-
         // strategy
         if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
             cfg.hopr.strategy.get_strategies().push(x);

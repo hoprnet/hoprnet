@@ -10,12 +10,14 @@ use hex;
 use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
-use utils_misc::ok_or_str;
 
 #[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use utils_validation::network::wasm::is_dns_address;
+use {
+    utils_validation::network::wasm::is_dns_address,
+    wasm_bindgen::JsError
+};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -407,10 +409,10 @@ pub struct CliArgs {
     pub module_address: Option<String>,
 }
 
+#[cfg(feature = "wasm")]
 impl CliArgs {
     /// Creates a new instance using custom cli_args and custom network variables
-    #[cfg(feature = "wasm")]
-    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, String> {
+    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, wasm_bindgen::JsError> {
         let mut cmd = Command::new("hoprd")
             .about("HOPRd")
             .bin_name("index.cjs")
@@ -421,15 +423,15 @@ impl CliArgs {
 
         cmd.update_env_from(env_vars);
 
-        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
+        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(JsError::from)?;
 
-        Ok(ok_or_str!(Self::from_arg_matches(&derived_matches))?)
+        Self::from_arg_matches(&derived_matches)
+            .map_err(wasm_bindgen::JsError::from)
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn parse_private_key() {
         let parsed =
@@ -497,30 +499,31 @@ pub mod wasm {
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::str::FromStr;
-    use utils_misc::{convert_from_jstrvec, ok_or_jserr};
+    use utils_misc::convert_from_jstrvec;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
-    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsValue> {
+    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsError> {
         convert_from_jstrvec!(cli_args, cli_str_args);
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into(),))?;
+        let string_envs = serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into(),)
+            .map_err(JsError::from)?;
 
         let mut env_map: HashMap<OsString, OsString> = HashMap::new();
         for (ref k, ref v) in string_envs {
             let key = OsString::from_str(k)
-                .or_else(|e| Err(format!("Could not convert key {} to OsString: {}", k, e.to_string())))?;
+                .map_err(|e| JsError::new(format!("Could not convert key {} to OsString: {}", k, e.to_string()).as_str()))?;
             let value = OsString::from_str(v)
-                .or_else(|e| Err(format!("Could not convert value {} to OsString: {}", v, e.to_string())))?;
+                .map_err(|e| JsError::new(format!("Could not convert value {} to OsString: {}", v, e.to_string()).as_str()))?;
 
             env_map.insert(key, value);
         }
 
-        let args = ok_or_jserr!(super::CliArgs::new_from(cli_str_args, env_map,))?;
+        let args = super::CliArgs::new_from(cli_str_args, env_map,)?;
 
-        ok_or_jserr!(serde_wasm_bindgen::to_value(&args))
+        serde_wasm_bindgen::to_value(&args).map_err(JsError::from)
     }
 }

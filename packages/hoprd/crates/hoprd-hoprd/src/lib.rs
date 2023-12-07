@@ -14,9 +14,6 @@ pub mod wasm {
     use core_ethereum_db::db::wasm::*;
 
     #[allow(unused_imports)]
-    use core_transport::wasm::*;
-
-    #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;
 
     #[allow(unused_imports)]
