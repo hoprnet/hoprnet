@@ -34,12 +34,19 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
+                        // This is a hard-failure which is unrecoverable (e.g. Anvil restart in the background when testing)
+                        assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
+
                         // Range is inclusive
                         let range_filter = ethers::types::Filter::from(filter.clone())
                             .from_block(BlockNumber::Number(from_block.into()))
                             .to_block(BlockNumber::Number(latest_block.into()));
 
-                        debug!("polling logs from {}", if from_block != latest_block { format!("#{from_block} - #{latest_block}") } else { format!("#{from_block}") });
+                        if from_block != latest_block {
+                            debug!("polling logs from blocks #{from_block} - #{latest_block}");
+                        } else {
+                             debug!("polling logs from block #{from_block}");
+                        }
 
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
