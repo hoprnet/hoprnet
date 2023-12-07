@@ -11,19 +11,26 @@ use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
     build_ticket_aggregation, libp2p_identity, p2p_loop, ApplicationData, ChainKeypair, HalfKeyChallenge, Keypair,
-    Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer,
+    Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer, HoprTransport
 };
 use core_types::protocol::TagBloomFilter;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{debug, info};
-use utils_types::traits::BinarySerializable;
+use utils_types::{
+    traits::BinarySerializable,
+    primitives::Address
+};
 
 use crate::chain::ChainNetworkConfig;
 use crate::{config::HoprLibConfig, constants};
 
-#[cfg(feature = "wasm")]
-use core_transport::wasm_impls::HoprTransport;
-use utils_types::primitives::Address;
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::spawn_local;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm_bindgen_futures::spawn_local;
+
+
 
 /// Enum differentiator for loop component futures.
 ///
@@ -91,6 +98,8 @@ where
     FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
 {
+    use futures::StreamExt;
+    use utils_log::error;
     use utils_types::traits::PeerIdLike;
 
     let identity: libp2p_identity::Keypair = (&me).into();
@@ -194,7 +203,7 @@ where
         indexer_updater,
         packet_actions.writer(),
         ticket_aggregation.writer(),
-        core_path::channel_graph::wasm::ChannelGraph::new(channel_graph.clone()),
+        channel_graph.clone(),
         my_multiaddresses.clone(),
     );
 
@@ -205,8 +214,36 @@ where
     let tbf_clone = tbf.clone();
     let multistrategy_clone = multi_strategy.clone();
 
+    // NOTE: This would normally be passed as ready loops and triggered in the 
+    // Hopr object's run, but with TS not fully migrated, these processes have to be
+    // spawned to make sure that announce and registrations pass
+    spawn_local(
+        async move {
+            let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+                Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
+                Box::pin(async move {
+                    action_queue
+                        .action_loop()
+                        .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                        .await
+                })
+            ];
+
+            let mut futs = crate::helpers::to_futures_unordered(chain_events);
+
+            while let Some(process) = futs.next().await {
+                if process.can_finish() {
+                    continue;
+                } else {
+                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                }
+            }
+        }
+    );
+
     let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-        Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
+        // Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
         Box::pin(async move { heartbeat.heartbeat_loop().map(|_| HoprLoopComponents::Heartbeat).await }),
         Box::pin(
             p2p_loop(
@@ -248,12 +285,12 @@ where
                 .map(|_| HoprLoopComponents::Timer)
                 .await
         }),
-        Box::pin(async move {
-            action_queue
-                .action_loop()
-                .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
-                .await
-        }),
+        // Box::pin(async move {
+        //     action_queue
+        //         .action_loop()
+        //         .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+        //         .await
+        // }),
     ];
 
     (hopr_transport_api, hopr_chain_api, ready_loops)

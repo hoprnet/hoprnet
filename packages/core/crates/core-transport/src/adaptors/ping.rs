@@ -18,7 +18,7 @@ use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_META
 /// the triggers for its functionality. This class implements the basic API by
 /// aggregating all necessary ping resources without leaking them into the
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP compliant.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PingExternalInteractions<R: PeerAddressResolver> {
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
     resolver: R,

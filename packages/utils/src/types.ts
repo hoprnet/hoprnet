@@ -99,6 +99,5 @@ export {
   WasmVecAcknowledgedTicket,
   WasmVecAddress,
   WasmVecChannelEntry,
-  HoprTransport,
   PingConfig
 } from '../../hoprd/lib/hoprd_hoprd.js'

@@ -5291,6 +5291,7 @@ name = "real-base"
 version = "0.1.1"
 dependencies = [
  "bitflags 2.4.0",
+ "js-sys",
  "thiserror",
  "wasm-bindgen",
  "wasm-opt",

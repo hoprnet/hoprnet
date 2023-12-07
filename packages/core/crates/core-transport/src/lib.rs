@@ -250,388 +250,355 @@ pub struct PublicNodesResult {
     pub multiaddrs: Vec<Multiaddr>,
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm_impls {
-    use super::*;
-    use core_crypto::keypairs::Keypair;
-    use core_crypto::types::Hash;
-    use core_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_network::network::{Health, PeerOrigin, PeerStatus};
-    use core_network::ping::Pinging;
-    use core_path::path::TransportPath;
-    use core_path::selectors::legacy::LegacyPathSelector;
-    use core_path::selectors::PathSelector;
-    use core_path::DbPeerAddressResolver;
-    use core_protocol::ticket_aggregation::processor::AggregationList;
-    use core_types::protocol::ApplicationData;
-    use futures::future::{select, Either};
-    use futures::pin_mut;
-    use js_sys::JsString;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::PeerIdLike;
-    use wasm_bindgen::prelude::*;
+use core_network::network::PeerOrigin;
+use core_network::ping::Pinging;
+use core_path::path::TransportPath;
+use core_path::selectors::legacy::LegacyPathSelector;
+use core_path::selectors::PathSelector;
+use core_protocol::ticket_aggregation::processor::AggregationList;
+use futures::future::{select, Either};
+use futures::pin_mut;
+use utils_types::primitives::{Balance, BalanceType};
+use utils_types::traits::PeerIdLike;
 
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct PublicNodesResult {
-        pub id: JsString,
-        pub address: Address,
-        pub multiaddrs: Vec<JsString>,
-    }
 
-    impl From<super::PublicNodesResult> for PublicNodesResult {
-        fn from(value: super::PublicNodesResult) -> Self {
-            Self {
-                id: JsString::from(value.id),
-                address: value.address,
-                multiaddrs: value
-                    .multiaddrs
-                    .into_iter()
-                    .map(|v| JsString::from(v.to_string()))
-                    .collect(),
-            }
-        }
-    }
 
-    #[wasm_bindgen]
-    #[derive(Clone)]
-    pub struct HoprTransport {
-        me: PeerId,
-        me_onchain: Address,
+#[derive(Debug, Clone)]
+pub struct HoprTransport {
+    me: PeerId,
+    me_onchain: Address,
+    cfg: config::TransportConfig,
+    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
+    network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    network_change_notifier: Sender<NetworkEvent>,
+    indexer: processes::indexer::IndexerActions,
+    pkt_sender: PacketActions,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    my_multiaddresses: Vec<Multiaddr>,
+}
+
+impl HoprTransport {
+    pub fn new(
+        identity: libp2p_identity::Keypair,
+        me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-        ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
+        ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-        network_change_notifier: Sender<NetworkEvent>,
+        change_notifier: Sender<NetworkEvent>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
-        channel_graph: core_path::channel_graph::wasm::ChannelGraph,
+        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
+    ) -> Self {
+        Self {
+            me: identity.public().to_peer_id(),
+            me_onchain: me_onchain.public().to_address(),
+            cfg,
+            db,
+            ping: Arc::new(RwLock::new(ping)),
+            network,
+            network_change_notifier: change_notifier,
+            indexer,
+            pkt_sender,
+            ticket_aggregate_actions,
+            channel_graph,
+            my_multiaddresses,
+        }
     }
 
-    impl HoprTransport {
-        pub fn new(
-            identity: libp2p_identity::Keypair,
-            me_onchain: ChainKeypair,
-            cfg: config::TransportConfig,
-            db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-            ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-            network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-            change_notifier: Sender<NetworkEvent>,
-            indexer: processes::indexer::IndexerActions,
-            pkt_sender: PacketActions,
-            ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
-            channel_graph: core_path::channel_graph::wasm::ChannelGraph,
-            my_multiaddresses: Vec<Multiaddr>,
-        ) -> Self {
-            Self {
-                me: identity.public().to_peer_id(),
-                me_onchain: me_onchain.public().to_address(),
-                cfg,
-                db,
-                ping: Arc::new(RwLock::new(ping)),
-                network, //adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
-                network_change_notifier: change_notifier,
-                indexer,
-                pkt_sender,
-                ticket_aggregate_actions,
-                channel_graph,
-                my_multiaddresses,
-            }
+    pub fn me(&self) -> &PeerId {
+        &self.me
+    }
+
+    pub fn index_updater(&self) -> IndexerActions {
+        self.indexer.clone()
+    }
+
+    pub async fn ping(&self, peer: &PeerId) -> Option<std::time::Duration> {
+        if !(self.is_allowed_to_access_network(peer).await) {
+            return None;
         }
 
-        pub fn me(&self) -> &PeerId {
-            &self.me
+        let mut pinger = self.ping.write().await;
+
+        // TODO: add timeout on the p2p transport layer
+        let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
+        let ping = (*pinger).ping(vec![peer.clone()]).fuse();
+
+        pin_mut!(timeout, ping);
+
+        if !self.network.read().await.has(&peer) {
+            self.network.write().await.add(&peer, PeerOrigin::ManualPing)
         }
 
-        pub fn index_updater(&self) -> IndexerActions {
-            self.indexer.clone()
-        }
+        let start = current_timestamp();
 
-        pub async fn ping(&self, peer: &PeerId) -> Option<std::time::Duration> {
-            if !(self.is_allowed_to_access_network(peer).await) {
-                return None;
-            }
+        match select(timeout, ping).await {
+            Either::Left(_) => info!("Manual ping to peer '{}' timed out", peer),
+            Either::Right(_) => info!("Manual ping succeeded"),
+        };
 
-            let mut pinger = self.ping.write().await;
+        self.network
+            .read()
+            .await
+            .get_peer_status(&peer)
+            .map(|status| std::time::Duration::from_millis(status.last_seen - start))
+    }
 
-            // TODO: add timeout on the p2p transport layer
-            let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
-            let ping = (*pinger).ping(vec![peer.clone()]).fuse();
+    pub async fn send_message(
+        &self,
+        msg: Box<[u8]>,
+        destination: PeerId,
+        intermediate_path: Option<Vec<PeerId>>,
+        hops: Option<u16>,
+        application_tag: Option<u16>,
+    ) -> crate::errors::Result<HalfKeyChallenge> {
+        let app_data = ApplicationData::new(application_tag, &msg)?;
 
-            pin_mut!(timeout, ping);
+        let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
+            let mut full_path = intermediate_path;
+            full_path.push(destination.clone());
 
-            if !self.network.read().await.has(&peer) {
-                self.network.write().await.add(&peer, PeerOrigin::ManualPing)
-            }
+            let cg = self.channel_graph.read().await;
 
-            let start = current_timestamp();
-
-            match select(timeout, ping).await {
-                Either::Left(_) => info!("Manual ping to peer '{}' timed out", peer),
-                Either::Right(_) => info!("Manual ping succeeded"),
-            };
-
-            self.network
-                .read()
+            TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &*cg)
                 .await
-                .get_peer_status(&peer)
-                .map(|status| std::time::Duration::from_millis(status.last_seen - start))
-        }
+                .map(|(p, _)| p)?
+        } else if let Some(hops) = hops {
+            let pk = OffchainPublicKey::from_peerid(&destination)?;
 
-        pub async fn send_message(
-            &self,
-            msg: Box<[u8]>,
-            destination: PeerId,
-            intermediate_path: Option<Vec<PeerId>>,
-            hops: Option<u16>,
-            application_tag: Option<u16>,
-        ) -> crate::errors::Result<HalfKeyChallenge> {
-            let app_data = ApplicationData::new(application_tag, &msg)?;
+            if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {
+                let selector = LegacyPathSelector::default();
+                let cp = {
+                    let cg = self.channel_graph.read().await;
+                    selector.select_path(&cg, cg.my_address(), chain_key.clone(), hops as usize)?
+                };
 
-            let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
-                let mut full_path = intermediate_path;
-                full_path.push(destination.clone());
-
-                let graph = self.channel_graph.as_ref_counted();
-                let cg = graph.read().await;
-
-                TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &*cg)
-                    .await
-                    .map(|(p, _)| p)?
-            } else if let Some(hops) = hops {
-                let pk = OffchainPublicKey::from_peerid(&destination)?;
-
-                if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {
-                    let selector = LegacyPathSelector::default();
-                    let cp = {
-                        let cgraph = self.channel_graph.as_ref_counted();
-                        let cg = cgraph.read().await;
-                        selector.select_path(&cg, cg.my_address(), chain_key.clone(), hops as usize)?
-                    };
-
-                    cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
-                } else {
-                    return Err(crate::errors::HoprTransportError::Api(
-                        "send msg: unknown destination peer id encountered".to_owned(),
-                    ));
-                }
+                cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
             } else {
                 return Err(crate::errors::HoprTransportError::Api(
-                    "send msg: one of either hops or intermediate path must be specified".to_owned(),
+                    "send msg: unknown destination peer id encountered".to_owned(),
                 ));
-            };
-
-            #[cfg(all(feature = "prometheus", not(test)))]
-            SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
-
-            match self.pkt_sender.clone().send_packet(app_data, path) {
-                Ok(mut awaiter) => {
-                    utils_log::debug!("Awaiting the HalfKeyChallenge");
-                    Ok(awaiter
-                        .consume_and_wait(std::time::Duration::from_millis(
-                            crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,
-                        ))
-                        .await?)
-                }
-                Err(e) => Err(crate::errors::HoprTransportError::Api(format!(
-                    "send msg: failed to enqueue msg send: {}",
-                    e
-                ))),
             }
-        }
+        } else {
+            return Err(crate::errors::HoprTransportError::Api(
+                "send msg: one of either hops or intermediate path must be specified".to_owned(),
+            ));
+        };
 
-        pub async fn aggregate_tickets(&mut self, channel: &Hash) -> errors::Result<()> {
-            let entry = self
-                .db
-                .read()
-                .await
-                .get_channel(&channel)
-                .await
-                .map_err(errors::HoprTransportError::from)
-                .and_then(|c| {
-                    if let Some(c) = c {
-                        Ok(c)
-                    } else {
-                        Err(errors::HoprTransportError::Api(format!(
-                            "aggregate tickets: no channel entry found for hash '{}'",
-                            &channel
-                        )))
-                    }
-                })?;
+        #[cfg(all(feature = "prometheus", not(test)))]
+        SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
 
-            Ok(self
-                .ticket_aggregate_actions
-                .aggregate_tickets(AggregationList::WholeChannel(entry))?
-                .consume_and_wait(std::time::Duration::from_millis(60000))
-                .await?)
-        }
-
-        pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
-            let db = self.db.read().await;
-
-            let mut public_nodes = vec![];
-
-            for node in db.get_public_node_accounts().await?.into_iter() {
-                if let Ok(Some(v)) = db.get_packet_key(&node.chain_addr).await {
-                    public_nodes.push((
-                        v.to_peerid(),
-                        node.chain_addr,
-                        if let Some(ma) = node.get_multiaddr() {
-                            vec![ma]
-                        } else {
-                            vec![]
-                        },
+        match self.pkt_sender.clone().send_packet(app_data, path) {
+            Ok(mut awaiter) => {
+                utils_log::debug!("Awaiting the HalfKeyChallenge");
+                Ok(awaiter
+                    .consume_and_wait(std::time::Duration::from_millis(
+                        crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,
                     ))
-                }
+                    .await?)
             }
-
-            Ok(public_nodes)
-        }
-
-        pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
-            let db = self.db.read().await;
-
-            if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
-                if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
-                    return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
-                }
-            }
-
-            false
-        }
-
-        pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-            self.network.read().await.get_peer_multiaddresses(&self.me)
-        }
-
-        pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
-            let mut mas = self
-                .local_multiaddresses()
-                .into_iter()
-                .filter(|ma| {
-                    crate::multiaddrs::is_supported(ma)
-                        && (self.cfg.announce_local_addresses || !crate::multiaddrs::is_private(ma))
-                })
-                .map(|ma| crate::multiaddrs::decapsulate_p2p_protocol(&ma))
-                .filter(|v| !v.is_empty())
-                .collect::<Vec<_>>();
-
-            mas.sort_by(|l, r| {
-                let is_left_dns = crate::multiaddrs::is_dns(l);
-                let is_right_dns = crate::multiaddrs::is_dns(r);
-
-                if !(is_left_dns ^ is_right_dns) {
-                    std::cmp::Ordering::Equal
-                } else if is_left_dns {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Greater
-                }
-            });
-
-            mas
-        }
-
-        pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
-            self.my_multiaddresses.clone()
-        }
-
-        pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-            self.network.read().await.get_peer_multiaddresses(&peer)
-        }
-
-        pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-            self.network.read().await.get_peer_multiaddresses(&peer)
-        }
-
-        pub async fn network_health(&self) -> Health {
-            self.network.read().await.health()
-        }
-
-        pub async fn network_unregister(&self, peer: &PeerId) {
-            let mut change_notifier = self.network_change_notifier.clone();
-
-            match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
-                Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(peer.clone())) {
-                    Ok(_) => {}
-                    Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
-                },
-                Err(e) => error!("The receiver for network updates was dropped: {}", e),
-            }
-        }
-
-        pub async fn network_connected_peers(&self) -> Vec<PeerId> {
-            self.network.read().await.get_all_peers()
-        }
-
-        pub async fn network_peer_info(&self, peer: &PeerId) -> Option<PeerStatus> {
-            self.network.read().await.get_peer_status(&peer)
-        }
-
-        pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
-            let db = self.db.read().await;
-
-            let acked_ticket_amounts = db
-                .get_acknowledged_tickets(None)
-                .await
-                .map(|v| v.into_iter().map(|at| at.ticket.amount).collect::<Vec<_>>())?;
-
-            let losing = db.get_losing_tickets_count().await?;
-
-            let total_value = acked_ticket_amounts
-                .iter()
-                .fold(Balance::zero(BalanceType::HOPR), |sum, val| sum.add(val));
-
-            Ok(TicketStatistics {
-                win_proportion: if (acked_ticket_amounts.len() + losing) > 0 {
-                    acked_ticket_amounts.len() as f64 / (acked_ticket_amounts.len() + losing) as f64
-                } else {
-                    0f64
-                },
-                losing: losing as u32,
-                unredeemed: acked_ticket_amounts.len() as u32,
-                unredeemed_value: total_value,
-                redeemed: db.get_redeemed_tickets_count().await? as u32,
-                redeemed_value: db.get_redeemed_tickets_value().await?,
-                neglected: db.get_neglected_tickets_count().await? as u32,
-                neglected_value: db.get_neglected_tickets_value().await?,
-                rejected: db.get_rejected_tickets_count().await? as u32,
-                rejected_value: db.get_rejected_tickets_value().await?,
-            })
-        }
-
-        pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
-            let db = self.db.read().await;
-
-            let channel = db.get_channel(&channel).await?;
-
-            if let Some(channel) = channel {
-                if channel.destination == self.me_onchain {
-                    return Ok(db.get_acknowledged_tickets(Some(channel)).await?);
-                }
-            }
-
-            Ok(vec![])
-        }
-
-        pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
-            Ok(self
-                .db
-                .read()
-                .await
-                .get_acknowledged_tickets(None)
-                .await
-                .map(|tickets| {
-                    tickets
-                        .into_iter()
-                        .map(|acked_ticket| acked_ticket.ticket)
-                        .collect::<Vec<_>>()
-                })?)
+            Err(e) => Err(crate::errors::HoprTransportError::Api(format!(
+                "send msg: failed to enqueue msg send: {}",
+                e
+            ))),
         }
     }
+
+    pub async fn aggregate_tickets(&mut self, channel: &Hash) -> errors::Result<()> {
+        let entry = self
+            .db
+            .read()
+            .await
+            .get_channel(&channel)
+            .await
+            .map_err(errors::HoprTransportError::from)
+            .and_then(|c| {
+                if let Some(c) = c {
+                    Ok(c)
+                } else {
+                    Err(errors::HoprTransportError::Api(format!(
+                        "aggregate tickets: no channel entry found for hash '{}'",
+                        &channel
+                    )))
+                }
+            })?;
+
+        Ok(self
+            .ticket_aggregate_actions
+            .aggregate_tickets(AggregationList::WholeChannel(entry))?
+            .consume_and_wait(std::time::Duration::from_millis(60000))
+            .await?)
+    }
+
+    pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
+        let db = self.db.read().await;
+
+        let mut public_nodes = vec![];
+
+        for node in db.get_public_node_accounts().await?.into_iter() {
+            if let Ok(Some(v)) = db.get_packet_key(&node.chain_addr).await {
+                public_nodes.push((
+                    v.to_peerid(),
+                    node.chain_addr,
+                    if let Some(ma) = node.get_multiaddr() {
+                        vec![ma]
+                    } else {
+                        vec![]
+                    },
+                ))
+            }
+        }
+
+        Ok(public_nodes)
+    }
+
+    pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
+        let db = self.db.read().await;
+
+        if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
+            if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
+                return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
+            }
+        }
+
+        false
+    }
+
+    pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
+        self.network.read().await.get_peer_multiaddresses(&self.me)
+    }
+
+    pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
+        let mut mas = self
+            .local_multiaddresses()
+            .into_iter()
+            .filter(|ma| {
+                crate::multiaddrs::is_supported(ma)
+                    && (self.cfg.announce_local_addresses || !crate::multiaddrs::is_private(ma))
+            })
+            .map(|ma| crate::multiaddrs::decapsulate_p2p_protocol(&ma))
+            .filter(|v| !v.is_empty())
+            .collect::<Vec<_>>();
+
+        mas.sort_by(|l, r| {
+            let is_left_dns = crate::multiaddrs::is_dns(l);
+            let is_right_dns = crate::multiaddrs::is_dns(r);
+
+            if !(is_left_dns ^ is_right_dns) {
+                std::cmp::Ordering::Equal
+            } else if is_left_dns {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        });
+
+        mas
+    }
+
+    pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
+        self.my_multiaddresses.clone()
+    }
+
+    pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
+        self.network.read().await.get_peer_multiaddresses(&peer)
+    }
+
+    pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
+        self.network.read().await.get_peer_multiaddresses(&peer)
+    }
+
+    pub async fn network_health(&self) -> Health {
+        self.network.read().await.health()
+    }
+
+    pub async fn network_unregister(&self, peer: &PeerId) {
+        let mut change_notifier = self.network_change_notifier.clone();
+
+        match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
+            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(peer.clone())) {
+                Ok(_) => {}
+                Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
+            },
+            Err(e) => error!("The receiver for network updates was dropped: {}", e),
+        }
+    }
+
+    pub async fn network_connected_peers(&self) -> Vec<PeerId> {
+        self.network.read().await.get_all_peers()
+    }
+
+    pub async fn network_peer_info(&self, peer: &PeerId) -> Option<PeerStatus> {
+        self.network.read().await.get_peer_status(&peer)
+    }
+
+    pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
+        let db = self.db.read().await;
+
+        let acked_ticket_amounts = db
+            .get_acknowledged_tickets(None)
+            .await
+            .map(|v| v.into_iter().map(|at| at.ticket.amount).collect::<Vec<_>>())?;
+
+        let losing = db.get_losing_tickets_count().await?;
+
+        let total_value = acked_ticket_amounts
+            .iter()
+            .fold(Balance::zero(BalanceType::HOPR), |sum, val| sum.add(val));
+
+        Ok(TicketStatistics {
+            win_proportion: if (acked_ticket_amounts.len() + losing) > 0 {
+                acked_ticket_amounts.len() as f64 / (acked_ticket_amounts.len() + losing) as f64
+            } else {
+                0f64
+            },
+            losing: losing as u32,
+            unredeemed: acked_ticket_amounts.len() as u32,
+            unredeemed_value: total_value,
+            redeemed: db.get_redeemed_tickets_count().await? as u32,
+            redeemed_value: db.get_redeemed_tickets_value().await?,
+            neglected: db.get_neglected_tickets_count().await? as u32,
+            neglected_value: db.get_neglected_tickets_value().await?,
+            rejected: db.get_rejected_tickets_count().await? as u32,
+            rejected_value: db.get_rejected_tickets_value().await?,
+        })
+    }
+
+    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
+        let db = self.db.read().await;
+
+        let channel = db.get_channel(&channel).await?;
+
+        if let Some(channel) = channel {
+            if channel.destination == self.me_onchain {
+                return Ok(db.get_acknowledged_tickets(Some(channel)).await?);
+            }
+        }
+
+        Ok(vec![])
+    }
+
+    pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
+        Ok(self
+            .db
+            .read()
+            .await
+            .get_acknowledged_tickets(None)
+            .await
+            .map(|tickets| {
+                tickets
+                    .into_iter()
+                    .map(|acked_ticket| acked_ticket.ticket)
+                    .collect::<Vec<_>>()
+            })?)
+    }
 }
+// }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

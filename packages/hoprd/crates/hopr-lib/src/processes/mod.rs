@@ -14,12 +14,13 @@ use core_transport::{
     libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, PeerEligibility, TransportOutput,
 };
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
 use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
 use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
+
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::spawn_local;
+
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 

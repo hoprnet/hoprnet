@@ -10,6 +10,7 @@ use utils_misc::time::native::current_timestamp;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+#[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
     emitter: Sender<NetworkEvent>,
 }

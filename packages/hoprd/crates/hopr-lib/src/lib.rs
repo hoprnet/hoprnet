@@ -11,7 +11,7 @@ use core_ethereum_actions::node::NodeActions;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::{pin::Pin, str::FromStr};
+use std::pin::Pin;
 
 use async_std::sync::RwLock;
 use futures::{Future, StreamExt};
@@ -20,7 +20,7 @@ use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, Keypair, Multiaddr, OffchainKeypair,
+    ApplicationData, ChainKeypair, HoprTransport, HalfKeyChallenge, Hash, Health, Keypair, Multiaddr, OffchainKeypair,
 };
 
 use utils_log::{error, info};
@@ -28,8 +28,11 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
 
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::{remove_dir_all, join, read_file, write};
+
 #[cfg(all(feature = "wasm", not(test)))]
-use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
+use real_base::file::wasm::{remove_dir_all, join, read_file, write};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -38,7 +41,10 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use { 
+    std::str::FromStr,
+    utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge}
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -56,6 +62,8 @@ lazy_static::lazy_static! {
         &["version"]
     ).unwrap();
 }
+
+
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -75,6 +83,7 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
+    use crate::chain::SmartContractConfig;
     use crate::config::SafeModule;
     use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
     use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
@@ -82,14 +91,16 @@ mod native {
     use core_ethereum_types::chain_events::ChainEventType;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
+    use core_types::protocol::TagBloomFilter;
     use core_types::{
         account::AccountEntry,
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
+    use utils_db::db::DB;
     use std::time::Duration;
     use utils_log::debug;
-    use utils_types::traits::PeerIdLike;
+    use utils_types::traits::{PeerIdLike, ToHex as _, BinarySerializable};
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
@@ -111,14 +122,11 @@ mod native {
     }
 
     impl Hopr {
-        pub fn new<FOnReceived, FOnSent, FSaveTbf>(
-            cfg: config::HoprLibConfig,
+        pub fn new<FOnReceived, FOnSent>(
+            mut cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             my_addresses: Vec<Multiaddr>,
-            db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-            tbf: core_types::protocol::TagBloomFilter,
-            save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
@@ -126,12 +134,57 @@ mod native {
         where
             FOnReceived: Fn(ApplicationData) + 'static,
             FOnSent: Fn(HalfKeyChallenge) + 'static,
-            FSaveTbf: Fn(Box<[u8]>) + 'static,
         {
+            // pre-flight checks
+            // Announced limitation for the `providence` release
+            if ! cfg.chain.announce {
+                panic!("Announce option should be turned ON in Providence, only public nodes are supported");
+            }
+
+            let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG]).expect("Could not create a db storage path");
+            info!("Initiating the DB at: {db_path}");
+            
+            if cfg.db.force_initialize {
+                info!("Force cleaning up existing database");
+                remove_dir_all(&db_path).expect("Failed to remove the preexisting DB directory");
+                cfg.db.initialize = true
+            }
+
+            let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+                DB::new(utils_db::rusty::RustyLevelDbShim::new(&db_path, cfg.db.initialize)),
+                me_onchain.public().to_address(),
+            )));
+
+            info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
+            let resolved_environment = crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref()).expect("Failed to resolve environment");
+            let contract_addresses = SmartContractConfig::from(&resolved_environment);
+            info!("Resolved contract addresses for myself as '{}': {:?}", me_onchain.public().to_hex(), contract_addresses);
+
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
 
             let is_public = cfg.chain.announce;
+
+            let tbf_path = join(&[&cfg.db.data, "tbf"]).expect("Could not create a tbf storage path");
+            info!("Creating the Bloom filter storage at: {}", tbf_path);
+            
+            let tbf = read_file(&tbf_path)
+                .and_then(|data| {
+                    TagBloomFilter::from_bytes(&data)
+                        .map_err(|e| real_base::error::RealError::GeneralError(e.to_string()))
+                })
+                .unwrap_or_else(|_| {
+                    debug!("No tag Bloom filter found, using empty");
+                    TagBloomFilter::default()
+                });
+            
+            let save_tbf = move |data: Box<[u8]>| {
+                if let Err(e) = write(&tbf_path, data) {
+                    error!("Tag Bloom filter save failed: {e}")
+                } else {
+                    info!("Tag Bloom filter saved successfully")
+                };
+            };
 
             let (transport_api, chain_api, processes) = components::build_components(
                 cfg.clone(),
@@ -323,7 +376,7 @@ mod native {
                     .chain_api
                     .actions_ref()
                     .register_safe_by_node(self.safe_module_cfg.safe_address)
-                    //.await? TODO: add back this await once action queue is started
+                    .await?
                     .await
                 {
                     let db = self.chain_api.db().clone();
@@ -738,7 +791,6 @@ pub mod wasm_impl {
     use wasm_bindgen::prelude::*;
 
     use core_ethereum_api::ChannelEntry;
-    use core_transport::wasm_impls::PublicNodesResult;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -747,6 +799,27 @@ pub mod wasm_impl {
     };
 
     use crate::processes::wasm::WasmHoprMessageEmitter;
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct PublicNodesResult {
+        pub id: JsString,
+        pub address: Address,
+        pub multiaddrs: Vec<JsString>,
+    }
+
+    impl From<core_transport::PublicNodesResult> for PublicNodesResult {
+        fn from(value: core_transport::PublicNodesResult) -> Self {
+            Self {
+                id: JsString::from(value.id),
+                address: value.address,
+                multiaddrs: value
+                    .multiaddrs
+                    .into_iter()
+                    .map(|v| JsString::from(v.to_string()))
+                    .collect(),
+            }
+        }
+    }
 
     #[wasm_bindgen]
     pub struct HoprProcesses {
@@ -813,9 +886,6 @@ pub mod wasm_impl {
             cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
-            db: Database,
-            tbf: core_types::protocol::TagBloomFilter,
-            save_tbf: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: js_sys::Function,           // passed emit on the WasmHoprMessageEmitter on packet sent
@@ -841,18 +911,6 @@ pub mod wasm_impl {
                     me,
                     me_onchain,
                     vec![multiaddress],
-                    db.as_ref_counted(),
-                    tbf,
-                    move |content: Box<[u8]>| {
-                        if let Ok(_) = save_tbf.call1(
-                            &wasm_bindgen::JsValue::null(),
-                            js_sys::Uint8Array::from(content.as_ref()).as_ref(),
-                        ) {
-                            debug!("tag bloom filter saved");
-                        } else {
-                            error!("failed to call save tbf closure");
-                        }
-                    },
                     chain_config,
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {

@@ -15,7 +15,7 @@ use utils_log::error;
 use utils_types::primitives::Address;
 
 /// DB backed packet key to chain key resolver
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DbPeerAddressResolver(pub Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>);
 
 #[async_trait(? Send)]

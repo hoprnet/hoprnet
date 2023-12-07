@@ -1,5 +1,6 @@
 import path from 'path'
 import retimer from 'retimer'
+import { rmSync } from 'fs'
 
 import {
   get_package_version,
@@ -9,7 +10,8 @@ import {
   HoprKeys,
   Hopr,
   IdentityOptions,
-  ApplicationData
+  ApplicationData,
+  HalfKeyChallenge,
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -28,16 +30,39 @@ hoprd_hoprd_initialize_crate()
 
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
-import { createHoprNode } from './hopr.js'
 
 import { decodeMessage } from './api/utils.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
 
-export { WasmHoprMessageEmitter } from './hopr.js'
+
+import EventEmitter from 'events'
+
+const log = debug('hoprd')
+
+/*
+ * General HoprMessageEmitter object responsible for emitting
+ * data that would otherwise be obtained from the core-transport
+ * stream.
+ *
+ * Ingress part of the chain.
+ */
+export class WasmHoprMessageEmitter extends EventEmitter {
+  public constructor() {
+    super()
+  }
+
+  public delegate_on(event: string, callback: () => void) {
+    this.on(event, callback)
+  }
+}
 
 const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
-const log = debug('hoprd')
+export function removeAllInPath(target: string) {
+  const p = path.normalize(target)
+  rmSync(p, { recursive: true, force: true })
+}
+
 
 function stopGracefully(signal) {
   log(`Process exiting with signal ${signal}`)
@@ -193,7 +218,29 @@ async function main() {
     // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
     // if safe address or module address is not provided, replace with values stored in the db
     const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
-    let node = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    
+    // NODE Rust to TS hacked setup before fully migrating everything
+    let message_emitter = new WasmHoprMessageEmitter()
+    const onAcknowledgement = (ackChallenge: HalfKeyChallenge) => {
+      // Can subscribe to both: per specific message or all message acknowledgments
+      message_emitter.emit(`hopr:message-acknowledged:${ackChallenge.to_hex()}`)
+      message_emitter.emit('hopr:message-acknowledged', ackChallenge.to_hex())
+    }
+
+    const onReceivedMessage = (msg: ApplicationData) => {
+      message_emitter.emit('hopr:message', msg)
+    }
+
+    log('Creating the hopr-lib node instance...')
+    let node = new Hopr(
+      hoprlib_cfg,
+      keypair.packet_key,
+      keypair.chain_key,
+      message_emitter as WasmHoprMessageEmitter,
+      onReceivedMessage,
+      onAcknowledgement
+    )
+    
     let loops = await node.run()
 
     // Subscribe to node events
@@ -223,12 +270,8 @@ async function main() {
     if (cfg.api.enable) startApiListen()
 
     showOnboardingInformation(node)
-
+    
     // Won't return until node is terminated
-    log('# STARTED NODE')
-    log('ID {}', node.peerId())
-    log('Protocol version', node.getVersionCoerced())
-
     await loops.execute()
   } catch (e) {
     log('Node failed to start: ' + e)

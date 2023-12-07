@@ -39,7 +39,7 @@ fn get_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> Result<utils_db::db:
     to_acknowledged_ticket_key(&ack.ticket.channel_id, ack.ticket.channel_epoch, ack.ticket.index)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CoreEthereumDb<T>
 where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone,
