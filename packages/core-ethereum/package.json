@@ -42,7 +42,7 @@
     "mocha": "10.2.0",
     "typedoc": "0.24.8",
     "typedoc-plugin-markdown": "3.15.4",
-    "typescript": "5.3.2"
+    "typescript": "5.3.3"
   },
   "mocha": {
     "spec": "lib/**/*.spec.js"
