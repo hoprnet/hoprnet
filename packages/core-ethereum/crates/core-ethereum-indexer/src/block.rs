@@ -499,15 +499,16 @@ pub mod tests {
         let cfg = IndexerConfig::default();
 
         handlers.expect_contract_addresses().return_const(vec![]);
-
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
+        
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .times(1)
-            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
+        .times(1)
+        .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
+        .return_once(move |_, _| Ok(Box::pin(rx)));
+
+        let head_block = 1000;
+        rpc.expect_block_number().returning(move || Ok(head_block));
+        rpc.expect_block_number().returning(move || Ok(head_block));
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
@@ -558,14 +559,18 @@ pub mod tests {
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
             .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
+
+        let head_block = 1000;
+        for i in 0..2 {
+            let current_block = head_block + i;
+            rpc.expect_block_number()
+                .returning(move || Ok(current_block));
+        }
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
@@ -576,6 +581,7 @@ pub mod tests {
                 U256::from(23u8),
             ),
         };
+
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
             logs: vec![],
