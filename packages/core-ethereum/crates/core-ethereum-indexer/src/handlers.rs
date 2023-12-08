@@ -363,6 +363,9 @@ where
                     // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
                     db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
                         .await?;
+                    // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
+                    db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
+                        .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);

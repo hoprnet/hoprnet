@@ -580,6 +580,7 @@ pub mod wasm {
     use js_sys::JsString;
     use std::str::FromStr;
     use utils_misc::utils::wasm::js_map_to_hash_map;
+    use utils_types::sma::SingleSumSMA;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]

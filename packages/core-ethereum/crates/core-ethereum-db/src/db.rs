@@ -649,7 +649,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
     // core-ethereum only part
     async fn mark_acknowledged_tickets_neglected(&mut self, channel: ChannelEntry) -> Result<()> {
-        let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
+        let acknowledged_tickets: Vec<AcknowledgedTicket> = self
+            .get_acknowledged_tickets(Some(channel))
+            .await?
+            .into_iter()
+            .filter(|ack| U256::from(ack.ticket.channel_epoch) <= channel.channel_epoch)
+            .collect();
 
         let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
         let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
@@ -2042,6 +2047,56 @@ mod tests {
         }
 
         acked_tickets
+    }
+
+    #[async_std::test]
+    async fn test_mark_mark_acknowledged_tickets_neglected() {
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+
+        let start_index = 23u64;
+        let tickets_to_generate = 3u64;
+        let channel_epoch = 29u32;
+
+        // set channel to current epoch
+        let mut channel = ChannelEntry::new(
+            ALICE_KEYPAIR.public().to_address(),
+            BOB_KEYPAIR.public().to_address(),
+            Balance::zero(BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            channel_epoch.into(),
+            0_u32.into(),
+        );
+
+        db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        // create acked tickets of channel_epoch
+        let acked_tickets = create_acknowledged_tickets(&mut db, tickets_to_generate, channel_epoch, start_index).await;
+
+        // assert channel id
+        let channel_id = generate_channel_id(&ALICE_KEYPAIR.public().to_address(), &BOB_KEYPAIR.public().to_address());
+        assert_eq!(channel_id, acked_tickets[0].ticket.channel_id);
+        assert_eq!(channel_id, channel.get_id());
+
+        // check acked ticket count
+        let acked_tickets_count = db.get_acknowledged_tickets_count(Some(channel.clone())).await.unwrap();
+
+        assert_eq!(acked_tickets_count, tickets_to_generate as usize);
+
+        // bump channel to next epoch
+        channel.channel_epoch = (channel_epoch + 1).into();
+        db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        // mark_acknowledged_tickets_neglected
+        assert!(db.mark_acknowledged_tickets_neglected(channel).await.is_ok());
+
+        // acked tickets should reduce to zero
+        let acked_tickets_count_after_mark = db.get_acknowledged_tickets_count(None).await.unwrap();
+        assert_eq!(acked_tickets_count_after_mark, 0usize);
     }
 
     #[async_std::test]

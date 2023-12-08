@@ -560,6 +560,28 @@ api:
   host:
     address: !IPv4 127.0.0.1
     port: 1233
+healthcheck:
+  enable: false
+  host: 127.0.0.1
+  port: 0
+protocol:
+  ack:
+    timeout: 15
+  heartbeat:
+    timeout: 15
+  msg:
+    timeout: 15
+  ticket_aggregation:
+    timeout: 15
+network: testing
+chain:
+  announce: false
+  provider: null
+  check_unrealized_balance: true
+safe_module:
+  safe_transaction_service_provider: null
+  safe_address: null
+  module_address: null
 test:
   use_weak_crypto: false
 "#;
