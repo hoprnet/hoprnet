@@ -39,7 +39,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             from_block = latest_block;
                         }
 
-                        // This is a hard-failure on subsequent iterations which is unrecoverable (e.g. Anvil restart in the background when testing)
+                        // This is a hard-failure on subsequent iterations which is unrecoverable
+                        // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
                         assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
 
                         // Range is inclusive

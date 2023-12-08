@@ -66,7 +66,7 @@ impl Default for RpcOperationsConfig {
 }
 
 pub(crate) type HoprMiddleware<P> =
-    SignerMiddleware<NonceManagerMiddleware<Provider<RetryClient<P>>>, Wallet<SigningKey>>;
+    NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -105,8 +105,8 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let provider = Arc::new(
             Provider::new(provider_client)
                 .interval(cfg.tx_polling_interval)
+                .with_signer(wallet)
                 .nonce_manager(chain_key.public().to_address().into())
-                .with_signer(wallet),
         );
 
         debug!("{:?}", cfg.contract_addrs);
@@ -190,6 +190,9 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction> {
+        // This only sets the nonce on the first TX, otherwise it is a no-op
+        let _ = self.provider.initialize_nonce(None).await;
+
         // Also fills the transaction including the EIP1559 fee estimates from the provider
         let sent_tx = self
             .provider
@@ -299,6 +302,55 @@ pub mod tests {
             .expect("failed to send tx");
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+    }
+
+    #[async_std::test]
+    async fn test_should_send_consecutive_txs() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            tx_confirmations: 2,
+            ..RpcOperationsConfig::default()
+        };
+
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+
+        let balance_1 = rpc
+            .get_balance((&chain_key_0).into(), BalanceType::Native)
+            .await
+            .unwrap();
+        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
+
+        let txs_count = 5_u64;
+        let send_amount = 1000000_u64;
+
+        // Send 1 ETH to some random address
+        futures::future::join_all((0..txs_count)
+            .into_iter()
+            .map(|_| async {
+                rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
+                    .await
+                    .expect("tx should be sent")
+                    .await
+                    .expect("tx should resolve")
+            })
+        ).await;
+
+
+        let balance_2 = rpc
+            .get_balance((&chain_key_0).into(), BalanceType::Native)
+            .await
+            .unwrap();
+
+        assert!(balance_2.value().as_u64() <= balance_1.value().as_u64() - txs_count * send_amount, "balance must be less");
     }
 
     #[async_std::test]
