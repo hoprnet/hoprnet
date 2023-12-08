@@ -266,8 +266,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                                 .await? // TODO: optimize this DB query and iteration
                                 .into_iter()
                                 .find(|ticket| {
-                                    ticket.ticket.index - (ticket.ticket.index_offset as u64 - 1)
-                                        == ticket_redeemed.new_ticket_index - 1
+                                    ticket.ticket.index + ticket.ticket.index_offset as u64
+                                        == ticket_redeemed.new_ticket_index
                                 })
                             {
                                 db.mark_redeemed(&ticket).await?;
