@@ -196,7 +196,7 @@ where
                     match self.tx_exec.redeem_ticket(ack.clone()).await {
                         Ok(tx_hash) => IndexerExpectation::new(
                             tx_hash,
-                            move |event| matches!(event, ChainEventType::TicketRedeemed(_, Some(ticket)) if ack.ticket.channel_id.eq(&ticket.ticket.channel_id)),
+                            move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
                         ),
                         Err(e) => {
                             // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
