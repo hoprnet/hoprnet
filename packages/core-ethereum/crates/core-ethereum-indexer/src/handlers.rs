@@ -266,7 +266,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                                 .await? // TODO: optimize this DB query and iteration
                                 .into_iter()
                                 .find(|ticket| {
-                                    ticket.ticket.index - ticket.ticket.index_offset as u64 - 1
+                                    ticket.ticket.index - (ticket.ticket.index_offset as u64 - 1)
                                         == ticket_redeemed.new_ticket_index - 1
                                 })
                             {
@@ -275,7 +275,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                             } else {
                                 error!(
                                     "could not find acknowledged ticket with idx {} in {channel}",
-                                    ticket_redeemed.new_ticket_index
+                                    ticket_redeemed.new_ticket_index - 1
                                 );
                                 None
                             }
