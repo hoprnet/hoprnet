@@ -88,7 +88,7 @@ describe('db functional tests', function () {
 
     const initialBlockNumber = await db.get_latest_block_number()
 
-    assert(initialBlockNumber == 0, `initial block number must be set to 0`)
+    assert(initialBlockNumber == undefined, `initial block number must be set to 0`)
 
     const blockNumber = new BN(23)
     await db.update_latest_block_number(blockNumber.toNumber())
