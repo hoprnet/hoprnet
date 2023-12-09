@@ -94,7 +94,7 @@ services:
       - hopr-net
 
   prometheus:
-    image: prom/prometheus:v2.47.2@sha256:3002935850ea69a59816825d4cb718fafcdb9b124e4e6153ebc6894627525f7f
+    image: prom/prometheus:v2.48.1@sha256:a67e5e402ff5410b86ec48b39eab1a3c4df2a7e78a71bf025ec5e32e09090ad4
     restart: always
     container_name: prometheus
     hostname: prometheus
