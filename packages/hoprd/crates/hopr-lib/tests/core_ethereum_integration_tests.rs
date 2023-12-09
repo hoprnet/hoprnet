@@ -23,7 +23,7 @@ use std::time::Duration;
 use utils_db::db::DB;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::debug;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::PeerIdLike;
 
 #[async_std::test]
@@ -34,7 +34,7 @@ async fn integration_test_indexer() {
     let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
 
     // Deploy contracts
-    let contract_addrs = {
+    let (contract_addrs, module_addr, safe_addr) = {
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -50,12 +50,12 @@ async fn integration_test_indexer() {
         )
         .await;
 
-        ContractAddresses::from(&instances)
-    };
+        let (module, safe) = core_ethereum_types::utils::deploy_one_safe_one_module_and_setup_for_testing(&instances, client.clone(), &contract_deployer)
+            .await
+            .expect("could not deploy safe and module");
 
-    // TODO: deploy module and safe
-    let module_addr = Address::random();
-    let safe_addr = Address::random();
+        (ContractAddresses::from(&instances), module, safe)
+    };
 
     // DB
     let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -93,7 +93,7 @@ async fn integration_test_indexer() {
         db.clone(),
         action_queue.new_sender(),
     );
-    async_std::task::spawn_local(action_queue.transaction_loop());
+    async_std::task::spawn_local(action_queue.action_loop());
 
     // Action state tracking
     let (sce_tx, mut sce_rx) = futures::channel::mpsc::unbounded();

@@ -269,7 +269,7 @@ pub mod tests {
     async fn test_should_send_consecutive_txs() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let anvil = core_ethereum_types::utils::create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
@@ -295,7 +295,7 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).into_iter().map(|_| async {
-            rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
+            rpc.send_transaction(core_ethereum_types::utils::create_native_transfer(Address::random(), send_amount.into()))
                 .await
                 .expect("tx should be sent")
                 .await

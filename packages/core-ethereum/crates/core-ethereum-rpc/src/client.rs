@@ -358,6 +358,7 @@ pub mod tests {
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;
     use std::time::Duration;
+    use core_ethereum_types::utils::deploy_one_safe_one_module_and_setup_for_testing;
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
@@ -398,8 +399,7 @@ pub mod tests {
             .expect("failed to deploy");
 
         // deploy instance
-        let result = contract_instances
-            .deploy_one_safe_one_module_and_setup_for_testing(client.clone(), &chain_key_0)
+        let result = deploy_one_safe_one_module_and_setup_for_testing(&contract_instances, client.clone(),  &chain_key_0)
             .await
             .expect("failed to deploy safe and module");
 
