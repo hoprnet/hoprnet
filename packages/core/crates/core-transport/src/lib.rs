@@ -261,8 +261,6 @@ use futures::pin_mut;
 use utils_types::primitives::{Balance, BalanceType};
 use utils_types::traits::PeerIdLike;
 
-
-
 #[derive(Debug, Clone)]
 pub struct HoprTransport {
     me: PeerId,

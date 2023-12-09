@@ -14,10 +14,7 @@ use strum::VariantNames;
 #[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use {
-    utils_validation::network::wasm::is_dns_address,
-    wasm_bindgen::JsError
-};
+use {utils_validation::network::wasm::is_dns_address, wasm_bindgen::JsError};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -33,9 +30,7 @@ pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 fn parse_host(s: &str) -> Result<HostConfig, String> {
     let host = s.split_once(':').map_or(s, |(h, _)| h);
     if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
-        return Err(
-            "Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into()
-        );
+        return Err("Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into());
     }
 
     HostConfig::from_str(s)
@@ -57,16 +52,15 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
 
         Ok(Box::new(decoded))
     } else {
-        Err(
-            "Given string is not a private key. A private key must contain 128 hex chars.".into()
-        )
+        Err("Given string is not a private key. A private key must contain 128 hex chars.".into())
     }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
     if s.len() < MINIMAL_API_TOKEN_LENGTH {
         return Err(format!(
-            "Length of API token is too short, minimally required {MINIMAL_API_TOKEN_LENGTH} but given {}", s.len()
+            "Length of API token is too short, minimally required {MINIMAL_API_TOKEN_LENGTH} but given {}",
+            s.len()
         ));
     }
 
@@ -420,8 +414,7 @@ impl CliArgs {
 
         let derived_matches = cmd.try_get_matches_from(cli_args).map_err(JsError::from)?;
 
-        Self::from_arg_matches(&derived_matches)
-            .map_err(wasm_bindgen::JsError::from)
+        Self::from_arg_matches(&derived_matches).map_err(wasm_bindgen::JsError::from)
     }
 }
 
@@ -504,8 +497,8 @@ pub mod wasm {
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let string_envs = serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into(),)
-            .map_err(JsError::from)?;
+        let string_envs =
+            serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into()).map_err(JsError::from)?;
 
         let mut env_map: HashMap<OsString, OsString> = HashMap::new();
         for (ref k, ref v) in string_envs {
@@ -517,7 +510,7 @@ pub mod wasm {
             env_map.insert(key, value);
         }
 
-        let args = super::CliArgs::new_from(cli_str_args, env_map,)?;
+        let args = super::CliArgs::new_from(cli_str_args, env_map)?;
 
         serde_wasm_bindgen::to_value(&args).map_err(JsError::from)
     }

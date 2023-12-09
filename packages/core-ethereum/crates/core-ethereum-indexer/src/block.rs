@@ -499,12 +499,12 @@ pub mod tests {
         let cfg = IndexerConfig::default();
 
         handlers.expect_contract_addresses().return_const(vec![]);
-        
+
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-        .times(1)
-        .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
-        .return_once(move |_, _| Ok(Box::pin(rx)));
+            .times(1)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
+            .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
         rpc.expect_block_number().returning(move || Ok(head_block));
@@ -568,8 +568,7 @@ pub mod tests {
         let head_block = 1000;
         for i in 0..2 {
             let current_block = head_block + i;
-            rpc.expect_block_number()
-                .returning(move || Ok(current_block));
+            rpc.expect_block_number().returning(move || Ok(current_block));
         }
 
         let finalized_block = BlockWithLogs {

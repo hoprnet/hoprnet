@@ -10,16 +10,13 @@ use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, libp2p_identity, p2p_loop, ApplicationData, ChainKeypair, HalfKeyChallenge, Keypair,
-    Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer, HoprTransport
+    build_ticket_aggregation, libp2p_identity, p2p_loop, ApplicationData, ChainKeypair, HalfKeyChallenge,
+    HoprTransport, Keypair, Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer,
 };
 use core_types::protocol::TagBloomFilter;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{debug, info};
-use utils_types::{
-    traits::BinarySerializable,
-    primitives::Address
-};
+use utils_types::{primitives::Address, traits::BinarySerializable};
 
 use crate::chain::ChainNetworkConfig;
 use crate::{config::HoprLibConfig, constants};
@@ -29,8 +26,6 @@ use async_std::task::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-
-
 
 /// Enum differentiator for loop component futures.
 ///
@@ -210,33 +205,31 @@ where
     let tbf_clone = tbf.clone();
     let multistrategy_clone = multi_strategy.clone();
 
-    // NOTE: This would normally be passed as ready loops and triggered in the 
+    // NOTE: This would normally be passed as ready loops and triggered in the
     // Hopr object's run, but with TS not fully migrated, these processes have to be
     // spawned to make sure that announce and registrations pass
-    spawn_local(
-        async move {
-            let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-                Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
-                Box::pin(async move {
-                    action_queue
-                        .action_loop()
-                        .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
-                        .await
-                })
-            ];
+    spawn_local(async move {
+        let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+            Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
+            Box::pin(async move {
+                action_queue
+                    .action_loop()
+                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                    .await
+            }),
+        ];
 
-            let mut futs = crate::helpers::to_futures_unordered(chain_events);
+        let mut futs = crate::helpers::to_futures_unordered(chain_events);
 
-            while let Some(process) = futs.next().await {
-                if process.can_finish() {
-                    continue;
-                } else {
-                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                }
+        while let Some(process) = futs.next().await {
+            if process.can_finish() {
+                continue;
+            } else {
+                error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
             }
         }
-    );
+    });
 
     let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         // Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),

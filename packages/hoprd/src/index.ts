@@ -11,7 +11,7 @@ import {
   Hopr,
   IdentityOptions,
   ApplicationData,
-  HalfKeyChallenge,
+  HalfKeyChallenge
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -33,7 +33,6 @@ import setupAPI from './api/index.js'
 
 import { decodeMessage } from './api/utils.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
-
 
 import EventEmitter from 'events'
 
@@ -62,7 +61,6 @@ export function removeAllInPath(target: string) {
   const p = path.normalize(target)
   rmSync(p, { recursive: true, force: true })
 }
-
 
 function stopGracefully(signal) {
   log(`Process exiting with signal ${signal}`)
@@ -218,7 +216,7 @@ async function main() {
     // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
     // if safe address or module address is not provided, replace with values stored in the db
     const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
-    
+
     // NODE Rust to TS hacked setup before fully migrating everything
     let message_emitter = new WasmHoprMessageEmitter()
     const onAcknowledgement = (ackChallenge: HalfKeyChallenge) => {
@@ -240,7 +238,7 @@ async function main() {
       onReceivedMessage,
       onAcknowledgement
     )
-    
+
     let loops = await node.run()
 
     // Subscribe to node events
@@ -270,7 +268,7 @@ async function main() {
     if (cfg.api.enable) startApiListen()
 
     showOnboardingInformation(node)
-    
+
     // Won't return until node is terminated
     await loops.execute()
   } catch (e) {

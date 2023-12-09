@@ -63,11 +63,13 @@ pub struct RustyLevelDbShim {
     db: Arc<Mutex<rusty_leveldb::DB>>,
 }
 
-/// Custom implementation going around the fact that rusty_leveldb 
+/// Custom implementation going around the fact that rusty_leveldb
 /// does not provide the Debug implementation
 impl Debug for RustyLevelDbShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RustyLevelDbShim").field("db", &"rusty level DB".to_owned()).finish()
+        f.debug_struct("RustyLevelDbShim")
+            .field("db", &"rusty level DB".to_owned())
+            .finish()
     }
 }
 

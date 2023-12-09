@@ -435,17 +435,15 @@ pub mod wasm {
         network_id: String,
         custom_provider: Option<String>,
     ) -> Result<SmartContractConfig, JsError> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
-                .map_err(|e| JsError::new(e.as_str()))?;
+        let resolved_environment = super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
+            .map_err(|e| JsError::new(e.as_str()))?;
 
         Ok(SmartContractConfig::from(&resolved_environment))
     }
 
     #[wasm_bindgen]
     pub fn resolve_network(id: &str, maybe_custom_provider: Option<String>) -> JsResult<JsValue> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
+        let resolved_environment = super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&resolved_environment))
     }

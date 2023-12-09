@@ -1,6 +1,9 @@
 pub mod native {
     use crate::error::{RealError, Result};
-    use std::{fs, path::{Path, PathBuf}};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
 
     pub fn read_to_string(file_path: &str) -> Result<String> {
         fs::read_to_string(file_path)
@@ -19,20 +22,19 @@ pub mod native {
 
     pub fn join(components: &[&str]) -> Result<String> {
         let mut path = PathBuf::new();
-        
+
         for component in components.iter() {
             path.push(component);
         }
 
         match path.to_str().map(|p| p.to_owned()) {
             Some(p) => Ok(p),
-            None => Err(RealError::GeneralError("Failed to stringify path".into()))
+            None => Err(RealError::GeneralError("Failed to stringify path".into())),
         }
     }
 
     pub fn remove_dir_all(path: &str) -> Result<()> {
-        fs::remove_dir_all(Path::new(path))
-            .map_err(|e| RealError::GeneralError(e.to_string()))?;
+        fs::remove_dir_all(Path::new(path)).map_err(|e| RealError::GeneralError(e.to_string()))?;
 
         Ok(())
     }
@@ -112,14 +114,18 @@ pub mod wasm {
         write_file_js(path, contents.as_ref()).map_err(|e| RealError::JsError(format!("{:?}", e)))
     }
 
-    pub fn join(components: &[&str]) -> Result<String> {     
-        // NOTE: expecting a Unix system 
+    pub fn join(components: &[&str]) -> Result<String> {
+        // NOTE: expecting a Unix system
         Ok(components.join("/"))
     }
 
     pub fn remove_dir_all(path: &str) -> Result<()> {
-        remove_dir(path)
-            .map_err(|e| RealError::GeneralError(e.as_string().unwrap_or(format!("Unknown error on removing the path: {}", path))))
+        remove_dir(path).map_err(|e| {
+            RealError::GeneralError(
+                e.as_string()
+                    .unwrap_or(format!("Unknown error on removing the path: {}", path)),
+            )
+        })
     }
 
     pub fn metadata(path: &str) -> Result<()> {

@@ -115,7 +115,7 @@ pub async fn p2p_loop(
     for multiaddress in my_multiaddresses.iter() {
         // NOTE: Due to lack of STUN the passed in multiaddresses are believed to be correct after
         // the first successful listen. Relevant for Providence, but not beyond.
-        if ! valid_mas.is_empty() {
+        if !valid_mas.is_empty() {
             valid_mas.push(multiaddress.clone());
             continue;
         }

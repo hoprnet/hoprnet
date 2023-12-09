@@ -6,5 +6,5 @@ import { rmSync } from 'fs'
 export * from './semver.js'
 
 export function removePathRecursively(path: string) {
-    rmSync(path, { recursive: true, force: true })
+  rmSync(path, { recursive: true, force: true })
 }

@@ -1,9 +1,7 @@
 use multiaddr::Multiaddr;
 
 pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
-    Multiaddr::from_iter(ma.iter().filter(|v| {
-        ! matches!(v, multiaddr::Protocol::P2p(_))
-    }))
+    Multiaddr::from_iter(ma.iter().filter(|v| !matches!(v, multiaddr::Protocol::P2p(_))))
 }
 
 pub(crate) fn is_dns(ma: &Multiaddr) -> bool {
@@ -30,11 +28,16 @@ pub(crate) fn is_private(ma: &Multiaddr) -> bool {
 pub(crate) fn is_supported(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
-        .map(|proto| matches!(proto, multiaddr::Protocol::Ip4(_)
-            | multiaddr::Protocol::Ip6(_)
-            | multiaddr::Protocol::Dns(_)
-            | multiaddr::Protocol::Dns4(_)
-            | multiaddr::Protocol::Dns6(_)))
+        .map(|proto| {
+            matches!(
+                proto,
+                multiaddr::Protocol::Ip4(_)
+                    | multiaddr::Protocol::Ip6(_)
+                    | multiaddr::Protocol::Dns(_)
+                    | multiaddr::Protocol::Dns4(_)
+                    | multiaddr::Protocol::Dns6(_)
+            )
+        })
         .unwrap_or(false)
 }
 

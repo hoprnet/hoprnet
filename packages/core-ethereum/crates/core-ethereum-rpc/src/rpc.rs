@@ -106,7 +106,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             Provider::new(provider_client)
                 .interval(cfg.tx_polling_interval)
                 .with_signer(wallet)
-                .nonce_manager(chain_key.public().to_address().into())
+                .nonce_manager(chain_key.public().to_address().into()),
         );
 
         debug!("{:?}", cfg.contract_addrs);
@@ -333,24 +333,24 @@ pub mod tests {
         let send_amount = 1000000_u64;
 
         // Send 1 ETH to some random address
-        futures::future::join_all((0..txs_count)
-            .into_iter()
-            .map(|_| async {
-                rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
-                    .await
-                    .expect("tx should be sent")
-                    .await
-                    .expect("tx should resolve")
-            })
-        ).await;
-
+        futures::future::join_all((0..txs_count).into_iter().map(|_| async {
+            rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
+                .await
+                .expect("tx should be sent")
+                .await
+                .expect("tx should resolve")
+        }))
+        .await;
 
         let balance_2 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
             .await
             .unwrap();
 
-        assert!(balance_2.value().as_u64() <= balance_1.value().as_u64() - txs_count * send_amount, "balance must be less");
+        assert!(
+            balance_2.value().as_u64() <= balance_1.value().as_u64() - txs_count * send_amount,
+            "balance must be less"
+        );
     }
 
     #[async_std::test]

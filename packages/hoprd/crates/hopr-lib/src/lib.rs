@@ -10,8 +10,8 @@ pub use chain::{Network, ProtocolConfig};
 use core_ethereum_actions::node::NodeActions;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use async_std::sync::RwLock;
 use futures::{Future, StreamExt};
@@ -20,7 +20,7 @@ use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ApplicationData, ChainKeypair, HoprTransport, HalfKeyChallenge, Hash, Health, Keypair, Multiaddr, OffchainKeypair,
+    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
 };
 
 use utils_log::{error, info};
@@ -29,10 +29,10 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 use crate::chain::ChainNetworkConfig;
 
 #[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::{remove_dir_all, join, read_file, write};
+use real_base::file::native::{join, read_file, remove_dir_all, write};
 
 #[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::{remove_dir_all, join, read_file, write};
+use real_base::file::wasm::{join, read_file, remove_dir_all, write};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -41,9 +41,9 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use { 
+use {
     std::str::FromStr,
-    utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge}
+    utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -62,8 +62,6 @@ lazy_static::lazy_static! {
         &["version"]
     ).unwrap();
 }
-
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -97,10 +95,10 @@ mod native {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
-    use utils_db::db::DB;
     use std::time::Duration;
+    use utils_db::db::DB;
     use utils_log::debug;
-    use utils_types::traits::{PeerIdLike, ToHex as _, BinarySerializable};
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
@@ -137,13 +135,14 @@ mod native {
         {
             // pre-flight checks
             // Announced limitation for the `providence` release
-            if ! cfg.chain.announce {
+            if !cfg.chain.announce {
                 panic!("Announce option should be turned ON in Providence, only public nodes are supported");
             }
 
-            let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG]).expect("Could not create a db storage path");
+            let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG])
+                .expect("Could not create a db storage path");
             info!("Initiating the DB at: {db_path}");
-            
+
             if cfg.db.force_initialize {
                 info!("Force cleaning up existing database");
                 remove_dir_all(&db_path).expect("Failed to remove the preexisting DB directory");
@@ -156,9 +155,15 @@ mod native {
             )));
 
             info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
-            let resolved_environment = crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref()).expect("Failed to resolve environment");
+            let resolved_environment =
+                crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref())
+                    .expect("Failed to resolve environment");
             let contract_addresses = SmartContractConfig::from(&resolved_environment);
-            info!("Resolved contract addresses for myself as '{}': {:?}", me_onchain.public().to_hex(), contract_addresses);
+            info!(
+                "Resolved contract addresses for myself as '{}': {:?}",
+                me_onchain.public().to_hex(),
+                contract_addresses
+            );
 
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
@@ -167,7 +172,7 @@ mod native {
 
             let tbf_path = join(&[&cfg.db.data, "tbf"]).expect("Could not create a tbf storage path");
             info!("Creating the Bloom filter storage at: {}", tbf_path);
-            
+
             let tbf = read_file(&tbf_path)
                 .and_then(|data| {
                     TagBloomFilter::from_bytes(&data)
@@ -177,7 +182,7 @@ mod native {
                     debug!("No tag Bloom filter found, using empty");
                     TagBloomFilter::default()
                 });
-            
+
             let save_tbf = move |data: Box<[u8]>| {
                 if let Err(e) = write(&tbf_path, data) {
                     error!("Tag Bloom filter save failed: {e}")
@@ -398,7 +403,8 @@ mod native {
                 // TODO: allow announcing all addresses once that option is supported
                 let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
                 info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-                if self.chain_api
+                if self
+                    .chain_api
                     .actions_ref()
                     .announce(&multiaddresses_to_announce[0], &self.me)
                     .await
@@ -624,11 +630,7 @@ mod native {
                 ));
             }
 
-            let awaiter = self
-                .chain_api
-                .actions_ref()
-                .open_channel(*destination, *amount)
-                .await?;
+            let awaiter = self.chain_api.actions_ref().open_channel(*destination, *amount).await?;
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
             Ok(awaiter.await.map(|confirm| OpenChannelResult {
@@ -749,7 +751,6 @@ mod native {
 
             Ok(())
         }
-
 
         pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
             if self.status() != State::Running {
@@ -902,11 +903,9 @@ pub mod wasm_impl {
                 }
             };
 
-            let chain_config = chain::ChainNetworkConfig::new(
-                &cfg.chain.network,
-                cfg.chain.provider.clone().as_deref(),
-            )
-            .expect("Valid configuration leads to a valid network");
+            let chain_config =
+                chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.clone().as_deref())
+                    .expect("Valid configuration leads to a valid network");
 
             Self {
                 hopr: super::native::Hopr::new(
@@ -985,11 +984,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = run)]
         pub async fn _run(&mut self) -> Result<HoprProcesses, JsError> {
-            self.hopr
-                .run()
-                .await
-                .map(HoprProcesses::new)
-                .map_err(JsError::from)
+            self.hopr.run().await.map(HoprProcesses::new).map_err(JsError::from)
         }
 
         // p2p transport =========
@@ -1344,10 +1339,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen]
         pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> Result<Hash, JsError> {
-            self.hopr
-                .withdraw(*recipient, *amount)
-                .await
-                .map_err(JsError::from)
+            self.hopr.withdraw(*recipient, *amount).await.map_err(JsError::from)
         }
 
         #[wasm_bindgen(js_name = openChannel)]
