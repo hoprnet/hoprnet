@@ -19,7 +19,7 @@ use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::{error, info, warn};
+use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::{HoprChainError, Result};
@@ -44,6 +44,10 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     rpc: &Rpc,
 ) -> Result<bool> {
     let target_address = rpc.get_module_target_address().await?;
+    debug!("-- node address: {me}");
+    debug!("-- safe address: {safe_address}");
+    debug!("-- module target address: {target_address}");
+
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
         return Err(HoprChainError::Api("safe is not the module target".into()));
@@ -117,6 +121,7 @@ impl HoprChain {
         db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
         contract_addresses: ContractAddresses,
         safe_address: Address,
+        indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
         rpc_operations: RpcOperations<JsonRpcClient>,
@@ -124,11 +129,12 @@ impl HoprChain {
     ) -> Self {
         let db_processor =
             ContractEventHandlers::new(contract_addresses, safe_address, (&me_onchain).into(), db.clone());
+
         let indexer = Indexer::new(
             rpc_operations.clone(),
             db_processor,
             db.clone(),
-            IndexerConfig::default(), // TODO: pass down indexer configuration
+            indexer_cfg,
             indexer_events_tx,
         );
         Self {
@@ -216,39 +222,5 @@ impl HoprChain {
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
         Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_log::logger::wasm::JsLogger;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-    static LOGGER: JsLogger = JsLogger {};
-
-    #[allow(dead_code)]
-    #[wasm_bindgen]
-    pub fn core_ethereum_api_initialize_crate() {
-        let _ = JsLogger::install(&LOGGER, None);
-
-        // When the `console_error_panic_hook` feature is enabled, we can call the
-        // `set_panic_hook` function at least once during initialization, and then
-        // we will get better error messages if our code ever panics.
-        //
-        // For more details see
-        // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
-    }
-
-    #[wasm_bindgen]
-    pub fn core_ethereum_api_gather_metrics() -> JsResult<String> {
-        utils_metrics::metrics::wasm::gather_all_metrics()
     }
 }

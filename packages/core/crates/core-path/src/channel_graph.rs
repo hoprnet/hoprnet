@@ -454,26 +454,3 @@ mod tests {
         );
     }
 }
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use async_std::sync::RwLock;
-    use std::sync::Arc;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    #[derive(Clone)]
-    pub struct ChannelGraph {
-        w: Arc<RwLock<super::ChannelGraph>>,
-    }
-
-    impl ChannelGraph {
-        pub fn new(w: Arc<RwLock<super::ChannelGraph>>) -> Self {
-            Self { w }
-        }
-
-        pub fn as_ref_counted(&self) -> Arc<RwLock<super::ChannelGraph>> {
-            self.w.clone()
-        }
-    }
-}

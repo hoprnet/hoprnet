@@ -259,7 +259,7 @@ impl ChainNetworkConfig {
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SmartContractConfig {
     pub hopr_announcements_address: String,
@@ -366,6 +366,7 @@ where
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_config.chain.chain_id as u64,
         contract_addrs,
+        module_address,
         max_http_retries: 10,
         expected_block_time: Duration::from_secs(7),
         ..RpcOperationsConfig::default()
@@ -373,12 +374,12 @@ where
     let rpc_client_cfg = RpcEthereumClientConfig::default();
     let action_queue_cfg = ActionQueueConfig::default();
 
-    let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
+    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
         .expect("failed to initialize RPC");
 
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
-        SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
+        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
     );
 
     let tx_queue = ActionQueue::new(
@@ -398,16 +399,23 @@ pub fn build_chain_api(
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
+    indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
+    let indexer_cfg = core_ethereum_indexer::block::IndexerConfig {
+        start_block_number: indexer_start_block,
+        ..Default::default()
+    };
+
     core_ethereum_api::HoprChain::new(
         me_onchain,
         db,
         contract_addrs,
         safe_address,
+        indexer_cfg,
         indexer_events_tx,
         chain_actions,
         rpc_operations,
@@ -427,17 +435,15 @@ pub mod wasm {
         network_id: String,
         custom_provider: Option<String>,
     ) -> Result<SmartContractConfig, JsError> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(&network_id, custom_provider.as_ref().map(|c| c.as_str()))
-                .map_err(|e| JsError::new(e.as_str()))?;
+        let resolved_environment = super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
+            .map_err(|e| JsError::new(e.as_str()))?;
 
         Ok(SmartContractConfig::from(&resolved_environment))
     }
 
     #[wasm_bindgen]
     pub fn resolve_network(id: &str, maybe_custom_provider: Option<String>) -> JsResult<JsValue> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(id, maybe_custom_provider.as_ref().map(|c| c.as_str()))?;
+        let resolved_environment = super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&resolved_environment))
     }

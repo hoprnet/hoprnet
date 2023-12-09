@@ -92,6 +92,8 @@ impl ActionState for IndexerActionTracker {
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
 
+        debug!("found {} expectations to match event {:?}", matched_keys.len(), event);
+
         if matched_keys.is_empty() {
             return Vec::new();
         }

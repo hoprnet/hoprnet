@@ -20,7 +20,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
     fn try_stream_logs<'a>(
         &'a self,
-        start_block_number: Option<u64>,
+        start_block_number: u64,
         filter: LogFilter,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>> {
         if filter.is_empty() {
@@ -28,22 +28,31 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         }
 
         Ok(Box::pin(stream! {
-            let mut from_block;
-            let mut current_block = 0;
+            // On first iteration use the given block number as start
+            let mut from_block = start_block_number;
 
             loop {
                 match self.block_number().await {
-                    Ok(cb) => {
-                        // On first iteration, decide whether to use current block number or the given one.
-                        from_block = if current_block == 0 { start_block_number.unwrap_or(cb) } else { cb };
-                        current_block = cb;
+                    Ok(latest_block) => {
+                        // If on first iteration the start block is in the future, just set it to latest
+                        if from_block == start_block_number && from_block > latest_block {
+                            from_block = latest_block;
+                        }
+
+                        // This is a hard-failure on subsequent iterations which is unrecoverable
+                        // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
+                        assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
 
                         // Range is inclusive
                         let range_filter = ethers::types::Filter::from(filter.clone())
                             .from_block(BlockNumber::Number(from_block.into()))
-                            .to_block(BlockNumber::Number(current_block.into()));
+                            .to_block(BlockNumber::Number(latest_block.into()));
 
-                        debug!("polling logs between {} - {}", from_block, current_block);
+                        if from_block != latest_block {
+                            debug!("polling logs from blocks #{from_block} - #{latest_block}");
+                        } else {
+                             debug!("polling logs from block #{from_block}");
+                        }
 
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
@@ -66,7 +75,9 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         }
 
                         debug!("retrieved complete {current_block_log}");
+
                         yield current_block_log;
+                        from_block = latest_block + 1;
                     }
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
@@ -176,7 +187,7 @@ mod test {
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = rpc
-            .try_stream_logs(Some(1), log_filter)
+            .try_stream_logs(1, log_filter)
             .expect("must create stream")
             .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
             .take(1)
@@ -278,7 +289,7 @@ mod test {
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = rpc
-            .try_stream_logs(Some(1), log_filter)
+            .try_stream_logs(1, log_filter)
             .expect("must create stream")
             .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
             .take(1)

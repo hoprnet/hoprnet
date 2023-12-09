@@ -177,6 +177,22 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "migrateSafeModule(address[],address,address)" [$(node_address)] $(safe_address) $(module_address)
 
+# E.g. make move-nodes-to-safe-module network=anvil-localhost environment-type=local node_addresses="0xc614b16027fd80c2b45ec51692260667157fd06a,0x02262ecbe2812f3138ce951c1898bc39f9868a18" safe_address=0xd46bd490944891D09c9a547432D140421C6Fdc48 module_address=0x9b2E3F03DD82516C8989d24dc2bDeA5C8C11D3a2
+.PHONY: move-nodes-to-safe-module
+move-nodes-to-safe-module: ensure-environment-and-network-are-set ensure-privatekey-is-set
+move-nodes-to-safe-module: ## Move nodes attached to safe and module to a new safe module
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(safe_address),)
+	echo "parameter <safe_address> missing" >&2 && exit 1
+endif
+ifeq ($(module_address),)
+	echo "parameter <module_address> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "moveNodesToSafeModule(address[],address,address)" [$(node_addresses)] $(safe_address) $(module_address)
+
 # E.g. make add-all-allowed-target network=anvil-localhost environment-type=local target_address=0xcb192a4ba9abea8579c59231b8a57e3f0591e02b safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E
 .PHONY: add-all-allowed-target
 add-all-allowed-target: ensure-environment-and-network-are-set ensure-privatekey-is-set

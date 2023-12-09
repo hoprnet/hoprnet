@@ -1,5 +1,6 @@
 use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
+use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::initialize_node::InitializeNodeArgs;
@@ -9,6 +10,7 @@ use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 pub mod create_safe_module;
 pub mod migrate_safe_module;
+pub mod move_node_to_safe_module;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
@@ -48,6 +50,8 @@ enum Commands {
     CreateSafeModule(CreateSafeModuleArgs),
     #[clap(about = "Migrate an exising set of node(d) with safe and module to a new network, with default permissions")]
     MigrateSafeModule(MigrateSafeModuleArgs),
+    #[clap(about = "Move a registered node to a new safe and module pair")]
+    MoveNodeToSafeModule(MoveNodeToSafeModuleArgs),
     #[clap(about = "Sync eligibility of safes on network registry")]
     SyncNetworkRegistry(SyncNetworkRegistryArgs),
 }
@@ -72,6 +76,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::MigrateSafeModule(opt) => {
+            opt.run()?;
+        }
+        Commands::MoveNodeToSafeModule(opt) => {
             opt.run()?;
         }
         Commands::SyncNetworkRegistry(opt) => {

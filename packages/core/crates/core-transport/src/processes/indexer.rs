@@ -112,7 +112,7 @@ impl IndexerActions {
                                     }
                                 };
 
-                                match db_local.read().await.is_allowed_to_access_network(&&address).await {
+                                match db_local.read().await.is_allowed_to_access_network(&address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }

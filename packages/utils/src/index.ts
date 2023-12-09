@@ -26,7 +26,6 @@ export {
   get_package_version,
   HoprLibConfig,
   HoprdConfig,
-  HoprTransport,
   SmartContractConfig,
   TagBloomFilter,
   TicketStatistics,

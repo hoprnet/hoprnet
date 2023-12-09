@@ -33,9 +33,6 @@ export {
   ChannelDirection,
   OpenChannelResult,
   CloseChannelResult,
-  core_network_gather_metrics,
-  core_packet_gather_metrics,
-  core_protocol_gather_metrics,
   create_counter,
   create_gauge,
   create_histogram,
@@ -99,6 +96,5 @@ export {
   WasmVecAcknowledgedTicket,
   WasmVecAddress,
   WasmVecChannelEntry,
-  HoprTransport,
   PingConfig
 } from '../../hoprd/lib/hoprd_hoprd.js'

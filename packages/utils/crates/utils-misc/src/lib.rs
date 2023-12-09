@@ -24,13 +24,6 @@ pub mod wasm {
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
 
-#[macro_export]
-macro_rules! ok_or_str {
-    ($v:expr) => {
-        $v.map_err(|e| e.to_string())
-    };
-}
-
 /// Macro used to convert `Vec<JsString>` to `Vec<&str>`
 #[cfg(feature = "wasm")]
 #[macro_export]

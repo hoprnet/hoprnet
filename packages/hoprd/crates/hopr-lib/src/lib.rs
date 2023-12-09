@@ -10,8 +10,8 @@ pub use chain::{Network, ProtocolConfig};
 use core_ethereum_actions::node::NodeActions;
 
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
-use std::{pin::Pin, str::FromStr};
 
 use async_std::sync::RwLock;
 use futures::{Future, StreamExt};
@@ -20,7 +20,7 @@ use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, Keypair, Multiaddr, OffchainKeypair,
+    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
 };
 
 use utils_log::{error, info};
@@ -28,8 +28,11 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
 
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::{join, read_file, remove_dir_all, write};
+
 #[cfg(all(feature = "wasm", not(test)))]
-use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
+use real_base::file::wasm::{join, read_file, remove_dir_all, write};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -38,7 +41,10 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use {
+    std::str::FromStr,
+    utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -75,6 +81,7 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
+    use crate::chain::SmartContractConfig;
     use crate::config::SafeModule;
     use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
     use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
@@ -82,14 +89,16 @@ mod native {
     use core_ethereum_types::chain_events::ChainEventType;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
+    use core_types::protocol::TagBloomFilter;
     use core_types::{
         account::AccountEntry,
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
     use std::time::Duration;
+    use utils_db::db::DB;
     use utils_log::debug;
-    use utils_types::traits::PeerIdLike;
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
@@ -111,14 +120,11 @@ mod native {
     }
 
     impl Hopr {
-        pub fn new<FOnReceived, FOnSent, FSaveTbf>(
-            cfg: config::HoprLibConfig,
+        pub fn new<FOnReceived, FOnSent>(
+            mut cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             my_addresses: Vec<Multiaddr>,
-            db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-            tbf: core_types::protocol::TagBloomFilter,
-            save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
@@ -126,12 +132,64 @@ mod native {
         where
             FOnReceived: Fn(ApplicationData) + 'static,
             FOnSent: Fn(HalfKeyChallenge) + 'static,
-            FSaveTbf: Fn(Box<[u8]>) + 'static,
         {
+            // pre-flight checks
+            // Announced limitation for the `providence` release
+            if !cfg.chain.announce {
+                panic!("Announce option should be turned ON in Providence, only public nodes are supported");
+            }
+
+            let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG])
+                .expect("Could not create a db storage path");
+            info!("Initiating the DB at: {db_path}");
+
+            if cfg.db.force_initialize {
+                info!("Force cleaning up existing database");
+                remove_dir_all(&db_path).expect("Failed to remove the preexisting DB directory");
+                cfg.db.initialize = true
+            }
+
+            let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+                DB::new(utils_db::rusty::RustyLevelDbShim::new(&db_path, cfg.db.initialize)),
+                me_onchain.public().to_address(),
+            )));
+
+            info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
+            let resolved_environment =
+                crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref())
+                    .expect("Failed to resolve environment");
+            let contract_addresses = SmartContractConfig::from(&resolved_environment);
+            info!(
+                "Resolved contract addresses for myself as '{}': {:?}",
+                me_onchain.public().to_hex(),
+                contract_addresses
+            );
+
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
 
             let is_public = cfg.chain.announce;
+
+            let tbf_path = join(&[&cfg.db.data, "tbf"]).expect("Could not create a tbf storage path");
+            info!("Creating the Bloom filter storage at: {}", tbf_path);
+
+            let tbf = read_file(&tbf_path)
+                .and_then(|data| {
+                    TagBloomFilter::from_bytes(&data)
+                        .map_err(|e| real_base::error::RealError::GeneralError(e.to_string()))
+                })
+                .unwrap_or_else(|_| {
+                    debug!("No tag Bloom filter found, using empty");
+                    TagBloomFilter::default()
+                });
+
+            let save_tbf = move |data: Box<[u8]>| {
+                if let Err(e) = write(&tbf_path, data) {
+                    error!("Tag Bloom filter save failed: {e}")
+                } else {
+                    info!("Tag Bloom filter saved successfully")
+                };
+            };
 
             let (transport_api, chain_api, processes) = components::build_components(
                 cfg.clone(),
@@ -194,7 +252,7 @@ mod native {
         }
 
         pub async fn get_alias(&self, alias: &String) -> Option<PeerId> {
-            self.aliases.read().await.get(alias).map(|v| v.clone())
+            self.aliases.read().await.get(alias).copied()
         }
 
         pub async fn get_aliases(&self) -> HashMap<String, PeerId> {
@@ -249,7 +307,7 @@ mod native {
             self.aliases
                 .write()
                 .await
-                .insert("me".to_owned(), self.transport_api.me().clone());
+                .insert("me".to_owned(), *self.transport_api.me());
 
             self.state = State::Initializing;
 
@@ -258,7 +316,7 @@ mod native {
             let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
 
             info!(
-                "Ethereum account {} has {}. Mininum balance is {}",
+                "Ethereum account {} has {}. Minimum balance is {}",
                 self.chain_api.me_onchain(),
                 balance.to_formatted_string(),
                 minimum_balance.to_formatted_string()
@@ -275,7 +333,7 @@ mod native {
                 .db()
                 .write()
                 .await
-                .link_chain_and_packet_keys(&self.chain_api.me_onchain(), &self.me.public(), &Snapshot::default())
+                .link_chain_and_packet_keys(&self.chain_api.me_onchain(), self.me.public(), &Snapshot::default())
                 .await
                 .map_err(core_transport::errors::HoprTransportError::from)?;
 
@@ -286,7 +344,7 @@ mod native {
                     debug!("Using initial public node '{peer_id}'");
                     index_updater
                         .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
-                            peer_id.clone(),
+                            peer_id,
                             PeerEligibility::Eligible,
                         ))
                         .await;
@@ -319,11 +377,13 @@ mod native {
                     ));
                 }
 
-                if let Ok(_) = self
+                if self
                     .chain_api
                     .actions_ref()
                     .register_safe_by_node(self.safe_module_cfg.safe_address)
+                    .await?
                     .await
+                    .is_ok()
                 {
                     let db = self.chain_api.db().clone();
                     let mut db = db.write().await;
@@ -343,11 +403,12 @@ mod native {
                 // TODO: allow announcing all addresses once that option is supported
                 let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
                 info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-                if let Err(_) = self
+                if self
                     .chain_api
                     .actions_ref()
                     .announce(&multiaddresses_to_announce[0], &self.me)
                     .await
+                    .is_err()
                 {
                     // If the announcement fails we keep going to prevent the node from retrying
                     // after restart. Functionality is limited and users must check the logs for
@@ -387,7 +448,7 @@ mod native {
 
         /// Test whether the peer with PeerId is allowed to access the network
         pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
-            self.transport_api.is_allowed_to_access_network(&peer).await
+            self.transport_api.is_allowed_to_access_network(peer).await
         }
 
         /// Ping another node in the network based on the PeerId
@@ -398,7 +459,7 @@ mod native {
                 ));
             }
 
-            Ok(self.transport_api.ping(&peer).await)
+            Ok(self.transport_api.ping(peer).await)
         }
 
         /// Send a message to another peer in the network
@@ -470,7 +531,7 @@ mod native {
 
         /// Unregister a peer from the network
         pub async fn unregister(&self, peer: &PeerId) {
-            self.transport_api.network_unregister(&peer).await
+            self.transport_api.network_unregister(peer).await
         }
 
         /// List all peers connected to this
@@ -530,7 +591,7 @@ mod native {
 
         /// List all channels open to a specified address
         pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-            Ok(self.chain_api.channels_to(&dest).await?)
+            Ok(self.chain_api.channels_to(dest).await?)
         }
 
         /// List all channels
@@ -569,11 +630,7 @@ mod native {
                 ));
             }
 
-            let awaiter = self
-                .chain_api
-                .actions_ref()
-                .open_channel(destination.clone(), *amount)
-                .await?;
+            let awaiter = self.chain_api.actions_ref().open_channel(*destination, *amount).await?;
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
             Ok(awaiter.await.map(|confirm| OpenChannelResult {
@@ -703,6 +760,7 @@ mod native {
             }
 
             // We do not await the on-chain confirmation
+            #[allow(clippy::let_underscore_future)]
             let _ = self.chain_api.actions_ref().redeem_ticket(ack_ticket).await?;
 
             Ok(())
@@ -737,7 +795,6 @@ pub mod wasm_impl {
     use wasm_bindgen::prelude::*;
 
     use core_ethereum_api::ChannelEntry;
-    use core_transport::wasm_impls::PublicNodesResult;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -746,6 +803,27 @@ pub mod wasm_impl {
     };
 
     use crate::processes::wasm::WasmHoprMessageEmitter;
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct PublicNodesResult {
+        pub id: JsString,
+        pub address: Address,
+        pub multiaddrs: Vec<JsString>,
+    }
+
+    impl From<core_transport::PublicNodesResult> for PublicNodesResult {
+        fn from(value: core_transport::PublicNodesResult) -> Self {
+            Self {
+                id: JsString::from(value.id),
+                address: value.address,
+                multiaddrs: value
+                    .multiaddrs
+                    .into_iter()
+                    .map(|v| JsString::from(v.to_string()))
+                    .collect(),
+            }
+        }
+    }
 
     #[wasm_bindgen]
     pub struct HoprProcesses {
@@ -812,9 +890,6 @@ pub mod wasm_impl {
             cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
-            db: Database,
-            tbf: core_types::protocol::TagBloomFilter,
-            save_tbf: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: js_sys::Function,           // passed emit on the WasmHoprMessageEmitter on packet sent
@@ -828,11 +903,9 @@ pub mod wasm_impl {
                 }
             };
 
-            let chain_config = chain::ChainNetworkConfig::new(
-                &cfg.chain.network,
-                cfg.chain.provider.clone().as_ref().map(|v| v.as_str()),
-            )
-            .expect("Valid configuration leads to valid network");
+            let chain_config =
+                chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.clone().as_deref())
+                    .expect("Valid configuration leads to a valid network");
 
             Self {
                 hopr: super::native::Hopr::new(
@@ -840,18 +913,6 @@ pub mod wasm_impl {
                     me,
                     me_onchain,
                     vec![multiaddress],
-                    db.as_ref_counted(),
-                    tbf,
-                    move |content: Box<[u8]>| {
-                        if let Ok(_) = save_tbf.call1(
-                            &wasm_bindgen::JsValue::null(),
-                            js_sys::Uint8Array::from(content.as_ref()).as_ref(),
-                        ) {
-                            debug!("tag bloom filter saved");
-                        } else {
-                            error!("failed to call save tbf closure");
-                        }
-                    },
                     chain_config,
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {
@@ -897,7 +958,8 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = removeAlias)]
         pub async fn _remove_alias(&self, alias: String) -> Result<(), JsError> {
-            Ok(self.hopr.remove_alias(&alias).await)
+            self.hopr.remove_alias(&alias).await;
+            Ok(())
         }
 
         #[wasm_bindgen(js_name = getAlias)]
@@ -922,11 +984,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = run)]
         pub async fn _run(&mut self) -> Result<HoprProcesses, JsError> {
-            self.hopr
-                .run()
-                .await
-                .map(|processes| HoprProcesses::new(processes))
-                .map_err(JsError::from)
+            self.hopr.run().await.map(HoprProcesses::new).map_err(JsError::from)
         }
 
         // p2p transport =========
@@ -962,7 +1020,7 @@ pub mod wasm_impl {
         pub async fn _is_allowed_to_access_network(&self, peer: JsString) -> bool {
             let x: String = peer.into();
 
-            if let Some(peer) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(peer) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 self.hopr.is_allowed_to_access_network(&peer).await
             } else {
                 false
@@ -973,7 +1031,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = ping)]
         pub async fn _ping(&self, peer: JsString) -> Result<Option<u32>, JsError> {
             let x: String = peer.into();
-            if let Some(converted) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(converted) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 Ok(self.hopr.ping(&converted).await?.map(|v| v.as_millis() as u32))
             } else {
                 Ok(None)
@@ -998,7 +1056,7 @@ pub mod wasm_impl {
             application_tag: Option<u16>,
         ) -> Result<JsString, JsError> {
             let x: String = destination.into();
-            if let Some(destination) = core_transport::libp2p_identity::PeerId::from_str(&x).ok() {
+            if let Ok(destination) = core_transport::libp2p_identity::PeerId::from_str(&x) {
                 let (path, hops) = {
                     if let Some(intermediate_path) = intermediate_path {
                         let full_path = intermediate_path
@@ -1029,20 +1087,17 @@ pub mod wasm_impl {
                     }
                 };
 
-                let result = self
-                    .hopr
+                self.hopr
                     .send_message(msg, destination, path, hops, application_tag)
                     .await
                     .map(|v| JsString::from(v.to_hex()))
-                    .map_err(JsError::from);
-
-                result
+                    .map_err(JsError::from)
             } else {
                 // TODO: Should this really be counted?
                 #[cfg(all(feature = "prometheus", not(test)))]
                 SimpleCounter::increment(&METRIC_MESSAGE_FAIL_COUNT);
 
-                return Err(JsError::new("send msg: invalid destination peer id supplied"));
+                Err(JsError::new("send msg: invalid destination peer id supplied"))
             }
         }
 
@@ -1284,10 +1339,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen]
         pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> Result<Hash, JsError> {
-            self.hopr
-                .withdraw(recipient.clone(), amount.clone())
-                .await
-                .map_err(JsError::from)
+            self.hopr.withdraw(*recipient, *amount).await.map_err(JsError::from)
         }
 
         #[wasm_bindgen(js_name = openChannel)]
@@ -1340,7 +1392,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = redeemTicketsInChannel)]
         pub async fn _redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> Result<(), JsError> {
             self.hopr
-                .redeem_tickets_in_channel(&channel, only_aggregated)
+                .redeem_tickets_in_channel(channel, only_aggregated)
                 .await
                 .map_err(JsError::from)
         }

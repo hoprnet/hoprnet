@@ -87,4 +87,4 @@ jobs:
             path: "./DAppNodePackage-Hopr"
             delete-branch: true
             assignees: ${{ github.actor }}
-            reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka,Jaguaras"
+            reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka"

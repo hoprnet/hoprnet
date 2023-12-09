@@ -73,6 +73,14 @@ pub struct IndexerConfig {
     /// that the logs will be buffered for before being considered
     /// successfully joined to the chain.
     pub finalization: u64,
+    /// The block at which the indexer should start
+    ///
+    /// It typically makes little sense to start indexing from the beginning
+    /// of the chain, all that is sufficient is to start indexing since the
+    /// relevant smart contracts were introduced into the chain.
+    ///
+    /// This value makes sure that indexing is relevant and as minimal as possible.
+    pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
@@ -83,6 +91,7 @@ impl Default for IndexerConfig {
     fn default() -> Self {
         Self {
             finalization: 8,
+            start_block_number: 0,
             fetch_token_transactions: true,
         }
     }
@@ -147,7 +156,14 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let latest_block_in_db = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
+        let latest_block_in_db = self
+            .db
+            .read()
+            .await
+            .get_latest_block_number()
+            .await?
+            .map(|v| v as u64)
+            .unwrap_or(self.cfg.start_block_number);
 
         info!("Latest saved block {:?}", latest_block_in_db);
 
@@ -157,11 +173,13 @@ where
         topics.extend(crate::constants::topics::node_safe_registry());
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
-        // TODO: if (fetchTokenTransactions)
-        // // Actively query for logs to prevent polling done by Ethers.js
-        // // that don't retry on failed attempts and thus makes the indexer
-        // // handle errors produced by internal Ethers.js provider calls
-        topics.extend(crate::constants::topics::token());
+        if self.cfg.fetch_token_transactions {
+            // TODO: Still needed?
+            // Actively query for logs to prevent polling done by Ethers.js
+            // that don't retry on failed attempts and thus makes the indexer
+            // handle errors produced by internal Ethers.js provider calls
+            topics.extend(crate::constants::topics::token());
+        }
 
         let log_filter = LogFilter {
             address: db_processor.contract_addresses(),
@@ -178,12 +196,11 @@ where
             let mut tx = Some(tx);
 
             let mut block_stream = rpc
-                .try_stream_logs(latest_block_in_db.clone(), log_filter)
+                .try_stream_logs(latest_block_in_db, log_filter)
                 .expect("block stream should be constructible");
 
-            let chain_head_on_indexing_start = rpc.block_number().await.unwrap_or(0);
-            let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
             let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
+            let mut chain_head = 0;
 
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
@@ -197,14 +214,27 @@ where
                 }
 
                 let current_block = block_with_logs.block_id;
+
+                match rpc.block_number().await {
+                    Ok(current_chain_block_number) => {
+                        chain_head = current_chain_block_number;
+                    }
+                    Err(error) => {
+                        error!("failed to fetch block number from RPC: {error}");
+                        chain_head = chain_head.max(current_block);
+                    }
+                }
+
                 if tx.is_some() {
+                    let indexing_scope = chain_head - latest_block_in_db;
                     info!(
                         "Sync progress {:.2}% @ block {}",
-                        (chain_head_on_indexing_start - current_block) as f64 / (indexing_scope as f64),
+                        (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64))) * 100f64,
                         current_block
                     );
 
-                    if current_block == chain_head_on_indexing_start {
+                    if current_block + finalization >= chain_head {
+                        info!("Indexer sync successfully completed");
                         let _ = tx.take().expect("tx should be present").send(());
                     }
                 }
@@ -226,8 +256,9 @@ where
                                 METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
                             }
 
+                            let bn = log.block_number;
                             if let Some(logs) = unconfirmed_events.pop_front() {
-                                debug!("processing logs: {:?}", logs);
+                                debug!("processing logs from block #{}: {:?}", bn, logs);
 
                                 for log in logs.into_iter() {
                                     if let Err(error) = tx_proc.unbounded_send(log) {
@@ -347,7 +378,7 @@ pub mod tests {
 
             fn try_stream_logs<'a>(
                 &'a self,
-                start_block_number: Option<u64>,
+                start_block_number: u64,
                 filter: LogFilter,
             ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
         }
@@ -366,7 +397,7 @@ pub mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
@@ -403,7 +434,7 @@ pub mod tests {
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == Some(latest_block))
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == latest_block)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let mut indexer = Indexer::new(
@@ -434,7 +465,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let expected = BlockWithLogs {
@@ -469,14 +500,15 @@ pub mod tests {
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
+
+        let head_block = 1000;
+        rpc.expect_block_number().returning(move || Ok(head_block));
+        rpc.expect_block_number().returning(move || Ok(head_block));
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
@@ -527,14 +559,17 @@ pub mod tests {
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &Option<u64>, _y: &core_ethereum_rpc::LogFilter| x.clone() == None)
+            .withf(move |x: &u64, _y: &core_ethereum_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
+
+        let head_block = 1000;
+        for i in 0..2 {
+            let current_block = head_block + i;
+            rpc.expect_block_number().returning(move || Ok(current_block));
+        }
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - cfg.finalization - 1,
@@ -545,6 +580,7 @@ pub mod tests {
                 U256::from(23u8),
             ),
         };
+
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
             logs: vec![],

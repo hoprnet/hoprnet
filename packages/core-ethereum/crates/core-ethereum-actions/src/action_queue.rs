@@ -191,25 +191,13 @@ where
 {
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(mut ack) => match ack.status {
+            Action::RedeemTicket(ack) => match ack.status {
                 BeingRedeemed { .. } => {
-                    match self.tx_exec.redeem_ticket(ack.clone()).await {
-                        Ok(tx_hash) => IndexerExpectation::new(
-                            tx_hash,
-                            move |event| matches!(event, ChainEventType::TicketRedeemed(_, Some(ticket)) if ack.eq(ticket)),
-                        ),
-                        Err(e) => {
-                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
-
-                            error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = self.db.write().await.update_acknowledged_ticket(&ack).await {
-                                error!("cannot mark {ack} as untouched: {e}");
-                            }
-
-                            return Err(e);
-                        }
-                    }
+                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone()).await?;
+                    IndexerExpectation::new(
+                        tx_hash,
+                        move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
+                    )
                 }
                 _ => return Err(InvalidState(ack.to_string())),
             },
@@ -382,14 +370,18 @@ where
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
-    pub async fn transaction_loop(self) {
+    pub async fn action_loop(self) {
         while let Ok((act, tx_finisher)) = self.queue_recv.recv().await {
+            // Some minimum separation to avoid batching txs
+            futures_timer::Delay::new(Duration::from_millis(100)).await;
+
             let exec_context = self.ctx.clone();
             spawn_local(async move {
                 let act_id = act.to_string();
                 debug!("start executing {act_id}");
 
-                let tx_result = exec_context.execute_action(act).await;
+                let db_clone = exec_context.db.clone();
+                let tx_result = exec_context.execute_action(act.clone()).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!("successful {confirmation}");
@@ -397,17 +389,28 @@ where
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_COUNT_SUCCESSFUL_ACTIONS.increment();
                     }
-                    Err(Timeout) => {
-                        error!("timeout while waiting for confirmation of {act_id}");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_TIMEOUT_ACTIONS.increment();
-                    }
                     Err(err) => {
-                        error!("{act_id} failed: {err}");
+                        // On error in Ticket redeem action, we also need to reset ack ticket state
+                        if let Action::RedeemTicket(mut ack) = act {
+                            error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
+                            ack.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
+                                error!("cannot mark {ack} as untouched: {e}");
+                            }
+                        }
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_FAILED_ACTIONS.increment();
+                        // Timeout are accounted in different metric
+                        if let Timeout = err {
+                            error!("timeout while waiting for confirmation of {act_id}");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_TIMEOUT_ACTIONS.increment();
+                        } else {
+                            error!("{act_id} failed: {err}");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_FAILED_ACTIONS.increment();
+                        }
                     }
                 }
 

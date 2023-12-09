@@ -14,12 +14,13 @@ use core_transport::{
     libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, PeerEligibility, TransportOutput,
 };
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
 use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
 use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
+
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::spawn_local;
+
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
@@ -41,7 +42,8 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     spawn_local(async move {
         pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
-            indexer_action_tracker.match_and_resolve(&event).await;
+            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+            info!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
 
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
@@ -53,9 +55,9 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
                             .filter(|v| !v.is_empty())
                             .collect::<Vec<_>>();
 
-                        if mas.len() > 0 {
+                        if ! mas.is_empty() {
                             transport_indexer_actions
-                                .emit_indexer_update(IndexerToProcess::Announce(peer.clone(), mas))
+                                .emit_indexer_update(IndexerToProcess::Announce(peer, mas))
                                 .await;
 
                             if db

@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 
 export class HttpError {
-  constructor(public msg: string, public httpStatus: number) {}
+  constructor(public msg: string, public status: number) {}
 }
 
 export type HttpConfig = {
@@ -21,7 +21,7 @@ export async function http_post(url: string, json_data: string, config: HttpConf
       }
     })
 
-    return response.data.toString()
+    return JSON.stringify(response.data)
   } catch (err) {
     if (err instanceof AxiosError) {
       let error = err as AxiosError
