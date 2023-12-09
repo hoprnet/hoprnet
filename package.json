@@ -24,7 +24,7 @@
     "@types/node": "18",
     "prettier": "2.8.8",
     "solhint-community": "3.6.1",
-    "ts-node": "10.9.1",
+    "ts-node": "10.9.2",
     "typescript": "5.3.2"
   },
   "resolutions": {
