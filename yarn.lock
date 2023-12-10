@@ -469,7 +469,7 @@ __metadata:
     semver: 7.5.4
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
-    typescript: 5.2.2
+    typescript: 5.3.2
   languageName: unknown
   linkType: soft
 
@@ -486,10 +486,10 @@ __metadata:
     debug: 4.3.4
     ethers: 5.7.2
     mocha: 10.2.0
-    sinon: 16.1.0
+    sinon: 16.1.3
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
-    typescript: 5.2.2
+    typescript: 5.3.2
   languageName: unknown
   linkType: soft
 
@@ -506,7 +506,7 @@ __metadata:
     "@types/chai-as-promised": 7.1.5
     "@types/cookie": ^0.5.1
     "@types/cors": 2.8.14
-    "@types/debug": 4.1.9
+    "@types/debug": 4.1.12
     "@types/express": ^4.17.17
     "@types/mocha": 10.0.6
     "@types/morgan": ^1
@@ -531,16 +531,16 @@ __metadata:
     rewiremock: 3.14.5
     rlp: 3.0.0
     semver: 7.5.4
-    sinon: 16.1.0
+    sinon: 16.1.3
     supertest: ^6.2.2
     swagger-ui-express: 5.0.0
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
-    typescript: 5.2.2
+    typescript: 5.3.2
     uuid: ^9.0.0
-    ws: 8.14.2
+    ws: 8.15.0
   bin:
     hoprd: lib/main.cjs
   languageName: unknown
@@ -811,12 +811,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:4.1.9":
-  version: 4.1.9
-  resolution: "@types/debug@npm:4.1.9"
+"@types/debug@npm:4.1.12":
+  version: 4.1.12
+  resolution: "@types/debug@npm:4.1.12"
   dependencies:
     "@types/ms": "*"
-  checksum: e88ee8b19d106f33eb0d3bc58bacff9702e98d821fd1ebd1de8942e6b97419e19a1ccf39370f1764a1dc66f79fd4619f3412e1be6eeb9f0b76412f5ffe4ead93
+  checksum: 47876a852de8240bfdaf7481357af2b88cb660d30c72e73789abf00c499d6bc7cd5e52f41c915d1b9cd8ec9fef5b05688d7b7aef17f7f272c2d04679508d1053
   languageName: node
   linkType: hard
 
@@ -2838,7 +2838,7 @@ __metadata:
     prettier: 2.8.8
     solhint-community: 3.6.1
     ts-node: 10.9.1
-    typescript: 5.2.2
+    typescript: 5.3.2
   languageName: unknown
   linkType: soft
 
@@ -4696,9 +4696,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sinon@npm:16.1.0":
-  version: 16.1.0
-  resolution: "sinon@npm:16.1.0"
+"sinon@npm:16.1.3":
+  version: 16.1.3
+  resolution: "sinon@npm:16.1.3"
   dependencies:
     "@sinonjs/commons": ^3.0.0
     "@sinonjs/fake-timers": ^10.3.0
@@ -4706,7 +4706,7 @@ __metadata:
     diff: ^5.1.0
     nise: ^5.1.4
     supports-color: ^7.2.0
-  checksum: b3f910e9b3d28f1241b28ac9d384f45c673b64ecfabf7ca2b94c964036118bd4166a2315f2ec2379a85745a7d4840384514aca416bbf189508a9d7fb55b9d5a8
+  checksum: 83e5ccd724efdb5d1471e41b2cfaf4a46d9fe2cc76c15a23dedfbd741f7d448e6aec3d34a8253a79bdf8ddcc5bd889c5277ae71879e4709c621cb41094fbcdab
   languageName: node
   linkType: hard
 
@@ -5189,23 +5189,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:5.2.2":
-  version: 5.2.2
-  resolution: "typescript@npm:5.2.2"
+"typescript@npm:5.3.2":
+  version: 5.3.2
+  resolution: "typescript@npm:5.3.2"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 7912821dac4d962d315c36800fe387cdc0a6298dba7ec171b350b4a6e988b51d7b8f051317786db1094bd7431d526b648aba7da8236607febb26cf5b871d2d3c
+  checksum: d92534dda639eb825db013203404c1fabca8ac630564283c9e7dc9e64fd9c9346c2de95ecebdf3e6e8c1c32941bca1cfe0da37877611feb9daf8feeaea58d230
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@5.2.2#~builtin<compat/typescript>":
-  version: 5.2.2
-  resolution: "typescript@patch:typescript@npm%3A5.2.2#~builtin<compat/typescript>::version=5.2.2&hash=14eedb"
+"typescript@patch:typescript@5.3.2#~builtin<compat/typescript>":
+  version: 5.3.2
+  resolution: "typescript@patch:typescript@npm%3A5.3.2#~builtin<compat/typescript>::version=5.3.2&hash=14eedb"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 07106822b4305de3f22835cbba949a2b35451cad50888759b6818421290ff95d522b38ef7919e70fb381c5fe9c1c643d7dea22c8b31652a717ddbd57b7f4d554
+  checksum: c034461079fbfde3cb584ddee52afccb15b6e32a0ce186d0b2719968786f7ca73e1b07f71fac4163088790b16811c6ccf79680de190664ef66ff0ba9c1fe4a23
   languageName: node
   linkType: hard
 
@@ -5516,9 +5516,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:8.14.2":
-  version: 8.14.2
-  resolution: "ws@npm:8.14.2"
+"ws@npm:8.15.0":
+  version: 8.15.0
+  resolution: "ws@npm:8.15.0"
   peerDependencies:
     bufferutil: ^4.0.1
     utf-8-validate: ">=5.0.2"
@@ -5527,7 +5527,7 @@ __metadata:
       optional: true
     utf-8-validate:
       optional: true
-  checksum: 3ca0dad26e8cc6515ff392b622a1467430814c463b3368b0258e33696b1d4bed7510bc7030f7b72838b9fdeb8dbd8839cbf808367d6aae2e1d668ce741d4308b
+  checksum: ca15c590aa49bc0197223b8ab7d15e7362ae6c4011d91ed0e5cd5867cdd5497fd71470ea36314833b4b078929fe64dc4ba7748b1e58e50a0f8e41f147db2b464
   languageName: node
   linkType: hard
 
