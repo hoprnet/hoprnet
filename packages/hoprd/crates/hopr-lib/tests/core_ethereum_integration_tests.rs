@@ -16,7 +16,7 @@ use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::ChainEventType;
 use core_ethereum_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
-use core_types::channels::ChannelDirection;
+use core_types::channels::{ChannelDirection, ChannelStatus};
 use futures::StreamExt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,8 +40,10 @@ async fn integration_test_indexer() {
             .await
             .expect("failed to deploy");
 
-        // Mint some tokens and fund the node address
+        // Mint some tokens
         core_ethereum_types::utils::mint_tokens(instances.token.clone(), 1000_u128.into()).await;
+
+        // Fund the node address
         core_ethereum_types::utils::fund_node(
             node_chain_key.public().to_address(),
             10_u128.into(),
@@ -81,11 +83,12 @@ async fn integration_test_indexer() {
     );
 
     // Actions
+    let actions_cfg = ActionQueueConfig { max_action_confirmation_wait: Duration::from_secs(60) }; // use lower action confirmation limit
     let action_queue = ActionQueue::new(
         db.clone(),
         IndexerActionTracker::default(),
         tx_exec,
-        ActionQueueConfig::default(),
+        actions_cfg,
     );
     let action_state = action_queue.action_state();
     let actions = CoreEthereumActions::new(
@@ -121,6 +124,12 @@ async fn integration_test_indexer() {
     indexer.start().await.expect("indexer should sync");
 
     // ----------------
+    // Test plan:
+    // Register with Safe
+    // Announce
+    // Open channel to Bob
+    // Redeem ticket in the channel
+    // Close channel to Bob
 
     // Register Safe
     let confirmation = actions
@@ -185,6 +194,15 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     }
 
+    let channel = db.read().await.get_channel_to(&bob_chain_key.public().to_address())
+        .await
+        .expect("must get channel")
+        .expect("channel to bob must exist");
+
+    assert_eq!(ChannelStatus::Open, channel.status, "channel must be opened");
+
+    // TODO: create acknowledged ticket from Bob and store it in the DB, so Alice can redeem it here
+
     // Close channel
     let confirmation = actions
         .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, false)
@@ -211,4 +229,11 @@ async fn integration_test_indexer() {
         }
         _ => panic!("invalid confirmation"),
     }
+
+    let channel = db.read().await.get_channel_to(&bob_chain_key.public().to_address())
+        .await
+        .expect("must get channel")
+        .expect("channel to bob must exist");
+
+    assert_eq!(ChannelStatus::PendingToClose, channel.status, "channel must be pending to close");
 }
