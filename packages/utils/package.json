@@ -28,7 +28,7 @@
   "dependencies": {
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@multiformats/multiaddr": "10.3.3",
-    "axios": "1.5.1",
+    "axios": "1.6.2",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
     "ethers": "5.7.2"
