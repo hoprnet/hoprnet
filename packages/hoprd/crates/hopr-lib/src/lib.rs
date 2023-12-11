@@ -942,6 +942,11 @@ pub mod wasm_impl {
             JsString::from(self.hopr.version_coerced())
         }
 
+        #[wasm_bindgen(js_name = isRunning)]
+        pub fn _is_running(&self) -> bool {
+            self.hopr.status() == State::Running
+        }
+
         #[wasm_bindgen(js_name = setAlias)]
         pub async fn _set_alias(&self, alias: String, peer: String) -> Result<(), JsError> {
             let peer: String = peer;
@@ -975,11 +980,6 @@ pub mod wasm_impl {
             }
 
             aliases
-        }
-
-        #[wasm_bindgen(js_name = getState)]
-        pub fn _status(&self) -> State {
-            self.hopr.status()
         }
 
         #[wasm_bindgen(js_name = run)]
