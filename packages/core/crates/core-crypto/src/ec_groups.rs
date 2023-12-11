@@ -70,7 +70,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgo
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        scalar * &curve25519_dalek::constants::X25519_BASEPOINT
+        scalar * curve25519_dalek::constants::X25519_BASEPOINT
     }
 
     fn is_valid(&self) -> bool {
@@ -92,7 +92,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        scalar * &curve25519_dalek::constants::ED25519_BASEPOINT_POINT
+        scalar * curve25519_dalek::constants::ED25519_BASEPOINT_POINT
     }
 
     fn is_valid(&self) -> bool {
