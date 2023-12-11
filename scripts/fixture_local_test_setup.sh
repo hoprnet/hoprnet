@@ -423,27 +423,29 @@ env \
   --hopr-amount "0.0"
 # }}}
 
-log "Waiting for port binding"
+log "Waiting for nodes to become ready"
+# $1 = node api endpoint
+wait_for_api_ready() {
+  local api_port=${1}
+  local api_token=${2}
 
-#  --- Wait for ports to be bound --- {{{
-wait_for_regex "${node1_log}" "STARTED NODE"
-wait_for_regex "${node2_log}" "STARTED NODE"
-wait_for_regex "${node3_log}" "STARTED NODE"
-wait_for_regex "${node4_log}" "STARTED NODE"
-wait_for_regex "${node5_log}" "STARTED NODE"
-wait_for_regex "${node6_log}" "STARTED NODE"
-wait_for_port 19096 "127.0.0.1" "${node6_log}"
-wait_for_regex "${node7_log}" "STARTED NODE"
-# }}}
+  curl -X GET -m 3 --connect-timeout 300 -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url http://127.0.0.1:${api_port}/api/v3/readyz -o /dev/null -w %{http_code} -d
+}
 
-log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
-sleep 30
+wait_for_api_ready ${default_api_token} 13301
+wait_for_api_ready ${default_api_token} 13302
+wait_for_api_ready ${default_api_token} 13303
+wait_for_api_ready ${default_api_token} 13304
+wait_for_api_ready ${default_api_token} 13305
+wait_for_api_ready ${default_api_token} 13306
+wait_for_api_ready ${default_api_token} 13307
 
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
-wait_for_regex "${node1_log}" "STARTED NODE"
+
+wait_for_api_ready ${default_api_token} 13301
 # }}}
 
 #  --- Ensure data directories are used --- {{{
