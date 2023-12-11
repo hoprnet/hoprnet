@@ -583,7 +583,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned() {
+        for tkt in tickets.iter().cloned().skip(2) {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
