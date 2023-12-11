@@ -72,6 +72,7 @@ pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
 
+#[derive(Debug)]
 pub struct Ping<T: PingExternalAPI> {
     config: PingConfig,
     send_ping: HeartbeatSendPingTx,

@@ -1,16 +1,19 @@
 use std::fmt::{Display, Formatter};
+use std::future::{Future, IntoFuture};
 use std::pin::Pin;
+use std::time::Duration;
 
 use async_trait::async_trait;
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-pub use futures::channel::mpsc::UnboundedReceiver;
-use futures::Stream;
+use futures::{FutureExt, Stream};
 use primitive_types::H256;
 
 use core_crypto::types::Hash;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
+
+use crate::errors::RpcError::{ProviderError, TransactionDropped};
+pub use ethers::types::transaction::eip2718::TypedTransaction;
 
 /// Extended `JsonRpcClient` abstraction
 /// This module contains custom implementation of `ethers::providers::JsonRpcClient`
@@ -45,6 +48,8 @@ pub struct Log {
     pub tx_index: u64,
     /// Corresponding block number
     pub block_number: u64,
+    /// Corresponding transaction hash
+    pub tx_hash: Hash,
     /// Log index
     pub log_index: U256,
 }
@@ -58,6 +63,7 @@ impl From<ethers::types::Log> for Log {
             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
             block_number: value.block_number.expect("block id must be present").as_u64(),
             log_index: value.log_index.expect("log index must be present").into(),
+            tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
         }
     }
 }
@@ -139,6 +145,78 @@ pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
 
+/// Contains some selected fields of a receipt for a transaction that has been
+/// already included into the blockchain.
+#[derive(Debug, Clone)]
+pub struct TransactionReceipt {
+    /// Hash of the transaction.
+    pub tx_hash: Hash,
+    /// Number of the block in which the transaction has been included into the blockchain.
+    pub block_number: u64,
+}
+
+impl Display for TransactionReceipt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "receipt of tx {} in block {}", self.tx_hash, self.block_number)
+    }
+}
+
+impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
+    fn from(value: ethers::prelude::TransactionReceipt) -> Self {
+        Self {
+            tx_hash: value.transaction_hash.into(),
+            block_number: value.block_number.expect("invalid transaction receipt").as_u64(),
+        }
+    }
+}
+
+/// Represents a pending transaction that can be eventually
+/// resolved until confirmation, which is done by polling
+/// the respective RPC provider.
+/// The polling interval and number of confirmations are defined by the underlying provider.
+pub struct PendingTransaction<'a> {
+    tx_hash: Hash,
+    resolver: Box<dyn Future<Output = Result<TransactionReceipt>> + 'a>,
+}
+
+impl PendingTransaction<'_> {
+    /// Hash of the pending transaction.
+    pub fn tx_hash(&self) -> Hash {
+        self.tx_hash
+    }
+}
+
+impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
+    for PendingTransaction<'a>
+{
+    fn from(value: ethers_providers::PendingTransaction<'a, P>) -> Self {
+        let tx_hash = Hash::from(value.tx_hash());
+        Self {
+            tx_hash,
+            resolver: Box::new(value.map(move |result| match result {
+                Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
+                Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
+                Err(err) => Err(ProviderError(err)),
+            })),
+        }
+    }
+}
+
+impl Display for PendingTransaction<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "pending tx {}", self.tx_hash)
+    }
+}
+
+impl<'a> IntoFuture for PendingTransaction<'a> {
+    type Output = Result<TransactionReceipt>;
+    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + 'a>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::into_pin(self.resolver)
+    }
+}
+
 /// Trait defining general set of operations an RPC provider
 /// must provide to the HOPR node.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -148,7 +226,7 @@ pub trait HoprRpcOperations {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
     /// Retrieves the node's account balance of the given type.
-    async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance>;
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
 
     /// Retrieves info of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
@@ -159,8 +237,11 @@ pub trait HoprRpcOperations {
     /// Retrieves target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
 
+    /// Retrieves the notice period of channel closure from the Channels contract.
+    async fn get_channel_closure_notice_period(&self) -> Result<Duration>;
+
     /// Sends transaction to the RPC provider.
-    async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
+    async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.
@@ -171,6 +252,7 @@ pub struct BlockWithLogs {
     /// Filtered logs belonging to this block.
     pub logs: Vec<Log>,
 }
+
 impl Display for BlockWithLogs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "block #{} with {} logs", self.block_id, self.logs.len())
@@ -190,6 +272,7 @@ impl BlockWithLogs {
 }
 
 /// Trait with RPC provider functionality required by the Indexer.
+#[cfg_attr(test, mockall::automock)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprIndexerRpcOperations {
@@ -202,7 +285,7 @@ pub trait HoprIndexerRpcOperations {
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
     fn try_stream_logs<'a>(
         &'a self,
-        start_block_number: Option<u64>,
+        start_block_number: u64,
         filter: LogFilter,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
 }

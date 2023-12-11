@@ -70,19 +70,17 @@ impl SyncNetworkRegistryArgs {
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if let Err(_) = env::var("PRIVATE_KEY") {
+        if env::var("PRIVATE_KEY").is_err() {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
         // 2. Read addresses of safes
-        let all_safes_addresses: Vec<String> = safe_addresses.split(",").map(|addr| Address::from_str(addr).unwrap().to_checksum()).collect();
+        let all_safes_addresses: Vec<String> = safe_addresses.split(',').map(|addr| Address::from_str(addr).unwrap().to_checksum()).collect();
         
         log!(target: "sync_eligibility", Level::Info, "Safe addresses {:?}", all_safes_addresses);
         
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
         
         // Prepare payload and call function according to differnt types of sync
         match sync_type {
@@ -100,7 +98,7 @@ impl SyncNetworkRegistryArgs {
                     )
                 } else {
                     error!("Eligibility must be specified");
-                    return Err(HelperErrors::MissingParameter("eligibility".to_string()));
+                    Err(HelperErrors::MissingParameter("eligibility".to_string()))
                 }
             }
             SyncNetworkRegistryType::NormalSync => {

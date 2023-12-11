@@ -127,8 +127,8 @@ pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-fn validate_optional_private_key(s: &String) -> Result<(), ValidationError> {
-    validate_private_key(s.as_str())
+fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
+    validate_private_key(s)
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -245,7 +245,7 @@ pub struct Testing {
 /// ```
 ///
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
     #[validate]
@@ -264,21 +264,9 @@ pub struct HoprdConfig {
     pub test: Testing,
 }
 
-impl Default for HoprdConfig {
-    fn default() -> Self {
-        Self {
-            hopr: HoprLibConfig::default(),
-            identity: Identity::default(),
-            inbox: MessageInboxConfiguration::default(),
-            api: Api::default(),
-            test: Testing::default(),
-        }
-    }
-}
-
-impl Into<HoprLibConfig> for HoprdConfig {
-    fn into(self) -> HoprLibConfig {
-        self.hopr
+impl From<HoprdConfig> for HoprLibConfig {
+    fn from(val: HoprdConfig) -> HoprLibConfig {
+        val.hopr
     }
 }
 
@@ -328,17 +316,15 @@ impl HoprdConfig {
 
         // api
         cfg.api.enable = cli_args.api;
-        if cli_args.disable_api_authentication {
-            if &cfg.api.auth != &Auth::None {
-                cfg.api.auth = Auth::None;
-            }
+        if cli_args.disable_api_authentication && cfg.api.auth != Auth::None {
+            cfg.api.auth = Auth::None;
         };
         if let Some(x) = cli_args.api_token {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
             cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), DEFAULT_API_PORT).as_str())
-                .map_err(|e| crate::errors::HoprdConfigError::ValidationError(e))?;
+                .map_err(crate::errors::HoprdConfigError::ValidationError)?;
         }
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -370,8 +356,6 @@ impl HoprdConfig {
         if let Some(x) = cli_args.private_key {
             cfg.identity.private_key = Some(x)
         };
-
-        // TODO: resolve CLI configuration of strategies
 
         // strategy
         if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
@@ -455,11 +439,11 @@ pub mod wasm {
                     redacted_cfg.api.auth = crate::config::Auth::Token("<REDACTED>".to_owned())
                 }
             }
-            if let Some(_) = redacted_cfg.identity.private_key {
+            if redacted_cfg.identity.private_key.is_some() {
                 redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
             }
 
-            if let Some(_) = redacted_cfg.identity.private_key {
+            if redacted_cfg.identity.private_key.is_some() {
                 redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
             }
             redacted_cfg.identity.password = "<REDACTED>".to_owned();
@@ -475,10 +459,11 @@ pub mod wasm {
         let mut cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| JsError::new(e.to_string().as_str()))?;
 
         // replace the ~ in the path for a home paths
-        if cfg.hopr.db.data.starts_with("~") {
+        let home_symbol = '~';
+        if cfg.hopr.db.data.starts_with(home_symbol) {
             cfg.hopr.db.data = homedir() + &cfg.hopr.db.data[1..];
         }
-        if cfg.identity.file.starts_with("~") {
+        if cfg.identity.file.starts_with(home_symbol) {
             cfg.identity.file = homedir() + &cfg.identity.file[1..];
         }
 
@@ -492,7 +477,7 @@ pub mod wasm {
 }
 
 /// Used in the testing and documentation
-pub const EXAMPLE_YAML: &'static str = r#"hopr:
+pub const EXAMPLE_YAML: &str = r#"hopr:
   host:
     address: !IPv4 127.0.0.1
     port: 47462

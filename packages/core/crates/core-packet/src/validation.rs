@@ -197,7 +197,7 @@ mod tests {
             async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
+            async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<Option<u32>>;
             async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
             async fn get_channel(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;

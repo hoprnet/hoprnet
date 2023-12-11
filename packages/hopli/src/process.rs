@@ -164,9 +164,9 @@ pub fn child_process_call_foundry_move_node_to_safe_module(
         "--broadcast",
         "--sig",
         "moveNodesToSafeModule(address[],address,address)",
-        &ethereum_address,
-        &safe_address,
-        &module_address,
+        ethereum_address,
+        safe_address,
+        module_address,
     ];
 
     child_process_call_foundry(network, &move_node_args)
@@ -192,9 +192,9 @@ pub fn child_process_call_foundry_express_setup_safe_module(
         "--broadcast",
         "--sig",
         "expressSetupSafeModule(address[],uint256,uint256)",
-        &ethereum_address,
-        &hopr_amount,
-        &native_amount,
+        ethereum_address,
+        hopr_amount,
+        native_amount,
     ];
 
     child_process_call_foundry(network, &express_setup_safe_args)
@@ -209,7 +209,7 @@ pub fn child_process_call_foundry_express_setup_safe_module(
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let peer_id_string = ["[", peer_ids, "]"].concat();
     let self_register_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
@@ -237,8 +237,8 @@ pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address
         "--broadcast",
         "--sig",
         "forceSyncEligibility(address[],bool[])",
-        &staking_address,
-        &eligibilities,
+        staking_address,
+        eligibilities,
     ];
 
     child_process_call_foundry(network, &set_eligibility_args)
@@ -258,7 +258,7 @@ pub fn child_process_call_foundry_sync_eligibility(network: &str, staking_addres
         "--broadcast",
         "--sig",
         "syncEligibility(address[])",
-        &staking_address,
+        staking_address,
     ];
 
     child_process_call_foundry(network, &sync_eligibility_args)

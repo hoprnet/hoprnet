@@ -1,17 +1,26 @@
+use std::fmt::Display;
+use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumActions};
+use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
-use core_transport::ChainKeypair;
-use futures::channel::mpsc::UnboundedSender;
+use core_transport::{ChainKeypair, Keypair};
+use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
-use serde::{Deserialize, Serialize};
+use core_ethereum_actions::action_queue::ActionQueueConfig;
+use core_ethereum_actions::action_state::IndexerActionTracker;
+use core_ethereum_actions::payload::SafePayloadGenerator;
+use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use core_ethereum_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
+use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use core_ethereum_types::chain_events::SignificantChainEvent;
+use core_ethereum_types::{ContractAddresses, TypedTransaction};
 
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -25,14 +34,18 @@ pub enum EnvironmentType {
     Local,
 }
 
-impl ToString for EnvironmentType {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Production => "production".into(),
-            Self::Staging => "staging".into(),
-            Self::Development => "development".into(),
-            Self::Local => "local".into(),
-        }
+impl Display for EnvironmentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Production => "production",
+                Self::Staging => "staging",
+                Self::Development => "development",
+                Self::Local => "local",
+            }
+        )
     }
 }
 
@@ -246,7 +259,7 @@ impl ChainNetworkConfig {
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SmartContractConfig {
     pub hopr_announcements_address: String,
@@ -323,34 +336,89 @@ impl ProtocolConfig {
     }
 }
 
+type ActiveTxExecutor = EthereumTransactionExecutor<
+    TypedTransaction,
+    RpcEthereumClient<RpcOperations<JsonRpcClient>>,
+    SafePayloadGenerator,
+>;
+
 #[cfg(feature = "wasm")]
-pub fn build_chain_components<Db, TxExec: TransactionExecutor + 'static>(
-    me: Address,
+pub fn build_chain_components<Db>(
+    me_onchain: &ChainKeypair,
+    chain_config: ChainNetworkConfig,
+    contract_addrs: ContractAddresses,
+    module_address: Address,
     db: Arc<RwLock<Db>>,
-    tx_executor: TxExec,
-) -> (TransactionQueue<Db>, CoreEthereumActions<Db>)
+) -> (
+    ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
+    CoreEthereumActions<Db>,
+    RpcOperations<JsonRpcClient>,
+)
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
 {
-    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+    let rpc_client = JsonRpcClient::new(
+        &chain_config.chain.default_provider,
+        DefaultHttpPostRequestor::default(),
+    );
 
-    let chain_actions = CoreEthereumActions::new(me, db, tx_queue.new_sender());
+    // TODO: extract these configs from the global config type
+    let rpc_cfg = RpcOperationsConfig {
+        chain_id: chain_config.chain.chain_id as u64,
+        contract_addrs,
+        module_address,
+        max_http_retries: 10,
+        expected_block_time: Duration::from_secs(7),
+        ..RpcOperationsConfig::default()
+    };
+    let rpc_client_cfg = RpcEthereumClientConfig::default();
+    let action_queue_cfg = ActionQueueConfig::default();
 
-    (tx_queue, chain_actions)
+    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
+        .expect("failed to initialize RPC");
+
+    let ethereum_tx_executor = EthereumTransactionExecutor::new(
+        RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
+        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
+    );
+
+    let tx_queue = ActionQueue::new(
+        db.clone(),
+        IndexerActionTracker::default(),
+        ethereum_tx_executor,
+        action_queue_cfg,
+    );
+
+    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
+
+    (tx_queue, chain_actions, rpc_operations)
 }
 
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    contract_addrs: ContractAddresses,
+    safe_address: Address,
+    indexer_start_block: u64,
+    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    channel_updates: UnboundedSender<core_types::channels::ChannelEntry>,
+    rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
+    let indexer_cfg = core_ethereum_indexer::block::IndexerConfig {
+        start_block_number: indexer_start_block,
+        ..Default::default()
+    };
+
     core_ethereum_api::HoprChain::new(
         me_onchain,
         db,
+        contract_addrs,
+        safe_address,
+        indexer_cfg,
+        indexer_events_tx,
         chain_actions,
-        core_ethereum_api::ChannelEventEmitter { tx: channel_updates },
+        rpc_operations,
         channel_graph,
     )
 }
@@ -358,86 +426,25 @@ pub fn build_chain_api(
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::SmartContractConfig;
-    use serde::Deserialize;
-    use serde::Serialize;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen(getter_with_clone)]
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ChainConfiguration {
-        pub chain: String,
-        pub hoprAnnouncementsAddress: String,
-        pub hoprTokenAddress: String,
-        pub hoprChannelsAddress: String,
-        pub hoprNetworkRegistryAddress: String,
-        pub hoprNodeSafeRegistryAddress: String,
-        pub hoprTicketPriceOracleAddress: String,
-        pub moduleAddress: String,
-        pub safeAddress: String,
-        pub noticePeriodChannelClosure: u32,
-    }
 
     #[wasm_bindgen]
     pub fn get_contract_data(
         network_id: String,
         custom_provider: Option<String>,
     ) -> Result<SmartContractConfig, JsError> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(&network_id, custom_provider.as_ref().map(|c| c.as_str()))
-                .map_err(|e| JsError::new(e.as_str()))?;
+        let resolved_environment = super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
+            .map_err(|e| JsError::new(e.as_str()))?;
 
         Ok(SmartContractConfig::from(&resolved_environment))
     }
 
     #[wasm_bindgen]
     pub fn resolve_network(id: &str, maybe_custom_provider: Option<String>) -> JsResult<JsValue> {
-        let resolved_environment =
-            super::ChainNetworkConfig::new(id, maybe_custom_provider.as_ref().map(|c| c.as_str()))?;
+        let resolved_environment = super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&resolved_environment))
-    }
-
-    #[wasm_bindgen]
-    extern "C" {
-        /// EventEmitter object used to delegate `on` calls in WSS
-        pub type WasmChainQuery;
-
-        #[wasm_bindgen(method)]
-        pub fn clone(this: &WasmChainQuery) -> WasmChainQuery;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn startChainSync(this: &WasmChainQuery) -> Result<(), JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn canRegisterWithSafe(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn waitForFunds(this: &WasmChainQuery) -> Result<(), JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn isNodeSafeNotRegistered(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn getBalance(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn getNativeBalance(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn getSafeBalance(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub async fn getSafeNativeBalance(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method, catch)]
-        pub fn smartContractInfo(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
-
-        #[wasm_bindgen(method)]
-        pub fn on(this: &WasmChainQuery, event: js_sys::JsString, callback: js_sys::Function);
-
-        #[wasm_bindgen(method)]
-        pub fn emit(this: &WasmChainQuery, event: js_sys::JsString, callback: js_sys::Function);
     }
 }

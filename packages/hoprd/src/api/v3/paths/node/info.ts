@@ -1,28 +1,28 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { ChainConfiguration, health_to_string, Hopr } from '@hoprnet/hopr-utils'
+import { SmartContractInfo, health_to_string, Hopr } from '@hoprnet/hopr-utils'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const scInfo: ChainConfiguration = node.smartContractInfo()
+    const scInfo: SmartContractInfo = await node.smartContractInfo()
 
     return {
       network: node.chainConfig().id,
       announcedAddress: await node.getMultiaddressesAnnouncedToDHT(node.peerId()),
       listeningAddress: await node.getListeningMultiaddresses(),
       chain: scInfo.chain,
-      hoprToken: scInfo.hoprTokenAddress,
-      hoprChannels: scInfo.hoprChannelsAddress,
-      hoprNetworkRegistry: scInfo.hoprNetworkRegistryAddress,
-      hoprNodeSafeRegistry: scInfo.hoprNodeSafeRegistryAddress,
-      nodeManagementModule: scInfo.moduleAddress,
-      nodeSafe: scInfo.safeAddress,
+      hoprToken: scInfo.hopr_token,
+      hoprChannels: scInfo.hopr_channels,
+      hoprNetworkRegistry: scInfo.hopr_network_registry,
+      hoprNodeSafeRegistry: scInfo.hopr_node_safe_registry,
+      nodeManagementModule: scInfo.module_address,
+      nodeSafe: scInfo.safe_address,
       isEligible: await node.isAllowedToAccessNetwork(node.peerId()),
       connectivityStatus: health_to_string((await node.networkHealth()).unwrap()),
-      channelClosurePeriod: Math.ceil(scInfo.noticePeriodChannelClosure / 60)
+      channelClosurePeriod: Math.ceil(scInfo.notice_period_channel_closure / 60)
     }
   } catch (error) {
     // Make sure this doesn't throw

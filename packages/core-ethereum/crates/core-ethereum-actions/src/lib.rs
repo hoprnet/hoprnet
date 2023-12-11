@@ -3,26 +3,27 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use std::sync::Arc;
 use utils_types::primitives::Address;
 
-use crate::transaction_queue::TransactionSender;
+use crate::action_queue::ActionSender;
 
+pub mod action_queue;
+pub mod action_state;
 pub mod channels;
 pub mod errors;
 pub mod node;
 pub mod payload;
 pub mod redeem;
-pub mod transaction_queue;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Clone)]
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
     db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
+    tx_sender: ActionSender,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone> CoreEthereumActions<Db> {
     /// Creates new instance.
-    pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: TransactionSender) -> Self {
+    pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }
     }
 

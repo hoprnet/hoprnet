@@ -121,7 +121,7 @@ impl Deref for Key {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> {
     backend: T,
 }
