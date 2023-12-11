@@ -609,7 +609,7 @@ mod tests {
                     .find(|tk| tk.ticket.eq(&t.ticket))
                     .is_some()
             })
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 
@@ -677,7 +677,7 @@ mod tests {
                     .find(|tk| tk.ticket.eq(&t.ticket))
                     .is_some()
             })
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 

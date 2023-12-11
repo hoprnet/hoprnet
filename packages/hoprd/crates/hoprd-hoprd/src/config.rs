@@ -220,10 +220,6 @@ pub struct Testing {
 ///   backoff_exponent: 1.5
 ///   backoff_min: 2.0
 ///   backoff_max: 300.0
-/// healthcheck:
-///   enable: false
-///   host: 127.0.0.1
-///   port: 0
 /// protocol:
 ///   ack:
 ///     timeout: 15
@@ -233,9 +229,9 @@ pub struct Testing {
 ///     timeout: 15
 ///   ticket_aggregation:
 ///     timeout: 15
-/// network: anvil-localhost
 /// chain:
 ///   announce: false
+///   network: anvil-localhost
 ///   provider: null
 ///   check_unrealized_balance: true
 /// safe_module:
@@ -560,28 +556,6 @@ api:
   host:
     address: !IPv4 127.0.0.1
     port: 1233
-healthcheck:
-  enable: false
-  host: 127.0.0.1
-  port: 0
-protocol:
-  ack:
-    timeout: 15
-  heartbeat:
-    timeout: 15
-  msg:
-    timeout: 15
-  ticket_aggregation:
-    timeout: 15
-network: testing
-chain:
-  announce: false
-  provider: null
-  check_unrealized_balance: true
-safe_module:
-  safe_transaction_service_provider: null
-  safe_address: null
-  module_address: null
 test:
   use_weak_crypto: false
 "#;
