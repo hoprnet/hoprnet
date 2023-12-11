@@ -9,11 +9,13 @@ export const GET: Operation = [
     try {
       if (node.isRunning()) {
         return res.status(200).send()
-      } {
-        return res.status(422)
-          .send({ status: STATUS_CODES.APPLICATION_CHECK_FAILED, error: 'Not started yet' })
       }
-    } catch (err) { {}
+      {
+        return res.status(422).send({ status: STATUS_CODES.APPLICATION_CHECK_FAILED, error: 'Not started yet' })
+      }
+    } catch (err) {
+      {
+      }
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
@@ -31,7 +33,7 @@ GET.apiDoc = {
       description: 'The node is started',
       content: {
         'application/json': {
-          schema: { }
+          schema: {}
         }
       }
     },
