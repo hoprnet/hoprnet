@@ -15,6 +15,8 @@ declare HOPR_LOG_ID="smoke-fixture-setup"
 source "${mydir}/testnet.sh"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
+source "${mydir}/api.sh"
 
 PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
@@ -423,27 +425,22 @@ env \
   --hopr-amount "0.0"
 # }}}
 
-log "Waiting for port binding"
-
-#  --- Wait for ports to be bound --- {{{
-wait_for_regex "${node1_log}" "STARTED NODE"
-wait_for_regex "${node2_log}" "STARTED NODE"
-wait_for_regex "${node3_log}" "STARTED NODE"
-wait_for_regex "${node4_log}" "STARTED NODE"
-wait_for_regex "${node5_log}" "STARTED NODE"
-wait_for_regex "${node6_log}" "STARTED NODE"
-wait_for_port 19096 "127.0.0.1" "${node6_log}"
-wait_for_regex "${node7_log}" "STARTED NODE"
-# }}}
-
-log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
-sleep 30
+api_token=$default_api_token
+log "Waiting for nodes to become ready"
+wait_for_api_ready http://127.0.0.1:13301/
+wait_for_api_ready http://127.0.0.1:13302/
+wait_for_api_ready http://127.0.0.1:13303/
+wait_for_api_ready http://127.0.0.1:13304/
+wait_for_api_ready http://127.0.0.1:13305/
+wait_for_api_ready http://127.0.0.1:13306/
+wait_for_api_ready http://127.0.0.1:13307/
 
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
-wait_for_regex "${node1_log}" "STARTED NODE"
+
+wait_for_api_ready http://127.0.0.1:13301/
 # }}}
 
 #  --- Ensure data directories are used --- {{{
