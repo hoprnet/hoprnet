@@ -164,7 +164,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
             if current_peers.intersection(others) == others:
                 break
             else:
-                assert current_peers.intersection(others) == others
+                current_peers.intersection(others) == others
                 await asyncio.sleep(0.5)
 
     await asyncio.gather(
