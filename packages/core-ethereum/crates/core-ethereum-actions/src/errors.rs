@@ -41,6 +41,12 @@ pub enum CoreEthereumActionsError {
     #[error("invalid state: {0}")]
     InvalidState(String),
 
+    #[error("timeout waiting for action confirmation")]
+    Timeout,
+
+    #[error("indexer expectation has been unregistered")]
+    ExpectationUnregistered,
+
     #[error(transparent)]
     DbError(#[from] DbError),
 

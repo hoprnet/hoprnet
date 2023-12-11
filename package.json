@@ -2,18 +2,13 @@
   "name": "hoprnet",
   "repository": "https://github.com/hoprnet/hoprnet",
   "workspaces": [
-    "packages/core",
-    "packages/core-ethereum",
     "packages/utils",
     "packages/hoprd",
     "packages/real"
   ],
   "scripts": {
-    "build:core": "yarn workspace @hoprnet/hopr-core run build",
-    "build:core:all": "yarn workspaces foreach -ptv --include @hoprnet/hopr-core --include @hoprnet/hopr-core-ethereum run build",
     "build:hoprd": "yarn workspace @hoprnet/hoprd run build",
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
-    "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
     "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --disableApiAuthentication",
     "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --disableApiAuthentication",
     "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
@@ -30,17 +25,13 @@
     "prettier": "2.8.8",
     "solhint-community": "3.6.1",
     "ts-node": "10.9.1",
-    "typescript": "5.2.2"
+    "typescript": "5.3.2"
   },
   "resolutions": {
-    "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/v5.7.0-fixed-memory-leak.tar.gz",
-    "@libp2p/kad-dht": "https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz",
     "@overnightjs/logger": "1.2.1",
     "@multiformats/multiaddr": "10.3.3",
     "colors": "1.4.0",
-    "it-length-prefixed": "https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz",
-    "libp2p@0.37.3": "patch:libp2p@npm%3A0.37.3#./.yarn/patches/libp2p-npm-0.37.3-ae5be411f2.patch",
-    "@libp2p/peer-store@^1.0.10": "patch:@libp2p/peer-store@npm%3A1.0.17#./.yarn/patches/@libp2p-peer-store-npm-1.0.17-714b0c0ec5.patch"
+    "it-length-prefixed": "https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz"
   },
   "prettier": {
     "tabWidth": 2,

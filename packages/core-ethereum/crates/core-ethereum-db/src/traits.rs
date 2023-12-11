@@ -11,6 +11,7 @@ use core_types::{
 use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[cfg_attr(test, mockall::automock)]
 pub trait HoprCoreEthereumDbActions {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
@@ -107,7 +108,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> Result<()>;
 
     /// Get the value of the lastest block number.
-    async fn get_latest_block_number(&self) -> Result<u32>;
+    async fn get_latest_block_number(&self) -> Result<Option<u32>>;
 
     /// Set the latest block number to this value.
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()>;

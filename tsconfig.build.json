@@ -2,11 +2,5 @@
   // Used to compile *all* packages at once by using
   // Typescript Project references, see https://www.typescriptlang.org/docs/handbook/project-references.html
   "files": [],
-  "references": [
-    { "path": "packages/core" },
-    { "path": "packages/core-ethereum" },
-    { "path": "packages/hoprd" },
-    { "path": "packages/real" },
-    { "path": "packages/utils" }
-  ]
+  "references": [{ "path": "packages/hoprd" }, { "path": "packages/real" }, { "path": "packages/utils" }]
 }

@@ -14,12 +14,13 @@ crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [features]
 default = [ "wasm" ]
-wasm = [ "dep:wasm-bindgen", "dep:bitflags" ]
+wasm = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
 
 [dependencies]
 thiserror = "1.0"
 bitflags = { version = "2.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

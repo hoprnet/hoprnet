@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.72"
+channel = "1.74"
 profile = "default"
 components = [ "rust-src" ]
 targets = [ "wasm32-unknown-unknown" ]

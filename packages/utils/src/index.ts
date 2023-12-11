@@ -1,13 +1,7 @@
 export * from './async/index.js'
-export * from './collection/index.js'
-export * from './libp2p/index.js'
-export * from './network/index.js'
-export * from './process/index.js'
 export * from './types.js'
+export * from './process/index.js'
 export * from './u8a/index.js'
-export * from './time.js'
-export * from './constants.js'
-export * from './ethereum/index.js'
 
 export * from './http.js'
 
@@ -32,19 +26,16 @@ export {
   get_package_version,
   HoprLibConfig,
   HoprdConfig,
-  HoprTransport,
   SmartContractConfig,
   TagBloomFilter,
   TicketStatistics,
   WasmVecAccountEntry,
   get_contract_data,
   resolve_network,
-  ChainNetworkConfig,
   Hopr,
   peer_metadata_protocol_version_name,
   WasmHealth,
-  HoprdPersistentDatabase,
-  ChainConfiguration
+  HoprdPersistentDatabase
 } from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string

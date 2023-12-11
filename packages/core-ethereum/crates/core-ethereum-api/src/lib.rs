@@ -1,74 +1,154 @@
 pub mod errors;
 pub mod executors;
 
+pub use core_ethereum_types::chain_events::SignificantChainEvent;
 pub use core_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
-
-use futures::channel::mpsc::UnboundedSender;
-use futures::SinkExt;
 use std::sync::Arc;
-use utils_log::info;
+use std::time::Duration;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_indexer::block::{Indexer, IndexerConfig};
+use core_ethereum_indexer::handlers::ContractEventHandlers;
+use core_ethereum_rpc::rpc::RpcOperations;
+use core_ethereum_rpc::HoprRpcOperations;
+use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_types::primitives::{Address, Balance};
+use utils_log::{debug, error, info, warn};
+use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::errors::HoprChainError;
+use crate::errors::{HoprChainError, Result};
 
-#[async_trait::async_trait]
-pub trait ChainQueries {
-    async fn is_node_safe_registered(&self) -> errors::Result<bool>;
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
-    async fn can_register_with_safe(&self) -> errors::Result<bool>;
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep;
 
-    async fn wait_for_funds(&self) -> errors::Result<()>;
+#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
+pub type DefaultHttpPostRequestor = core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor;
 
-    async fn clone(&self) -> Self;
-}
+#[cfg(not(target_arch = "wasm32"))]
+pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfRequestor;
 
-/// This is used by the indexer to emit events when a change on channel entry is detected.
-#[derive(Clone)]
-pub struct ChannelEventEmitter {
-    pub tx: UnboundedSender<ChannelEntry>,
-}
+pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;
 
-impl ChannelEventEmitter {
-    pub async fn send_event(&self, channel: &ChannelEntry) {
-        let mut sender = self.tx.clone();
-        let _ = sender.send(*channel).await;
+pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
+    me: Address,
+    safe_address: Address,
+    rpc: &Rpc,
+) -> Result<bool> {
+    let target_address = rpc.get_module_target_address().await?;
+    debug!("-- node address: {me}");
+    debug!("-- safe address: {safe_address}");
+    debug!("-- module target address: {target_address}");
+
+    if target_address != safe_address {
+        // cannot proceed when the safe address is not the target/owner of given module
+        return Err(HoprChainError::Api("safe is not the module target".into()));
+    }
+
+    let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
+    info!("currently registered Safe address in NodeSafeRegistry = {registered_address}");
+
+    if registered_address.is_zero() {
+        info!("Node is not associated with a Safe in NodeSafeRegistry yet");
+        Ok(true)
+    } else if registered_address != safe_address {
+        Err(HoprChainError::Api(
+            "Node is associated with a different Safe in NodeSafeRegistry".into(),
+        ))
+    } else {
+        info!("Node is associated with correct Safe in NodeSafeRegistry");
+        Ok(false)
     }
 }
 
+/// Waits until the given address is funded.
+/// This is done by querying the RPC provider for balance with backoff until `max_delay`
+pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
+    address: Address,
+    min_balance: Balance,
+    max_delay: Duration,
+    rpc: &Rpc,
+) -> Result<()> {
+    let multiplier = 1.05;
+    let mut current_delay = Duration::from_secs(2).min(max_delay);
+
+    while current_delay <= max_delay {
+        match rpc.get_balance(address, min_balance.balance_type()).await {
+            Ok(current_balance) => {
+                info!("current balance is {}", current_balance.to_formatted_string());
+                if current_balance.gte(&min_balance) {
+                    info!("node is funded");
+                    return Ok(());
+                } else {
+                    warn!("still unfunded, trying again soon");
+                }
+            }
+            Err(e) => error!("failed to fetch balance from the chain: {e}"),
+        }
+
+        sleep(current_delay).await;
+        current_delay = current_delay.mul_f64(multiplier);
+    }
+
+    Err(HoprChainError::Api("timeout waiting for funds".into()))
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+    indexer: Indexer<
+        RpcOperations<JsonRpcClient>,
+        ContractEventHandlers<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>,
+        CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>,
+    >,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    channel_events: ChannelEventEmitter,
+    rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
 impl HoprChain {
     pub fn new(
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+        contract_addresses: ContractAddresses,
+        safe_address: Address,
+        indexer_cfg: IndexerConfig,
+        indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-        channel_events: ChannelEventEmitter,
+        rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
+        let db_processor =
+            ContractEventHandlers::new(contract_addresses, safe_address, (&me_onchain).into(), db.clone());
+
+        let indexer = Indexer::new(
+            rpc_operations.clone(),
+            db_processor,
+            db.clone(),
+            indexer_cfg,
+            indexer_events_tx,
+        );
         Self {
             me_onchain,
             db,
+            indexer,
             chain_actions,
-            channel_events,
+            rpc_operations,
             channel_graph,
         }
+    }
+
+    pub async fn sync_chain(&mut self) -> errors::Result<()> {
+        Ok(self.indexer.start().await?)
     }
 
     pub fn me_onchain(&self) -> Address {
@@ -110,15 +190,6 @@ impl HoprChain {
         Ok(self.db.read().await.get_staking_safe_allowance().await?)
     }
 
-    pub async fn on_ticket_redeemed(&self, channel: &ChannelEntry, ticket_amount: &Balance) {
-        info!("redeemed ticket worth {ticket_amount} in {channel}");
-    }
-
-    pub async fn on_channel_event(&self, entry: &ChannelEntry) {
-        //utils_log::debug!("Received a channel event {:?}", entry);
-        self.channel_events.send_event(entry).await;
-    }
-
     pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>> {
         &self.chain_actions
     }
@@ -136,38 +207,20 @@ impl HoprChain {
     pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> {
         self.db.clone()
     }
-}
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_log::logger::wasm::JsLogger;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-    static LOGGER: JsLogger = JsLogger {};
-
-    #[allow(dead_code)]
-    #[wasm_bindgen]
-    pub fn core_ethereum_api_initialize_crate() {
-        let _ = JsLogger::install(&LOGGER, None);
-
-        // When the `console_error_panic_hook` feature is enabled, we can call the
-        // `set_panic_hook` function at least once during initialization, and then
-        // we will get better error messages if our code ever panics.
-        //
-        // For more details see
-        // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
+    pub fn rpc(&self) -> &RpcOperations<JsonRpcClient> {
+        &self.rpc_operations
     }
 
-    #[wasm_bindgen]
-    pub fn core_ethereum_api_gather_metrics() -> JsResult<String> {
-        utils_metrics::metrics::wasm::gather_all_metrics()
+    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_balance(self.me_onchain(), balance_type).await?)
+    }
+
+    pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    }
+
+    pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
+        Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
     }
 }

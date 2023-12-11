@@ -22,7 +22,7 @@ new_version="${1}"
 
 # define packages for versioning
 # does not include ethereum, which isn't a real package anymore, just a folder
-declare -a versioned_packages=( utils core-ethereum core real hoprd )
+declare -a versioned_packages=( utils real hoprd )
 
 # create new version in each package
 for package in "${versioned_packages[@]}"; do
