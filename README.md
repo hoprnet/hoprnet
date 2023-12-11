@@ -146,12 +146,6 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
-      --healthCheck
-          Run a health check end point [env: HOPRD_HEALTH_CHECK=]
-      --healthCheckHost <HOST>
-          Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST=]
-      --healthCheckPort <PORT>
-          Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
       --defaultStrategy <DEFAULT_STRATEGY>
