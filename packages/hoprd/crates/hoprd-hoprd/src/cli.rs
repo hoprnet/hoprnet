@@ -370,6 +370,28 @@ pub struct CliArgs {
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
+
+    // ==================================
+    /// deprecated
+    #[arg(
+        long = "healthCheck",
+        help = "DEPRECATED",
+        action = ArgAction::SetTrue,
+        default_value_t = false
+    )]
+    pub health_check: bool,
+
+    /// deprecated
+    #[arg(long = "healthCheckHost", help = "DEPRECATED")]
+    pub health_check_host: Option<String>,
+
+    /// deprecated
+    #[arg(
+        long = "healthCheckPort",
+        value_parser = clap::value_parser ! (u16),
+        help = "DEPRECATED",
+    )]
+    pub health_check_port: Option<u16>,
 }
 
 #[cfg(feature = "wasm")]
