@@ -18,8 +18,7 @@ const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description:
-    'Get list of messages currently present in the nodes message inbox.',
+  description: 'Get list of messages currently present in the nodes message inbox.',
   tags: ['Messages'],
   operationId: 'messagesPeekAllMessage',
   requestBody: {

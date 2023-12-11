@@ -34,10 +34,9 @@ pub trait InboxBackend<T: Copy + Default, M: Clone> {
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
-
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
-    
+
     // TODO: consider adding a stream version for `pop_all`
 
     /// Purges all entries strictly older than the given timestamp.
@@ -128,7 +127,7 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
-        
+
         return db.pop(tag).await;
     }
 
@@ -143,7 +142,7 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
-        
+
         return db.peek(tag).await;
     }
 

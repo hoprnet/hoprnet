@@ -18,8 +18,7 @@ const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description:
-    'Get oldest message currently present in the nodes message inbox.',
+  description: 'Get oldest message currently present in the nodes message inbox.',
   tags: ['Messages'],
   operationId: 'messagesPeekMessage',
   requestBody: {

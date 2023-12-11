@@ -28,7 +28,7 @@ where
 impl<T, M> RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone
+    M: Clone,
 {
     /// Creates new backend with default timestamping function from std::time.
     /// This is incompatible with WASM runtimes.
@@ -46,7 +46,7 @@ where
         self.buffers.get(&T::default()).map(|buf| buf.len()).unwrap_or(0)
     }
 
-    fn tag_resolution(&mut self, tag: Option<T>) -> Option<T>{
+    fn tag_resolution(&mut self, tag: Option<T>) -> Option<T> {
         let specific_tag = match tag {
             // If no tag was given, we need to find a tag which has the oldest entry in it
             None => self
@@ -142,15 +142,13 @@ where
         }
     }
 
-    
-
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
         let specific_tag = self.tag_resolution(tag).unwrap();
 
         self.buffers
             .get_mut(&specific_tag)
             .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
-    } 
+    }
 
     async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
         match tag {
@@ -392,11 +390,7 @@ mod test {
 
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(None)
-                .await
-                .into_iter()
-                .map(|(d, _)| d)
-                .collect::<Vec<_>>()
+            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
         );
         assert_eq!(3, rb.count(Some(1)).await);
     }
@@ -426,7 +420,6 @@ mod test {
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(3, rb.count(None).await);
     }
-    
 
     #[async_std::test]
     async fn test_purge() {

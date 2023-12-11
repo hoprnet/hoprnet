@@ -117,6 +117,7 @@ async def check_received_packets_with_pop(receiver, expected_packets, tag=None, 
 
     assert received == expected_packets
 
+
 async def check_received_packets_with_peek(receiver, expected_packets, tag=None, sort=True):
     received = []
 
@@ -132,6 +133,7 @@ async def check_received_packets_with_peek(receiver, expected_packets, tag=None,
         received.sort()
 
     assert received == expected_packets
+
 
 async def check_rejected_tickets(src, count):
     while int((await src["api"].get_tickets_statistics()).rejected) < count:
@@ -159,6 +161,7 @@ async def send_and_receive_packets_with_pop(packets, src, dest, path, timeout=MU
         assert await src["api"].send_message(dest["peer_id"], packet, path, random_tag)
 
     await asyncio.wait_for(check_received_packets_with_pop(dest, packets, tag=random_tag, sort=True), timeout)
+
 
 async def send_and_receive_packets_with_peek(packets, src, dest, path, timeout=MULTIHOP_MESSAGE_SEND_TIMEOUT):
     random_tag = random.randint(10, 65530)
@@ -323,10 +326,11 @@ async def test_peeking_messages_with_tag(src, dest, swarm7):
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
     random_tag = await send_and_receive_packets_with_peek(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
-    # after checking that messages are in the destination inbox, a second check should again assert 
+    # after checking that messages are in the destination inbox, a second check should again assert
     # that they are there. This shows that peeking does not remove the messages from the inbox
-    await asyncio.wait_for(check_received_packets_with_peek(
-        dest, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+    await asyncio.wait_for(
+        check_received_packets_with_peek(dest, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
+    )
 
 
 @pytest.mark.asyncio
@@ -362,7 +366,9 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel:
         packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
-        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]])
+        await send_and_receive_packets_with_pop(
+            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]]
+        )
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
@@ -433,7 +439,9 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         )
 
         packets = [f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
-        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]])
+        await send_and_receive_packets_with_pop(
+            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]]
+        )
 
         # this message has no funding in the channel, but it still should be sent
         assert await swarm7[src]["api"].send_message(
@@ -501,7 +509,9 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
 
     async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel:
         packets = [f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
-        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]])
+        await send_and_receive_packets_with_pop(
+            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]]
+        )
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
