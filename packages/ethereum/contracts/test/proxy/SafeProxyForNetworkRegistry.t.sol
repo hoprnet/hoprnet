@@ -25,13 +25,8 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
 
         // set _minStake with the production value
         hoprSafeProxyForNetworkRegistry = new HoprSafeProxyForNetworkRegistry(
-        owner,
-        owner,
-        DEFAULT_STAKE_THRESHOLD,
-        DEFAULT_SNAPSHOT_BLOCK_NUMBER,
-        token,
-        nodeSafeRegistry
-    );
+            owner, owner, DEFAULT_STAKE_THRESHOLD, DEFAULT_SNAPSHOT_BLOCK_NUMBER, token, nodeSafeRegistry
+        );
     }
 
     /**

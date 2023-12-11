@@ -15,6 +15,8 @@ declare HOPR_LOG_ID="smoke-fixture-setup"
 source "${mydir}/testnet.sh"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
+source "${mydir}/api.sh"
 
 PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
@@ -423,29 +425,22 @@ env \
   --hopr-amount "0.0"
 # }}}
 
+api_token=$default_api_token
 log "Waiting for nodes to become ready"
-# $1 = node api endpoint
-wait_for_api_ready() {
-  local api_port=${1}
-  local api_token=${2}
-
-  curl -X GET -m 3 --connect-timeout 300 -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url http://127.0.0.1:${api_port}/api/v3/readyz -o /dev/null -w %{http_code} -d
-}
-
-wait_for_api_ready ${default_api_token} 13301
-wait_for_api_ready ${default_api_token} 13302
-wait_for_api_ready ${default_api_token} 13303
-wait_for_api_ready ${default_api_token} 13304
-wait_for_api_ready ${default_api_token} 13305
-wait_for_api_ready ${default_api_token} 13306
-wait_for_api_ready ${default_api_token} 13307
+wait_for_api_ready http://127.0.0.1:13301/
+wait_for_api_ready http://127.0.0.1:13302/
+wait_for_api_ready http://127.0.0.1:13303/
+wait_for_api_ready http://127.0.0.1:13304/
+wait_for_api_ready http://127.0.0.1:13305/
+wait_for_api_ready http://127.0.0.1:13306/
+wait_for_api_ready http://127.0.0.1:13307/
 
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 
-wait_for_api_ready ${default_api_token} 13301
+wait_for_api_ready http://127.0.0.1:13301/
 # }}}
 
 #  --- Ensure data directories are used --- {{{

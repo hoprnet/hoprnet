@@ -82,6 +82,12 @@ api_call(){
   echo "${result}"
 }
 
+wait_for_api_ready() {
+  local node_api=${1}
+
+  api_call "${node_api}" "/readyz" "GET" "{}" "" 1 25 0 true
+}
+
 # $1 = node api endpoint
 # $2 = currency to withdraw
 # $3 = amount to withdraw

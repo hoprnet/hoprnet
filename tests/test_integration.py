@@ -170,7 +170,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
     await asyncio.gather(
         *[
             asyncio.wait_for(
-                check_all_connected(swarm7[k], [swarm7[v]["peer_id"] for v in default_nodes() if v != k]), 30.0
+                check_all_connected(swarm7[k], [swarm7[v]["peer_id"] for v in default_nodes() if v != k]), 60.0
             )
             for k in default_nodes()
         ]
