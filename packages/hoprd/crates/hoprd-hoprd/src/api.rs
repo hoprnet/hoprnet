@@ -26,7 +26,7 @@ use openssl::ssl::{Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod}
 use hoprd_api::models;
 
 /// Builds an SSL implementation for Simple HTTPS from some hard-coded file names
-pub async fn create(addr: &str, https: bool) {
+pub async fn create(addr: &str, hopr: Arc<hopr_lib::native::Hopr>, https: bool) {
     let addr = addr.parse().expect("Failed to parse bind address");
 
     let server = Server::new();
@@ -502,7 +502,7 @@ pub mod compat {
         type Error = io::Error;
 
         fn poll_accept(
-            mut self: Pin<&mut Self>,
+            self: Pin<&mut Self>,
             cx: &mut Context,
         ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
             let stream = task::ready!(Pin::new(&mut self.0.incoming()).poll_next(cx)).unwrap()?;

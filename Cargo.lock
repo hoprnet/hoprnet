@@ -3399,42 +3399,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hoprd-api"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "async-trait",
- "chrono",
- "clap 2.34.0",
- "env_logger 0.7.1",
- "frunk",
- "frunk-enum-core",
- "frunk-enum-derive",
- "frunk_core",
- "frunk_derives",
- "futures",
- "hyper",
- "hyper-openssl",
- "hyper-tls",
- "lazy_static",
- "log",
- "mime",
- "native-tls",
- "openssl",
- "percent-encoding 2.3.0",
- "regex",
- "serde",
- "serde_ignored",
- "serde_json",
- "swagger",
- "tokio",
- "tokio-openssl",
- "url",
- "validator",
-]
-
-[[package]]
-name = "hoprd-hoprd"
+name = "hoprd"
 version = "0.2.0"
 dependencies = [
  "async-lock",
@@ -3476,6 +3441,41 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
+]
+
+[[package]]
+name = "hoprd-api"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "chrono",
+ "clap 2.34.0",
+ "env_logger 0.7.1",
+ "frunk",
+ "frunk-enum-core",
+ "frunk-enum-derive",
+ "frunk_core",
+ "frunk_derives",
+ "futures",
+ "hyper",
+ "hyper-openssl",
+ "hyper-tls",
+ "lazy_static",
+ "log",
+ "mime",
+ "native-tls",
+ "openssl",
+ "percent-encoding 2.3.0",
+ "regex",
+ "serde",
+ "serde_ignored",
+ "serde_json",
+ "swagger",
+ "tokio",
+ "tokio-openssl",
+ "url",
+ "validator",
 ]
 
 [[package]]

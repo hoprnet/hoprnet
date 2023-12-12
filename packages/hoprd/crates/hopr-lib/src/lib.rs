@@ -80,7 +80,7 @@ pub enum State {
 pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
-mod native {
+pub mod native {
     use crate::chain::SmartContractConfig;
     use crate::config::SafeModule;
     use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
