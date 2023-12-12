@@ -946,7 +946,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
     async fn get_ticket_price(&self) -> Result<Option<U256>> {
         //utils_log::debug!("DB: get_ticket_price");
-        // TODO: use a default value if TICKET_PRICE_KEY value is not found
         let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
 
         self.db.get_or_none::<U256>(key).await
