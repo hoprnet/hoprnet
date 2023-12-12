@@ -5,7 +5,7 @@ const POST: Operation = [
   async (req, res, _next) => {
     const tag = req.body.tag
     const msgs = await req.context.inbox.peek_all(tag)
-    
+
     const messages = msgs.map((msg) => {
       return {
         tag: msg.data.application_tag,

@@ -118,7 +118,7 @@ async def check_received_packets_with_pop(receiver, expected_packets, tag=None, 
     assert received == expected_packets
 
 
-async def check_received_packets_with_peek(receiver, expected_packets:list[str], tag=None, sort=True):
+async def check_received_packets_with_peek(receiver, expected_packets: list[str], tag=None, sort=True):
     received = []
 
     while len(received) != len(expected_packets):
@@ -128,14 +128,13 @@ async def check_received_packets_with_peek(receiver, expected_packets:list[str],
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
             continue
 
-        received = [m.body for m in packets.messages] 
+        received = [m.body for m in packets.messages]
 
     if sort:
         expected_packets.sort()
         received.sort()
-    
-    assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
 
+    assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
 
 
 async def check_rejected_tickets(src, count):
@@ -333,11 +332,12 @@ async def test_peeking_messages_with_tag(src, dest, swarm7):
     # that they are there. This shows that peeking does not remove the messages from the inbox
     await asyncio.wait_for(
         check_received_packets_with_peek(
-            swarm7[dest], 
+            swarm7[dest],
             packets,
-            tag=random_tag, 
-            sort=True,), 
-        MULTIHOP_MESSAGE_SEND_TIMEOUT
+            tag=random_tag,
+            sort=True,
+        ),
+        MULTIHOP_MESSAGE_SEND_TIMEOUT,
     )
 
 
