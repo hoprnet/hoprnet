@@ -22,6 +22,7 @@ members = [
     "packages/hopli",
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hopr-lib",
+    "packages/hoprd/crates/hoprd-api",
     "packages/hoprd/crates/hoprd-hoprd",
     "packages/hoprd/crates/hoprd-inbox",
     "packages/hoprd/crates/hoprd-keypair",
@@ -82,6 +83,7 @@ core-strategy = { path = "packages/core/crates/core-strategy", default-features 
 core-transport = { path = "packages/core/crates/core-transport", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }
 hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
+hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false }
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
 real-base = { path = "packages/real/crates/real-base", default-features = false }
