@@ -1,8 +1,0 @@
-[package]
-name = "openapi_client"
-version = "3.0.0"
-authors = ["tech@hoprnet.org"]
-description = "This Rest API enables developers to interact with a hoprd node programatically."
-license = "GPL-3.0"
-edition = "2018"
-

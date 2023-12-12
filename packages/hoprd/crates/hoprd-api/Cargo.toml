@@ -8,14 +8,13 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
 default = ["client", "server"]
-client = [
-    "hyper", "hyper-openssl", "hyper-tls", "native-tls", "openssl", "url"
-]
-server = [
-   "serde_ignored", "hyper", "regex", "percent-encoding", "url", "lazy_static"
-]
+client = ["hyper", "hyper-openssl", "hyper-tls", "native-tls", "openssl", "url"]
+server = ["serde_ignored", "hyper", "regex", "percent-encoding", "url", "lazy_static"]
 conversion = ["frunk", "frunk_derives", "frunk_core", "frunk-enum-core", "frunk-enum-derive"]
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "ios"))'.dependencies]
@@ -71,5 +70,10 @@ native-tls = "0.2"
 tokio-openssl = "0.6"
 openssl = "0.10"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+[[example]]
+name = "client"
+required-features = ["client"]
+
+[[example]]
+name = "server"
+required-features = ["server"]
