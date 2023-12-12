@@ -6246,8 +6246,7 @@ pub struct Token {
 
     /// Array of capabilities associated with the token
     #[serde(rename = "capabilities")]
-    // #[validate(
-    //     )]
+    // #[validate()]
     pub capabilities: Vec<models::TokenCapability>,
 }
 
@@ -6406,8 +6405,7 @@ pub struct TokenCapability {
     pub endpoint: String,
 
     #[serde(rename = "limits")]
-    // #[validate(
-    //     )]
+    // #[validate()]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limits: Option<Vec<models::TokenCapabilityLimit>>,
 }
@@ -7065,8 +7063,7 @@ impl std::convert::TryFrom<hyper::header::HeaderValue> for header::IntoHeaderVal
 pub struct TokensCreateRequest {
     /// Capabilities attached to the created token.
     #[serde(rename = "capabilities")]
-    // #[validate(
-    //     )]
+    // #[validate()]
     pub capabilities: Vec<models::TokenCapability>,
 
     /// Lifetime of the token in seconds since creation. Defaults to unlimited lifetime.
