@@ -337,5 +337,4 @@ class HoprdAPI:
         :return: price: int
         """
         _, response = self.__call_api(TicketsApi, "tickets_get_ticket_price")
-        print(f"{response=}")
         return response.price if hasattr(response, "price") else None

@@ -17,7 +17,7 @@ const GET: Operation = [
           .send({ status: STATUS_CODES.TICKET_PRICE_NOT_FOUND, error: 'Could not retrieve ticket price' })
       }
 
-      return res.status(200).send({ price: ticket_price })
+      return res.status(200).send({ price: ticket_price.to_string() })
     } catch (err) {
       return res
         .status(422)
