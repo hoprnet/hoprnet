@@ -47,15 +47,8 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
         boostCap = 1 ether; // mock _boostCap with 1 ether
 
         hoprStakeBase = new HoprStakeBase(
-      newOwner,
-      programStart,
-      programEnd,
-      baseFactorNumerator,
-      boostCap,
-      nftAddress,
-      lockToken,
-      rewardToken
-    );
+            newOwner, programStart, programEnd, baseFactorNumerator, boostCap, nftAddress, lockToken, rewardToken
+        );
 
         // assign vm.addr(1) to vm.addr(6) to accounts
         accounts[0] = vm.addr(1);

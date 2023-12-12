@@ -40,11 +40,8 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         stakeContract = vm.addr(100); // make vm.addr(100) stakeContract
         owner = vm.addr(101); // make address(101) new owner
         // set _minStake with the production value
-        hoprStakingProxyForNetworkRegistry = new HoprStakingProxyForNetworkRegistry(
-      stakeContract,
-      owner,
-      INITIAL_MIN_STAKE
-    );
+        hoprStakingProxyForNetworkRegistry =
+            new HoprStakingProxyForNetworkRegistry(stakeContract, owner, INITIAL_MIN_STAKE);
         // assign vm.addr(1) to vm.addr(6) to accounts
         accounts[0] = vm.addr(1);
         accounts[1] = vm.addr(2);

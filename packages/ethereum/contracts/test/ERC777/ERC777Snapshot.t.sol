@@ -24,7 +24,7 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
         INITIAL_HOLDER = vm.addr(100); // make address(100) default operator
         DEFAULT_RECIPIENT = vm.addr(101); // make address(101) default recipient
         OTHER_RECIPIENT = vm.addr(102); // make address(102) a recipient other than the default recipient
-        erc777SnapshotMock = new ERC777SnapshotMock('ERC 777 Token', 'ERC777', INITIAL_HOLDER, INITIAL_BALANCE);
+        erc777SnapshotMock = new ERC777SnapshotMock("ERC 777 Token", "ERC777", INITIAL_HOLDER, INITIAL_BALANCE);
         INITIAL_MINT_BLOCK = uint128(block.number);
     }
 
