@@ -13,8 +13,12 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-std = { workspace = true, features = ["attributes"] }
+tokio = { version = "1.33", default-features = false }
 async-lock = { workspace = true }
+async-trait = { workspace = true }
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
+futures = { workspace = true }
 hex = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
@@ -37,6 +41,7 @@ core-ethereum-db = { workspace = true }
 core-ethereum-indexer = { workspace = true }
 core-ethereum-types = { workspace = true }
 hopr-lib = { workspace = true }
+hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 real-base = { workspace = true }
@@ -48,7 +53,7 @@ utils-types = { workspace = true }
 utils-validation = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true, features = ["attributes"] }
+
 tempfile = "3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
@@ -62,7 +67,7 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
+default = ["console_error_panic_hook", "wasm", "prometheus", "hoprd-api/server"]
 wasm = [
     "dep:wasm-bindgen",
     "dep:wasm-bindgen-futures",
