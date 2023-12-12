@@ -17,6 +17,11 @@ use std::error::Error;
 use std::task::{Context, Poll};
 use swagger::{ApiError, ContextWrapper};
 
+#[cfg(feature = "server")]
+pub use {
+    hyper, swagger
+};
+
 type ServiceError = Box<dyn Error + Send + Sync + 'static>;
 
 pub const BASE_PATH: &str = "/api/v3";
