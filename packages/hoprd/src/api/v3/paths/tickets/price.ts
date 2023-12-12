@@ -2,7 +2,6 @@ import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { debug, Hopr } from '@hoprnet/hopr-utils'
 
-
 const GET: Operation = [
   async (req, res, _next) => {
     const log = debug('hoprd:api:v3:get-ticket-price')
@@ -18,8 +17,7 @@ const GET: Operation = [
           .send({ status: STATUS_CODES.TICKET_PRICE_NOT_FOUND, error: 'Could not retrieve ticket price' })
       }
 
-      return res.status(200).send({price: ticket_price})
-      
+      return res.status(200).send({ price: ticket_price })
     } catch (err) {
       return res
         .status(422)
@@ -43,7 +41,7 @@ GET.apiDoc = {
               price: {
                 type: 'number',
                 description: 'Latest ticket price update.'
-              },
+              }
             }
           }
         }

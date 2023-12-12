@@ -667,11 +667,12 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     """
     assert True
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
 async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
     api: HoprdAPI = swarm7[peer]["api"]
-    
+
     price = await api.get_ticket_price()
 
     assert price == TICKET_PRICE_PER_HOP
