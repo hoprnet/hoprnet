@@ -1309,7 +1309,9 @@ pub mod wasm_impl {
         #[wasm_bindgen(js_name = getTicketPrice)]
         pub async fn _get_ticket_price(&self) -> Result<Option<U256>, JsError> {
             self.hopr.get_ticket_price().await.map_err(JsError::from)
+            
         }
+       
 
         // Chain =========
         #[wasm_bindgen(js_name = getEthereumAddress)]

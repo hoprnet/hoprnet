@@ -1,8 +1,9 @@
 import logging
-from hoprd_sdk import Configuration, ApiClient
-from hoprd_sdk.models import AliasesBody, MessagesBody, MessagesPopBody, ChannelsBody, ChannelidFundBody
+
+from hoprd_sdk import ApiClient, Configuration
+from hoprd_sdk.api import AccountApi, AliasesApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.models import AliasesBody, ChannelidFundBody, ChannelsBody, MessagesBody, MessagesPopBody
 from hoprd_sdk.rest import ApiException
-from hoprd_sdk.api import AliasesApi, NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
 from urllib3.exceptions import MaxRetryError
 
 
@@ -329,3 +330,12 @@ class HoprdAPI:
         """
         status, _ = self.__call_api(TicketsApi, "tickets_redeem_tickets")
         return status
+
+    async def ticket_price(self):
+        """
+        Returns the ticket price in wei.
+        :return: price: int
+        """
+        _, response = self.__call_api(TicketsApi, "tickets_get_ticket_price")
+        print(f"{response=}")
+        return response.price if hasattr(response, "price") else None

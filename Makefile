@@ -325,6 +325,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
 create-local-identity: id_prefix=.identity-local_
+create-local-identity: id_count=1
 create-local-identity: ## run HOPRd from local repo
 	if [ ! -f "${id_dir}${id_prefix}0.id" ]; then \
 		ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" \
@@ -332,11 +333,11 @@ create-local-identity: ## run HOPRd from local repo
 		--action create \
 		--identity-directory "${id_dir}" \
 		--identity-prefix "${id_prefix}" \
-		--number 1; \
+		--number ${id_count}; \
 	fi
 
 .PHONY: run-local
-run-local: id_path=`pwd`/.identity-local.id
+run-local: id_path=$$(pwd)/.identity-local.id
 run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
@@ -346,6 +347,7 @@ run-local: ## run HOPRd from local repo
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
+		--data /tmp/ \
 		$(args)
 
 .PHONY: run-local-with-safe
@@ -590,7 +592,7 @@ generate-python-sdk: build-docs-api			# not using the official swagger-codegen-c
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
 		-c /local/scripts/python-sdk-config.json
-	patch ./hoprd-sdk-python/ ./scripts/sdk-python.patch
+	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help
 help:
