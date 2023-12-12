@@ -4,6 +4,10 @@ pub mod config;
 pub mod errors;
 pub mod token;
 
+fn main() {
+    let num = 10;
+}
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     // Temporarily re-export crates
