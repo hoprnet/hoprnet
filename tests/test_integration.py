@@ -212,6 +212,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
         check=True,
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
 async def test_hoprd_node_should_be_able_to_alias_other_peers(peer, swarm7):
@@ -665,9 +666,10 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     """
     assert True
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
 async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
     price = await swarm7[peer]["api"].ticket_price()
-    
+
     assert price == TICKET_PRICE_PER_HOP
