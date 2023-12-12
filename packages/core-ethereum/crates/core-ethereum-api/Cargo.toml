@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -14,15 +14,17 @@ default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "dep:js-sys", "dep:serde-wasm-bindgen",
-    "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm",
+    "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm", "core-ethereum-indexer/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
 [dependencies]
+async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+ethers = { workspace = true }
 futures = { workspace = true }
 primitive-types = "0.12"
 hex = { workspace = true }
@@ -39,6 +41,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-indexer = { workspace = true, default-features = false }
 core-ethereum-rpc = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }

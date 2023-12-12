@@ -47,8 +47,6 @@ function cleanup {
   log "Remove logs"
   rm -f "${node_log_file}" "${anvil_rpc_log}"
 
-  wait
-
   exit $EXIT_CODE
 }
 trap cleanup SIGINT SIGTERM ERR EXIT

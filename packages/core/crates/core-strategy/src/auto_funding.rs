@@ -113,28 +113,41 @@ mod tests {
     use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
+    use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
+    use core_ethereum_actions::action_queue::{ActionConfirmation, PendingAction};
     use core_ethereum_actions::channels::ChannelActions;
-    use core_ethereum_actions::transaction_queue::{TransactionCompleted, TransactionResult};
+    use core_ethereum_types::actions::Action;
+    use core_ethereum_types::chain_events::ChainEventType;
     use core_types::channels::ChannelChange::CurrentBalance;
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
-    use futures::{future::ready, FutureExt};
+    use futures::{future::ok, FutureExt};
     use mockall::mock;
     use utils_types::primitives::{Address, Balance, BalanceType};
+    use utils_types::traits::BinarySerializable;
 
     mock! {
         ChannelAct { }
         #[async_trait(? Send)]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
                 direction: core_types::channels::ChannelDirection,
                 redeem_before_close: bool,
-            ) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            ) -> core_ethereum_actions::errors::Result<PendingAction>;
+        }
+    }
+
+    fn mock_action_confirmation(channel: ChannelEntry, balance: Balance) -> ActionConfirmation {
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        ActionConfirmation {
+            tx_hash: random_hash,
+            event: Some(ChainEventType::ChannelBalanceIncreased(channel, balance)),
+            action: Action::FundChannel(channel, balance),
         }
     }
 
@@ -179,12 +192,7 @@ mod tests {
             .expect_fund_channel()
             .times(1)
             .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(&balance))
-            .return_once(|_, _| {
-                Ok(ready(TransactionResult::ChannelFunded {
-                    tx_hash: Default::default(),
-                })
-                .boxed())
-            });
+            .return_once(move |_, _| Ok(ok(mock_action_confirmation(c2, fund_amount)).boxed()));
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,

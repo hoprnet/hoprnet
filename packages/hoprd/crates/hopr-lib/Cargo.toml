@@ -8,7 +8,6 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-# TODO: change this to a binary crate once the migration is complete
 [lib]
 crate-type = ["cdylib", "rlib"]
 
@@ -25,6 +24,7 @@ validator = { workspace = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { workspace = true, optional = true }
+gloo-timers = { workspace = true, optional = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
@@ -35,8 +35,10 @@ core-types = { workspace = true }
 core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
 core-ethereum-actions = { workspace = true }
 core-ethereum-api = { workspace = true }
+core-ethereum-rpc = { workspace = true }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true }
+core-ethereum-indexer = { workspace = true }
 real-base = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true }
@@ -61,6 +63,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:js-sys",
+    "dep:gloo-timers",
     "dep:serde-wasm-bindgen",
     "dep:wasm-bindgen",
     "dep:wasm-bindgen-futures",
@@ -71,6 +74,8 @@ wasm = [
     "core-ethereum-actions/wasm",
     "core-ethereum-api/wasm",
     "core-ethereum-db/wasm",
+    "core-ethereum-indexer/wasm",
+    "core-ethereum-rpc/wasm",
     "real-base/wasm",
     "utils-db/wasm",
     "utils-log/wasm",
@@ -78,5 +83,5 @@ wasm = [
     "utils-misc/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "dep:utils-metrics"]
+prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

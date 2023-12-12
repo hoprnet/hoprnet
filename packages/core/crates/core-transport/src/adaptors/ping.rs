@@ -18,7 +18,7 @@ use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_META
 /// the triggers for its functionality. This class implements the basic API by
 /// aggregating all necessary ping resources without leaking them into the
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP compliant.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PingExternalInteractions<R: PeerAddressResolver> {
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
     resolver: R,
@@ -60,7 +60,7 @@ impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
                 status.get_quality(),
                 status.get_average_quality()
             );
-            if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
+            if let Ok(pk) = OffchainPublicKey::from_peerid(peer) {
                 let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                 if let Some(chain_key) = maybe_chain_key {
                     let mut g = self.channel_graph.write().await;

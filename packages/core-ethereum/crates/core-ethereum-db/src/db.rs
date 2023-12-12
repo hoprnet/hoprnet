@@ -39,7 +39,7 @@ fn get_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> Result<utils_db::db:
     to_acknowledged_ticket_key(&ack.ticket.channel_id, ack.ticket.channel_epoch, ack.ticket.index)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CoreEthereumDb<T>
 where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone,
@@ -675,9 +675,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         self.db.batch(batch_ops, true).await
     }
 
-    async fn get_latest_block_number(&self) -> Result<u32> {
+    async fn get_latest_block_number(&self) -> Result<Option<u32>> {
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
-        self.db.get_or_none::<u32>(key).await.map(|v| v.unwrap_or(0))
+        self.db.get_or_none::<u32>(key).await
     }
 
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
@@ -783,11 +783,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        // TODO: for debugging purposes this operation has been un-batched
-        // Note that if any of the un-batched operations fail, the stats of redeemed
-        // tickets will be in an inconsistent state.
-        // Once the underlying issue is resolved, it should be batched again.
-
         debug!("start marking {acked_ticket} as redeemed");
 
         let mut ops = utils_db::db::Batch::default();
@@ -1449,7 +1444,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_latest_block_number(&self) -> Result<u32, JsValue> {
+        pub async fn get_latest_block_number(&self) -> Result<Option<u32>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;

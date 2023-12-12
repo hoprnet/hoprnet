@@ -703,6 +703,8 @@ impl BinarySerializable for U256 {
     }
 }
 
+// TODO: should we change U256 to have underlying type primitive_types::U256 and ditch ethnum?
+
 impl From<u256> for U256 {
     fn from(value: u256) -> Self {
         Self { value }

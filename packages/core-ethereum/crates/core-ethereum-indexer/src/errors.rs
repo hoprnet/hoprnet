@@ -5,6 +5,9 @@ use utils_types::{errors::GeneralError, primitives::Address};
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {
+    #[error("{0}")]
+    ProcessError(String),
+
     #[error(transparent)]
     DbError(#[from] DbError),
 
@@ -43,6 +46,9 @@ pub enum CoreEthereumIndexerError {
 
     #[error(transparent)]
     MultiaddrParseError(#[from] multiaddr::Error),
+
+    #[error(transparent)]
+    RpcError(#[from] core_ethereum_rpc::errors::RpcError),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumIndexerError>;

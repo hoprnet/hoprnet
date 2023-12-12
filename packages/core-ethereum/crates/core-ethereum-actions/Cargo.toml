@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-actions"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -17,7 +17,7 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 ethers = { version = "2", default-features = false }
 futures = { workspace = true }
-gloo-timers = { workspace = true, optional = true }
+futures-timer = { workspace = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -46,14 +46,13 @@ async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
-tokio = { version = "1", features = ["macros"] }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:gloo-timers", "dep:serde-wasm-bindgen",
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics", "core-ethereum-rpc/prometheus" ]

@@ -10,12 +10,11 @@ use hex;
 use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
-use utils_misc::ok_or_str;
 
 #[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use utils_validation::network::wasm::is_dns_address;
+use {utils_validation::network::wasm::is_dns_address, wasm_bindgen::JsError};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -29,14 +28,9 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 fn parse_host(s: &str) -> Result<HostConfig, String> {
-    let host = s.split_once(":").map_or(s, |(h, _)| h);
+    let host = s.split_once(':').map_or(s, |(h, _)| h);
     if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
-        return Err(format!(
-            "Given string {} is not a valid host, Example: {}:{}",
-            s,
-            DEFAULT_HOST.to_string(),
-            DEFAULT_PORT.to_string()
-        ));
+        return Err("Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into());
     }
 
     HostConfig::from_str(s)
@@ -58,30 +52,27 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
 
         Ok(Box::new(decoded))
     } else {
-        Err(format!(
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        ))
+        Err("Given string is not a private key. A private key must contain 128 hex chars.".into())
     }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
     if s.len() < MINIMAL_API_TOKEN_LENGTH {
         return Err(format!(
-            "Length of API token is too short, minimally required {} but given {}",
-            MINIMAL_API_TOKEN_LENGTH.to_string(),
+            "Length of API token is too short, minimally required {MINIMAL_API_TOKEN_LENGTH} but given {}",
             s.len()
         ));
     }
 
-    match (s.starts_with("'"), s.ends_with("'")) {
+    match (s.starts_with('\''), s.ends_with('\'')) {
         (true, true) => {
-            s = s.strip_prefix("'").unwrap();
-            s = s.strip_suffix("'").unwrap();
+            s = s.strip_prefix('\'').unwrap();
+            s = s.strip_suffix('\'').unwrap();
 
             Ok(s.into())
         }
-        (true, false) => Err(format!("Found leading quote but no trailing quote")),
-        (false, true) => Err(format!("Found trailing quote but no leading quote")),
+        (true, false) => Err("Found leading quote but no trailing quote".into()),
+        (false, true) => Err("Found trailing quote but no leading quote".into()),
         (false, false) => Ok(s.into()),
     }
 }
@@ -183,32 +174,6 @@ pub struct CliArgs {
         env = "HOPRD_API_TOKEN"
     )]
     pub api_token: Option<String>,
-
-    #[arg(
-        long = "healthCheck",
-        env = "HOPRD_HEALTH_CHECK",
-        help = "Run a health check end point",
-        action = ArgAction::SetTrue,
-        default_value_t = crate::config::HealthCheck::default().enable
-    )]
-    pub health_check: bool,
-
-    #[arg(
-        long = "healthCheckHost",
-        value_name = "HOST",
-        help = "Updates the host for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_HOST"
-    )]
-    pub health_check_host: Option<String>,
-
-    #[arg(
-        long = "healthCheckPort",
-        value_name = "PORT",
-        value_parser = clap::value_parser ! (u16),
-        help = "Updates the port for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_PORT"
-    )]
-    pub health_check_port: Option<u16>,
 
     #[arg(
         long,
@@ -405,31 +370,52 @@ pub struct CliArgs {
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
+
+    // ==================================
+    /// deprecated
+    #[arg(
+        long = "healthCheck",
+        help = "DEPRECATED",
+        action = ArgAction::SetTrue,
+        default_value_t = false
+    )]
+    pub health_check: bool,
+
+    /// deprecated
+    #[arg(long = "healthCheckHost", help = "DEPRECATED")]
+    pub health_check_host: Option<String>,
+
+    /// deprecated
+    #[arg(
+        long = "healthCheckPort",
+        value_parser = clap::value_parser ! (u16),
+        help = "DEPRECATED",
+    )]
+    pub health_check_port: Option<u16>,
 }
 
+#[cfg(feature = "wasm")]
 impl CliArgs {
     /// Creates a new instance using custom cli_args and custom network variables
-    #[cfg(feature = "wasm")]
-    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, String> {
+    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, wasm_bindgen::JsError> {
         let mut cmd = Command::new("hoprd")
             .about("HOPRd")
             .bin_name("index.cjs")
             .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-            .version(&hopr_lib::constants::APP_VERSION_COERCED);
+            .version(hopr_lib::constants::APP_VERSION_COERCED);
 
         cmd = Self::augment_args(cmd);
 
         cmd.update_env_from(env_vars);
 
-        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
+        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(JsError::from)?;
 
-        Ok(ok_or_str!(Self::from_arg_matches(&derived_matches))?)
+        Self::from_arg_matches(&derived_matches).map_err(wasm_bindgen::JsError::from)
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn parse_private_key() {
         let parsed =
@@ -497,30 +483,31 @@ pub mod wasm {
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::str::FromStr;
-    use utils_misc::{convert_from_jstrvec, ok_or_jserr};
+    use utils_misc::convert_from_jstrvec;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
-    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsValue> {
+    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsError> {
         convert_from_jstrvec!(cli_args, cli_str_args);
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into(),))?;
+        let string_envs =
+            serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into()).map_err(JsError::from)?;
 
         let mut env_map: HashMap<OsString, OsString> = HashMap::new();
         for (ref k, ref v) in string_envs {
             let key = OsString::from_str(k)
-                .or_else(|e| Err(format!("Could not convert key {} to OsString: {}", k, e.to_string())))?;
+                .map_err(|e| JsError::new(format!("Could not convert key {k} to OsString: {e}").as_str()))?;
             let value = OsString::from_str(v)
-                .or_else(|e| Err(format!("Could not convert value {} to OsString: {}", v, e.to_string())))?;
+                .map_err(|e| JsError::new(format!("Could not convert value {v} to OsString: {e}").as_str()))?;
 
             env_map.insert(key, value);
         }
 
-        let args = ok_or_jserr!(super::CliArgs::new_from(cli_str_args, env_map,))?;
+        let args = super::CliArgs::new_from(cli_str_args, env_map)?;
 
-        ok_or_jserr!(serde_wasm_bindgen::to_value(&args))
+        serde_wasm_bindgen::to_value(&args).map_err(JsError::from)
     }
 }
