@@ -12,7 +12,14 @@ const GET: Operation = [
       const ticket_price = await node.getTicketPrice()
       log(`retrieved ticket price ${ticket_price}`)
 
+      if (ticket_price === null) {
+        return res
+          .status(206)
+          .send({ status: STATUS_CODES.TICKET_PRICE_NOT_FOUND, error: 'Could not retrieve ticket price' })
+      }
+
       return res.status(200).send({price: ticket_price})
+      
     } catch (err) {
       return res
         .status(422)

@@ -540,8 +540,8 @@ mod native {
         }
 
         /// Get ticket price
-        pub async fn get_ticket_price(&self) -> errors::Result<U256> {
-            Ok(self.chain_api.ticket_price().await)
+        pub async fn get_ticket_price(&self) -> errors::Result<Option<U256>> {
+            Ok(self.chain_api.ticket_price().await?)
         }
 
         /// List of all accounts announced on the chain
@@ -1307,7 +1307,7 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen(js_name = getTicketPrice)]
-        pub async fn _get_ticket_price(&self) -> Result<U256, JsError>{
+        pub async fn _get_ticket_price(&self) -> Result<Option<U256>, JsError>{
             self.hopr.get_ticket_price().await.map_err(JsError::from)
         }
 
