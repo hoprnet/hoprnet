@@ -45,7 +45,7 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/cachix-action@v13
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -122,7 +122,7 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/cachix-action@v13
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
