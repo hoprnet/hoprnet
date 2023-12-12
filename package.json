@@ -21,7 +21,7 @@
     "reset": "rm -Rf packages/*/node_modules node_modules"
   },
   "devDependencies": {
-    "@types/node": "18",
+    "@types/node": "20",
     "prettier": "2.8.8",
     "solhint-community": "3.6.1",
     "ts-node": "10.9.1",
