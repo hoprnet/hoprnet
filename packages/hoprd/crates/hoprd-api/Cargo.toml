@@ -1,0 +1,32 @@
+[package]
+name = "hoprd-api"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "API server using the hopr-lib created HOPR node and exposing it using a HTTP REST API"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+async-std = { workspace = true, features = ["attributes"] }
+
+[dev-dependencies]
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = []
+wasm = [ "utils-log/wasm", "utils-misc/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
