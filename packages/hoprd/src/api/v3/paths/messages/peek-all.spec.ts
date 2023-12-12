@@ -52,6 +52,8 @@ describe('GET /messages/peek-all', function () {
     expect(res.body.messages[0].body).to.equal('hello world')
     expect(res.body.messages[0].receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(1)
+
+    await inbox.pop_all()
   })
 
   it('should return two messages when inbox contains 2 messages', async function () {
@@ -74,6 +76,8 @@ describe('GET /messages/peek-all', function () {
     expect(res.body.messages[1].body).to.equal('hello world 2')
     expect(res.body.messages[1].receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(2)
+
+    await inbox.pop_all()
   })
 
   it('should return nothing when other inbox is not empty', async function () {
@@ -89,5 +93,7 @@ describe('GET /messages/peek-all', function () {
     expect(res.status).to.equal(200)
     expect(res.body.messages.length).to.equal(0)
     expect(await inbox.size(tag)).to.equal(1)
+
+    await inbox.pop_all()
   })
 })

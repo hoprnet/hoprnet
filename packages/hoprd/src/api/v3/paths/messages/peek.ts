@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-const GET: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const tag: number = req.body.tag
     const msg = await req.context.inbox.peek(tag)
@@ -17,7 +17,7 @@ const GET: Operation = [
   }
 ]
 
-GET.apiDoc = {
+POST.apiDoc = {
   description: 'Get oldest message currently present in the nodes message inbox.',
   tags: ['Messages'],
   operationId: 'messagesPeekMessage',
@@ -74,4 +74,4 @@ GET.apiDoc = {
   }
 }
 
-export default { GET }
+export default { POST }

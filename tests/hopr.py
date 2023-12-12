@@ -334,7 +334,7 @@ class HoprdAPI:
         """
 
         body = MessagesPopBody(tag=tag)
-        _, response = self.__call_api(MessagesApi, "messages_peek_all_messages", body=body)
+        _, response = self.__call_api(MessagesApi, "messages_peek_all_message", body=body)
         return response
 
     async def tickets_redeem(self):

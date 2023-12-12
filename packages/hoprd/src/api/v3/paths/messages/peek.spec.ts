@@ -50,6 +50,8 @@ describe('GET /messages/peek', function () {
     expect(res.body.body).to.equal('hello world')
     expect(res.body.receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(1)
+
+    await inbox.pop_all()
   })
 
   it('should return nothing when other inbox is not empty', async function () {
@@ -64,5 +66,7 @@ describe('GET /messages/peek', function () {
     const res = await request(service).post(`/api/v3/messages/peek`).send({ tag: otherTag })
     expect(res.status).to.equal(404)
     expect(await inbox.size(tag)).to.equal(1)
+
+    await inbox.pop_all()
   })
 })

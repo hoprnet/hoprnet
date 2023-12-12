@@ -392,7 +392,13 @@ mod test {
             vec![0, 2, 1],
             rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
         );
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
         assert_eq!(3, rb.count(Some(1)).await);
+
+        rb.pop_all(None).await;
     }
 
     #[async_std::test]
@@ -410,7 +416,7 @@ mod test {
 
         assert_eq!(
             vec![0, 2, 1],
-            rb.pop_all(Some(1))
+            rb.peek_all(Some(1))
                 .await
                 .into_iter()
                 .map(|(d, _)| d)
@@ -418,7 +424,7 @@ mod test {
         );
         assert_eq!(3, rb.count(Some(1)).await);
         assert_eq!(2, rb.count(Some(2)).await);
-        assert_eq!(3, rb.count(None).await);
+        assert_eq!(6, rb.count(None).await);
     }
 
     #[async_std::test]

@@ -1,10 +1,11 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-const GET: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const tag = req.body.tag
     const msgs = await req.context.inbox.peek_all(tag)
+    
     const messages = msgs.map((msg) => {
       return {
         tag: msg.data.application_tag,
@@ -17,7 +18,7 @@ const GET: Operation = [
   }
 ]
 
-GET.apiDoc = {
+POST.apiDoc = {
   description: 'Get list of messages currently present in the nodes message inbox.',
   tags: ['Messages'],
   operationId: 'messagesPeekAllMessage',
@@ -80,4 +81,4 @@ GET.apiDoc = {
   }
 }
 
-export default { GET }
+export default { POST }
