@@ -5,7 +5,6 @@ import shutil
 import subprocess
 
 import pytest
-
 from hopr import HoprdAPI
 
 random_data = os.urandom(8)
@@ -16,7 +15,7 @@ LOCALHOST = "127.0.0.1"
 OPEN_CHANNEL_FUNDING_VALUE = "1000000000000000000000"
 
 TICKET_AGGREGATION_THRESHOLD = 100
-TICKET_PRICE_PER_HOP = 100
+TICKET_PRICE_PER_HOP = 100 # modified later using API call
 
 
 def pytest_addoption(parser):
@@ -154,9 +153,11 @@ def swarm7(request):
         )
         res.check_returncode()
         nodes = NODES.copy()
+
         for key in NODES.keys():
             port = NODES[key]["api_port"]
             nodes[key]["api"] = HoprdAPI(f"http://localhost:{port}", DEFAULT_API_TOKEN)
+
         yield nodes
     except Exception:
         logging.error("Creating a 7 node cluster from bash - FAILED")

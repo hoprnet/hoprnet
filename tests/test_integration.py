@@ -154,7 +154,7 @@ def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
 
-# NOTE: this test is first, ensuring that all tests following it have ensured connectivity
+# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and correct ticket price from api
 @pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
@@ -175,6 +175,14 @@ async def test_hoprd_swarm_connectivity(swarm7):
             for k in default_nodes()
         ]
     )
+
+    ticket_price = await random.choice(list(swarm7.values()))["api"].ticket_price()
+    if ticket_price is not None:
+        global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
+        TICKET_PRICE_PER_HOP = ticket_price
+        AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
+    else:
+        print("Could not get ticket price from API, using default value")   
 
 
 def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
@@ -296,7 +304,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 )
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(src, dest, swarm7):
     hopr_amount = OPEN_CHANNEL_FUNDING_VALUE
-
+    
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src]["api"].balances()
 
@@ -672,4 +680,5 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
 async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
     price = await swarm7[peer]["api"].ticket_price()
 
-    assert price == TICKET_PRICE_PER_HOP
+    assert isinstance(price, int)
+    assert price > 0
