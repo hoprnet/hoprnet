@@ -31,11 +31,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike};
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -551,7 +547,6 @@ impl PacketActions {
 }
 
 /// Configuration parameters for the packet interaction.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
@@ -560,9 +555,7 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PacketInteractionConfig {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),

@@ -128,7 +128,7 @@ impl Hopr {
             panic!("Announce option should be turned ON in Providence, only public nodes are supported");
         }
 
-        let multiaddress = match cfg.host.address() {
+        let multiaddress = match &cfg.host.address {
             core_transport::config::HostType::IPv4(ip) => {
                 Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), cfg.host.port).as_str()).unwrap()
             }

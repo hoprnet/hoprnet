@@ -35,10 +35,3 @@ pub enum CryptoError {
 }
 
 pub type Result<T> = core::result::Result<T, CryptoError>;
-
-#[cfg(feature = "wasm")]
-impl From<CryptoError> for wasm_bindgen::JsValue {
-    fn from(value: CryptoError) -> Self {
-        value.to_string().into()
-    }
-}

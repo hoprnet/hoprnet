@@ -31,10 +31,3 @@ pub enum ProtocolError {
 }
 
 pub type Result<T> = core::result::Result<T, ProtocolError>;
-
-#[cfg(feature = "wasm")]
-impl From<ProtocolError> for wasm_bindgen::JsValue {
-    fn from(value: ProtocolError) -> Self {
-        value.to_string().into()
-    }
-}

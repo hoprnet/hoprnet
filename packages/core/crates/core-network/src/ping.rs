@@ -6,13 +6,10 @@ use libp2p_identity::PeerId;
 
 use utils_log::{debug, error, info};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
 use crate::messaging::ControlMessage;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
@@ -49,22 +46,10 @@ pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub timeout: u64, // `Duration` -> should be in millis,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl PingConfig {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(max_parallel_pings: usize, timeout: u64) -> Self {
-        Self {
-            max_parallel_pings,
-            timeout,
-        }
-    }
+    pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
@@ -200,7 +185,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                 .await;
 
             let remaining_time = current_timestamp() - start_all_peers;
-            if (remaining_time as u128) < self.config.timeout as u128 {
+            if (remaining_time as u128) < self.config.timeout.as_millis() {
                 while let Some(peer) = waiting.pop_front() {
                     if !active_pings.contains_key(&peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -231,7 +216,7 @@ mod tests {
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            timeout: 150, //Duration::from_millis(150),
+            timeout: std::time::Duration::from_millis(150),
         }
     }
 
@@ -314,8 +299,10 @@ mod tests {
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peer = PeerId::random();
-        let mut ping_config = simple_ping_config();
-        ping_config.timeout = 0;
+        let ping_config = PingConfig {
+            timeout: std::time::Duration::from_millis(0),
+            ..simple_ping_config()
+        };
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
@@ -334,7 +321,7 @@ mod tests {
             };
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
+        let mut pinger = Ping::new(ping_config, tx, rx, mock);
         futures::join!(pinger.ping(vec![peer.clone()]), timeout_single_use_channel);
     }
 

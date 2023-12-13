@@ -31,17 +31,8 @@ use utils_types::{
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use futures::stream::FuturesUnordered;
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
+use async_std::task::{sleep, spawn_local};
 
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;

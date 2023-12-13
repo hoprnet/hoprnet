@@ -111,12 +111,10 @@ mod arrays {
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct CurvePoint {
     affine: AffinePoint,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl CurvePoint {
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
@@ -226,12 +224,10 @@ impl CurvePoint {
 /// Natural extension of the Curve Point to the Proof-of-Relay challenge.
 /// Proof-of-Relay challenge is a secp256k1 curve point.
 #[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Challenge {
     pub curve_point: CurvePoint,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Challenge {
     /// Converts the PoR challenge to an Ethereum challenge.
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
@@ -295,7 +291,6 @@ impl BinarySerializable for Challenge {
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
 /// itself does not validate nor enforce this fact,
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKey {
     hkey: [u8; Self::SIZE],
 }
@@ -315,9 +310,7 @@ impl Default for HalfKey {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HalfKey {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(half_key: &[u8]) -> Self {
         assert_eq!(half_key.len(), Self::SIZE, "invalid length");
         let mut ret = Self::default();
@@ -361,7 +354,6 @@ impl BinarySerializable for HalfKey {
 /// Half-key challenge is equivalent to a secp256k1 curve point.
 /// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKeyChallenge {
     #[serde(with = "arrays")]
     hkc: [u8; Self::SIZE],
@@ -385,9 +377,7 @@ impl Default for HalfKeyChallenge {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HalfKeyChallenge {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(half_key_challenge: &[u8]) -> Self {
         assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
         let mut ret = Self::default();
@@ -435,7 +425,6 @@ impl From<HalfKey> for HalfKeyChallenge {
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
     hash: [u8; Self::SIZE],
 }
@@ -461,9 +450,7 @@ impl Display for Hash {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(hash: &[u8]) -> Self {
         assert_eq!(hash.len(), Self::SIZE, "invalid length");
         let mut ret = Hash::default();
@@ -537,7 +524,6 @@ impl From<primitive_types::H256> for Hash {
 
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
 }
@@ -620,13 +606,11 @@ impl From<&OffchainPublicKey> for MontgomeryPoint {
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
     key: elliptic_curve::PublicKey<Secp256k1>,
     pub(crate) compressed: EncodedPoint<Secp256k1>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
@@ -971,7 +955,6 @@ impl VrfParameters {
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
     response: [u8; Self::SIZE],
 }
@@ -997,9 +980,7 @@ impl std::fmt::Display for Response {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Response {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
         let mut ret = Self::default();
@@ -1049,12 +1030,10 @@ impl BinarySerializable for Response {
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainSignature {
     signature: ed25519_dalek::Signature,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         // Expand the SK from the given keypair
@@ -1110,16 +1089,13 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
     #[serde(with = "arrays")]
     signature: [u8; Self::SIZE],
     recovery: u8,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Signature {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
         assert_eq!(raw_bytes.len(), Self::SIZE, "invalid length");
         assert!(recovery <= 1, "invalid recovery bit");
@@ -1705,423 +1681,5 @@ pub mod tests {
         assert!(vrf_values
             .verify(&keypair.public().to_address(), &test_msg, &Hash::default().to_bytes())
             .is_ok());
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use js_sys::Uint8Array;
-    use k256::ecdsa::VerifyingKey;
-    use sha3::{digest::DynDigest, Keccak256};
-    use std::str::FromStr;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
-    use wasm_bindgen::prelude::*;
-
-    use crate::types::{
-        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
-        Response, Signature,
-    };
-
-    #[wasm_bindgen]
-    impl CurvePoint {
-        #[wasm_bindgen(js_name = "from_exponent")]
-        pub fn _from_exponent(exponent: &[u8]) -> JsResult<CurvePoint> {
-            ok_or_jserr!(Self::from_exponent(exponent))
-        }
-
-        #[wasm_bindgen(js_name = "from_str")]
-        pub fn _from_str(str: &str) -> JsResult<CurvePoint> {
-            ok_or_jserr!(Self::from_str(str))
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(bytes: &[u8]) -> JsResult<CurvePoint> {
-            ok_or_jserr!(Self::from_bytes(bytes))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "serialize_compressed")]
-        pub fn _serialize_compressed(&self) -> Box<[u8]> {
-            self.serialize_compressed()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &CurvePoint) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            *self
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Challenge {
-        #[wasm_bindgen(js_name = "from_hint_and_share")]
-        pub fn _from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> JsResult<Challenge> {
-            ok_or_jserr!(Self::from_hint_and_share(own_share, hint))
-        }
-
-        #[wasm_bindgen(js_name = "from_own_share_and_half_key")]
-        pub fn _from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> JsResult<Challenge> {
-            ok_or_jserr!(Self::from_own_share_and_half_key(own_share, half_key))
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Challenge> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl HalfKey {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKey> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &HalfKey) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl HalfKeyChallenge {
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &HalfKeyChallenge) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "from_str")]
-        pub fn _from_str(str: &str) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(Self::from_str(str))
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(HalfKeyChallenge::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            *self
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Hash {
-        #[wasm_bindgen(js_name = "create")]
-        pub fn _create(inputs: Vec<Uint8Array>) -> Self {
-            let mut hash = Keccak256::default();
-            inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
-
-            let mut ret = Hash {
-                hash: [0u8; Self::SIZE],
-            };
-            hash.finalize_into(&mut ret.hash).unwrap();
-            ret
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Hash> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Hash) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            *self
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl OffchainPublicKey {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(bytes: &[u8]) -> JsResult<OffchainPublicKey> {
-            ok_or_jserr!(OffchainPublicKey::from_bytes(bytes))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "from_peerid_str")]
-        pub fn _from_peerid_str(peer_id: &str) -> JsResult<OffchainPublicKey> {
-            ok_or_jserr!(OffchainPublicKey::from_peerid_str(peer_id))
-        }
-
-        #[wasm_bindgen(js_name = "to_peerid_str")]
-        pub fn _to_peerid_str(&self) -> String {
-            self.to_peerid_str()
-        }
-
-        #[wasm_bindgen(js_name = "from_privkey")]
-        pub fn _from_privkey(private_key: &[u8]) -> JsResult<OffchainPublicKey> {
-            ok_or_jserr!(OffchainPublicKey::from_privkey(private_key))
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &OffchainPublicKey) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct KeyPair {
-        pub private: Box<[u8]>,
-        pub public: PublicKey,
-    }
-
-    #[wasm_bindgen]
-    impl PublicKey {
-        #[wasm_bindgen(js_name = "random_keypair")]
-        pub fn _random_keypair() -> KeyPair {
-            let (private, public) = Self::random_keypair();
-            KeyPair {
-                private: private.into(),
-                public,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
-            ok_or_jserr!(PublicKey::from_bytes(bytes))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self, compressed: bool) -> Box<[u8]> {
-            self.to_bytes(compressed)
-        }
-
-        #[wasm_bindgen(js_name = "from_signature")]
-        pub fn _from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> JsResult<PublicKey> {
-            ok_or_jserr!(PublicKey::from_raw_signature(
-                hash,
-                r,
-                s,
-                v,
-                VerifyingKey::recover_from_msg
-            ))
-        }
-
-        #[wasm_bindgen(js_name = "from_privkey")]
-        pub fn _from_privkey(private_key: &[u8]) -> JsResult<PublicKey> {
-            ok_or_jserr!(PublicKey::from_privkey(private_key))
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &PublicKey) -> bool {
-            self.eq(other)
-        }
-
-        pub fn size_compressed() -> u32 {
-            Self::SIZE_COMPRESSED as u32
-        }
-
-        pub fn size_uncompressed() -> u32 {
-            Self::SIZE_UNCOMPRESSED as u32
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Response {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
-            ok_or_jserr!(Response::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "from_half_keys")]
-        pub fn _from_half_keys(first: &HalfKey, second: &HalfKey) -> JsResult<Response> {
-            ok_or_jserr!(Response::from_half_keys(first, second))
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Signature {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(signature: &[u8]) -> JsResult<Signature> {
-            ok_or_jserr!(Signature::from_bytes(signature))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    impl OffchainSignature {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(signature: &[u8]) -> JsResult<OffchainSignature> {
-            ok_or_jserr!(OffchainSignature::from_bytes(signature))
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
     }
 }

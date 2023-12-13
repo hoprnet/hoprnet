@@ -28,21 +28,13 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
-#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
 
 /// Configuration of the Heartbeat
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync
@@ -51,18 +43,6 @@ pub struct HeartbeatConfig {
     pub interval: u64,
     /// The maximum number of concurrent heartbeat pings
     pub threshold: u64,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl HeartbeatConfig {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(variance: u64, interval: u64, threshold: u64) -> HeartbeatConfig {
-        HeartbeatConfig {
-            variance,
-            interval,
-            threshold,
-        }
-    }
 }
 
 impl Default for HeartbeatConfig {

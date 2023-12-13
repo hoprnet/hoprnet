@@ -31,10 +31,3 @@ pub enum PathError {
 }
 
 pub type Result<T> = std::result::Result<T, PathError>;
-
-#[cfg(feature = "wasm")]
-impl From<PathError> for wasm_bindgen::JsValue {
-    fn from(value: PathError) -> Self {
-        value.to_string().into()
-    }
-}

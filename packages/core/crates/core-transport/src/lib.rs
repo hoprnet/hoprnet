@@ -81,11 +81,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
 use {async_std::task::sleep, utils_misc::time::native::current_timestamp};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use {gloo_timers::future::sleep, utils_misc::time::wasm::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,
@@ -133,7 +129,7 @@ pub fn build_manual_ping(
 
     let ping_cfg = PingConfig {
         max_parallel_pings: constants::MAX_PARALLEL_PINGS,
-        timeout: cfg.heartbeat.timeout().as_millis() as u64,
+        timeout: cfg.heartbeat.timeout,
     };
 
     // manual ping explicitly called by the API
@@ -198,7 +194,7 @@ pub fn build_heartbeat(
 
     let ping_cfg = PingConfig {
         max_parallel_pings: constants::MAX_PARALLEL_PINGS,
-        timeout: proto_cfg.heartbeat.timeout().as_millis() as u64,
+        timeout: proto_cfg.heartbeat.timeout,
     };
 
     let hb_pinger = Ping::new(
@@ -229,7 +225,6 @@ impl ChannelEventEmitter {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
     pub losing: u32,
