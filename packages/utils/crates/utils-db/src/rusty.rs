@@ -83,6 +83,20 @@ impl RustyLevelDbShim {
         }
     }
 
+    pub fn new(path: &str, create_if_missing: bool) -> Self {
+        let opts = rusty_leveldb::Options {
+            create_if_missing,
+            error_if_exists: false,
+            ..rusty_leveldb::Options::default()
+        };
+
+        Self {
+            db: Arc::new(Mutex::new(
+                rusty_leveldb::DB::open(path, opts).expect("failed to create DB"),
+            )),
+        }
+    }
+
     #[cfg(feature = "wasm")]
     pub fn new_in_memory() -> Self {
         Self {

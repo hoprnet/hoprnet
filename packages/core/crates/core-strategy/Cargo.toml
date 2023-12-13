@@ -57,5 +57,6 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
+default = ["prometheus"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures" ]
 prometheus = [ "dep:utils-metrics" ]

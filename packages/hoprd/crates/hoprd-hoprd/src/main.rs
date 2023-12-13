@@ -4,58 +4,171 @@ pub mod config;
 pub mod errors;
 pub mod token;
 
-fn main() {
-    let num = 10;
-}
+use std::{sync::Arc, time::SystemTime, path::Path};
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    // Temporarily re-export crates
+use async_lock::RwLock;
+use chrono::{DateTime, Utc};
 
-    #[allow(unused_imports)]
-    use core_network::network::wasm::*;
+use core_transport::HalfKeyChallenge;
+use hoprd_keypair::key_pair::{IdentityOptions, HoprKeys};
+use utils_log::{info, warn};
+use utils_types::traits::{PeerIdLike, ToHex};
+use crate::cli::CliArgs;
 
-    #[allow(unused_imports)]
-    use core_ethereum_db::db::wasm::*;
 
-    #[allow(unused_imports)]
-    use hoprd_inbox::inbox::wasm::*;
+const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
-    #[allow(unused_imports)]
-    use hoprd_keypair::key_pair::wasm::*;
+    // export function removeAllInPath(target: string) {
+    //   const p = path.normalize(target)
+    //   rmSync(p, { recursive: true, force: true })
+    // }
 
-    use utils_log::logger::wasm::JsLogger;
+    // function stopGracefully(signal) {
+    //   log(`Process exiting with signal ${signal}`)
+    //   process.exit()
+    // }
 
-    #[allow(unused_imports)]
-    use utils_misc::utils::wasm::*;
+    // process.on('uncaughtExceptionMonitor', (err, origin) => {
+    //   // Make sure we get a log.
+    //   log(`FATAL ERROR, exiting with uncaught exception`, origin, err)
+    // })
 
-    #[allow(unused_imports)]
-    use utils_metrics::metrics::wasm::*;
+    // process.once('exit', stopGracefully)
+    // process.on('SIGINT', stopGracefully)
+    // process.on('SIGTERM', stopGracefully)
 
-    use wasm_bindgen::prelude::wasm_bindgen;
-    static LOGGER: JsLogger = JsLogger {};
-    #[allow(dead_code)]
-    #[wasm_bindgen]
-    pub fn hoprd_hoprd_initialize_crate() {
-        let _ = JsLogger::install(&LOGGER, None);
+    // // Metrics
+    // const metric_latency = create_histogram_with_buckets(
+    //   'hoprd_histogram_message_latency_ms',
+    //   'Histogram of measured received message latencies',
+    //   new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
+    // )
 
-        // When the `console_error_panic_hook` feature is enabled, we can call the
-        // `set_panic_hook` function at least once during initialization, and then
-        // we will get better error messages if our code ever panics.
-        //
-        // For more details see
-        // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = <CliArgs as clap::Parser>::parse();
+
+    // TODO: remove the dry run
+    if ! args.dry_run {
+        info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
+        
+        if std::env::var("DAPPNODE").map(|v| v.to_lowercase() == "true").unwrap_or(false) {
+            info!("The HOPRd node appears to run on DappNode");
+        }
+
+        let cfg = config::HoprdConfig::from_cli_args(args, false)?;
+        info!("Node configuration: {}", cfg.as_redacted_string()?);
+
+        // Find or create an identity
+        let identity_opts = IdentityOptions {
+            initialize: cfg.hopr.db.initialize,
+            id_path: cfg.identity.file.clone(),
+            password: cfg.identity.password.clone(),
+            use_weak_crypto: Some(cfg.test.use_weak_crypto),
+            private_key: cfg.identity.private_key.clone().and_then(|v| cli::parse_private_key(&v).ok()),
+        };
+
+        let hopr_keys = HoprKeys::init(identity_opts)?;
+
+        info!("This node has packet key '{}' and uses a blockchain address '{}'",
+            core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+            core_transport::Keypair::public(&hopr_keys.chain_key).to_hex()
+        );
+
+        if core_transport::Keypair::public(&hopr_keys.packet_key).to_string().starts_with("0xff") {
+            warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
+        }
+
+        // Create the message inbox
+        let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
+            std::time::Duration::from_millis(utils_misc::time::native::current_timestamp())
+        })));
+
+        let inbox_clone = inbox.clone();
+        let on_message = move |data: core_transport::ApplicationData| {
+            let now = Into::<DateTime<Utc>>::into(SystemTime::now()).to_rfc3339();
+            info!("#### NODE RECEIVED MESSAGE [{now}] ####");
+            let ingress = inbox_clone.clone();
+
+            //         let decodedMsg = decodeMessage(data.plain_text)
+            //         log(`Message: ${decodedMsg.msg}`)
+            //         log(`App tag: ${data.application_tag ?? 0}`)
+            //         log(`Latency: ${decodedMsg.latency} ms`)
+            //         metric_latency.observe(decodedMsg.latency)
+
+            //         if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
+            //           log(`RPCh: received message [${decodedMsg.msg}]`)
+            //         }
+
+            async_std::task::spawn_local(async move {
+                ingress.write().await.push(data).await
+            });
+        };
+
+
+        let on_acknowledgement = |_ack: HalfKeyChallenge| {
+            // TODO: needed by the websockets? 
+        };
+
+        // Create the node instance
+        info!("Creating the HOPRd node instance from hopr-lib");
+        // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
+        // -> if safe address or module address is not provided, replace with values stored in the db
+        let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
+
+        let node = Arc::new(RwLock::new(hopr_lib::Hopr::new(
+            hoprlib_cfg,
+            &hopr_keys.packet_key,
+            &hopr_keys.chain_key,
+            on_message,
+            on_acknowledgement
+        )));
+
+        // setup API endpoint
+        if cfg.api.enable {
+            info!("Creating HOPRd API database");
+
+            let hoprd_db_path = Path::new(&cfg.hopr.db.data).join("db").join("hoprd")
+                .into_os_string()
+                .into_string()
+                .map_err(|_| errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
+            
+            let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
+                utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
+            ))));
+        }
+
+        // TODO: should be executed in the background as separate tasks
+        let loops = node.write().await.run().await?;
+
+        // Show onboarding information
+        let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
+        let my_peer_id = core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid();
+        let version = hopr_lib::constants::APP_VERSION;
+            
+        while ! node.read().await.is_allowed_to_access_network(&my_peer_id).await {
+            info!("
+                Node information:
+
+                Node peerID: {my_peer_id}
+                Node address: {my_address}
+                Node version: {version}
+
+                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
+            ");
+
+            async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+        }
+
+        info!("
+            Node information:
+
+            Node peerID: {my_peer_id}
+            Node address: {my_address}
+            Node version: {version}
+        ");
     }
 
-    #[wasm_bindgen]
-    pub fn hoprd_hoprd_gather_metrics() -> JsResult<String> {
-        utils_metrics::metrics::wasm::gather_all_metrics()
-    }
-
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    Ok(())
 }

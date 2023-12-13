@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
+default = ["prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "dep:js-sys", "dep:serde-wasm-bindgen",

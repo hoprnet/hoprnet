@@ -71,9 +71,6 @@ pub struct ChainOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
-    // TODO: why would this be needed in the non-wasm setup?
-    /// number of follow-on blocks required until a block is considered confirmed on-chain
-    pub confirmations: u32,
     pub tags: Option<Vec<String>>,
 }
 
@@ -342,7 +339,6 @@ type ActiveTxExecutor = EthereumTransactionExecutor<
     SafePayloadGenerator,
 >;
 
-#[cfg(feature = "wasm")]
 pub fn build_chain_components<Db>(
     me_onchain: &ChainKeypair,
     chain_config: ChainNetworkConfig,

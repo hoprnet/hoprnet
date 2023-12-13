@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_std::sync::RwLock;
-use futures::{Future, StreamExt};
+use futures::Future;
 
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -41,10 +41,7 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    std::str::FromStr,
-    utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
-};
+use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -73,13 +70,23 @@ pub enum State {
     Running = 4,
 }
 
-// #[cfg(any(not(feature = "wasm"), test))]
-// pub use native::Hopr;
+#[cfg(any(not(feature = "wasm"), test))]
+pub use native::Hopr;
 
 #[cfg(all(feature = "wasm", not(test)))]
 pub use wasm_impl::Hopr;
 
-#[cfg(feature = "wasm")]
+pub struct OpenChannelResult {
+    pub tx_hash: Hash,
+    pub channel_id: Hash,
+}
+
+pub struct CloseChannelResult {
+    pub tx_hash: Hash,
+    pub status: core_types::channels::ChannelStatus,
+}
+
+
 pub mod native {
     use crate::chain::SmartContractConfig;
     use crate::config::SafeModule;
@@ -95,12 +102,11 @@ pub mod native {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
+    use std::str::FromStr;
     use std::time::Duration;
     use utils_db::db::DB;
     use utils_log::debug;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
-
-    use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
     use super::*;
 
@@ -124,8 +130,6 @@ pub mod native {
             mut cfg: config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
-            my_addresses: Vec<Multiaddr>,
-            chain_config: ChainNetworkConfig,
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self
@@ -138,6 +142,19 @@ pub mod native {
             if !cfg.chain.announce {
                 panic!("Announce option should be turned ON in Providence, only public nodes are supported");
             }
+
+            let multiaddress = match cfg.host.address() {
+                core_transport::config::HostType::IPv4(ip) => {
+                    Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), cfg.host.port).as_str()).unwrap()
+                }
+                core_transport::config::HostType::Domain(domain) => {
+                    Multiaddr::from_str(format!("/dns4/{}/tcp/{}", domain.as_str(), cfg.host.port).as_str()).unwrap()
+                }
+            };
+
+            let chain_config =
+                chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.clone().as_deref())
+                    .expect("Valid configuration leads to a valid network");
 
             let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG])
                 .expect("Could not create a db storage path");
@@ -201,7 +218,7 @@ pub mod native {
                 on_received,
                 tbf,
                 save_tbf,
-                my_addresses,
+                vec![multiaddress],
             );
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -788,6 +805,7 @@ pub mod native {
 pub mod wasm_impl {
     use super::*;
 
+    use futures::StreamExt;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use js_sys::{Array, JsString};
     use serde::{Deserialize, Serialize};
@@ -1468,19 +1486,6 @@ pub mod wasm_impl {
             self.msg_emitter.delegate_on(event, callback)
         }
     }
-
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct OpenChannelResult {
-        pub tx_hash: Hash,
-        pub channel_id: Hash,
-    }
-
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct CloseChannelResult {
-        pub tx_hash: Hash,
-        pub status: core_types::channels::ChannelStatus,
-    }
-
     #[wasm_bindgen]
     impl WasmHealth {
         #[wasm_bindgen(js_name = green)]
@@ -1493,19 +1498,20 @@ pub mod wasm_impl {
             self.h
         }
     }
-}
 
-/// Wrapper object necessary for async wasm function return value
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct WasmHealth {
-    h: Health,
-}
+    /// Wrapper object necessary for async wasm function return value
+    #[wasm_bindgen]
+    pub struct WasmHealth {
+        h: Health,
+    }
 
-impl From<Health> for WasmHealth {
-    fn from(value: Health) -> Self {
-        Self { h: value }
+    impl From<Health> for WasmHealth {
+        fn from(value: Health) -> Self {
+            Self { h: value }
+        }
     }
 }
+
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

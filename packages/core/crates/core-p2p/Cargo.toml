@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = []
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom",
     "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",

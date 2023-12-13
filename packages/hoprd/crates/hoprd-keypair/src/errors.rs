@@ -45,10 +45,3 @@ pub enum KeyPairError {
 }
 
 pub type Result<T> = core::result::Result<T, KeyPairError>;
-
-#[cfg(feature = "wasm")]
-impl From<KeyPairError> for wasm_bindgen::JsValue {
-    fn from(value: KeyPairError) -> Self {
-        value.to_string().into()
-    }
-}

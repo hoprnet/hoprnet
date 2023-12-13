@@ -465,33 +465,6 @@ impl Debug for HoprKeys {
     }
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::IdentityOptions;
-    use crate::key_pair::HoprKeys;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl HoprKeys {
-        #[wasm_bindgen(constructor)]
-        pub fn _random() -> Self {
-            HoprKeys::random()
-        }
-
-        #[wasm_bindgen(js_name = "init")]
-        pub fn _init(identity_options: IdentityOptions) -> JsResult<HoprKeys> {
-            ok_or_jserr!(HoprKeys::init(identity_options))
-        }
-
-        #[wasm_bindgen(js_name = "id")]
-        pub fn _id(&self) -> String {
-            self.id.to_string()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;

@@ -8,9 +8,6 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 proc-macro-regex = "~1.1.0"
 
@@ -25,5 +22,5 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["wasm"]
+default = []
 wasm = []
