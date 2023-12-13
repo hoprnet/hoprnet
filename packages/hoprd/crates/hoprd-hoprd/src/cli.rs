@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-use std::ffi::OsString;
 use std::str::FromStr;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
-use clap::{ArgAction, Args, Command, FromArgMatches as _};
+use clap::{ArgAction, Parser};
 use core_strategy::Strategy;
 use core_transport::config::HostConfig;
 use hex;
@@ -14,7 +12,13 @@ use strum::VariantNames;
 #[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use {utils_validation::network::wasm::is_dns_address, wasm_bindgen::JsError};
+use {
+    std::collections::HashMap,
+    std::ffi::OsString,
+    clap::{Command, FromArgMatches as _},
+    utils_validation::network::wasm::is_dns_address,
+    wasm_bindgen::JsError
+};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -80,8 +84,8 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 /// Takes all CLI arguments whose structure is known at compile-time.
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
-#[derive(Serialize, Deserialize, Args, Clone)]
-#[command(about = "HOPRd")]
+#[derive(Serialize, Deserialize, Clone, Parser)]
+#[command(author, version, about, long_about = None)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
     /// Network the node will operate in
@@ -394,26 +398,6 @@ pub struct CliArgs {
     pub health_check_port: Option<u16>,
 }
 
-#[cfg(feature = "wasm")]
-impl CliArgs {
-    /// Creates a new instance using custom cli_args and custom network variables
-    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, wasm_bindgen::JsError> {
-        let mut cmd = Command::new("hoprd")
-            .about("HOPRd")
-            .bin_name("index.cjs")
-            .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-            .version(hopr_lib::constants::APP_VERSION_COERCED);
-
-        cmd = Self::augment_args(cmd);
-
-        cmd.update_env_from(env_vars);
-
-        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(JsError::from)?;
-
-        Self::from_arg_matches(&derived_matches).map_err(wasm_bindgen::JsError::from)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -474,40 +458,5 @@ mod tests {
             parsed,
             "Given string is not a private key. A private key must contain 128 hex chars."
         )
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use js_sys::JsString;
-    use std::collections::HashMap;
-    use std::ffi::OsString;
-    use std::str::FromStr;
-    use utils_misc::convert_from_jstrvec;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen]
-    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsError> {
-        convert_from_jstrvec!(cli_args, cli_str_args);
-
-        // wasm_bindgen receives Strings but to
-        // comply with Rust standard, turn them into OsStrings
-        let string_envs =
-            serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into()).map_err(JsError::from)?;
-
-        let mut env_map: HashMap<OsString, OsString> = HashMap::new();
-        for (ref k, ref v) in string_envs {
-            let key = OsString::from_str(k)
-                .map_err(|e| JsError::new(format!("Could not convert key {k} to OsString: {e}").as_str()))?;
-            let value = OsString::from_str(v)
-                .map_err(|e| JsError::new(format!("Could not convert value {v} to OsString: {e}").as_str()))?;
-
-            env_map.insert(key, value);
-        }
-
-        let args = super::CliArgs::new_from(cli_str_args, env_map)?;
-
-        serde_wasm_bindgen::to_value(&args).map_err(JsError::from)
     }
 }

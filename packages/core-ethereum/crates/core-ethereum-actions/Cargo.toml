@@ -51,7 +51,7 @@ hex-literal = "0.4"
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["wasm"]
+default = ["prometheus"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]

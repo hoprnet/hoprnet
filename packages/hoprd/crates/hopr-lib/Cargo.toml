@@ -60,7 +60,7 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
+default = ["prometheus"]
 wasm = [
     "dep:js-sys",
     "dep:gloo-timers",
@@ -83,5 +83,5 @@ wasm = [
     "utils-misc/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics"]
+prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics", "dep:utils-misc", ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

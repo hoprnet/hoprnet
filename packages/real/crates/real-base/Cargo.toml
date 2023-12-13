@@ -13,7 +13,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [features]
-default = [ "wasm" ]
+default = []
 wasm = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
 
 [dependencies]

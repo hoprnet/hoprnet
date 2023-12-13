@@ -257,16 +257,16 @@ use real_base::file::wasm::read_to_string;
 
 use utils_log::debug;
 
-use crate::errors::HoprdConfigError;
+use crate::errors::HoprdError;
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
             debug!("fetching configuration from file {cfg_path}");
             let yaml_configuration = read_to_string(cfg_path.as_str())
-                .map_err(|e| crate::errors::HoprdConfigError::FileError(e.to_string()))?;
+                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
-                .map_err(|e| crate::errors::HoprdConfigError::SerializationError(e.to_string()))?
+                .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
             debug!("loading default configuration");
             HoprdConfig::default()
@@ -303,7 +303,7 @@ impl HoprdConfig {
         };
         if let Some(x) = cli_args.api_host {
             cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), DEFAULT_API_PORT).as_str())
-                .map_err(crate::errors::HoprdConfigError::ValidationError)?;
+                .map_err(crate::errors::HoprdError::ValidationError)?;
         }
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -365,93 +365,56 @@ impl HoprdConfig {
         };
         if let Some(x) = cli_args.safe_address {
             cfg.hopr.safe_module.safe_address =
-                Address::from_str(&x).map_err(|e| HoprdConfigError::ValidationError(e.to_string()))?
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
         };
         if let Some(x) = cli_args.module_address {
             cfg.hopr.safe_module.module_address =
-                Address::from_str(&x).map_err(|e| HoprdConfigError::ValidationError(e.to_string()))?
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
         };
 
         // test
         cfg.test.use_weak_crypto = cli_args.test_use_weak_crypto;
+
+        // additional updates
+        let home_symbol = '~';
+        if cfg.hopr.db.data.starts_with(home_symbol) {
+            cfg.hopr.db.data = std::env::home_dir().map(|h| h.as_path().display().to_string()).expect("home dir for a user must be specified") + &cfg.hopr.db.data[1..];
+        }
+        if cfg.identity.file.starts_with(home_symbol) {
+            cfg.identity.file = std::env::home_dir().map(|h| h.as_path().display().to_string()).expect("home dir for a user must be specified") + &cfg.identity.file[1..];
+        }
 
         if skip_validation {
             Ok(cfg)
         } else {
             match cfg.validate() {
                 Ok(_) => Ok(cfg),
-                Err(e) => Err(crate::errors::HoprdConfigError::ValidationError(e.to_string())),
+                Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
             }
         }
     }
-}
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::config::HoprdConfig;
-    use hopr_lib::config::HoprLibConfig;
-    use utils_misc::ok_or_jserr;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
+    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
+        let mut redacted_cfg = self.clone();
 
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(js_namespace = os)]
-        pub fn homedir() -> String;
-    }
-
-    #[wasm_bindgen]
-    impl HoprdConfig {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self::default()
-        }
-
-        #[wasm_bindgen]
-        pub fn as_redacted_string(&self) -> Result<String, JsValue> {
-            let mut redacted_cfg = self.clone();
-
-            // redacting sensitive information
-            match &mut redacted_cfg.api.auth {
-                crate::config::Auth::None => {}
-                crate::config::Auth::Token(_) => {
-                    redacted_cfg.api.auth = crate::config::Auth::Token("<REDACTED>".to_owned())
-                }
+        // redacting sensitive information
+        match &mut redacted_cfg.api.auth {
+            crate::config::Auth::None => {}
+            crate::config::Auth::Token(_) => {
+                redacted_cfg.api.auth = crate::config::Auth::Token("<REDACTED>".to_owned())
             }
-            if redacted_cfg.identity.private_key.is_some() {
-                redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
-            }
-
-            if redacted_cfg.identity.private_key.is_some() {
-                redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
-            }
-            redacted_cfg.identity.password = "<REDACTED>".to_owned();
-
-            ok_or_jserr!(serde_json::to_string(&redacted_cfg))
         }
-    }
-
-    #[wasm_bindgen]
-    pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsError> {
-        let args: crate::cli::CliArgs =
-            serde_wasm_bindgen::from_value(cli_args).map_err(|e| JsError::new(e.to_string().as_str()))?;
-        let mut cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| JsError::new(e.to_string().as_str()))?;
-
-        // replace the ~ in the path for a home paths
-        let home_symbol = '~';
-        if cfg.hopr.db.data.starts_with(home_symbol) {
-            cfg.hopr.db.data = homedir() + &cfg.hopr.db.data[1..];
-        }
-        if cfg.identity.file.starts_with(home_symbol) {
-            cfg.identity.file = homedir() + &cfg.identity.file[1..];
+        if redacted_cfg.identity.private_key.is_some() {
+            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
         }
 
-        Ok(cfg)
-    }
+        if redacted_cfg.identity.private_key.is_some() {
+            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+        }
+        redacted_cfg.identity.password = "<REDACTED>".to_owned();
 
-    #[wasm_bindgen]
-    pub fn to_hoprlib_config(cfg: &HoprdConfig) -> HoprLibConfig {
-        cfg.clone().into()
+        serde_json::to_string(&redacted_cfg)
+            .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
 }
 

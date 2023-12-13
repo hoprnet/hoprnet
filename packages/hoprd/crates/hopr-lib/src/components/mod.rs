@@ -67,7 +67,6 @@ impl std::fmt::Display for HoprLoopComponents {
 }
 
 /// Main builder of the hopr lib components
-#[cfg(feature = "wasm")]
 pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,

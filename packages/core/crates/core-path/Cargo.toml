@@ -44,7 +44,7 @@ tempfile = "3"
 wasm-bindgen-test = "0.3.36"
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["prometheus"]
 wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-metrics?/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

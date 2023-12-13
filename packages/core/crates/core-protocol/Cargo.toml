@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
+default = ["prometheus"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:gloo-timers",
     "core-crypto/wasm", "core-ethereum-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",

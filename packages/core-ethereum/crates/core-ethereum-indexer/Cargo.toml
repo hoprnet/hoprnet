@@ -50,7 +50,7 @@ mockall = "0.11"
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["prometheus"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-ethereum-rpc/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

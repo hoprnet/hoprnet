@@ -1,11 +1,11 @@
-use proc_macro_regex::regex;
-
-regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use proc_macro_regex::regex;
+
+    regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
+
     pub fn is_dns_address(s: &str) -> bool {
-        crate::network::is_dns_address_regex(s)
+        is_dns_address_regex(s)
     }
 }
 
@@ -21,18 +21,18 @@ pub mod native {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    #[cfg(feature = "wasm")]
     #[test]
     fn test_verify_valid_dns_addresses() {
-        assert!(is_dns_address_regex("localhost"));
-        assert!(is_dns_address_regex("hoprnet.org"));
-        assert!(is_dns_address_regex("hub.hoprnet.org"));
+        assert!(super::wasm::is_dns_address_regex("localhost"));
+        assert!(super::wasm::is_dns_address_regex("hoprnet.org"));
+        assert!(super::wasm::is_dns_address_regex("hub.hoprnet.org"));
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn test_verify_invalid_dns_addresses() {
-        assert!(!is_dns_address_regex(".org"));
-        assert!(!is_dns_address_regex("-hoprnet-.org"));
+        assert!(!super::wasm::is_dns_address_regex(".org"));
+        assert!(!super::wasm::is_dns_address_regex("-hoprnet-.org"));
     }
 }

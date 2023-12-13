@@ -38,62 +38,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprdPersist
     }
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::*;
-    use async_lock::RwLock;
-    use std::sync::Arc;
-    use utils_db::rusty::RustyLevelDbShim;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    pub struct HoprdPersistentDatabase {
-        inner: Arc<RwLock<HoprdPersistentDb<RustyLevelDbShim>>>,
-    }
-
-    #[wasm_bindgen]
-    impl HoprdPersistentDatabase {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(path: &str) -> Self {
-            Self {
-                inner: Arc::new(RwLock::new(HoprdPersistentDb::new(DB::new(
-                    utils_db::rusty::RustyLevelDbShim::new(path, true),
-                )))),
-            }
-        }
-
-        #[wasm_bindgen(js_name = newInMemory)]
-        pub fn _new_in_memory() -> Self {
-            Self {
-                inner: Arc::new(RwLock::new(HoprdPersistentDb::new(DB::new(
-                    utils_db::rusty::RustyLevelDbShim::new_in_memory(),
-                )))),
-            }
-        }
-
-        #[wasm_bindgen]
-        pub async fn store_authorization(&self, token: AuthorizationToken) -> Result<(), JsError> {
-            let data = self.inner.clone();
-            let mut db = data.write().await;
-            db.store_authorization(token).await.map_err(JsError::from)
-        }
-
-        #[wasm_bindgen]
-        pub async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>, JsError> {
-            let data = self.inner.clone();
-            let db = data.read().await;
-            db.retrieve_authorization(id).await.map_err(JsError::from)
-        }
-
-        #[wasm_bindgen]
-        pub async fn delete_authorization(&self, id: String) -> Result<(), JsError> {
-            let data = self.inner.clone();
-            let mut db = data.write().await;
-            db.delete_authorization(id).await.map_err(JsError::from)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use utils_db::rusty::RustyLevelDbShim;

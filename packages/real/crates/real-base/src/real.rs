@@ -19,7 +19,8 @@ pub fn satisfies(version: &str, range: &str) -> Result<bool> {
 
 #[cfg(not(feature = "wasm"))]
 pub fn satisfies(_version: &str, _range: &str) -> Result<bool> {
-    todo!("Implement native satisfies")
+    // TODO: The version check based on glob/basic or cases needs to be implemented
+    Ok(true)
 }
 
 #[cfg(feature = "wasm")]
