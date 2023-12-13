@@ -65,7 +65,8 @@ impl Default for SafeModule {
     }
 }
 
-fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
+#[allow(dead_code)]
+fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
         Ok(())
     } else {
@@ -76,7 +77,6 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
-    #[validate(custom = "validate_directory_path")]
     pub data: String,
     pub initialize: bool,
     pub force_initialize: bool,

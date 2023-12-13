@@ -31,7 +31,8 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-) where
+) -> Pin<Box<dyn futures::Future<Output = ()>>>
+where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + 'static,
     S: Stream<Item = SignificantChainEvent> + 'static,
 {
@@ -129,12 +130,16 @@ pub async fn spawn_refresh_process_for_chain_events<Db, S>(
 
         error!("The chain update process of HOPR objects should never stop")
     });
+
+    // TODO: placeholder for the async_std::task::spawn API
+    // This future will never resolve and immitate a running async task that can be joined
+    Box::pin(futures::future::pending())
 }
 
 /// Helper loop ensuring processing of winning acknowledge tickets
 pub fn spawn_ack_winning_ticket_handling(
     multi_strategy: Arc<MultiStrategy>,
-) -> futures::channel::mpsc::UnboundedSender<AcknowledgedTicket> {
+) -> (Pin<Box<dyn futures::Future<Output = ()>>>, futures::channel::mpsc::UnboundedSender<AcknowledgedTicket>) {
     let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
     spawn_local(async move {
         while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
@@ -143,11 +148,13 @@ pub fn spawn_ack_winning_ticket_handling(
         }
     });
 
-    on_ack_tkt_tx
+    // TODO: placeholder for the async_std::task::spawn API
+    // This future will never resolve and immitate a running async task that can be joined
+    (Box::pin(futures::future::pending()), on_ack_tkt_tx)
 }
 
 /// Helper loop ensuring enqueueing of transport events going out of the module
-pub fn spawn_transport_output<F1, F2>(mut rx: UnboundedReceiver<TransportOutput>, on_final_packet: F1, on_ack: F2)
+pub fn spawn_transport_output<F1, F2>(mut rx: UnboundedReceiver<TransportOutput>, on_final_packet: F1, on_ack: F2) -> Pin<Box<dyn futures::Future<Output = ()>>>
 where
     F1: Fn(ApplicationData) + 'static,
     F2: Fn(HalfKeyChallenge) + 'static,
@@ -160,4 +167,8 @@ where
             }
         }
     });
+
+    // TODO: placeholder for the async_std::task::spawn API
+    // This future will never resolve and immitate a running async task that can be joined
+    Box::pin(futures::future::pending())
 }

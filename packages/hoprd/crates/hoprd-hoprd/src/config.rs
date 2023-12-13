@@ -113,15 +113,6 @@ impl std::fmt::Debug for Identity {
     }
 }
 
-#[allow(dead_code)]
-fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
-    if std::path::Path::new(s).is_dir() {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Invalid directory path specified"))
-    }
-}
-
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Testing {
     pub use_weak_crypto: bool,
