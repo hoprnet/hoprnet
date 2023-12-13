@@ -1,6 +1,6 @@
 [package]
 name = "hoprd"
-version = "0.2.0"
+version = "2.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains the main entry point of HOPR daemon application"
@@ -13,7 +13,7 @@ async-std = { workspace = true, features = ["attributes"] }
 tokio = { version = "1.33", default-features = false }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
+clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
 futures = { workspace = true }
 hex = { workspace = true }
