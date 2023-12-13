@@ -31,11 +31,7 @@ use crate::errors::CoreEthereumActionsError::{
 };
 use crate::errors::Result;
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -119,7 +115,6 @@ type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmatio
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
 #[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {

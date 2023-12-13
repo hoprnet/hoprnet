@@ -58,10 +58,3 @@ pub enum CoreEthereumActionsError {
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;
-
-#[cfg(feature = "wasm")]
-impl From<CoreEthereumActionsError> for wasm_bindgen::JsValue {
-    fn from(value: CoreEthereumActionsError) -> Self {
-        value.to_string().into()
-    }
-}
