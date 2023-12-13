@@ -182,7 +182,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
         TICKET_PRICE_PER_HOP = ticket_price
         AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
     else:
-        print("Could not get ticket price from API, using default value")   
+        print("Could not get ticket price from API, using default value")
 
 
 def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
@@ -304,7 +304,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 )
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(src, dest, swarm7):
     hopr_amount = OPEN_CHANNEL_FUNDING_VALUE
-    
+
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src]["api"].balances()
 

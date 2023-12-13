@@ -12,9 +12,7 @@ const GET: Operation = [
       log(`retrieved ticket price ${ticket_price}`)
 
       if (ticket_price === null) {
-        return res
-          .status(404)
-          .send()
+        return res.status(404).send()
       }
 
       return res.status(200).send({ price: ticket_price.to_string() })
