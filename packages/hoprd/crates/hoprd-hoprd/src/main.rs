@@ -137,6 +137,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
                 utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
             ))));
+
+            // TODO: add api instantiation here
         }
 
         // TODO: should be executed in the background as separate tasks

@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node ${mydir}/../packages/hoprd/lib/main.cjs"
+declare hoprd_command="target/debug/hoprd"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
@@ -157,14 +157,11 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*" \
-    NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    NODE_OPTIONS="--experimental-wasm-modules" \
     ${hoprd_command} \
       --announce \
       --api-token "${api_token}" \
