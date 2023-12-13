@@ -24,7 +24,6 @@ fn validate_network(network: &String) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
     pub announce: bool,
@@ -45,7 +44,6 @@ impl Default for Chain {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
@@ -67,8 +65,6 @@ impl Default for SafeModule {
     }
 }
 
-/// Does not work in the WASM environment
-#[allow(dead_code)]
 fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
         Ok(())
@@ -77,10 +73,10 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
+    #[validate(custom = "validate_directory_path")]
     pub data: String,
     pub initialize: bool,
     pub force_initialize: bool,
@@ -96,7 +92,6 @@ impl Default for Db {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
@@ -146,20 +141,6 @@ impl Default for HoprLibConfig {
             protocol: ProtocolConfig::default(),
             chain: Chain::default(),
             safe_module: SafeModule::default(),
-        }
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::HoprLibConfig;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl HoprLibConfig {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self::default()
         }
     }
 }

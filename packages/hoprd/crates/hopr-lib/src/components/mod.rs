@@ -21,11 +21,7 @@ use utils_types::{primitives::Address, traits::BinarySerializable};
 use crate::chain::ChainNetworkConfig;
 use crate::{config::HoprLibConfig, constants};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 /// Enum differentiator for loop component futures.
 ///

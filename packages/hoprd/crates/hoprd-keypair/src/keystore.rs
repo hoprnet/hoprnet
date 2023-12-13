@@ -1,6 +1,4 @@
 // Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
-//
-// Adds WASM compatibility (FS-access and RNG for `uuid` crate)
 
 use hex::{FromHex, ToHex};
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};

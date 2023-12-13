@@ -18,11 +18,7 @@ use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
 use utils_log::{debug, error, info};
 use utils_types::{primitives::Address, traits::PeerIdLike};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 /// Helper process responsible for refreshing the state of HOPR components
 /// from the chain events confirmed by the indexer.
@@ -164,18 +160,4 @@ where
             }
         }
     });
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    extern "C" {
-        /// EventEmitter object used to delegate `on` calls in WSS
-        pub type WasmHoprMessageEmitter;
-
-        #[wasm_bindgen(method)]
-        pub fn delegate_on(this: &WasmHoprMessageEmitter, event: js_sys::JsString, callback: js_sys::Function);
-    }
 }

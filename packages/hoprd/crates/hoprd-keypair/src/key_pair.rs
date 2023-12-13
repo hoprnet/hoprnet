@@ -19,11 +19,7 @@ use utils_log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::{metadata, read_to_string, write};
-
 use crate::errors::KeyPairError::KeyDerivationError;
-#[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
@@ -59,7 +55,6 @@ impl Aes128Ctr {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct IdentityOptions {
     pub initialize: bool,
     pub id_path: String,
@@ -68,27 +63,6 @@ pub struct IdentityOptions {
     pub private_key: Option<Box<[u8]>>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl IdentityOptions {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(
-        initialize: bool,
-        id_path: String,
-        password: String,
-        use_weak_crypto: Option<bool>,
-        private_key: Option<Box<[u8]>>,
-    ) -> Self {
-        Self {
-            initialize,
-            id_path,
-            password,
-            use_weak_crypto,
-            private_key,
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct HoprKeys {
     pub packet_key: OffchainKeypair,
     pub chain_key: ChainKeypair,

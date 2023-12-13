@@ -9,16 +9,7 @@ use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-#[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
-#[cfg(feature = "wasm")]
-use {
-    std::collections::HashMap,
-    std::ffi::OsString,
-    clap::{Command, FromArgMatches as _},
-    utils_validation::network::wasm::is_dns_address,
-    wasm_bindgen::JsError
-};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -165,7 +156,7 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         hide = true,
-        default_value_t = crate::config::Api::default().is_auth_disabled()
+        default_value_t = crate::config::Api::default().auth == crate::config::Auth::None
     )]
     pub disable_api_authentication: bool,
 

@@ -31,8 +31,6 @@ where
     M: Clone,
 {
     /// Creates new backend with default timestamping function from std::time.
-    /// This is incompatible with WASM runtimes.
-    #[cfg(not(feature = "wasm"))]
     pub fn new(capacity: usize) -> Self {
         Self::new_with_capacity(capacity, || {
             std::time::SystemTime::now()
