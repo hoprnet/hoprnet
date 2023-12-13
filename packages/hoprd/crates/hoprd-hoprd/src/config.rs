@@ -41,45 +41,26 @@ pub enum Auth {
     Token(String),
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Api {
     pub enable: bool,
     /// Auth enum holding the API auth configuration
-    ///
-    /// The auth enum cannot be made public due to incompatibility with the wasm_bindgen.
     #[validate(custom = "validate_api_auth")]
-    auth: Auth,
+    pub auth: Auth,
     #[validate]
     pub host: HostConfig,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Api {
-    pub fn is_auth_disabled(&self) -> bool {
-        self.auth == Auth::None
-    }
-
-    pub fn auth_token(&self) -> Option<String> {
-        match &self.auth {
-            Auth::None => None,
-            Auth::Token(token) => Some(token.clone()),
-        }
-    }
 }
 
 impl Default for Api {
     fn default() -> Self {
         Self {
             enable: false,
-            auth: Auth::Token("".to_owned()),
+            auth: Auth::None,
             host: HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap(),
         }
     }
 }
 
-/// Does not work in the WASM environment
-#[allow(dead_code)]
 fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
         Ok(())
@@ -110,9 +91,9 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
     validate_private_key(s)
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
+    #[validate(custom = "validate_file_path")]
     pub file: String,
     #[validate(custom = "validate_password")]
     pub password: String,
@@ -132,7 +113,6 @@ impl std::fmt::Debug for Identity {
     }
 }
 
-/// Does not work in the WASM environment
 #[allow(dead_code)]
 fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
@@ -142,7 +122,6 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Testing {
     pub use_weak_crypto: bool,
@@ -223,7 +202,6 @@ pub struct Testing {
 ///   use_weak_crypto: false
 /// ```
 ///
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
@@ -249,11 +227,7 @@ impl From<HoprdConfig> for HoprLibConfig {
     }
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::read_to_string;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::read_to_string;
 
 use utils_log::debug;
 

@@ -21,12 +21,9 @@ use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
 
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -53,7 +50,6 @@ impl Display for EnvironmentType {
 /// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[cfg(not(feature = "wasm"))]
 pub struct ChainOptions {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -71,32 +67,6 @@ pub struct ChainOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
-    pub tags: Option<Vec<String>>,
-}
-
-// duplicate due to issue of wasm_bindgen with proc macros on struct properties
-#[cfg(feature = "wasm")]
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
-#[wasm_bindgen(getter_with_clone)]
-pub struct ChainOptions {
-    #[serde(skip_deserializing)]
-    pub id: String,
-    pub description: String,
-    /// >= 0
-    pub chain_id: u32,
-    pub live: bool,
-    /// a valid HTTP url pointing at a RPC endpoint
-    pub default_provider: String,
-    /// a valid HTTP url pointing at a RPC endpoint
-    pub etherscan_api_url: Option<String>,
-    /// The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
-    pub max_fee_per_gas: String,
-    /// Tips paid directly to miners, e.g. '2 gwei'
-    pub max_priority_fee_per_gas: String,
-    pub native_token_name: String,
-    pub hopr_token_name: String,
-    #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Option<Vec<String>>,
 }
 
@@ -104,7 +74,6 @@ pub struct ChainOptions {
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[cfg(not(feature = "wasm"))]
 pub struct Network {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -122,36 +91,8 @@ pub struct Network {
     pub confirmations: u32,
 }
 
-// duplicate due to issue of wasm_bindgen with proc macros on struct properties
-#[cfg(feature = "wasm")]
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[wasm_bindgen(getter_with_clone)]
-pub struct Network {
-    #[serde(skip_deserializing)]
-    pub id: String,
-    /// must match one of the Network.id
-    pub chain: String,
-    pub environment_type: EnvironmentType,
-    /// Node.js-fashioned semver string
-    pub version_range: String,
-    /// block number to start the indexer from
-    pub indexer_start_block_number: u32,
-    /// contract addresses used by the network
-    pub addresses: Addresses,
-    /// Number of blockchain block to wait until an on-chain state-change is considered to be final
-    ///
-    /// Note that the probability that on-chain state changes will get pruned due to
-    /// block reorganizations increases exponentially in the number of confirmations, e.g.
-    /// after one block it is `0.5` whereas after two blocks it is `0.25 = 0.5^2`  etc.
-    pub confirmations: u32,
-    #[wasm_bindgen(skip)] // no tags in Typescript
-    pub tags: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Addresses {
     /// address of contract that manages authorization to access the Hopr network
     pub network_registry: String,
@@ -175,7 +116,6 @@ pub struct Addresses {
 }
 
 #[derive(Serialize, Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChainNetworkConfig {
     /// the network identifier, e.g. monte_rosa
     pub id: String,
@@ -257,7 +197,6 @@ impl ChainNetworkConfig {
 }
 
 #[derive(Debug, Serialize, Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SmartContractConfig {
     pub hopr_announcements_address: String,
     pub hopr_token_address: String,
@@ -417,30 +356,4 @@ pub fn build_chain_api(
         rpc_operations,
         channel_graph,
     )
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::SmartContractConfig;
-    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen]
-    pub fn get_contract_data(
-        network_id: String,
-        custom_provider: Option<String>,
-    ) -> Result<SmartContractConfig, JsError> {
-        let resolved_environment = super::ChainNetworkConfig::new(&network_id, custom_provider.as_deref())
-            .map_err(|e| JsError::new(e.as_str()))?;
-
-        Ok(SmartContractConfig::from(&resolved_environment))
-    }
-
-    #[wasm_bindgen]
-    pub fn resolve_network(id: &str, maybe_custom_provider: Option<String>) -> JsResult<JsValue> {
-        let resolved_environment = super::ChainNetworkConfig::new(id, maybe_custom_provider.as_deref())?;
-
-        ok_or_jserr!(serde_wasm_bindgen::to_value(&resolved_environment))
-    }
 }

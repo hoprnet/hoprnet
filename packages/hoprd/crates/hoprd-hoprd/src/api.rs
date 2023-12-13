@@ -26,7 +26,7 @@ use openssl::ssl::{Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod}
 use hoprd_api::models;
 
 /// Builds an SSL implementation for Simple HTTPS from some hard-coded file names
-pub async fn create(addr: &str, hopr: Arc<hopr_lib::native::Hopr>, https: bool) {
+pub async fn create(addr: &str, hopr: Arc<hopr_lib::Hopr>, https: bool) {
     let addr = addr.parse().expect("Failed to parse bind address");
 
     let server = Server::new();
