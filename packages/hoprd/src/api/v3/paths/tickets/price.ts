@@ -14,7 +14,7 @@ const GET: Operation = [
       if (ticket_price === null) {
         return res
           .status(404)
-          .send({ status: STATUS_CODES.TICKET_PRICE_NOT_FOUND, error: 'Could not retrieve ticket price' })
+          .send()
       }
 
       return res.status(200).send({ price: ticket_price.to_string() })
