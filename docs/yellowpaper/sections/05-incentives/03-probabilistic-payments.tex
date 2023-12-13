@@ -87,7 +87,7 @@ Incentives relate to packets which are assumed to be sent very often in the HOPR
 
 $$ \forall i \ \forall j \ : \ value(ticket_i) = value(ticket_j) $$
 
-Moreover, the nodes estimate the usage of the link to the nodes with whom they have engaged in a payment channel and pick a ticket winning probability that leads to a continous payout. Connections with higher througput can use lower probabilities whilst those with less traffic should use winning probabilities closer to 1.
+Moreover, the nodes estimate the usage of the link to the nodes with whom they have engaged in a payment channel and pick a ticket winning probability that leads to a continuous payout. Connections with higher througput can use lower probabilities whilst those with less traffic should use winning probabilities closer to 1.
 
 Probabilistic payments rely on the necessity for the ticket issuer to not know whether a ticket that is issued will turn into an asset transfer or not. Hence, the ticket redemption must rely on some entropy provided by the ticket redeemer and need to be kept secret until the ticket is redeemed. This is necessary, because by knowing which ticket is going to become a winner, the ticket issuer would solely issue losing tickets and thereby withhold the incentives for the next downstream node.
 
