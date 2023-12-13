@@ -31,6 +31,7 @@ HOPLI_CRATE := ./packages/hopli
 FOUNDRY_DIR ?= $(mydir).foundry
 # Use custom pinned version of foundry from
 # https://github.com/hoprnet/foundry/tree/hopr-release
+# TODO: even more advanced working version is used and distributed by Q
 FOUNDRY_REPO := hoprnet/foundry
 FOUNDRY_VSN := v0.0.4
 FOUNDRYUP_VSN := fc64e18
@@ -54,21 +55,6 @@ SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
-
-# use custom flags for installing dependencies
-YARNFLAGS :=
-
-# Build specific package
-ifeq ($(package),)
-	YARNFLAGS := ${YARNFLAGS} -A
-else
-	YARNFLAGS := ${YARNFLAGS} @hoprnet/${package}
-endif
-
-# Don't install devDependencies in production
-ifneq ($(origin PRODUCTION),undefined)
-	YARNFLAGS := ${YARNFLAGS} --production
-endif
 
 all: help
 
@@ -95,7 +81,6 @@ deps-ci: ## Installs dependencies when running in CI
 	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-	CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps-docker
 deps-docker: ## Installs dependencies when building Docker images
@@ -105,7 +90,6 @@ ifeq ($(origin PRODUCTION),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 endif
-	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps
 deps: ## Installs dependencies for local setup
@@ -119,9 +103,6 @@ deps: ## Installs dependencies for local setup
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
-	command -v wasm-opt || $(cargo) install wasm-opt
-	command -v wasm-pack || $(cargo) install wasm-pack
-	yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: install-foundry
 install-foundry: ## install foundry
@@ -163,7 +144,7 @@ cargo-download: ## download vendored Cargo dependencies
 
 .PHONY: build
 build: ## build all packages
-build: build-yarn
+build: build-cargo
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
@@ -174,34 +155,12 @@ build-solidity-types: ## generate Solidity typings
 	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
 		echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 
-.PHONY: build-yarn
-build-yarn: ## build yarn packages
-build-yarn: build-cargo
-ifeq ($(package),)
-	npx tsc --build tsconfig.build.json
-else
-	npx tsc --build packages/${package}/tsconfig.json
-endif
-
-.PHONY: build-yarn-watch
-build-yarn-watch: ## build yarn packages (in watch mode)
-build-yarn-watch: build-cargo
-	npx tsc --build tsconfig.build.json -w
-
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
 build-cargo: build-solidity-types
 # build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
-ifeq ($(origin NO_CARGO),undefined)
-# Build crates and copy bindings to their destination
-	wasm-pack build --weak-refs --reference-types --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
-	$(MAKE) -C packages/hoprd/crates install-hoprd
-ifeq ($(origin NO_HOPLI),undefined)
-# build hopli
-	$(MAKE) $(HOPLI_CRATE)
-endif
-endif
+	$(cargo) build
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
@@ -209,41 +168,16 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs
-build-docs: | build-docs-typescript build-docs-api
-
-.PHONY: build-docs-typescript
-build-docs-typescript: ## build typedocs
-build-docs-typescript: build
-	yarn workspaces foreach -pv run docs:generate
-
-.PHONY: build-docs-api
-build-docs-api: ## build Rest API docs
-build-docs-api: build
-	./scripts/build-rest-api-spec.sh
+build-docs: build-docs-api
 
 .PHONY: clean
-clean: # Cleanup build directories (lib,build, ...etc.)
+clean: # Cleanup build directories
 	cargo clean
-	yarn clean
-	find packages -type f -name "*.js" -path "packages/*/src/*" ! -path "packages/*/crates/*" -delete
 	find packages/ethereum/crates/bindings/src -delete
-
-.PHONY: reset
-reset: # Performs cleanup & also deletes all "node_modules" directories
-reset: clean
-	yarn reset
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
-ifeq ($(package),)
-	yarn workspaces foreach -pv run test
-	cargo test --no-default-features
-# disabled until `wasm-bindgen-test-runner` supports ESM
-# cargo test --target wasm32-unknown-unknow
-else
-	yarn workspace @hoprnet/${package} run test
-	yarn workspace @hoprnet/${package} run test:wasm
-endif
+	$(cargo) test
 
 .PHONY: smoke-test
 smoke-test: ## run smoke tests
@@ -262,7 +196,7 @@ smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint
-lint: lint-ts lint-rust lint-python lint-sol
+lint: lint-rust lint-python lint-sol
 lint: ## run linter for TS, Rust, Python, Solidity
 
 .PHONY: lint-sol
@@ -273,10 +207,6 @@ lint-sol: ## run linter for Solidity
 	# FIXME: disabled until all linter errors are resolved
 	# npx solhint $${f} || exit 1; \
 
-.PHONY: lint-ts
-lint-ts: ## run linter for TS
-	npx prettier --check .
-
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
 	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
@@ -286,7 +216,7 @@ lint-python: ## run linter for Python
 	source .venv/bin/activate && ruff --fix . && black --check tests/
 
 .PHONY: fmt
-fmt: fmt-ts fmt-rust fmt-python fmt-sol
+fmt: fmt-rust fmt-python fmt-sol
 fmt: ## run code formatter for TS, Rust, Python, Solidity
 
 .PHONY: fmt-sol
@@ -294,10 +224,6 @@ fmt-sol: ## run code formatter for Solidity
 	for f in $(SOLIDITY_FILES); do \
 		forge fmt $${f} --root ./packages/ethereum/contracts; \
 	done
-
-.PHONY: fmt-ts
-fmt-ts: ## run code formatter for TS
-	npx prettier --write .
 
 .PHONY: fmt-rust
 fmt-rust: ## run code formatter for Rust
@@ -341,8 +267,7 @@ run-local: id_path=$$(pwd)/.identity-local.id
 run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
-	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		packages/hoprd/lib/main.cjs --init --api \
+	target/debug/hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
