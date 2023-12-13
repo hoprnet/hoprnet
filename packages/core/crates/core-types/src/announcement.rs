@@ -20,14 +20,12 @@ use utils_types::{
 /// This is used to attest on-chain that node owns the corresponding packet key and links it with
 /// the chain key.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct KeyBinding {
     pub chain_key: Address,
     pub packet_key: OffchainPublicKey,
     pub signature: OffchainSignature,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl KeyBinding {
     fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
         let mut to_sign = Vec::with_capacity(70);
@@ -38,7 +36,6 @@ impl KeyBinding {
     }
 
     /// Create and sign new key binding of the given chain key and packet key.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(chain_key: Address, packet_key: &OffchainKeypair) -> Self {
         let to_sign = Self::prepare_for_signing(&chain_key, packet_key.public());
         Self {
@@ -79,13 +76,11 @@ impl Display for KeyBinding {
 /// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
 /// optional `KeyBinding` (announcement can be done with key bindings or without)
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AnnouncementData {
     multiaddress: Multiaddr,
     pub key_binding: Option<KeyBinding>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AnnouncementData {
     pub fn to_multiaddress_str(&self) -> String {
         self.multiaddress.to_string()

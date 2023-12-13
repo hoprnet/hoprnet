@@ -30,7 +30,6 @@ pub type EncodedWinProb = [u8; 7];
 /// Describes status of a channel
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
     #[default]
     Closed = 0,
@@ -62,7 +61,6 @@ impl Display for ChannelStatus {
 /// The direction of a channel that is not own is undefined.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelDirection {
     /// The other party is initiator of the channel.
     Incoming = 0,
@@ -81,7 +79,6 @@ impl Display for ChannelDirection {
 
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
@@ -93,9 +90,7 @@ pub struct ChannelEntry {
     id: Hash,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl ChannelEntry {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(
         source: Address,
         destination: Address,
@@ -119,7 +114,6 @@ impl ChannelEntry {
     }
 
     /// Generates the channel ID using the source and destination address
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
         self.id
     }
@@ -142,11 +136,6 @@ impl ChannelEntry {
         self.closure_time
             .gt(&0_u64.into())
             .then(|| self.closure_time.as_u64().saturating_sub(now_seconds))
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
-    pub fn _to_string(&self) -> String {
-        format!("{}", self)
     }
 }
 
@@ -219,7 +208,6 @@ impl BinarySerializable for ChannelEntry {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
 }
@@ -1085,180 +1073,5 @@ pub mod tests {
         assert!(zero_hop_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use core_crypto::{
-        keypairs::ChainKeypair,
-        types::{Hash, Signature},
-    };
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::{
-        primitives::{Address, Balance, EthereumChallenge, U256},
-        traits::BinarySerializable,
-    };
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    use crate::channels::{ChannelEntry, ChannelStatus};
-
-    #[wasm_bindgen]
-    pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
-        status as u8
-    }
-
-    #[wasm_bindgen]
-    pub fn number_to_channel_status(number: u8) -> Option<ChannelStatus> {
-        ChannelStatus::from_byte(number)
-    }
-
-    #[wasm_bindgen]
-    pub fn channel_status_to_string(status: ChannelStatus) -> String {
-        status.to_string()
-    }
-
-    #[wasm_bindgen]
-    impl ChannelEntry {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<ChannelEntry> {
-            ok_or_jserr!(ChannelEntry::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &ChannelEntry) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            *self
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
-    pub struct Ticket {
-        w: super::Ticket,
-    }
-
-    #[wasm_bindgen]
-    impl Ticket {
-        #[wasm_bindgen(constructor)]
-        pub fn new(
-            counterparty: &Address,
-            balance: &Balance,
-            index: U256,
-            index_offset: U256,
-            win_prob: f64,
-            epoch: U256,
-            challenge: EthereumChallenge,
-            chain_key: &ChainKeypair,
-            domain_separator: &Hash,
-        ) -> JsResult<Ticket> {
-            Ok(Self {
-                w: ok_or_jserr!(super::Ticket::new(
-                    counterparty,
-                    balance,
-                    index,
-                    index_offset,
-                    win_prob,
-                    epoch,
-                    challenge,
-                    chain_key,
-                    domain_separator
-                ))?,
-            })
-        }
-
-        #[wasm_bindgen(js_name = "make_default")]
-        pub fn _default() -> Ticket {
-            Self {
-                w: super::Ticket::default(),
-            }
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn channel_id(&self) -> Hash {
-            self.w.channel_id
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn amount(&self) -> Balance {
-            self.w.amount
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn index(&self) -> U256 {
-            self.w.index.into()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn index_offset(&self) -> U256 {
-            self.w.index_offset.into()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn win_prob(&self) -> f64 {
-            self.w.win_prob()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn channel_epoch(&self) -> U256 {
-            self.w.channel_epoch.into()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn challenge(&self) -> EthereumChallenge {
-            self.w.challenge.clone()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn signature(&self) -> Option<Signature> {
-            self.w.signature.clone()
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.w.to_string()
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Ticket {
-            Self { w: self.w.clone() }
-        }
-    }
-
-    impl From<super::Ticket> for Ticket {
-        fn from(value: super::Ticket) -> Self {
-            Self { w: value }
-        }
-    }
-
-    impl From<&super::Ticket> for Ticket {
-        fn from(value: &super::Ticket) -> Self {
-            Self { w: value.clone() }
-        }
-    }
-
-    impl From<Ticket> for super::Ticket {
-        fn from(value: Ticket) -> Self {
-            value.w
-        }
-    }
-
-    impl From<&Ticket> for super::Ticket {
-        fn from(value: &Ticket) -> Self {
-            value.w.clone()
-        }
     }
 }

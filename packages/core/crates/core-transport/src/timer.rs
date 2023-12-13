@@ -4,15 +4,8 @@ use futures::FutureExt;
 use std::time::Duration;
 use utils_log::{debug, warn};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
-#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 /// Represents a periodic timer that ticks in a loop with the given period.
 /// Could be later extended so it supports multiple different periods and multiple actions.

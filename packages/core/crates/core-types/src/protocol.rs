@@ -40,7 +40,6 @@ pub trait PeerAddressResolver {
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagBloomFilter {
     bloom: Bloom<PacketTag>,
@@ -101,7 +100,6 @@ impl Default for TagBloomFilter {
 }
 
 /// Represents the received decrypted packet carrying the application-layer data.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationData {
     pub application_tag: Option<Tag>,
@@ -231,32 +229,5 @@ mod tests {
             !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
             "bf 2 must not contain zero tag"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-mod wasm {
-    use crate::protocol::ApplicationData;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::traits::BinarySerializable;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl ApplicationData {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(tag: Option<u16>, data: &[u8]) -> JsResult<ApplicationData> {
-            ok_or_jserr!(Self::new(tag, data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
     }
 }

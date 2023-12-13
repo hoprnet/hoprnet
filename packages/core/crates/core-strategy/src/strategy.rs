@@ -21,11 +21,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
-#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -38,7 +34,7 @@ lazy_static::lazy_static! {
     static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter =
         SimpleCounter::new("core_counter_strategy_count_closure_finalization", "Count of channels where closure finalizing was initiated automatically").unwrap();
 
-     static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
+    static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
         MultiGauge::new("core_multi_gauge_strategy_enabled_strategies", "List of enabled strategies", Strategy::VARIANTS).unwrap();
 }
 
@@ -124,7 +120,6 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
@@ -146,28 +141,7 @@ pub struct MultiStrategyConfig {
 
     /// Configuration of individual sub-strategies.
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
-    pub(crate) strategies: Vec<Strategy>, // non-pub due to wasm
-}
-
-impl MultiStrategyConfig {
-    pub fn new(
-        on_fail_continue: bool,
-        allow_recursive: bool,
-        finalize_channel_closure: bool,
-        strategies: Vec<Strategy>,
-    ) -> Self {
-        // This constructor can be removed once `strategies` field is made `pub`
-        Self {
-            on_fail_continue,
-            allow_recursive,
-            finalize_channel_closure,
-            strategies,
-        }
-    }
-
-    pub fn get_strategies(&mut self) -> &mut Vec<Strategy> {
-        &mut self.strategies
-    }
+    pub strategies: Vec<Strategy>,
 }
 
 impl Default for MultiStrategyConfig {

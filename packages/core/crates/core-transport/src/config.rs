@@ -3,10 +3,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-#[cfg(not(feature = "wasm"))]
 use utils_validation::network::native::is_dns_address;
-#[cfg(feature = "wasm")]
-use utils_validation::network::wasm::is_dns_address;
 
 pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
 pub use core_protocol::config::ProtocolConfig;
@@ -17,42 +14,12 @@ pub enum HostType {
     Domain(String),
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
     #[validate(custom = "validate_host_address")]
-    address: HostType,
+    pub address: HostType,
     #[validate(range(min = 1u16))]
     pub port: u16,
-}
-
-// necessary only while the object must be wasm-compatible
-impl HostConfig {
-    pub fn address(&self) -> &HostType {
-        &self.address
-    }
-}
-
-#[cfg(feature = "wasm")]
-#[wasm_bindgen::prelude::wasm_bindgen]
-impl HostConfig {
-    #[wasm_bindgen::prelude::wasm_bindgen]
-    pub fn is_ipv4(&self) -> bool {
-        matches!(self.address, HostType::IPv4(_))
-    }
-
-    #[wasm_bindgen::prelude::wasm_bindgen]
-    pub fn is_domain(&self) -> bool {
-        matches!(self.address, HostType::Domain(_))
-    }
-
-    #[wasm_bindgen::prelude::wasm_bindgen(js_name=address)]
-    pub fn _address(&self) -> String {
-        match &self.address {
-            HostType::IPv4(s) => s.clone(),
-            HostType::Domain(s) => s.clone(),
-        }
-    }
 }
 
 impl Default for HostConfig {
@@ -120,7 +87,6 @@ fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does

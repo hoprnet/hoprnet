@@ -14,14 +14,11 @@ use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
 use utils_types::sma::{SingleSumSMA, SMA};
 
-#[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
-use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "prometheus", not(test), feature = "wasm"))]
-use utils_misc::time::wasm::current_timestamp;
-
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram};
+use {
+    utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
+    utils_misc::time::native::current_timestamp,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -40,7 +37,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
 pub struct NetworkConfig {
@@ -93,7 +89,6 @@ impl Default for NetworkConfig {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerOrigin {
     Initialization = 0,
@@ -124,7 +119,6 @@ impl std::fmt::Display for PeerOrigin {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Health {
     /// Unknown health, on application startup
@@ -168,7 +162,6 @@ pub trait NetworkExternalActions {
     fn create_timestamp(&self) -> u64;
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
     id: PeerId,
@@ -571,78 +564,6 @@ impl<T: NetworkExternalActions> Network<T> {
         }
 
         output
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::*;
-    use js_sys::JsString;
-    use std::str::FromStr;
-    use utils_misc::utils::wasm::js_map_to_hash_map;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    pub fn health_to_string(h: Health) -> String {
-        format!("{:?}", h)
-    }
-
-    #[wasm_bindgen]
-    impl PeerStatus {
-        #[wasm_bindgen]
-        pub fn peer_id(&self) -> String {
-            self.id.to_base58()
-        }
-
-        #[wasm_bindgen(js_name = "quality")]
-        pub fn _quality(&self) -> f64 {
-            self.quality
-        }
-
-        #[wasm_bindgen(js_name = "metadata")]
-        pub fn _metadata(&self) -> js_sys::Map {
-            let ret = js_sys::Map::new();
-            self.metadata.iter().for_each(|(k, v)| {
-                ret.set(&JsValue::from(k.clone()), &JsValue::from(v.clone()));
-            });
-            ret
-        }
-
-        #[wasm_bindgen]
-        pub fn build(
-            peer: JsString,
-            origin: PeerOrigin,
-            is_public: bool,
-            last_seen: u64,
-            last_seen_latency: u64,
-            quality: f64,
-            heartbeats_sent: u64,
-            heartbeats_succeeded: u64,
-            backoff: f64,
-            peer_metadata: &js_sys::Map,
-            quality_window: u32,
-        ) -> Self {
-            let peer = peer
-                .as_string()
-                .ok_or_else(|| "Own peer id was not passed as a string".to_owned())
-                .and_then(|peer| PeerId::from_str(peer.as_str()).map_err(|e| e.to_string()))
-                .map_err(|e| panic!("Failed to parse PeerId from string: {}", e.to_string()))
-                .expect("Unknown peer parsing failure occurred");
-
-            Self {
-                id: peer,
-                origin,
-                is_public,
-                last_seen,
-                last_seen_latency,
-                quality,
-                heartbeats_sent,
-                heartbeats_succeeded,
-                backoff,
-                metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
-                quality_avg: SingleSumSMA::new_with_samples(quality_window, vec![quality]),
-            }
-        }
     }
 }
 

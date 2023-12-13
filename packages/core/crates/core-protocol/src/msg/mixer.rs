@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use rand::Rng;
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct MixerConfig {
     min_delay: Duration,
@@ -21,24 +20,11 @@ impl Default for MixerConfig {
 }
 
 impl MixerConfig {
-    /// Get a random delay duration from the specified minimum and maximum delay available
-    /// inside the configuration.
-    pub fn random_delay(&self) -> Duration {
-        let mut rng = rand::thread_rng();
-        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
-
-        Duration::from_millis(random_delay)
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl MixerConfig {
     /// Create an instance of a new mixer configuration
     ///
     /// # Arguments
     /// * `min_delay` - the minimum delay invoked by the mixer represented in milliseconds
     /// * `min_delay` - the maximum delay invoked by the mixer represented in milliseconds
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn new(min_delay: u64, max_delay: u64) -> Self {
         if min_delay >= max_delay {
             panic!("The minimum delay must be smaller than the maximum delay")
@@ -49,6 +35,15 @@ impl MixerConfig {
             max_delay: Duration::from_millis(max_delay),
             metric_delay_window: 10u64,
         }
+    }
+
+    /// Get a random delay duration from the specified minimum and maximum delay available
+    /// inside the configuration.
+    pub fn random_delay(&self) -> Duration {
+        let mut rng = rand::thread_rng();
+        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
+
+        Duration::from_millis(random_delay)
     }
 }
 

@@ -22,11 +22,7 @@ use validator::Validate;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::{strategy::SingularStrategy, Strategy};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;

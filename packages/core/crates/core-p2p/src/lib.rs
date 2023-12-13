@@ -74,7 +74,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(hb_cfg.timeout());
+                    cfg.set_request_timeout(hb_cfg.timeout);
                     cfg
                 },
             ),
@@ -86,7 +86,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(msg_cfg.timeout());
+                    cfg.set_request_timeout(msg_cfg.timeout);
                     cfg
                 },
             ),
@@ -98,7 +98,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(ack_cfg.timeout());
+                    cfg.set_request_timeout(ack_cfg.timeout);
                     cfg
                 },
             ),
@@ -113,7 +113,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout());
+                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout);
                     cfg
                 },
             ),
@@ -180,30 +180,12 @@ impl From<libp2p_request_response::Event<Acknowledgement, ()>> for HoprNetworkBe
     }
 }
 
-/// Build wasm variant of `Transport` for the Node environment
-#[cfg(all(feature = "wasm", not(test)))]
-pub fn build_basic_transport() -> libp2p_wasm_ext::ExtTransport {
-    libp2p_wasm_ext::ExtTransport::new(libp2p_wasm_ext::ffi::tcp_transport())
-}
-
-/// Build wasm variant of `Swarm`
-#[cfg(all(feature = "wasm", not(test)))]
-pub fn build_swarm<T: NetworkBehaviour>(
-    transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
-    behavior: T,
-    me: PeerId,
-) -> libp2p_swarm::Swarm<T> {
-    SwarmBuilder::with_wasm_executor(transport, behavior, me).build()
-}
-
 /// Build native `Transport`
-#[cfg(any(not(feature = "wasm"), test))]
 fn build_basic_transport() -> libp2p::tcp::Transport<libp2p::tcp::async_io::Tcp> {
     libp2p::tcp::async_io::Transport::new(libp2p::tcp::Config::default().nodelay(true))
 }
 
 /// Build native `Swarm`
-#[cfg(any(not(feature = "wasm"), test))]
 fn build_swarm<T: NetworkBehaviour>(
     transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
     behavior: T,

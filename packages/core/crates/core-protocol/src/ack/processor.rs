@@ -16,11 +16,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;

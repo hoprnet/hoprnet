@@ -180,27 +180,6 @@ pub fn derive_vrf_parameters<const T: usize>(
     })
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        Ok(super::derive_packet_tag(&secret.try_into()?).into())
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Box<[u8]> {
-        super::derive_commitment_seed(private_key, channel_info).into()
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_mac_key(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        Ok(super::derive_mac_key(&secret.try_into()?).into())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
