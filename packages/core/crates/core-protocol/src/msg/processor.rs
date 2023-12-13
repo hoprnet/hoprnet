@@ -596,7 +596,6 @@ impl PacketInteraction {
         let processor = PacketProcessor::new(db, cfg);
 
         let mut processing_stream = to_process_rx
-            // transform raw data into packets
             .then_concurrent(move |event| {
                 let processor = processor.clone();
                 let pkt_keypair = pkt_keypair.clone();

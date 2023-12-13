@@ -106,7 +106,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         };
 
-
         let on_acknowledgement = |_ack: HalfKeyChallenge| {
             // TODO: needed by the websockets? 
         };
@@ -141,8 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // TODO: add api instantiation here
         }
 
-        // TODO: should be executed in the background as separate tasks
-        let loops = node.write().await.run().await?;
+        let hopr_processes = node.write().await.run().await?;
 
         // Show onboarding information
         let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
@@ -170,6 +168,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Node address: {my_address}
             Node version: {version}
         ");
+
+        hopr_processes.await
     }
 
     Ok(())

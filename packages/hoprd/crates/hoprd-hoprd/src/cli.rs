@@ -77,7 +77,6 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 /// file contents need be specified using `clap`s builder API
 #[derive(Serialize, Deserialize, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
     /// Network the node will operate in
     #[arg(

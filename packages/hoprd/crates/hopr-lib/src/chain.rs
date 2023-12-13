@@ -8,6 +8,7 @@ use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
@@ -92,30 +93,41 @@ pub struct Network {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
+#[serde_as]
 #[serde(deny_unknown_fields)]
 pub struct Addresses {
     /// address of contract that manages authorization to access the Hopr network
-    pub network_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry: Address,
     /// address of contract that maps to the requirements that need to be fulfilled
     /// in order to access the network, upgradeable
-    pub network_registry_proxy: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry_proxy: Address,
     /// HoprChannels contract address, implementation of mixnet incentives
-    pub channels: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub channels: Address,
     /// Hopr token contract address
-    pub token: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub token: Address,
     /// contract address of Safe capability module implementation
-    pub module_implementation: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub module_implementation: Address,
     /// address of contract that maps between Safe instances and node addresses
-    pub node_safe_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_safe_registry: Address,
     /// address of contract that allows Hopr Association to dictate price per packet in Hopr
-    pub ticket_price_oracle: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub ticket_price_oracle: Address,
     /// address of contract that manages transport announcements in the hopr network
-    pub announcements: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub announcements: Address,
     /// factory contract to produce Safe instances
-    pub node_stake_v2_factory: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_stake_v2_factory: Address,
 }
 
 #[derive(Serialize, Clone)]
+#[serde_as]
 pub struct ChainNetworkConfig {
     /// the network identifier, e.g. monte_rosa
     pub id: String,
@@ -123,24 +135,33 @@ pub struct ChainNetworkConfig {
     pub environment_type: EnvironmentType,
     pub channel_contract_deploy_block: u32,
     /// address of contract that manages authorization to access the Hopr network
-    pub network_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry: Address,
     /// address of contract that maps to the requirements that need to be fulfilled
     /// in order to access the network, upgradeable
-    pub network_registry_proxy: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry_proxy: Address,
     /// HoprChannels contract address, implementation of mixnet incentives
-    pub channels: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub channels: Address,
     /// Hopr token contract address
-    pub token: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub token: Address,
     /// contract address of Safe capability module implementation
-    pub module_implementation: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub module_implementation: Address,
     /// address of contract that maps between Safe instances and node addresses
-    pub node_safe_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_safe_registry: Address,
     /// address of contract that allows Hopr Association to dictate price per packet in Hopr
-    pub ticket_price_oracle: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub ticket_price_oracle: Address,
     /// address of contract that manages transport announcements in the hopr network
-    pub announcements: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub announcements: Address,
     /// factory contract to produce Safe instances
-    pub node_stake_v2_factory: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_stake_v2_factory: Address,
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
 }
@@ -198,12 +219,12 @@ impl ChainNetworkConfig {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct SmartContractConfig {
-    pub hopr_announcements_address: String,
-    pub hopr_token_address: String,
-    pub hopr_channels_address: String,
-    pub hopr_network_registry_address: String,
-    pub hopr_node_safe_registry_address: String,
-    pub hopr_ticket_price_oracle_address: String,
+    pub hopr_announcements_address: Address,
+    pub hopr_token_address: Address,
+    pub hopr_channels_address: Address,
+    pub hopr_network_registry_address: Address,
+    pub hopr_node_safe_registry_address: Address,
+    pub hopr_ticket_price_oracle_address: Address,
     pub indexer_start_block_number: u32,
 }
 

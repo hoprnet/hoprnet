@@ -1,32 +1,30 @@
 mod chain;
-mod components;
 pub mod config;
 pub mod constants;
 pub mod errors;
 mod helpers;
 mod processes;
 
+
 pub use chain::{Network, ProtocolConfig};
-use core_ethereum_actions::node::NodeActions;
 
-use std::collections::HashMap;
-use std::pin::Pin;
-use std::sync::Arc;
-
-use async_std::sync::RwLock;
-use futures::Future;
-
-use core_ethereum_api::HoprChain;
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_transport::libp2p_identity::PeerId;
-use core_transport::{
-    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    sync::Arc,
+    str::FromStr,
+    time::Duration
 };
 
-use utils_log::{error, info};
-use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
+use async_std::{
+    sync::RwLock,
+    task::spawn_local,
+};
+use futures::{
+    Future, channel::mpsc::unbounded, FutureExt, StreamExt
+};
 
-use core_ethereum_actions::{channels::ChannelActions, redeem::TicketRedeemActions};
+use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions};
 use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry};
 use core_ethereum_types::chain_events::ChainEventType;
 use core_transport::PeerEligibility;
@@ -37,18 +35,35 @@ use core_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, ChannelStatus, Ticket},
 };
-use std::str::FromStr;
-use std::time::Duration;
+
 use utils_db::db::DB;
 use utils_log::debug;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
+
+use core_ethereum_api::HoprChain;
+use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use core_ethereum_types::ContractAddresses;
+use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
+use core_strategy::strategy::{MultiStrategy, SingularStrategy};
+use core_transport::{
+    build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
+    build_ticket_aggregation, libp2p_identity, p2p_loop, TransportOutput, UniversalTimer,
+};
+use core_transport::libp2p_identity::PeerId;
+use core_transport::{
+    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
+};
+use real_base::file::native::{join, read_file, remove_dir_all, write};
+use utils_db::rusty::RustyLevelDbShim;
+use utils_log::{error, info};
+use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 use crate::chain::SmartContractConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use crate::chain::ChainNetworkConfig;
+use crate::config::HoprLibConfig;
 
-use real_base::file::native::{join, read_file, remove_dir_all, write};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_misc::time::native::current_timestamp;
@@ -73,6 +88,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     Uninitialized = 0,
@@ -93,19 +109,259 @@ pub struct CloseChannelResult {
 }
 
 
+/// Enum differentiator for loop component futures.
+///
+/// Used to differentiate the type of the future that exits the loop premateruly
+/// by tagging it as an enum.
+#[derive(Debug, Clone)]
+pub enum HoprLoopComponents {
+    Swarm,
+    Heartbeat,
+    Timer,
+    Indexing,
+    OutgoingOnchainTxQueue,
+}
 
+impl HoprLoopComponents {
+    pub fn can_finish(&self) -> bool {
+        matches!(self, HoprLoopComponents::Indexing)
+    }
+}
+
+impl std::fmt::Display for HoprLoopComponents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HoprLoopComponents::Swarm => write!(
+                f,
+                "libp2p component responsible for the handling of the p2p communication"
+            ),
+            HoprLoopComponents::Heartbeat => write!(
+                f,
+                "heartbeat component responsible for maintaining the network quality measurements"
+            ),
+            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
+            HoprLoopComponents::Indexing => write!(f, "initial indexing operation into the DB"),
+            HoprLoopComponents::OutgoingOnchainTxQueue => {
+                write!(f, "on-chain transaction queue component for outgoing transactions")
+            }
+        }
+    }
+}
+
+/// Main builder of the hopr lib components
+pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
+    cfg: HoprLibConfig,
+    chain_config: ChainNetworkConfig,
+    me: OffchainKeypair,
+    me_onchain: ChainKeypair,
+    db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    on_acknowledgement: FOnSent,
+    on_final_packet: FOnReceived,
+    tbf: TagBloomFilter,
+    save_tbf: FSaveTbf,
+    my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
+) -> (
+    HoprTransport,
+    HoprChain,
+    Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>>,
+)
+where
+    FOnReceived: Fn(ApplicationData) + 'static,
+    FOnSent: Fn(HalfKeyChallenge) + 'static,
+    FSaveTbf: Fn(Box<[u8]>) + 'static,
+{
+    let identity: libp2p_identity::Keypair = (&me).into();
+
+    let (network, network_events_tx, network_events_rx) =
+        build_network(identity.public().to_peer_id(), cfg.network_options);
+
+    let addr_resolver = DbPeerAddressResolver(db.clone());
+
+    let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
+
+    let contract_addrs = ContractAddresses {
+        announcements: chain_config.announcements,
+        channels: chain_config.channels,
+        token: chain_config.token,
+        price_oracle: chain_config.ticket_price_oracle,
+        network_registry: chain_config.network_registry,
+        network_registry_proxy: chain_config.network_registry_proxy,
+        stake_factory: chain_config.node_stake_v2_factory,
+        safe_registry: chain_config.node_safe_registry,
+        module_implementation: chain_config.module_implementation,
+    };
+
+    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
+
+    let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
+        &me_onchain,
+        chain_config.clone(),
+        contract_addrs,
+        cfg.safe_module.module_address,
+        db.clone(),
+    );
+
+    let multi_strategy = Arc::new(MultiStrategy::new(
+        cfg.strategy,
+        db.clone(),
+        network.clone(),
+        chain_actions.clone(),
+        ticket_aggregation.writer(),
+    ));
+    debug!("initialized strategies: {multi_strategy:?}");
+
+    let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+
+    let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
+
+    let indexer_refreshing_loop = crate::processes::spawn_refresh_process_for_chain_events(
+        me.public().to_peerid(),
+        core_transport::Keypair::public(&me_onchain).to_address(),
+        db.clone(),
+        multi_strategy.clone(),
+        rx_indexer_events,
+        channel_graph.clone(),
+        indexer_updater.clone(),
+        action_queue.action_state(),
+    );
+
+    let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
+        me_onchain.clone(),
+        db.clone(),
+        contract_addrs,
+        cfg.safe_module.safe_address,
+        chain_config.channel_contract_deploy_block as u64,
+        tx_indexer_events,
+        chain_actions.clone(),
+        rpc_operations.clone(),
+        channel_graph.clone(),
+    );
+
+    // on acknowledged ticket notifier
+    let (winning_ticket_process, on_ack_tkt_tx) = crate::processes::spawn_ack_winning_ticket_handling(multi_strategy.clone());
+
+    let tbf = Arc::new(RwLock::new(tbf));
+
+    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone());
+
+    let (ping, ping_rx, pong_tx) = build_manual_ping(
+        cfg.protocol,
+        network.clone(),
+        addr_resolver.clone(),
+        channel_graph.clone(),
+    );
+
+    let (mut heartbeat, hb_ping_rx, hb_pong_tx) = build_heartbeat(
+        cfg.protocol,
+        cfg.heartbeat,
+        network.clone(),
+        addr_resolver.clone(),
+        channel_graph.clone(),
+    );
+
+    let hopr_transport_api = HoprTransport::new(
+        identity.clone(),
+        me_onchain.clone(),
+        cfg.transport,
+        db.clone(),
+        ping,
+        network.clone(),
+        network_events_tx,
+        indexer_updater,
+        packet_actions.writer(),
+        ticket_aggregation.writer(),
+        channel_graph.clone(),
+        my_multiaddresses.clone(),
+    );
+
+    let (transport_output_tx, transport_output_rx) = unbounded::<TransportOutput>();
+    let transport_output_process = crate::processes::spawn_transport_output(transport_output_rx, on_final_packet, on_acknowledgement);
+
+    let swarm_network_clone = network.clone();
+    let tbf_clone = tbf.clone();
+    let multistrategy_clone = multi_strategy.clone();
+
+    // NOTE: This would normally be passed as ready loops and triggered in the
+    // Hopr object's run, but with TS not fully migrated, these processes have to be
+    // spawned to make sure that announce and registrations pass
+    spawn_local(async move {
+        let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+            Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
+            Box::pin(async move {
+                action_queue
+                    .action_loop()
+                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                    .await
+            }),
+        ];
+
+        let mut futs = crate::helpers::to_futures_unordered(chain_events);
+
+        while let Some(process) = futs.next().await {
+            if process.can_finish() {
+                continue;
+            } else {
+                error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+            }
+        }
+    });
+
+    let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        Box::pin(async move { heartbeat.heartbeat_loop().map(|_| HoprLoopComponents::Heartbeat).await }),
+        Box::pin(
+            p2p_loop(
+                String::from(constants::APP_VERSION),
+                identity,
+                swarm_network_clone,
+                network_events_rx,
+                indexer_update_rx,
+                ack_actions,
+                packet_actions,
+                ticket_aggregation,
+                core_transport::api::HeartbeatRequester::new(hb_ping_rx),
+                core_transport::api::HeartbeatResponder::new(hb_pong_tx),
+                core_transport::api::ManualPingRequester::new(ping_rx),
+                core_transport::api::HeartbeatResponder::new(pong_tx),
+                my_multiaddresses,
+                cfg.protocol,
+                transport_output_tx,
+                on_ack_tkt_tx,
+            )
+            .map(|_| HoprLoopComponents::Swarm),
+        ),
+        Box::pin(async move {
+            UniversalTimer::new(Duration::from_secs(60))
+                .timer_loop(|| async {
+                    info!("doing strategy tick");
+                    let _ = multistrategy_clone.on_tick().await;
+                    info!("strategy tick done");
+                })
+                .map(|_| HoprLoopComponents::Timer)
+                .await
+        }),
+        Box::pin(async move {
+            UniversalTimer::new(Duration::from_secs(90))
+                .timer_loop(|| async {
+                    let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
+                    (save_tbf)(bloom.to_bytes());
+                })
+                .map(|_| HoprLoopComponents::Timer)
+                .await
+        }),
+    ];
+
+    (hopr_transport_api, hopr_chain_api, ready_loops)
+}
 
 pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
     state: State,
-
-    /// RwLocked HashMap making sure that no Rust aliasing issues
-    /// can occur, discard once Rust support is not needed
     aliases: Arc<RwLock<HashMap<String, PeerId>>>,
     transport_api: HoprTransport,
     chain_api: HoprChain,
-    processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
+    processes: Option<Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>>>,
     chain_cfg: ChainNetworkConfig,
     safe_module_cfg: SafeModule,
 }
@@ -159,7 +415,7 @@ impl Hopr {
         info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
         let resolved_environment =
             crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref())
-                .expect("Failed to resolve environment");
+                .expect("Failed to resolve blockchain environment");
         let contract_addresses = SmartContractConfig::from(&resolved_environment);
         info!(
             "Resolved contract addresses for myself as '{}': {:?}",
@@ -193,7 +449,7 @@ impl Hopr {
             };
         };
 
-        let (transport_api, chain_api, processes) = components::build_components(
+        let (transport_api, chain_api, processes) = build_components(
             cfg.clone(),
             chain_config.clone(),
             me.clone(),
@@ -282,7 +538,7 @@ impl Hopr {
 
     pub async fn run(
         &mut self,
-    ) -> errors::Result<Vec<Pin<Box<dyn Future<Output = components::HoprLoopComponents>>>>> {
+    ) -> errors::Result<impl Future<Output = ()>> {
         if self.state != State::Uninitialized {
             return Err(errors::HoprLibError::GeneralError(
                 "Cannot start the hopr node multiple times".to_owned(),
@@ -434,7 +690,20 @@ impl Hopr {
         info!("ID {}", self.transport_api.me());
         info!("Protocol version {}", constants::APP_VERSION);
 
-        Ok(self.processes.take().expect("processes should be present in the node"))
+        let processes = self.processes.take().expect("processes should be present in the node");
+
+        Ok(Box::pin(async move {
+            let mut futs = crate::helpers::to_futures_unordered(processes);
+
+            while let Some(process) = futs.next().await {
+                if process.can_finish() {
+                    continue;
+                } else {
+                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                }
+            }
+        }))
     }
 
     // p2p transport =========
