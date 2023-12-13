@@ -65,10 +65,10 @@ Ticket redemption relies on providing the value $opening$\footnote{TODO: Properl
 
 The ticket value is given by the intended $value$ divided by the winning probability $winProb$ in the base unit of the token, which is $10^{-8}$. Hence, sending $1$ HOPR with a winning probability of $1$ leads to $ticket.value = 10^8$.
 
-\paragraph{Winning probablity}
+\paragraph{Winning probability}
 \label{sec:tickets:issuance:winningprobability}
 
-The proportion of tickets which lead to an actual payout is determined by their winning probability. To prevent from issues resulting from roundings, $ticketData$ includes the inverse winning probabilty that is normalized with the common base of Ethereum, which is $2^{256} - 1$. Hence,
+The proportion of tickets which lead to an actual payout is determined by their winning probability. To prevent from issues resulting from roundings, $ticketData$ includes the inverse winning probability that is normalized with the common base of Ethereum, which is $2^{256} - 1$. Hence,
 
 $$ ticketData.invWinProb := winProb * (2^{256} -1)$$
 
