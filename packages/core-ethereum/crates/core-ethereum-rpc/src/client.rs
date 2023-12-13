@@ -15,12 +15,14 @@ use utils_metrics::metrics::MultiCounter;
 
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {
-     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
         "core_ethereum_counter_rpc_calls",
         "Number of successful RPC calls over HTTP",
-        &["eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
-          "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
-          "eth_getTransactionByHash", "eth_getLogs"]
+        &[
+            "eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
+            "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
+            "eth_getTransactionByHash", "eth_getLogs"
+        ]
     )
     .unwrap();
 }
@@ -55,8 +57,7 @@ impl<Req: HttpPostRequestor + Debug + Clone> Clone for JsonRpcProviderClient<Req
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req> {
     type Error = JsonRpcProviderClientError;
 

@@ -225,10 +225,10 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
     }
 }
 
-/// Used for testing. Creates local Anvil instance.
-/// When block time is given, new blocks is mined periodically.
+/// Creates local Anvil instance.
+/// 
+/// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
-#[cfg(not(target_arch = "wasm32"))]
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
     let mut anvil = ethers::utils::Anvil::new()
         .path(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"));

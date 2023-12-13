@@ -27,10 +27,6 @@ pub mod indexer;
 /// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
 
-/// Node.js based HTTP client
-#[cfg(feature = "wasm")]
-pub mod nodejs;
-
 /// Helper types required by `client` module.
 mod helper;
 
@@ -131,8 +127,7 @@ impl From<LogFilter> for ethers::types::Filter {
 }
 
 /// Abstraction for HTTP client that perform HTTP POST with JSON data.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 #[cfg_attr(test, mockall::automock)]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
@@ -219,8 +214,7 @@ impl<'a> IntoFuture for PendingTransaction<'a> {
 
 /// Trait defining general set of operations an RPC provider
 /// must provide to the HOPR node.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 pub trait HoprRpcOperations {
     /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
@@ -273,8 +267,7 @@ impl BlockWithLogs {
 
 /// Trait with RPC provider functionality required by the Indexer.
 #[cfg_attr(test, mockall::automock)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;

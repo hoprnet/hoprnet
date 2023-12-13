@@ -14,11 +14,7 @@ use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

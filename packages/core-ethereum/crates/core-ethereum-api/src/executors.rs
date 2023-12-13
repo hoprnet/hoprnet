@@ -14,11 +14,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 use utils_types::primitives::{Address, Balance};
 
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.

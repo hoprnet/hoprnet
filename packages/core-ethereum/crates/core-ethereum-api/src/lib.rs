@@ -24,14 +24,7 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::{HoprChainError, Result};
 
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
-
-#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-pub type DefaultHttpPostRequestor = core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfRequestor;
@@ -101,7 +94,6 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,

@@ -124,8 +124,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
         let ts = self

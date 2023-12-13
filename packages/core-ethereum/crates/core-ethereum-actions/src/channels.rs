@@ -17,10 +17,6 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
-#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
