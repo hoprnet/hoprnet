@@ -13,7 +13,7 @@ const GET: Operation = [
 
       if (ticket_price === null) {
         return res
-          .status(206)
+          .status(404)
           .send({ status: STATUS_CODES.TICKET_PRICE_NOT_FOUND, error: 'Could not retrieve ticket price' })
       }
 
@@ -52,6 +52,9 @@ GET.apiDoc = {
     },
     '403': {
       $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
     },
     '422': {
       description: 'Unknown failure.',
