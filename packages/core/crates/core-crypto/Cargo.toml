@@ -39,8 +39,8 @@ thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
+platform = { workspace = true }
 utils-log = { workspace = true }
-utils-misc = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -55,5 +55,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "getrandom/js", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "getrandom/js", "utils-log/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

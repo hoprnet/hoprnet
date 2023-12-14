@@ -9,7 +9,7 @@ use futures::{
 };
 use libp2p_identity::PeerId;
 use rand::Rng;
-
+use serde_with::{serde_as, DurationSeconds};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -29,20 +29,24 @@ lazy_static::lazy_static! {
 }
 
 use async_std::task::sleep;
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
 
 /// Configuration of the Heartbeat
+#[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
-    /// Round-to-round variance to complicate network sync
-    pub variance: u64,
-    /// Interval in which the heartbeat is triggered
-    pub interval: u64,
-    /// The maximum number of concurrent heartbeat pings
-    pub threshold: u64,
+    /// Round-to-round variance to complicate network sync [seconds]
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub variance: std::time::Duration,
+    /// Interval in which the heartbeat is triggered [seconds]
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub interval: std::time::Duration,
+    /// The time interval for which to consider peer heartbeat renewal [seconds]
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub threshold: std::time::Duration,
 }
 
 impl Default for HeartbeatConfig {
@@ -98,26 +102,18 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let start = current_timestamp();
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-            info!(
-                "Starting a heartbeat round for peers since timestamp {}",
-                from_timestamp
-            );
-            let peers = self.external_api.get_peers(from_timestamp).await;
+            info!("Starting a heartbeat round for peers since timestamp {from_timestamp:?}");
+            let peers = self.external_api.get_peers(from_timestamp.as_millis() as u64).await;
 
             // random timeout to avoid network sync:
-            let this_round_planned_duration_in_ms: u64 = self
-                .rng
-                .gen_range(
-                    self.config.interval
-                        ..self
-                            .config
-                            .interval
-                            .checked_add(self.config.variance.max(1))
-                            .unwrap_or(u64::MAX),
-                )
-                .into();
+            let this_round_planned_duration = std::time::Duration::from_millis({
+                let interval_ms = self.config.interval.as_millis() as u64;
+                let variance_ms = self.config.interval.as_millis() as u64;
 
-            let timeout = sleep(std::time::Duration::from_millis(this_round_planned_duration_in_ms)).fuse();
+                self.rng.gen_range(interval_ms..interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX))
+            });
+
+            let timeout = sleep(this_round_planned_duration).fuse();
             let ping = self.pinger.ping(peers).fuse();
 
             pin_mut!(timeout, ping);
@@ -127,12 +123,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 Either::Right(_) => info!("Heartbeat round finished for all peers"),
             };
 
-            let this_round_actual_duration_in_ms = current_timestamp().checked_sub(start).unwrap_or(0u64);
-            if this_round_actual_duration_in_ms < this_round_planned_duration_in_ms {
-                let time_to_wait_for_next_round = this_round_planned_duration_in_ms - this_round_actual_duration_in_ms;
+            let this_round_actual_duration = current_timestamp().saturating_sub(start);
+            if this_round_actual_duration < this_round_planned_duration {
+                let time_to_wait_for_next_round = this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
-                debug!("Heartbeat sleeping for: {}ms", time_to_wait_for_next_round);
-                sleep(std::time::Duration::from_millis(time_to_wait_for_next_round)).await
+                debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}ms");
+                sleep(time_to_wait_for_next_round).await
             }
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -147,20 +143,20 @@ mod tests {
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {
-            variance: 0u64,
-            interval: 5u64,
-            threshold: 0u64,
+            variance: std::time::Duration::from_millis(0u64),
+            interval: std::time::Duration::from_millis(5u64),
+            threshold: std::time::Duration::from_millis(0u64),
         }
     }
 
     pub struct DelayingPinger {
-        pub delay: u64,
+        pub delay: std::time::Duration,
     }
 
     #[async_trait(? Send)]
     impl Pinging for DelayingPinger {
         async fn ping(&mut self, _peers: Vec<PeerId>) {
-            sleep(std::time::Duration::from_millis(self.delay)).await;
+            sleep(self.delay).await;
         }
     }
 
@@ -168,7 +164,31 @@ mod tests {
     async fn test_heartbeat_should_loop_multiple_times() {
         let config = simple_heartbeat_config();
 
-        let ping_delay = 5u64;
+        let ping_delay = std::time::Duration::from_millis(5u64);
+        let expected_loop_count = 2u32;
+
+        let mut mock = MockHeartbeatExternalApi::new();
+        mock.expect_get_peers()
+            .times(expected_loop_count as usize..)
+            .return_const(vec![PeerId::random(), PeerId::random()]);
+
+        let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
+
+        futures_lite::future::race(
+            heartbeat.heartbeat_loop(),
+            sleep(ping_delay * expected_loop_count)
+        )
+        .await;
+    }
+
+    #[async_std::test]
+    async fn test_heartbeat_should_interrupt_long_running_heartbeats() {
+        let config = HeartbeatConfig {
+            interval: std::time::Duration::from_millis(5u64),
+            ..simple_heartbeat_config()
+        };
+
+        let ping_delay = 2 * config.interval;
         let expected_loop_count = 2;
 
         let mut mock = MockHeartbeatExternalApi::new();
@@ -180,33 +200,7 @@ mod tests {
 
         futures_lite::future::race(
             heartbeat.heartbeat_loop(),
-            sleep(std::time::Duration::from_millis(
-                (expected_loop_count as u64) * ping_delay,
-            )),
-        )
-        .await;
-    }
-
-    #[async_std::test]
-    async fn test_heartbeat_should_interrupt_long_running_heartbeats() {
-        let mut config = simple_heartbeat_config();
-        config.interval = 5u64;
-
-        let ping_delay = 2 * config.interval;
-        let expected_loop_count = 2;
-
-        let mut mock = MockHeartbeatExternalApi::new();
-        mock.expect_get_peers()
-            .times(expected_loop_count..)
-            .return_const(vec![PeerId::random(), PeerId::random()]);
-
-        let mut heartbeat = Heartbeat::new(config.clone(), DelayingPinger { delay: ping_delay }, mock);
-
-        futures_lite::future::race(
-            heartbeat.heartbeat_loop(),
-            sleep(std::time::Duration::from_millis(
-                (expected_loop_count as u64) * config.interval,
-            )),
+            sleep(config.interval * (expected_loop_count as u32)),
         )
         .await;
     }

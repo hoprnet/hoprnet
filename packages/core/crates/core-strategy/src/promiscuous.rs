@@ -410,7 +410,7 @@ mod tests {
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use utils_misc::time::native::current_timestamp;
+    use platform::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -443,7 +443,7 @@ mod tests {
         }
         fn emit(&self, _: NetworkEvent) {}
         fn create_timestamp(&self) -> u64 {
-            current_timestamp()
+            current_timestamp().as_millis() as u64
         }
     }
 
@@ -479,7 +479,7 @@ mod tests {
             net.add(peer, PeerOrigin::Initialization);
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                net.update(peer, Ok(current_timestamp()));
+                net.update(peer, Ok(current_timestamp().as_millis() as u64));
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",

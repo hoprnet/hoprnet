@@ -5,7 +5,7 @@ use std::time::Duration;
 use utils_log::{debug, warn};
 
 use async_std::task::sleep;
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 /// Represents a periodic timer that ticks in a loop with the given period.
 /// Could be later extended so it supports multiple different periods and multiple actions.
@@ -15,7 +15,7 @@ pub struct UniversalTimer {
 }
 
 fn get_timestamp() -> Duration {
-    Duration::from_millis(current_timestamp())
+    current_timestamp()
 }
 
 impl UniversalTimer {

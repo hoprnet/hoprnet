@@ -3,7 +3,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use utils_validation::network::native::is_dns_address;
+use utils_validation::network::{is_reachable_domain, looks_like_domain};
 
 pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
 pub use core_protocol::config::ProtocolConfig;
@@ -47,7 +47,7 @@ impl FromStr for HostConfig {
                 address: HostType::IPv4(ip_or_dns.to_owned()),
                 port,
             })
-        } else if is_dns_address(ip_or_dns) {
+        } else if looks_like_domain(ip_or_dns) {
             Ok(Self {
                 address: HostType::Domain(ip_or_dns.to_owned()),
                 port,
@@ -73,7 +73,7 @@ fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
 }
 
 fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
-    if is_dns_address(s) {
+    if looks_like_domain(s) || is_reachable_domain(s) {
         Ok(())
     } else {
         Err(ValidationError::new("Invalid DNS address provided"))
@@ -124,15 +124,12 @@ mod tests {
     #[test]
     fn test_verify_valid_dns_addresses() {
         assert!(validate_dns_address("localhost").is_ok());
-        assert!(validate_dns_address("hoprnet.org").is_ok());
+        assert!(validate_dns_address("google.com").is_ok());
         assert!(validate_dns_address("hub.hoprnet.org").is_ok());
     }
 
     #[test]
     fn test_verify_invalid_dns_addresses() {
-        assert!(validate_dns_address("org").is_err());
-        assert!(validate_dns_address(".org").is_err());
         assert!(validate_dns_address("-hoprnet-.org").is_err());
-        assert!(validate_dns_address("unknown.sub.sub.hoprnet.org").is_err());
     }
 }

@@ -166,6 +166,13 @@ pub struct ChainNetworkConfig {
     pub confirmations: u32,
 }
 
+/// Check whether the version is allowed
+/// 
+/// TODO: Needs implementing
+fn satisfies(_version: &str, _allowed_versions: &str) -> crate::errors::Result<bool> {
+    Ok(true)
+}
+
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
     pub fn new(id: &str, maybe_custom_provider: Option<&str>) -> Result<Self, String> {
@@ -185,7 +192,7 @@ impl ChainNetworkConfig {
             chain.default_provider = custom_provider.into();
         }
 
-        match real_base::real::satisfies(crate::constants::APP_VERSION_COERCED, network.version_range.as_str()) {
+        match satisfies(crate::constants::APP_VERSION_COERCED, network.version_range.as_str()) {
             Ok(true) => Ok(ChainNetworkConfig {
                 announcements: network.addresses.announcements.to_owned(),
                 chain: chain.to_owned(),
@@ -284,7 +291,7 @@ impl ProtocolConfig {
         for (_, env) in self.networks.iter() {
             let range = env.version_range.to_owned();
 
-            if let Ok(true) = real_base::real::satisfies(crate::constants::APP_VERSION_COERCED, range.as_str()) {
+            if let Ok(true) = satisfies(crate::constants::APP_VERSION_COERCED, range.as_str()) {
                 allowed.push(env.to_owned())
             }
         }

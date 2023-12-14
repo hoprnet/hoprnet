@@ -42,7 +42,6 @@ core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, default-features = false, optional = true }
 utils-types = { workspace = true, default-features = false }
 
@@ -60,7 +59,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 prometheus = ["dep:utils-metrics"]
 reqwest = ["dep:reqwest"]

@@ -17,7 +17,7 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait(? Send)]
@@ -128,15 +128,15 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                     ChannelStatus::PendingToClose => {
                         info!(
                             "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp())
+                            channel.remaining_closure_time(current_timestamp().as_millis() as u64)
                         );
-                        if channel.closure_time_passed(current_timestamp()) {
+                        if channel.closure_time_passed(current_timestamp().as_millis() as u64) {
                             info!("initiating finalization of channel closure of {channel} in {direction}");
                             self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                         } else {
                             Err(ClosureTimeHasNotElapsed(
                                 channel
-                                    .remaining_closure_time(current_timestamp())
+                                    .remaining_closure_time(current_timestamp().as_millis() as u64)
                                     .unwrap_or(u32::MAX as u64),
                             ))
                         }

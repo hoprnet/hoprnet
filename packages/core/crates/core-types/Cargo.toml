@@ -29,7 +29,7 @@ ethers = { workspace = true, default-features = false }
 bindings =  { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
@@ -43,5 +43,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "core-crypto/wasm", "utils-log/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

@@ -1,7 +1,7 @@
 use core_crypto::errors::CryptoError;
 use getrandom::Error as RandomError;
 use hex::FromHexError;
-use real_base::error::RealError;
+use platform::error::PlatformError;
 use serde_json::Error as JsonError;
 use thiserror::Error;
 
@@ -11,7 +11,7 @@ pub enum KeyPairError {
     EntropyError(#[from] RandomError),
 
     #[error("file system error: {0}")]
-    FileSystemError(#[from] RealError),
+    FileSystemError(#[from] PlatformError),
 
     #[error("cryptography error: {0}")]
     CryptographyError(#[from] CryptoError),
