@@ -229,15 +229,19 @@ pub fn build_p2p_network(
     mplex_config.set_max_num_streams(512);
 
     // libp2p default is 32 Bytes
-    // we use 2KB, just above the uniform hopr message size, trade off memory for less scheduler
-    // switching
+    // we use the default for now
     // FIXME: benchmark and find appropriate values
-    mplex_config.set_max_buffer_size(2 * 1024);
+    mplex_config.set_max_buffer_size(32);
 
     // libp2p default is 8 KBytes
-    // we use the allowed max 1MB, trade off memory for less scheduler
+    // we use the default for now, max allowed would be 1MB
     // FIXME: benchmark and find appropriate values
-    mplex_config.set_split_send_size(1 * 1024 * 1024);
+    mplex_config.set_split_send_size(8 * 1024);
+
+    // libp2p default is Block
+    // Alternative is ResetStream
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
 
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
