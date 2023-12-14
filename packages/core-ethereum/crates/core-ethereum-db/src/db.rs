@@ -68,10 +68,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> CoreEthereum
         let mut cached_channel: HashMap<Hash, (u32, u64)> = HashMap::new(); // channel_id: (channel_epoch, ticket_index)
         debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
 
-        let tickets = self.get_tickets(None).await?;
+        // FIXME: Currently a node does not have a way of reconciling unacknowledged
+        // tickets with the sender. Therefore, the use of unack tickets could make a
+        // channel inoperable. Re-enable the use of unacknowledged tickets in this
+        // calculation once a reconciliation mechanism has been implemented
+        let tickets = self.get_acknowledged_tickets(None).await?;
         info!("Calculating unrealized balance for {} tickets...", tickets.len());
 
-        for ticket in tickets.into_iter() {
+        for ack_ticket in tickets.into_iter() {
+            let ticket = ack_ticket.ticket;
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
                 if let Some((current_channel_epoch, current_ticket_index)) =
@@ -325,16 +330,21 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
         self.db.set(key, &pending_acknowledgment).await?;
 
-        if let PendingAcknowledgement::WaitingAsRelayer(v) = pending_acknowledgment {
-            let current_unrealized_value = self
-                .cached_unrealized_value
-                .get(&v.ticket.channel_id)
-                .map(|v| v.clone())
-                .unwrap_or(Balance::zero(BalanceType::HOPR));
+        // FIXME: Currently a node does not have a way of reconciling unacknowledged
+        // tickets with the sender. Therefore, the use of unack tickets could make a
+        // channel inoperable. Re-enable the use of unacknowledged tickets in this
+        // calculation once a reconciliation mechanism has been implemented
 
-            self.cached_unrealized_value
-                .insert(v.ticket.channel_id, current_unrealized_value.add(&v.ticket.amount));
-        }
+        // if let PendingAcknowledgement::WaitingAsRelayer(v) = pending_acknowledgment {
+        //     let current_unrealized_value = self
+        //         .cached_unrealized_value
+        //         .get(&v.ticket.channel_id)
+        //         .map(|v| v.clone())
+        //         .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+        //     self.cached_unrealized_value
+        //         .insert(v.ticket.channel_id, current_unrealized_value.add(&v.ticket.amount));
+        // }
 
         self.db.flush().await?;
 
@@ -348,6 +358,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
         let ack_key = get_acknowledged_ticket_key(&acked_ticket)?;
+
+        // FIXME: Currently a node does not have a way of reconciling unacknowledged
+        // tickets with the sender. Therefore, the use of unack tickets could make a
+        // channel inoperable. Re-enable the use of unacknowledged tickets in this
+        // calculation once a reconciliation mechanism has been implemented
+
+        let current_unrealized_value = self
+            .cached_unrealized_value
+            .get(&acked_ticket.ticket.channel_id)
+            .map(|v| v.clone())
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+        self.cached_unrealized_value.insert(
+            acked_ticket.ticket.channel_id,
+            current_unrealized_value.add(&acked_ticket.ticket.amount),
+        );
 
         let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.del(unack_key);
@@ -2671,7 +2697,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_db_should_increase_unrealized_balance_on_losing_ticket() {
+    async fn test_db_should_decrease_unrealized_balance_on_losing_ticket() {
         let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
