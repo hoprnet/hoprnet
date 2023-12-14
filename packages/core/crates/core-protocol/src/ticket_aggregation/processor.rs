@@ -709,7 +709,7 @@ impl<T, U> Stream for TicketAggregationInteraction<T, U> {
 
 #[cfg(test)]
 mod tests {
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},

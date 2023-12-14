@@ -4,7 +4,7 @@ use crate::auto_redeeming::AutoRedeemingStrategy;
 use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;

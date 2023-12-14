@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;

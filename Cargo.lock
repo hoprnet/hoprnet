@@ -1648,6 +1648,7 @@ dependencies = [
 name = "core-path"
 version = "0.2.0"
 dependencies = [
+ "async-lock",
  "async-std",
  "async-trait",
  "console_error_panic_hook",
@@ -1721,6 +1722,7 @@ dependencies = [
 name = "core-strategy"
 version = "0.6.0"
 dependencies = [
+ "async-lock",
  "async-std",
  "async-trait",
  "core-crypto",
@@ -3385,6 +3387,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.1.0-rc.1"
 dependencies = [
+ "async-lock",
  "async-std",
  "console_error_panic_hook",
  "const_format",

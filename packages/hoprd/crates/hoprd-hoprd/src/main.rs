@@ -28,14 +28,6 @@ const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration
     //   process.exit()
     // }
 
-    // process.on('uncaughtExceptionMonitor', (err, origin) => {
-    //   // Make sure we get a log.
-    //   log(`FATAL ERROR, exiting with uncaught exception`, origin, err)
-    // })
-
-    // process.once('exit', stopGracefully)
-    // process.on('SIGINT', stopGracefully)
-    // process.on('SIGTERM', stopGracefully)
 
     // // Metrics
     // const metric_latency = create_histogram_with_buckets(
@@ -48,6 +40,10 @@ const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = <CliArgs as clap::Parser>::parse();
+
+    // TOOD: add proper signal handling
+    // The signal handling should produce the crossbeam-channel and notify all background loops to terminate gracefully
+    // https://rust-cli.github.io/book/in-depth/signals.html
 
     // TODO: remove the dry run
     if ! args.dry_run {

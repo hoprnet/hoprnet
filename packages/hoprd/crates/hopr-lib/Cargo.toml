@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-lock = { workspace = true }
 async-std = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }

@@ -3,7 +3,7 @@ pub mod errors;
 pub mod path;
 pub mod selectors;
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_trait::async_trait;
 use core_crypto::types::OffchainPublicKey;
 use core_ethereum_db::db::CoreEthereumDb;

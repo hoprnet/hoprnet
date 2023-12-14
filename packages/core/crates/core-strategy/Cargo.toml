@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-lock = { workspace = true }
 async-trait = { workspace = true }
 async-std = { workspace = true, features = ["unstable"]}
 getrandom = { workspace = true }
