@@ -20,7 +20,7 @@ use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
 use crate::errors::KeyPairError::KeyDerivationError;
-use real_base::file::native::{metadata, read_to_string, write};
+use platform::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;

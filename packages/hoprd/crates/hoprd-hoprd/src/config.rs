@@ -218,7 +218,7 @@ impl From<HoprdConfig> for HoprLibConfig {
     }
 }
 
-use real_base::file::native::read_to_string;
+use platform::file::native::read_to_string;
 
 use utils_log::debug;
 
@@ -276,13 +276,13 @@ impl HoprdConfig {
 
         // heartbeat
         if let Some(x) = cli_args.heartbeat_interval {
-            cfg.hopr.heartbeat.interval = x
+            cfg.hopr.heartbeat.interval = std::time::Duration::from_secs(x)
         };
         if let Some(x) = cli_args.heartbeat_threshold {
-            cfg.hopr.heartbeat.threshold = x
+            cfg.hopr.heartbeat.threshold = std::time::Duration::from_secs(x)
         };
         if let Some(x) = cli_args.heartbeat_variance {
-            cfg.hopr.heartbeat.variance = x
+            cfg.hopr.heartbeat.variance = std::time::Duration::from_secs(x)
         };
 
         // network options
@@ -470,9 +470,9 @@ mod tests {
                 },
                 strategy: hopr_lib::config::StrategyConfig::default(),
                 heartbeat: hopr_lib::config::HeartbeatConfig {
-                    interval: 0,
-                    threshold: 0,
-                    variance: 0,
+                    interval: std::time::Duration::from_secs(0),
+                    threshold: std::time::Duration::from_secs(0),
+                    variance: std::time::Duration::from_secs(0),
                 },
                 network_options: {
                     let mut c = hopr_lib::config::NetworkConfig::default();

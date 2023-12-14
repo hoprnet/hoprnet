@@ -1,8 +1,12 @@
+[build]
+rustflags = [ "-Zlocation-detail=none" ]
+
 [workspace]
 
 resolver = "2"
 
 members = [
+    "misc/platform",
     "packages/core/crates/core-crypto",
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
@@ -20,7 +24,6 @@ members = [
     "packages/core-ethereum/crates/core-ethereum-rpc",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
-    "packages/real/crates/real-base",
     "packages/hoprd/crates/hopr-lib",
     "packages/hoprd/crates/hoprd-api",
     "packages/hoprd/crates/hoprd-hoprd",
@@ -29,7 +32,6 @@ members = [
     "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
-    "packages/utils/crates/utils-misc",
     "packages/utils/crates/utils-types",
     "packages/utils/crates/utils-validation"
 ]
@@ -87,14 +89,13 @@ hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
 hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false }
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
-real-base = { path = "packages/real/crates/real-base", default-features = false }
+platform = { path = "misc/platform"}
 utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
 utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
-utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
 
 [profile.release]
-opt-level = "s"     # optimize for small code size
-#debug=true
+strip = true
+opt-level = 3

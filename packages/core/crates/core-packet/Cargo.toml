@@ -27,10 +27,10 @@ core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false}
 core-types = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
@@ -52,6 +52,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus"]
-wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-types/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 prometheus = ["dep:utils-metrics"]

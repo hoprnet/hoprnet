@@ -475,7 +475,7 @@ mod tests {
         test_env(
             Box::new(MemEnv::new()),
             Path::new("/"),
-            utils_misc::time::native::current_timestamp(),
+            platform::time::native::current_timestamp().as_millis() as u64,
         )
     }
 }
@@ -569,7 +569,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            utils_misc::time::wasm::current_timestamp() * 1000
+            platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -882,7 +882,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            utils_misc::time::wasm::current_timestamp() * 1000
+            platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -895,7 +895,7 @@ pub mod wasm {
         test_env(
             Box::new(NodeJsEnv::new()),
             Path::new(base_dir),
-            utils_misc::time::wasm::current_timestamp(),
+            platform::time::wasm::current_timestamp(),
         );
     }
 }

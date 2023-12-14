@@ -9,23 +9,17 @@ use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-use utils_validation::network::native::is_dns_address;
+use utils_validation::network::looks_like_domain;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
-
-pub const DEFAULT_HOST: &str = "0.0.0.0";
-pub const DEFAULT_PORT: u16 = 9091;
-
-pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
-pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 fn parse_host(s: &str) -> Result<HostConfig, String> {
     let host = s.split_once(':').map_or(s, |(h, _)| h);
-    if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
-        return Err("Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into());
+    if !(validator::validate_ip_v4(host) || looks_like_domain(host)) {
+        return Err(format!("Given string {s} is not a valid host, should have a format: <ip>:<port> or <domain>(:<port>)"));
     }
 
     HostConfig::from_str(s)

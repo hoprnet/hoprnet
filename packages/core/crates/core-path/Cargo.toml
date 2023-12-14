@@ -28,10 +28,10 @@ wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futur
 core-ethereum-db = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-log = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
@@ -46,7 +46,7 @@ wasm-bindgen-test = "0.3.36"
 
 [features]
 default = ["prometheus"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-metrics?/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 

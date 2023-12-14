@@ -16,15 +16,6 @@ pub enum GeneralError {
 
     #[error("non-specific error: {0}")]
     NonSpecificError(String),
-    //#[error(transparent)]
-    //Other(#[from] AnyError),
 }
 
 pub type Result<T> = core::result::Result<T, GeneralError>;
-
-#[cfg(feature = "wasm")]
-impl From<GeneralError> for wasm_bindgen::JsValue {
-    fn from(value: GeneralError) -> Self {
-        value.to_string().into()
-    }
-}

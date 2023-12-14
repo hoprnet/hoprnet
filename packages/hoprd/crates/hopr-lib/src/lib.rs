@@ -51,7 +51,7 @@ use core_transport::libp2p_identity::PeerId;
 use core_transport::{
     ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
 };
-use real_base::file::native::{join, read_file, remove_dir_all, write};
+use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
@@ -64,7 +64,7 @@ use crate::config::HoprLibConfig;
 
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
@@ -432,7 +432,7 @@ impl Hopr {
         let tbf = read_file(&tbf_path)
             .and_then(|data| {
                 TagBloomFilter::from_bytes(&data)
-                    .map_err(|e| real_base::error::RealError::GeneralError(e.to_string()))
+                    .map_err(|e| platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
                 debug!("No tag Bloom filter found, using empty");
@@ -462,7 +462,7 @@ impl Hopr {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_PROCESS_START_TIME.set(current_timestamp() as f64 / 1000.0);
+            METRIC_PROCESS_START_TIME.set(current_timestamp().as_secs() as f64);
             METRIC_HOPR_LIB_VERSION.set(
                 &["version"],
                 f64::from_str(const_format::formatcp!(

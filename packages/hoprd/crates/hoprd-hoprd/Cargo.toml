@@ -43,10 +43,9 @@ hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
-real-base = { workspace = true }
+platform = { workspace = true }
 utils-db = { workspace = true }
 utils-log = { workspace = true }
-utils-misc = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 utils-validation = { workspace = true }
@@ -80,9 +79,9 @@ wasm = [
     "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",
+    "platform/wasm-bindgen",
     "utils-db/wasm",
     "utils-log/wasm",
-    "utils-misc/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
     "utils-validation/wasm",

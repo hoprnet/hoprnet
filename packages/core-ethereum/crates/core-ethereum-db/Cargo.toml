@@ -17,9 +17,9 @@ async-lock = { version = "2.7.0", optional = true }
 console_error_panic_hook = { version = "0.1.6", optional = true }
 core-crypto = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false}
-utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 hex = { workspace = true }
 hex-literal = "0.4"
@@ -49,5 +49,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "core-crypto/wasm", "dep:serde-wasm-bindgen", "dep:async-lock", "dep:js-sys", "core-types/wasm", "utils-db/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-log/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "core-crypto/wasm", "dep:serde-wasm-bindgen", "dep:async-lock", "dep:js-sys", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-log/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

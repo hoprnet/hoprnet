@@ -17,14 +17,8 @@ use crate::cli::CliArgs;
 
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
-
-    // export function removeAllInPath(target: string) {
-    //   const p = path.normalize(target)
-    //   rmSync(p, { recursive: true, force: true })
-    // }
-
-
     // // Metrics
+    // TODO: introduce RLP
     // const metric_latency = create_histogram_with_buckets(
     //   'hoprd_histogram_message_latency_ms',
     //   'Histogram of measured received message latencies',
@@ -74,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Create the message inbox
         let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            std::time::Duration::from_millis(utils_misc::time::native::current_timestamp())
+            platform::time::native::current_timestamp()
         })));
 
         let inbox_clone = inbox.clone();

@@ -22,7 +22,7 @@ serde = "1.0"
 bindings = { workspace = true }
 core-crypto = { workspace = true }
 core-types = { workspace = true }
-utils-misc = { workspace = true }
+platform = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
 
@@ -47,5 +47,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

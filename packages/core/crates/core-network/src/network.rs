@@ -17,7 +17,7 @@ use utils_types::sma::{SingleSumSMA, SMA};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
-    utils_misc::time::native::current_timestamp,
+    platform::time::native::current_timestamp,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -238,7 +238,7 @@ pub struct Network<T: NetworkExternalActions> {
     last_health: Health,
     network_actions_api: T,
     #[cfg(all(feature = "prometheus", not(test)))]
-    started_at: Option<u64>,
+    started_at: Option<std::time::Duration>,
 }
 
 impl<T: NetworkExternalActions> Network<T> {
@@ -458,8 +458,9 @@ impl<T: NetworkExternalActions> Network<T> {
 
             #[cfg(all(feature = "prometheus", not(test)))]
             if self.started_at.is_some() {
-                METRIC_NETWORK_HEALTH_TIME_TO_GREEN
-                    .observe(((current_timestamp() - self.started_at.take().unwrap()) / 1000) as f64);
+                if let Some(ts) = current_timestamp().checked_sub(self.started_at.take().unwrap()) {
+                    METRIC_NETWORK_HEALTH_TIME_TO_GREEN.observe(ts.as_secs() as f64);
+                }
             }
 
             self.last_health = health;
@@ -573,7 +574,7 @@ mod tests {
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
     use libp2p_identity::PeerId;
-    use utils_misc::time::native::current_timestamp;
+    use platform::time::native::current_timestamp;
 
     struct DummyNetworkAction {}
 
@@ -585,7 +586,7 @@ mod tests {
         fn emit(&self, _: NetworkEvent) {}
 
         fn create_timestamp(&self) -> u64 {
-            current_timestamp()
+            current_timestamp().as_millis() as u64
         }
     }
 
@@ -842,7 +843,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
-        mock.expect_create_timestamp().returning(|| current_timestamp());
+        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -860,7 +861,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
-        mock.expect_create_timestamp().returning(|| current_timestamp());
+        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -883,7 +884,7 @@ mod tests {
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer.clone())))
             .return_const(());
-        mock.expect_create_timestamp().returning(|| current_timestamp());
+        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -905,7 +906,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
-        mock.expect_create_timestamp().returning(|| current_timestamp());
+        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(me, cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -929,7 +930,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
-        mock.expect_create_timestamp().returning(|| current_timestamp());
+        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);

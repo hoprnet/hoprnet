@@ -37,7 +37,7 @@ core-ethereum-types = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
 utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-misc = { workspace = true }
+platform = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
 
@@ -54,5 +54,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 default = ["prometheus"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+    "utils-db/wasm", "utils-log/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics", "core-ethereum-rpc/prometheus" ]

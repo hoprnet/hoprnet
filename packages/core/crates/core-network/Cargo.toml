@@ -28,8 +28,8 @@ js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-crypto = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, default-features = false, optional = true}
 utils-types = { workspace = true, default-features = false }
 
@@ -45,7 +45,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics/wasm", "utils-types/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "platform/wasm-bindgen", "utils-metrics/wasm", "utils-types/wasm"]
 compat-ping = []
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 prometheus = ["dep:utils-metrics"]

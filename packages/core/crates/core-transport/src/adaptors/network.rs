@@ -5,7 +5,7 @@ use core_network::{
 use futures::channel::mpsc::Sender;
 use utils_log::error;
 
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
@@ -30,6 +30,6 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         }
     }
     fn create_timestamp(&self) -> u64 {
-        current_timestamp()
+        current_timestamp().as_millis() as u64
     }
 }

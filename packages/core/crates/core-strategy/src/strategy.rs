@@ -21,7 +21,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -87,7 +87,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp())
+                channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp().as_millis() as u64)
             })
             .map(|channel| async {
                 let channel_cpy = *channel;

@@ -81,7 +81,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use {async_std::task::sleep, utils_misc::time::native::current_timestamp};
+use {async_std::task::sleep, platform::time::native::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,
@@ -339,7 +339,7 @@ impl HoprTransport {
             .read()
             .await
             .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen - start))
+            .map(|status| std::time::Duration::from_millis(status.last_seen) - start)
     }
 
     pub async fn send_message(

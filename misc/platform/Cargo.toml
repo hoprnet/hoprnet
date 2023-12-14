@@ -1,24 +1,26 @@
 [package]
-name = "utils-metrics"
-version = "1.1.0"
+name = "platform"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust WASM module containing support for general metrics collection"
+description = "Rust implementation of wrappers for different platforms, including WASM"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
+
+[features]
+default = []
+wasm-bindgen = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
 
 [dependencies]
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { workspace = true, optional = true }
-prometheus = "0.13"
-regex = "1"
+thiserror = "1.0"
+bitflags = { version = "2.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-
-platform = { workspace = true }
+js-sys = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -29,8 +31,3 @@ wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
-
-[features]
-default = []
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "platform/wasm-bindgen" ]
-console_error_panic_hook = ["dep:console_error_panic_hook"]

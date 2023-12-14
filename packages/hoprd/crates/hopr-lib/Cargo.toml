@@ -23,6 +23,7 @@ serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
 
+# wasm-bindgen
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { workspace = true, optional = true }
 gloo-timers = { workspace = true, optional = true }
@@ -40,11 +41,10 @@ core-ethereum-rpc = { workspace = true }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true }
 core-ethereum-indexer = { workspace = true }
-real-base = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
-utils-misc = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -77,12 +77,11 @@ wasm = [
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",
     "core-ethereum-rpc/wasm",
-    "real-base/wasm",
+    "platform/wasm-bindgen",
     "utils-db/wasm",
     "utils-log/wasm",
     "utils-metrics?/wasm",
-    "utils-misc/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics", "dep:utils-misc", ]
+prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

@@ -27,7 +27,6 @@ wasm-bindgen = { workspace = true, optional = true }
 
 core-types = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -45,5 +44,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-types/wasm", "utils-log/wasm", "utils-misc/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-types/wasm", "utils-log/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

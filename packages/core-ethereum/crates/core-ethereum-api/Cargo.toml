@@ -16,7 +16,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "dep:js-sys", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm", "core-ethereum-indexer/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
+    "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
@@ -48,7 +48,6 @@ core-path = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
