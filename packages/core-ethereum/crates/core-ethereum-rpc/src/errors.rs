@@ -6,6 +6,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RpcError {
+    #[error("error on backend interface: {0}")]
+    InterfaceError(String),
+
     #[error("contract error: {0}")]
     ContractError(String),
 
