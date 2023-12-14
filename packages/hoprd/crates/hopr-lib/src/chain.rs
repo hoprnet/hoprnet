@@ -8,7 +8,7 @@ use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{serde_as, DisplayFromStr};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
@@ -92,8 +92,8 @@ pub struct Network {
     pub confirmations: u32,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
 #[serde_as]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Addresses {
     /// address of contract that manages authorization to access the Hopr network
@@ -126,8 +126,8 @@ pub struct Addresses {
     pub node_stake_v2_factory: Address,
 }
 
-#[derive(Serialize, Clone)]
 #[serde_as]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChainNetworkConfig {
     /// the network identifier, e.g. monte_rosa
     pub id: String,
@@ -262,7 +262,7 @@ impl FromStr for ProtocolConfig {
     /// Reads the protocol config JSON file and returns it
     fn from_str(data: &str) -> Result<Self, Self::Err> {
         let mut protocol_config =
-            (serde_json::from_slice::<ProtocolConfig>(data.as_bytes())).map_err(|e| e.to_string())?;
+            (serde_json::from_str::<ProtocolConfig>(data)).map_err(|e| e.to_string())?;
 
         for (id, env) in protocol_config.networks.iter_mut() {
             env.id = id.to_owned();
@@ -377,4 +377,14 @@ pub fn build_chain_api(
         rpc_operations,
         channel_graph,
     )
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_default_protocol_config_can_be_deserialized() {
+        let _ = ProtocolConfig::default();
+    }
 }
