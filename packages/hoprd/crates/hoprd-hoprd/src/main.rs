@@ -23,11 +23,6 @@ const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration
     //   rmSync(p, { recursive: true, force: true })
     // }
 
-    // function stopGracefully(signal) {
-    //   log(`Process exiting with signal ${signal}`)
-    //   process.exit()
-    // }
-
 
     // // Metrics
     // const metric_latency = create_histogram_with_buckets(
@@ -39,6 +34,9 @@ const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+
+    info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
 
     // TOOD: add proper signal handling
@@ -47,8 +45,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: remove the dry run
     if ! args.dry_run {
-        info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
-        
         if std::env::var("DAPPNODE").map(|v| v.to_lowercase() == "true").unwrap_or(false) {
             info!("The HOPRd node appears to run on DappNode");
         }

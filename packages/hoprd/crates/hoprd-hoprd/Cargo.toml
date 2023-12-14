@@ -15,6 +15,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
+env_logger = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 proc-macro-regex = "~1.1.0"

@@ -162,6 +162,8 @@ function setup_node() {
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    RUST_LOG="debug" \
+    RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
       --api-token "${api_token}" \
