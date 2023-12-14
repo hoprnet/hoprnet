@@ -760,8 +760,8 @@ impl Hopr {
             .send_message(msg, destination, intermediate_path, hops, application_tag)
             .await;
 
+        #[cfg(all(feature = "prometheus", not(test)))]
         if result.is_err() {
-            #[cfg(all(feature = "prometheus", not(test)))]
             SimpleCounter::increment(&METRIC_MESSAGE_FAIL_COUNT);
         }
 

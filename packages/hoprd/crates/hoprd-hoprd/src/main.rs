@@ -169,7 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Node version: {version}
         ");
 
-        hopr_processes.await
+        hopr_processes.await;
     }
 
     Ok(())
