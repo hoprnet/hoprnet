@@ -62,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             core_transport::Keypair::public(&hopr_keys.chain_key).to_hex()
         );
 
+        // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
         if core_transport::Keypair::public(&hopr_keys.packet_key).to_string().starts_with("0xff") {
             warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
         }
@@ -77,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("#### NODE RECEIVED MESSAGE [{now}] ####");
             let ingress = inbox_clone.clone();
 
+            // TODO: Move RLP for backwards compatibility to msg processor pipeline
             //         let decodedMsg = decodeMessage(data.plain_text)
             //         log(`Message: ${decodedMsg.msg}`)
             //         log(`App tag: ${data.application_tag ?? 0}`)
@@ -98,8 +100,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Create the node instance
         info!("Creating the HOPRd node instance from hopr-lib");
-        // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
-        // -> if safe address or module address is not provided, replace with values stored in the db
         let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
 
         let node = Arc::new(RwLock::new(hopr_lib::Hopr::new(

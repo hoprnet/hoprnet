@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use rand::Rng;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct MixerConfig {
@@ -40,8 +39,8 @@ impl MixerConfig {
     /// Get a random delay duration from the specified minimum and maximum delay available
     /// inside the configuration.
     pub fn random_delay(&self) -> Duration {
-        let mut rng = rand::thread_rng();
-        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
+        let random_delay = core_crypto::random::random_integer(self.min_delay.as_millis() as u64, Some(self.max_delay.as_millis() as u64))
+            .unwrap_or(self.max_delay.as_millis() as u64);
 
         Duration::from_millis(random_delay)
     }
@@ -50,6 +49,7 @@ impl MixerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;

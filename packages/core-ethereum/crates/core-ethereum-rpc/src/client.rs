@@ -57,7 +57,8 @@ impl<Req: HttpPostRequestor + Debug + Clone> Clone for JsonRpcProviderClient<Req
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req> {
     type Error = JsonRpcProviderClientError;
 
