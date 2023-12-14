@@ -1,4 +1,4 @@
-use async_std::sync::{Mutex, RwLock};
+use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use core_ethereum_actions::redeem::TicketRedeemActions;
@@ -323,7 +323,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use async_trait::async_trait;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},

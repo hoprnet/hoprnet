@@ -778,7 +778,7 @@ mod tests {
         ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
         msg::mixer::MixerConfig,
     };
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use async_trait::async_trait;
     use core_crypto::types::OffchainPublicKey;
     use core_crypto::{

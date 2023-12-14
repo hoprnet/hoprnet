@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;

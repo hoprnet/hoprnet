@@ -16,10 +16,8 @@ use std::{
     time::Duration
 };
 
-use async_std::{
-    sync::RwLock,
-    task::spawn_local,
-};
+use async_lock::RwLock;
+use async_std::task::spawn_local;
 use futures::{
     Future, channel::mpsc::unbounded, FutureExt, StreamExt
 };

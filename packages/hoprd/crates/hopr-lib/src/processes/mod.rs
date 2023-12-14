@@ -1,6 +1,6 @@
 use std::{pin::Pin, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use core_strategy::strategy::MultiStrategy;
 use core_types::acknowledgement::AcknowledgedTicket;
