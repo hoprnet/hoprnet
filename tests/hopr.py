@@ -323,6 +323,28 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "messages_pop_message", body=body)
         return response
 
+    async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Peek next message from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+
+        body = MessagesPopBody(tag=tag)
+        _, response = self.__call_api(MessagesApi, "messages_peek_message", body=body)
+        return response
+
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG) -> dict:
+        """
+        Peek all messages from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+
+        body = MessagesPopBody(tag=tag)
+        _, response = self.__call_api(MessagesApi, "messages_peek_all_message", body=body)
+        return response
+
     async def tickets_redeem(self):
         """
         Redeems all tickets.

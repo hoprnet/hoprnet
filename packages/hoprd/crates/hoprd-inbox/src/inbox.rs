@@ -12,7 +12,7 @@ pub type TimestampFn = fn() -> Duration;
 /// Represents a generic backend trait for the message inbox.
 /// Messages `M` can be tagged or untagged via the type `T`
 #[async_trait(?Send)]
-pub trait InboxBackend<T: Copy + Default, M> {
+pub trait InboxBackend<T: Copy + Default, M: Clone> {
     /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
 
@@ -29,6 +29,13 @@ pub trait InboxBackend<T: Copy + Default, M> {
 
     /// Pops all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
+
+    /// Peeks the oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
+    /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
+    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
+
+    /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
+    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
     // TODO: consider adding a stream version for `pop_all`
 
@@ -120,7 +127,36 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
-        db.pop(tag).await
+
+        return db.pop(tag).await;
+    }
+
+    /// Peek the oldest message with the given tag, or the oldest message regardless the tag
+    /// if it is not given. Returns `None` if there's no message with such `tag` (if given) in the inbox
+    /// or if the whole inbox is empty (if no `tag` is given).
+    pub async fn peek(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
+        if self.is_excluded_tag(&tag) {
+            return None;
+        }
+
+        let mut db = self.backend.lock().await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
+            .await;
+
+        return db.peek(tag).await;
+    }
+
+    /// Peeks all the messages with the given `tag` (ordered oldest to latest) or
+    /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
+    pub async fn peek_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
+        if self.is_excluded_tag(&tag) {
+            return Vec::new();
+        }
+
+        let mut db = self.backend.lock().await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
+            .await;
+        db.peek_all(tag).await
     }
 
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
@@ -273,6 +309,21 @@ pub mod wasm {
             ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
         }
 
+        pub async fn peek(&self, tag: Option<u16>) -> Option<MessageInboxEntry> {
+            self.w.peek(tag).await.map(MessageInboxEntry::from)
+        }
+
+        pub async fn peek_all(&self, tag: Option<u16>) -> JsResult<JsValue> {
+            let all = self
+                .w
+                .peek_all(tag)
+                .await
+                .into_iter()
+                .map(MessageInboxEntry::from)
+                .collect::<Vec<MessageInboxEntry>>();
+
+            ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
+        }
         pub async fn size(&self, tag: Option<u16>) -> u32 {
             self.w.size(tag).await as u32
         }
