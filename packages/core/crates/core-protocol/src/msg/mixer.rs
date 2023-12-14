@@ -85,8 +85,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
-        let constant_delay = Duration::from_millis(10);
-        let tolerance = Duration::from_millis(1);
+        let constant_delay = Duration::from_millis(50);
+        let tolerance = Duration::from_millis(3);
 
         let expected = vec![1, 2, 3];
 
