@@ -184,7 +184,8 @@ def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
 
-# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and correct ticket price from api
+# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
+# correct ticket price from api
 @pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
