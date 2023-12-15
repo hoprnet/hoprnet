@@ -402,7 +402,7 @@ impl HoprTransport {
         }
     }
 
-    pub async fn aggregate_tickets(&mut self, channel: &Hash) -> errors::Result<()> {
+    pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
         let entry = self
             .db
             .read()
@@ -423,6 +423,7 @@ impl HoprTransport {
 
         Ok(self
             .ticket_aggregate_actions
+            .clone()
             .aggregate_tickets(AggregationList::WholeChannel(entry))?
             .consume_and_wait(std::time::Duration::from_millis(60000))
             .await?)

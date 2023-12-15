@@ -1,4 +1,3 @@
-pub mod api;
 pub mod cli;
 pub mod config;
 pub mod errors;
@@ -10,6 +9,7 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use core_transport::HalfKeyChallenge;
+use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{IdentityOptions, HoprKeys};
 use utils_log::{info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
@@ -110,6 +110,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             on_acknowledgement
         );
 
+        let wait_til_end_of_time = node.run().await?;
+
         // Show onboarding information
         let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
         let my_peer_id = core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid();
@@ -117,25 +119,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
         while ! node.is_allowed_to_access_network(&my_peer_id).await {
             info!("
+                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
+            ");
+
+            async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+
+            info!("
                 Node information:
 
                 Node peerID: {my_peer_id}
                 Node address: {my_address}
                 Node version: {version}
-
-                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
             ");
-
-            async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
         }
-
-        info!("
-            Node information:
-
-            Node peerID: {my_peer_id}
-            Node address: {my_address}
-            Node version: {version}
-        ");
 
         // setup API endpoint
         if cfg.api.enable {
@@ -151,10 +147,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
             ))));
 
-            crate::api::run_as_service(&cfg.api.host.to_string(), node).await;
+            let host_listen = match cfg.api.host.address {
+                core_transport::config::HostType::IPv4(a) |
+                core_transport::config::HostType::Domain(a) => format!("{a}:{}", cfg.api.host.port),
+            };
+            futures::join!(wait_til_end_of_time, run_hopr_api(&host_listen, node));
         } else {
-            node.run().await?.await;
-        }
+            wait_til_end_of_time.await;
+        };
     }
 
     Ok(())
