@@ -93,7 +93,7 @@ impl Default for IndexerConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Indexer<T, U, V>
 where
     T: HoprIndexerRpcOperations + 'static,

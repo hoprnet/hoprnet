@@ -349,9 +349,24 @@ where
         }),
     ];
 
-    (hopr_transport_api, hopr_chain_api, ready_loops)
+    async_std::task::spawn_local(Box::pin(async move {
+            let mut futs = crate::helpers::to_futures_unordered(ready_loops);
+
+            while let Some(process) = futs.next().await {
+                if process.can_finish() {
+                    continue;
+                } else {
+                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                }
+            }
+        })
+    );
+
+    (hopr_transport_api, hopr_chain_api, vec![])
 }
 
+#[derive(Clone)]
 pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
@@ -359,7 +374,6 @@ pub struct Hopr {
     aliases: Arc<RwLock<HashMap<String, PeerId>>>,
     transport_api: HoprTransport,
     chain_api: HoprChain,
-    processes: Option<Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>>>,
     chain_cfg: ChainNetworkConfig,
     safe_module_cfg: SafeModule,
 }
@@ -447,7 +461,7 @@ impl Hopr {
             };
         };
 
-        let (transport_api, chain_api, processes) = build_components(
+        let (transport_api, chain_api, _processes) = build_components(
             cfg.clone(),
             chain_config.clone(),
             me.clone(),
@@ -481,7 +495,6 @@ impl Hopr {
             me: me.clone(),
             transport_api,
             chain_api,
-            processes: Some(processes),
             chain_cfg: chain_config,
             safe_module_cfg: cfg.safe_module,
         }
@@ -688,20 +701,21 @@ impl Hopr {
         info!("ID {}", self.transport_api.me());
         info!("Protocol version {}", constants::APP_VERSION);
 
-        let processes = self.processes.take().expect("processes should be present in the node");
+        // let processes = self.processes.take().expect("processes should be present in the node");
 
-        Ok(Box::pin(async move {
-            let mut futs = crate::helpers::to_futures_unordered(processes);
+        // Ok(Box::pin(async move {
+        //     let mut futs = crate::helpers::to_futures_unordered(processes);
 
-            while let Some(process) = futs.next().await {
-                if process.can_finish() {
-                    continue;
-                } else {
-                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                }
-            }
-        }))
+        //     while let Some(process) = futs.next().await {
+        //         if process.can_finish() {
+        //             continue;
+        //         } else {
+        //             error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+        //             panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+        //         }
+        //     }
+        // }))
+        Ok(futures::future::pending())
     }
 
     // p2p transport =========

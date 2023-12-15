@@ -120,7 +120,7 @@ impl RustyLevelDbShim {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl AsyncKVStorage for RustyLevelDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
@@ -177,11 +177,11 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
-        Ok(Box::new(iter(RustyLevelDbIterator::new(
+        Ok(Box::new(RustyLevelDbIterator::new(
             i,
             &prefix,
             suffix_size as usize,
-        ))))
+        )))
     }
 
     fn iterate_range(
@@ -195,7 +195,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
-        Ok(Box::new(iter(RustyLevelDbIterator::new_range(i, &start, &end))))
+        Ok(Box::new(RustyLevelDbIterator::new_range(i, &start, &end)))
     }
 
     async fn batch(
@@ -452,13 +452,11 @@ mod tests {
         let expected = vec![value_1.as_bytes().into(), value_3.as_bytes().into()];
 
         let mut received = Vec::new();
-        let mut data_stream = Box::into_pin(
-            kv_storage
-                .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
-                .unwrap(),
-        );
+        let mut data_stream = kv_storage
+            .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
+            .unwrap();
 
-        while let Some(value) = data_stream.next().await {
+        while let Some(value) = data_stream.next() {
             let v = value.unwrap();
 
             if v.as_ref() != value_2.as_bytes() {

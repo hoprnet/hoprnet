@@ -102,38 +102,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Creating the HOPRd node instance from hopr-lib");
         let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
 
-        let node = Arc::new(RwLock::new(hopr_lib::Hopr::new(
+        let mut node = hopr_lib::Hopr::new(
             hoprlib_cfg,
             &hopr_keys.packet_key,
             &hopr_keys.chain_key,
             on_message,
             on_acknowledgement
-        )));
-
-        // setup API endpoint
-        if cfg.api.enable {
-            info!("Creating HOPRd API database");
-
-            let hoprd_db_path = Path::new(&cfg.hopr.db.data).join("db").join("hoprd")
-                .into_os_string()
-                .into_string()
-                .map_err(|_| errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
-            
-            let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
-                utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
-            ))));
-
-            // TODO: add api instantiation here
-        }
-
-        let hopr_processes = node.write().await.run().await?;
+        );
 
         // Show onboarding information
         let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
         let my_peer_id = core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid();
         let version = hopr_lib::constants::APP_VERSION;
             
-        while ! node.read().await.is_allowed_to_access_network(&my_peer_id).await {
+        while ! node.is_allowed_to_access_network(&my_peer_id).await {
             info!("
                 Node information:
 
@@ -155,7 +137,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Node version: {version}
         ");
 
-        hopr_processes.await;
+        // setup API endpoint
+        if cfg.api.enable {
+            info!("Creating HOPRd API database");
+
+            let hoprd_db_path = Path::new(&cfg.hopr.db.data).join("db").join("hoprd")
+                .into_os_string()
+                .into_string()
+                .map_err(|_| errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
+            
+            // TODO: Authentication, needs implementing
+            let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
+                utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
+            ))));
+
+            crate::api::run_as_service(&cfg.api.host.to_string(), node).await;
+        } else {
+            node.run().await?.await;
+        }
     }
 
     Ok(())

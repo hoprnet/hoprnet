@@ -14,7 +14,7 @@ pub mod payload;
 pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
     db: Arc<RwLock<Db>>,
