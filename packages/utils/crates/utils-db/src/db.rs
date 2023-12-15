@@ -2,7 +2,6 @@ use crate::{
     errors::{DbError, Result},
     traits::AsyncKVStorage,
 };
-use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::{Display, Formatter},

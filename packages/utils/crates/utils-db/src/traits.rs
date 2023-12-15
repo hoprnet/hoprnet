@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use futures_lite::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;

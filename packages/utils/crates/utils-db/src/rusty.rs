@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
-use futures_lite::stream::iter;
 use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
 
 struct RustyLevelDbIterator {

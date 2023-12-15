@@ -6,7 +6,10 @@ mod helpers;
 mod processes;
 
 
-pub use chain::{Network, ProtocolConfig};
+pub use {
+    utils_types::primitives::{Address, Balance, BalanceType},
+    chain::{Network, ProtocolConfig}
+};
 
 use std::{
     collections::HashMap,
@@ -54,7 +57,7 @@ use core_transport::{
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{error, info};
-use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
+use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::SmartContractConfig;
 use crate::config::SafeModule;
@@ -781,7 +784,7 @@ impl Hopr {
     }
 
     /// Attempts to aggregate all tickets in the given channel
-    pub async fn aggregate_tickets(&mut self, channel: &Hash) -> errors::Result<()> {
+    pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
         Ok(self.transport_api.aggregate_tickets(channel).await?)
     }
 

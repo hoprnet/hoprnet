@@ -4,7 +4,7 @@
       "chain": "anvil",
       "environment_type": "local",
       "version_range": "*",
-      "indexer_start_block_number": 6,
+      "indexer_start_block_number": 5,
       "addresses": {
         "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
@@ -23,7 +23,7 @@
       "chain": "anvil",
       "environment_type": "local",
       "version_range": "*",
-      "indexer_start_block_number": 6,
+      "indexer_start_block_number": 5,
       "addresses": {
         "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",

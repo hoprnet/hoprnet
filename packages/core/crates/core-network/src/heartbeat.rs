@@ -8,7 +8,6 @@ use futures::{
     pin_mut,
 };
 use libp2p_identity::PeerId;
-use rand::Rng;
 use serde_with::{serde_as, DurationSeconds};
 use serde::{Deserialize, Serialize};
 use validator::Validate;

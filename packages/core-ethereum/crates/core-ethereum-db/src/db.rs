@@ -165,8 +165,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_tickets(&self, maybe_signer: Option<Address>) -> Result<Vec<Ticket>> {
-        let ms2 = maybe_signer.clone();
-
         let mut acked_tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
