@@ -520,6 +520,10 @@ api:
   host:
     address: !IPv4 127.0.0.1
     port: 1233
+healthcheck:
+  enable: false
+  host: 127.0.0.1
+  port: 0
 test:
   use_weak_crypto: false
 "#;

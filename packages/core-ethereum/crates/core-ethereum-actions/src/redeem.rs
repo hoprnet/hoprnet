@@ -11,7 +11,7 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
 use utils_log::{debug, error, info, warn};
-use utils_types::primitives::Address;
+use utils_types::primitives::{Address, U256};
 
 use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
@@ -154,7 +154,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
             .get_acknowledged_tickets(Some(*channel))
             .await?
             .iter()
-            .filter(|t| t.status == Untouched && (!only_aggregated || t.ticket.is_aggregated()))
+            .filter(|t| {
+                t.status == Untouched
+                    && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
+                    && (!only_aggregated || t.ticket.is_aggregated())
+            })
             .count();
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
@@ -174,7 +178,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
                 .get_acknowledged_tickets(Some(*channel))
                 .await?
                 .into_iter()
-                .filter(|t| Untouched == t.status && (!only_aggregated || t.ticket.is_aggregated()));
+                .filter(|t| {
+                    Untouched == t.status
+                        && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
+                        && (!only_aggregated || t.ticket.is_aggregated())
+                });
 
             for mut avail_to_redeem in redeemable {
                 if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
@@ -294,6 +302,7 @@ mod tests {
         rdb: RustyLevelDbShim,
         ticket_count: usize,
         counterparty: &ChainKeypair,
+        channel_epoch: U256,
     ) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
         let mut inner_db = DB::new(rdb);
         let mut input_tickets = Vec::new();
@@ -314,7 +323,7 @@ mod tests {
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
+            channel_epoch,
             U256::zero(),
         );
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
@@ -335,9 +344,11 @@ mod tests {
         let ticket_count = 5;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        // all the tickets can be redeemed, coz they are issued with the same epoch as channel
+        let (channel_from_bob, bob_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
         let (channel_from_charlie, charlie_tickets) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -394,7 +405,7 @@ mod tests {
             .withf(move |t| charlie_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
             .returning(move |_| Ok(random_hash));
 
-        // Start the TransactionQueue with the mock TransactionExecutor
+        // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
@@ -451,8 +462,11 @@ mod tests {
         let ticket_count = 5;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
-        let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
+        // all the tickets can be redeemed, coz they are issued with the same epoch as channel
+        let (channel_from_bob, bob_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+        let (channel_from_charlie, _) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -484,7 +498,7 @@ mod tests {
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
             .returning(move |_| Ok(random_hash));
 
-        // Start the TransactionQueue with the mock TransactionExecutor
+        // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
@@ -541,7 +555,8 @@ mod tests {
         let ticket_count = 3;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -581,7 +596,7 @@ mod tests {
                 });
         }
 
-        // Start the TransactionQueue with the mock TransactionExecutor
+        // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
@@ -615,5 +630,163 @@ mod tests {
             actions.redeem_ticket(tickets[1].clone()).await.is_err(),
             "cannot redeem a ticket that's being redeemed"
         );
+    }
+
+    #[async_std::test]
+    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ticket_count = 3;
+        let ticket_from_previous_epoch_count = 1;
+        let rdb = RustyLevelDbShim::new_in_memory();
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
+        // Make the first ticket from the previous epoch
+        let (_, mut tickets_from_previous_epoch) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_from_previous_epoch_count, &BOB, U256::from(3u32))
+                .await;
+        // remaining tickets are from the current epoch
+        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
+            rdb.clone(),
+            ticket_count - ticket_from_previous_epoch_count,
+            &BOB,
+            U256::from(4u32),
+        )
+        .await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
+
+        // Expect only the redeemable tickets get redeemed
+        let mut tickets = tickets_from_previous_epoch.clone();
+        tickets.append(&mut tickets_from_current_epoch);
+
+        let tickets_clone = tickets.clone();
+        let mut tx_exec = MockTransactionExecutor::new();
+        tx_exec
+            .expect_redeem_ticket()
+            .times(ticket_count - 2)
+            .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        for tkt in tickets.iter().cloned().skip(2) {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .once()
+                .return_once(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeemed(channel_from_bob, Some(tkt)),
+                    })
+                    .boxed())
+                });
+        }
+
+        // Start the ActionQueue with the mock TransactionExecutor
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.action_loop().await;
+        });
+
+        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+
+        futures::future::join_all(
+            actions
+                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .await
+                .expect("redeem_tickets_in_channel should succeed")
+                .into_iter(),
+        )
+        .await;
+
+        assert!(
+            actions.redeem_ticket(tickets[0].clone()).await.is_err(),
+            "cannot redeem a ticket that's from the previous epoch"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ticket_count = 4;
+        let ticket_from_next_epoch_count = 2;
+        let rdb = RustyLevelDbShim::new_in_memory();
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
+        // Make the first few tickets from the next epoch
+        let (_, mut tickets_from_next_epoch) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_from_next_epoch_count, &BOB, U256::from(5u32)).await;
+        // remaining tickets are from the current epoch
+        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
+            rdb.clone(),
+            ticket_count - ticket_from_next_epoch_count,
+            &BOB,
+            U256::from(4u32),
+        )
+        .await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
+
+        // Expect only the redeemable tickets get redeemed
+        let mut tickets = tickets_from_next_epoch.clone();
+        tickets.append(&mut tickets_from_current_epoch);
+
+        let tickets_clone = tickets.clone();
+        let mut tx_exec = MockTransactionExecutor::new();
+        tx_exec
+            .expect_redeem_ticket()
+            .times(ticket_count - 2)
+            .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        for tkt in tickets.iter().cloned().skip(2) {
+            indexer_action_tracker
+                .expect_register_expectation()
+                .once()
+                .return_once(move |_| {
+                    Ok(futures::future::ok(SignificantChainEvent {
+                        tx_hash: random_hash,
+                        event_type: TicketRedeemed(channel_from_bob, Some(tkt)),
+                    })
+                    .boxed())
+                });
+        }
+
+        // Start the ActionQueue with the mock TransactionExecutor
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.action_loop().await;
+        });
+
+        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+
+        futures::future::join_all(
+            actions
+                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .await
+                .expect("redeem_tickets_in_channel should succeed")
+                .into_iter(),
+        )
+        .await;
+
+        for unredeemable_index in 0..ticket_from_next_epoch_count {
+            assert!(
+                actions
+                    .redeem_ticket(tickets[unredeemable_index].clone())
+                    .await
+                    .is_err(),
+                "cannot redeem a ticket that's from the next epoch"
+            );
+        }
     }
 }

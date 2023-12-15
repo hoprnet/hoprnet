@@ -106,7 +106,7 @@ jobs:
             gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_release_latest_tag}
             if [ "${base_branch}" == "master" ]; then
               echo "Tagging ${image}:latest"
-              gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:latest
+              # gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:latest
             fi
           done
 

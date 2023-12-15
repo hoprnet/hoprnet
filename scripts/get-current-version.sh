@@ -20,9 +20,9 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 version_type=${1} # Can be any of these values Build | ReleaseCandidate | Patch | Minor | Major
-current_version=$(sed -n "s/^version = //p" ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml | tr -d '"')
+current_version=$(jq -r '.version' "${mydir}/../packages/hoprd/package.json")
 
-if [ "${version_type}" == "docker" ] 
+if [ "${version_type}" == "docker" ]
 then
   echo ${current_version}
 else
