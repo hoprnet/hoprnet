@@ -221,10 +221,15 @@ impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereum
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        if let Untouched = ack_ticket.status {
-            unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
+        let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
+        if let Some(channel) = ch {
+            if ack_ticket.status == Untouched && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch) {
+                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
+            } else {
+                Err(WrongTicketState(ack_ticket.to_string()))
+            }
         } else {
-            Err(WrongTicketState(ack_ticket.to_string()))
+            Err(ChannelDoesNotExist)
         }
     }
 }
@@ -261,7 +266,7 @@ mod tests {
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).unwrap();
     }
 
-    fn generate_random_ack_ticket(idx: u32, counterparty: &ChainKeypair) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(idx: u32, counterparty: &ChainKeypair, channel_epoch: U256) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -277,7 +282,7 @@ mod tests {
             idx.into(),
             U256::one(),
             1.0f64,
-            4u64.into(),
+            channel_epoch,
             Challenge::from(cp_sum).to_ethereum_challenge(),
             counterparty,
             &Hash::default(),
@@ -308,7 +313,7 @@ mod tests {
         let mut input_tickets = Vec::new();
 
         for i in 0..ticket_count {
-            let ack_ticket = generate_random_ack_ticket(i as u32, counterparty);
+            let ack_ticket = generate_random_ack_ticket(i as u32, counterparty, channel_epoch);
             inner_db
                 .set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket)
                 .await
@@ -642,7 +647,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Make the first ticket from the previous epoch
-        let (_, mut tickets_from_previous_epoch) =
+        let (_, tickets_from_previous_epoch) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_from_previous_epoch_count, &BOB, U256::from(3u32))
                 .await;
         // remaining tickets are from the current epoch
@@ -667,12 +672,17 @@ mod tests {
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_redeem_ticket()
-            .times(ticket_count - 2)
-            .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .times(ticket_count - ticket_from_previous_epoch_count)
+            .withf(move |t| {
+                tickets_clone[ticket_from_previous_epoch_count..]
+                    .iter()
+                    .find(|tk| tk.ticket.eq(&t.ticket))
+                    .is_some()
+            })
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned().skip(2) {
+        for tkt in tickets.iter().cloned().skip(ticket_from_previous_epoch_count) {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -719,7 +729,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Make the first few tickets from the next epoch
-        let (_, mut tickets_from_next_epoch) =
+        let (_, tickets_from_next_epoch) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_from_next_epoch_count, &BOB, U256::from(5u32)).await;
         // remaining tickets are from the current epoch
         let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
@@ -743,12 +753,17 @@ mod tests {
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_redeem_ticket()
-            .times(ticket_count - 2)
-            .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .times(ticket_count - ticket_from_next_epoch_count)
+            .withf(move |t| {
+                tickets_clone[ticket_from_next_epoch_count..]
+                    .iter()
+                    .find(|tk| tk.ticket.eq(&t.ticket))
+                    .is_some()
+            })
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned().skip(2) {
+        for tkt in tickets.iter().cloned().skip(ticket_from_next_epoch_count) {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
