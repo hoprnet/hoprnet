@@ -34,10 +34,10 @@ where
     put(Put<K, V>),
 }
 
-pub type StorageValueIterator<T> = Box<dyn Stream<Item = crate::errors::Result<T>>>;
+pub type StorageValueIterator<T> = Box<dyn Iterator<Item = crate::errors::Result<T>>>;
 
 #[cfg_attr(test, mockall::automock(type Key = Box < [u8] >; type Value = Box < [u8] >;))]
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait]
 pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;

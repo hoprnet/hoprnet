@@ -23,7 +23,7 @@ use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
 
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum EnvironmentType {
     Production,
@@ -49,7 +49,7 @@ impl Display for EnvironmentType {
 
 /// Holds all information we need about the blockchain network
 /// the client is going to use
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChainOptions {
     #[serde(skip_deserializing)]
@@ -127,7 +127,7 @@ pub struct Addresses {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainNetworkConfig {
     /// the network identifier, e.g. monte_rosa
     pub id: String,

@@ -74,7 +74,6 @@ pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
     external_api: API,
-    rng: rand::rngs::ThreadRng,
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
@@ -83,7 +82,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             config,
             pinger,
             external_api,
-            rng: rand::thread_rng(),
         }
     }
 
@@ -110,7 +108,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 let interval_ms = self.config.interval.as_millis() as u64;
                 let variance_ms = self.config.interval.as_millis() as u64;
 
-                self.rng.gen_range(interval_ms..interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX))
+                core_crypto::random::random_integer(interval_ms, Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)))
+                    .unwrap_or(interval_ms)
             });
 
             let timeout = sleep(this_round_planned_duration).fuse();

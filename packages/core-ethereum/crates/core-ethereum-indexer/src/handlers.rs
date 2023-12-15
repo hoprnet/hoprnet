@@ -25,6 +25,7 @@ use utils_types::{
     traits::PeerIdLike,
 };
 
+#[derive(Debug, Clone)]
 pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process

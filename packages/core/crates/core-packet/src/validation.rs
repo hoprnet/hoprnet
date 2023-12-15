@@ -141,7 +141,7 @@ mod tests {
     mock! {
         pub Db { }
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;

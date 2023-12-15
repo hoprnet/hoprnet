@@ -94,6 +94,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
+#[derive(Debug, Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,

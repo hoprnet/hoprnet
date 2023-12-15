@@ -2,6 +2,8 @@
 
 #![allow(unused_imports)]
 
+use hopr_lib::Hopr;
+use hopr_lib::errors::HoprLibError;
 use hoprd_api::hyper;
 use hoprd_api::swagger;
 
@@ -10,6 +12,7 @@ use futures::{future, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use hyper::server::conn::Http;
 use hyper::service::Service;
 use utils_log::info;
+use utils_types::primitives::BalanceType;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
@@ -23,10 +26,10 @@ use tokio::net::TcpListener;
 use hoprd_api::models;
 
 /// Builds an SSL implementation for Simple HTTPS from some hard-coded file names
-pub async fn create(addr: &str, hopr: hopr_lib::Hopr, https: bool) {
+pub async fn run_as_service(addr: &str, hopr: Hopr) {
     let addr = addr.parse().expect("Failed to parse bind address");
 
-    let server = Server::new();
+    let server = Server::new(hopr);
 
     let service = MakeService::new(server);
 
@@ -36,17 +39,28 @@ pub async fn create(addr: &str, hopr: hopr_lib::Hopr, https: bool) {
     let mut service = hoprd_api::server::context::MakeAddContext::<_, EmptyContext>::new(service);
 
     // Using HTTP
+    // async-std
+    // hyper::server::Server::builder(compat::HyperListener(
+    //         async_std::net::TcpListener::bind(addr).await.expect("must provide a valid TCP socket address"))
+    //     )
+    //     .executor(compat::HyperExecutor)
+    //     .serve(service)
+    //     .await
+    //     .unwrap();
+    
+    // tokio
     hyper::server::Server::bind(&addr).serve(service).await.unwrap()
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Server<C> {
+    hopr: Hopr,
     marker: PhantomData<C>,
 }
 
 impl<C> Server<C> {
-    pub fn new() -> Self {
-        Server { marker: PhantomData }
+    pub fn new(hopr: Hopr) -> Self {
+        Server { hopr, marker: PhantomData }
     }
 }
 
@@ -67,6 +81,12 @@ use hoprd_api::{
 use std::error::Error;
 use swagger::ApiError;
 
+use crate::errors::HoprdError;
+
+fn to_api_err(e: HoprLibError) -> swagger::ApiError {
+    swagger::ApiError(e.to_string())
+}
+
 #[async_trait]
 impl<C> Api<C> for Server<C>
 where
@@ -74,17 +94,40 @@ where
 {
     async fn account_get_address(&self, context: &C) -> Result<AccountGetAddressResponse, ApiError> {
         info!("account_get_address() - X-Span-ID: {:?}", context.get().0.clone());
-        Err(ApiError("Generic failure".into()))
+
+        // AAA code
+        
+        let native = Some(self.hopr.me_onchain().to_string());
+        let hopr = Some(self.hopr.me_peer_id().to_string());
+        
+        Ok(AccountGetAddressResponse::AddressesFetchedSuccessfully(
+            models::AccountGetAddresses200Response{ native, hopr }
+        ))
     }
 
     async fn account_get_addresses(&self, context: &C) -> Result<AccountGetAddressesResponse, ApiError> {
         info!("account_get_addresses() - X-Span-ID: {:?}", context.get().0.clone());
-        Err(ApiError("Generic failure".into()))
+        
+        let native = Some(self.hopr.me_onchain().to_string());
+        let hopr = Some(self.hopr.me_peer_id().to_string());
+        
+        Ok(AccountGetAddressesResponse::AddressesFetchedSuccessfully(
+            models::AccountGetAddresses200Response{ native, hopr }
+        ))
     }
 
     async fn account_get_balances(&self, context: &C) -> Result<AccountGetBalancesResponse, ApiError> {
         info!("account_get_balances() - X-Span-ID: {:?}", context.get().0.clone());
-        Err(ApiError("Generic failure".into()))
+
+        Ok(AccountGetBalancesResponse::BalancesFetchedSuccessfuly(
+            models::AccountGetBalances200Response{
+                native: Some(self.hopr.get_balance(BalanceType::Native).await.map_err(to_api_err)?.to_string()),
+                hopr: Some(self.hopr.get_balance(BalanceType::HOPR).await.map_err(to_api_err)?.to_string()),
+                safe_native: Some(self.hopr.get_safe_balance(BalanceType::Native).await.map_err(to_api_err)?.to_string()),
+                safe_hopr: Some(self.hopr.get_safe_balance(BalanceType::HOPR).await.map_err(to_api_err)?.to_string()),
+                safe_hopr_allowance: Some(self.hopr.safe_allowance().await.map_err(to_api_err)?.to_string())
+            }
+        ))
     }
 
     async fn account_withdraw(
@@ -246,6 +289,7 @@ where
 
     async fn check_node_healthy(&self, context: &C) -> Result<CheckNodeHealthyResponse, ApiError> {
         info!("check_node_healthy() - X-Span-ID: {:?}", context.get().0.clone());
+        
         Err(ApiError("Generic failure".into()))
     }
 
@@ -360,6 +404,7 @@ where
             peerid,
             context.get().0.clone()
         );
+
         Err(ApiError("Generic failure".into()))
     }
 
@@ -454,7 +499,7 @@ pub mod compat {
         }
     }
 
-    pub struct HyperListener(pub TcpListener);
+    pub struct HyperListener (pub TcpListener);
 
     impl hyper::server::accept::Accept for HyperListener {
         type Conn = HyperStream;

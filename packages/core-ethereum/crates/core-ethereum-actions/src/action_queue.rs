@@ -114,7 +114,7 @@ pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>>
 type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {
