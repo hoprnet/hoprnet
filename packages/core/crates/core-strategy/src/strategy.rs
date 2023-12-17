@@ -65,19 +65,19 @@ pub trait SingularStrategy: Display {
 
 /// Internal strategy which runs per tick and finalizes `PendingToClose` channels
 /// which have elapsed the grace period
-struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone> {
+struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
     db: Arc<RwLock<Db>>,
     chain_actions: CoreEthereumActions<Db>,
 }
 
-impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "channel_closure_finalizer")
     }
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFinalizer<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
         let to_close = self
             .db
@@ -87,7 +87,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp().as_millis() as u64)
+                channel.status == ChannelStatus::PendingToClose
+                    && channel.closure_time_passed(current_timestamp().as_millis() as u64)
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
@@ -175,7 +176,7 @@ impl MultiStrategy {
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Clone + 'static,
+        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
         Net: NetworkExternalActions + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();

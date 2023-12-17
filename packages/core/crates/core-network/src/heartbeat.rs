@@ -8,8 +8,8 @@ use futures::{
     pin_mut,
 };
 use libp2p_identity::PeerId;
-use serde_with::{serde_as, DurationSeconds};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
 use utils_log::{debug, info};
@@ -107,8 +107,11 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 let interval_ms = self.config.interval.as_millis() as u64;
                 let variance_ms = self.config.interval.as_millis() as u64;
 
-                core_crypto::random::random_integer(interval_ms, Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)))
-                    .unwrap_or(interval_ms)
+                core_crypto::random::random_integer(
+                    interval_ms,
+                    Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)),
+                )
+                .unwrap_or(interval_ms)
             });
 
             let timeout = sleep(this_round_planned_duration).fuse();
@@ -123,7 +126,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
             let this_round_actual_duration = current_timestamp().saturating_sub(start);
             if this_round_actual_duration < this_round_planned_duration {
-                let time_to_wait_for_next_round = this_round_planned_duration.saturating_sub(this_round_actual_duration);
+                let time_to_wait_for_next_round =
+                    this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
                 debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}ms");
                 sleep(time_to_wait_for_next_round).await
@@ -172,11 +176,7 @@ mod tests {
 
         let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
 
-        futures_lite::future::race(
-            heartbeat.heartbeat_loop(),
-            sleep(ping_delay * expected_loop_count)
-        )
-        .await;
+        futures_lite::future::race(heartbeat.heartbeat_loop(), sleep(ping_delay * expected_loop_count)).await;
     }
 
     #[async_std::test]

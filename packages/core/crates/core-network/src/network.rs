@@ -16,8 +16,8 @@ use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
     platform::time::native::current_timestamp,
+    utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -843,7 +843,8 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
-        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
+        mock.expect_create_timestamp()
+            .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -861,7 +862,8 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
-        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
+        mock.expect_create_timestamp()
+            .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -884,7 +886,8 @@ mod tests {
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer.clone())))
             .return_const(());
-        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
+        mock.expect_create_timestamp()
+            .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -906,7 +909,8 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
-        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
+        mock.expect_create_timestamp()
+            .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(me, cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -930,7 +934,8 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
-        mock.expect_create_timestamp().returning(|| current_timestamp().as_millis() as u64);
+        mock.expect_create_timestamp()
+            .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);

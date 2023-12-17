@@ -18,7 +18,7 @@ use async_std::task::sleep;
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.
-#[async_trait(? Send)]
+#[async_trait]
 pub trait EthereumClient<T: Into<TypedTransaction>> {
     /// Sends transaction to the blockchain and returns its hash.
     /// Does not poll for transaction completion.
@@ -73,8 +73,8 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
     }
 }
 
-#[async_trait(? Send)]
-impl<Rpc: HoprRpcOperations> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
+#[async_trait]
+impl<Rpc: HoprRpcOperations + Send + Sync> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
     async fn post_transaction(&self, tx: TypedTransaction) -> core_ethereum_rpc::errors::Result<Hash> {
         self.post_tx_with_timeout(tx).await.map(|t| t.tx_hash())
     }
@@ -118,12 +118,12 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<T, C, PGen> TransactionExecutor for EthereumTransactionExecutor<T, C, PGen>
 where
-    T: Into<TypedTransaction>,
-    C: EthereumClient<T> + Clone,
-    PGen: PayloadGenerator<T> + Clone,
+    T: Into<TypedTransaction> + Sync + Send,
+    C: EthereumClient<T> + Clone + Sync + Send,
+    PGen: PayloadGenerator<T> + Clone + Sync + Send,
 {
     async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<Hash> {
         let payload = self.payload_generator.redeem_ticket(acked_ticket)?;

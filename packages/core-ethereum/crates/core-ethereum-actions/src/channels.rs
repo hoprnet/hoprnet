@@ -20,7 +20,7 @@ use crate::CoreEthereumActions;
 use platform::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
-#[async_trait(? Send)]
+#[async_trait]
 pub trait ChannelActions {
     /// Opens a channel to the given `destination` with the given `amount` staked.
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction>;
@@ -37,8 +37,8 @@ pub trait ChannelActions {
     ) -> Result<PendingAction>;
 }
 
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));

@@ -10,7 +10,6 @@ use platform::time::native::current_timestamp;
 
 use crate::messaging::ControlMessage;
 
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
 
@@ -184,18 +183,18 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-                if (current_timestamp() - start_all_peers) < self.config.timeout {
-                    while let Some(peer) = waiting.pop_front() {
-                        if !active_pings.contains_key(&peer) {
-                            match self.initiate_peer_ping(&peer) {
-                                Ok(v) => {
-                                    active_pings.insert(peer.clone(), v);
-                                }
-                                Err(_) => continue,
-                            };
-                        }
+            if (current_timestamp() - start_all_peers) < self.config.timeout {
+                while let Some(peer) = waiting.pop_front() {
+                    if !active_pings.contains_key(&peer) {
+                        match self.initiate_peer_ping(&peer) {
+                            Ok(v) => {
+                                active_pings.insert(peer.clone(), v);
+                            }
+                            Err(_) => continue,
+                        };
                     }
                 }
+            }
 
             if active_pings.len() == 0 && waiting.len() == 0 {
                 break;

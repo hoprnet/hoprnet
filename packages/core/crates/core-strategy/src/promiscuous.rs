@@ -409,8 +409,8 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use lazy_static::lazy_static;
     use mockall::mock;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use platform::time::native::current_timestamp;
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::primitives::{Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 

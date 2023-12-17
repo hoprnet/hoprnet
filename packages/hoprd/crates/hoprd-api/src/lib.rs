@@ -1,22 +1,19 @@
 use std::sync::Arc;
 
 use serde_json::json;
-use tide::{Request, Response, http::Mime};
-use utoipa::{OpenApi, Modify};
+use tide::{http::Mime, Request, Response};
+use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
-use hopr_lib::{Hopr, Address, Balance, BalanceType};
-
+use hopr_lib::{Address, Balance, BalanceType, Hopr};
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
 
-
-
 #[derive(Clone)]
 pub struct State<'a> {
     pub hopr: Arc<Hopr>,
-    pub config: Arc<Config<'a>>
+    pub config: Arc<Config<'a>>,
 }
 
 #[derive(OpenApi)]
@@ -71,45 +68,47 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr) {
     let hopr = Arc::new(hopr);
     let state = State {
         hopr: hopr.clone(),
-        config: Arc::new(Config::from("openapi.json"))
+        config: Arc::new(Config::from("openapi.json")),
     };
     let mut app = tide::with_state(state.clone());
 
     app.at(&format!("api-docs/openapi.json"))
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
 
-    app.at(&format!("{BASE_PATH}/swagger-ui/*"))
-        .get(serve_swagger);
+    app.at(&format!("{BASE_PATH}/swagger-ui/*")).get(serve_swagger);
 
     app.at("startedz/").get(checks::startedz);
     app.at("readyz/").get(checks::readyz);
     app.at("healthyz/").get(checks::healthyz);
 
-    app.at(&format!("{BASE_PATH}"))
-        .nest({
-            let mut api = tide::with_state(state);
+    app.at(&format!("{BASE_PATH}")).nest({
+        let mut api = tide::with_state(state);
 
-            api.at("/account/addresses").get(account::account_addresses);
-            api.at("/account/balances").get(account::account_balances);
-            // api.at("/account/withdraw").get(account::account_withdraw);
+        api.at("/account/addresses").get(account::account_addresses);
+        api.at("/account/balances").get(account::account_balances);
+        // api.at("/account/withdraw").get(account::account_withdraw);
 
-            api
+        api
     });
 
     app.listen(host).await.expect("the server should run successfully")
 }
 
-#[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::IntoResponses)]
+#[derive(
+    Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::IntoResponses,
+)]
 #[response(status = 422)]
 pub struct Error422 {
     pub status: String,
     pub error: String,
 }
 
-
 impl Error422 {
     pub fn new(error: String) -> Self {
-        Self { status: "UNKNOWN_FAILURE".into(), error }
+        Self {
+            status: "UNKNOWN_FAILURE".into(),
+            error,
+        }
     }
 }
 
@@ -119,11 +118,11 @@ mod account {
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     struct AccountAddresses {
         pub native: String,
-        pub hopr: String
+        pub hopr: String,
     }
 
     /// Get node's HOPR and native addresses.
-    /// 
+    ///
     /// HOPR address is represented by the P2P PeerId and can be used by other node owner to interact with this node.
     #[utoipa::path(
         get,
@@ -137,7 +136,7 @@ mod account {
     pub(super) async fn account_addresses(req: Request<State<'_>>) -> tide::Result<Response> {
         let addresses = AccountAddresses {
             native: req.state().hopr.me_onchain().to_string(),
-            hopr: req.state().hopr.me_peer_id().to_string()
+            hopr: req.state().hopr.me_peer_id().to_string(),
         };
 
         Ok(Response::builder(200).body(json!(addresses)).build())
@@ -145,19 +144,19 @@ mod account {
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
     struct AccountBalances {
-        #[serde(rename="safeNative")]
+        #[serde(rename = "safeNative")]
         pub safe_native: String,
         pub native: String,
-        #[serde(rename="safeHopr")]
+        #[serde(rename = "safeHopr")]
         pub safe_hopr: String,
         pub hopr: String,
-        #[serde(rename="safeHoprAllowance")]
+        #[serde(rename = "safeHoprAllowance")]
         pub safe_hopr_allowance: String,
     }
 
     /// Get node's and associated Safe's HOPR and native balances as the allowance for HOPR
     /// tokens to be drawn by HoprChannels from Safe.
-    /// 
+    ///
     /// HOPR tokens from the Safe balance are used to fund the payment channels between this
     /// node and other nodes on the network.
     /// NATIVE balance of the Node is used to pay for the gas fees for the blockchain.
@@ -172,57 +171,32 @@ mod account {
     )]
     pub(super) async fn account_balances(req: Request<State<'_>>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        
+
         let mut account_balances = AccountBalances::default();
-        
+
         match hopr.get_balance(BalanceType::Native).await {
             Ok(v) => account_balances.native = v.to_string(),
-            Err(e) => {
-                return Ok(Response::builder(422)
-                    .body(json!(Error422::new(e.to_string())))
-                    .build()
-                )
-            },
+            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.hopr = v.to_string(),
-            Err(e) => {
-                return Ok(Response::builder(422)
-                    .body(json!(Error422::new(e.to_string())))
-                    .build()
-                )
-            },
+            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
             Ok(v) => account_balances.safe_native = v.to_string(),
-            Err(e) => {
-                return Ok(Response::builder(422)
-                    .body(json!(Error422::new(e.to_string())))
-                    .build()
-                )
-            },
+            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.safe_hopr = v.to_string(),
-            Err(e) => {
-                return Ok(Response::builder(422)
-                    .body(json!(Error422::new(e.to_string())))
-                    .build()
-                )
-            },
+            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
 
         match hopr.safe_allowance().await {
             Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
-            Err(e) => {
-                return Ok(Response::builder(422)
-                    .body(json!(Error422::new(e.to_string())))
-                    .build()
-                )
-            },
+            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
 
         Ok(Response::builder(200).body(json!(account_balances)).build())
@@ -233,11 +207,11 @@ mod account {
         currency: BalanceType,
         amount: u128,
         // TODO: add validations here
-        address: String
+        address: String,
     }
 
     /// Withdraw funds from this node to the ethereum wallet address.
-    /// 
+    ///
     /// Both NATIVE or HOPR can be withdrawn using this method."
     #[utoipa::path(
         get,
@@ -252,16 +226,22 @@ mod account {
         let withdraw_req_data: WithdrawRequest = req.body_json().await?;
         let recipient = <Address as std::str::FromStr>::from_str(&withdraw_req_data.address)?;
 
-        match req.state().hopr.withdraw(recipient, Balance::new(withdraw_req_data.amount.into(), withdraw_req_data.currency)).await {
+        match req
+            .state()
+            .hopr
+            .withdraw(
+                recipient,
+                Balance::new(withdraw_req_data.amount.into(), withdraw_req_data.currency),
+            )
+            .await
+        {
             Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
             Err(e) => Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
         }
     }
 }
 
-mod tickets {
-
-}
+mod tickets {}
 
 mod checks {
     use super::*;
@@ -308,17 +288,10 @@ mod checks {
     async fn is_running(req: Request<State<'_>>) -> tide::Result<Response> {
         match req.state().hopr.status() {
             hopr_lib::State::Running => Ok(Response::builder(200).build()),
-            _ => Ok(Response::builder(412).build())
+            _ => Ok(Response::builder(412).build()),
         }
     }
 }
-
-
-
-
-
-
-
 
 // #[derive(Debug, PartialEq, Serialize, Deserialize)]
 // #[must_use]
