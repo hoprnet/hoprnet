@@ -11,7 +11,7 @@ use utils_log::info;
 use utils_types::primitives::{Address, Balance};
 
 /// Contains all on-chain calls specific to HOPR node itself.
-#[async_trait(? Send)]
+#[async_trait]
 pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction>;
@@ -23,8 +23,8 @@ pub trait NodeActions {
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction>;
 }
 
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<Db> {
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEthereumActions<Db> {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));

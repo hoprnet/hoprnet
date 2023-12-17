@@ -226,7 +226,7 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 }
 
 /// Creates local Anvil instance.
-/// 
+///
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {

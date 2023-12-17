@@ -165,13 +165,15 @@ impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
     }
 }
 
+type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send + 'a>;
+
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,
-    resolver: Box<dyn Future<Output = Result<TransactionReceipt>> + 'a>,
+    resolver: Resolver<'a>,
 }
 
 impl PendingTransaction<'_> {
@@ -205,7 +207,7 @@ impl Display for PendingTransaction<'_> {
 
 impl<'a> IntoFuture for PendingTransaction<'a> {
     type Output = Result<TransactionReceipt>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + 'a>>;
+    type IntoFuture = Pin<Resolver<'a>>;
 
     fn into_future(self) -> Self::IntoFuture {
         Box::into_pin(self.resolver)

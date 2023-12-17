@@ -1,5 +1,4 @@
 use async_lock::RwLock;
-use futures::channel::mpsc::{channel, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -14,11 +13,12 @@ use core_types::{
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
+use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::future::{Future, poll_fn};
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -58,7 +58,7 @@ lazy_static::lazy_static! {
 /// Implements execution of transactions underlying each `Action`
 /// Each operation returns a transaction hash and may timeout.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
     async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
@@ -122,10 +122,9 @@ impl ActionSender {
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
         let mut sender = self.0.clone();
-        poll_fn(|cx| Pin::new(&mut sender).poll_ready(cx)).await
-            .and_then(move |_| {
-                sender.start_send((action, completer.0))
-            })
+        poll_fn(|cx| Pin::new(&mut sender).poll_ready(cx))
+            .await
+            .and_then(move |_| sender.start_send((action, completer.0)))
             .map(|_| {
                 completer
                     .1

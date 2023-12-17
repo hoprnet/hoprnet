@@ -124,7 +124,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 }
 
 #[async_trait] // not placing the `Send` trait limitations on the trait
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync> HoprCoreEthereumDbActions
+    for CoreEthereumDb<T>
+{
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
@@ -391,7 +393,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                Box::new(move |ack: &AcknowledgedTicket| filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)),
+                Box::new(move |ack: &AcknowledgedTicket| {
+                    filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)
+                }),
             )
             .await?;
 
@@ -407,7 +411,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                Box::new(move |ack: &AcknowledgedTicket| filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)),
+                Box::new(move |ack: &AcknowledgedTicket| {
+                    filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)
+                }),
             )
             .await?;
 
@@ -733,14 +739,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
     async fn get_channels(&self) -> Result<Vec<ChannelEntry>> {
         self.db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await
     }
 
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await?
             .into_iter()
             .filter(|x| x.status == ChannelStatus::Open)
@@ -765,15 +779,21 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, Box::new(|_| true))
+            .get_more::<AccountEntry>(
+                Box::from(ACCOUNT_PREFIX.as_bytes()),
+                Address::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await
     }
 
     async fn get_public_node_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, Box::new(|x| {
-                x.contains_routing_info()
-            }))
+            .get_more::<AccountEntry>(
+                Box::from(ACCOUNT_PREFIX.as_bytes()),
+                Address::SIZE as u32,
+                Box::new(|x| x.contains_routing_info()),
+            )
             .await
     }
 
@@ -918,7 +938,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     async fn get_channels_from(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await?
             .into_iter()
             .filter(move |x| x.source.eq(address))
@@ -928,7 +952,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await?
             .into_iter()
             .filter(move |x| x.source.eq(&self.me))
@@ -938,7 +966,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await?
             .into_iter()
             .filter(move |x| x.destination.eq(address))
@@ -948,7 +980,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     async fn get_incoming_channels(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, Box::new(|_| true))
+            .get_more::<ChannelEntry>(
+                Box::from(CHANNEL_PREFIX.as_bytes()),
+                Hash::SIZE as u32,
+                Box::new(|_| true),
+            )
             .await?
             .into_iter()
             .filter(move |x| x.destination.eq(&self.me))

@@ -525,8 +525,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     }
 }
 
-#[async_trait(? Send)]
-impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEventHandlers<U> {
+#[async_trait]
+impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler for ContractEventHandlers<U> {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
             self.addresses.channels,

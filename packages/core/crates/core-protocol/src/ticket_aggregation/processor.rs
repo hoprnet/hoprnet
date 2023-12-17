@@ -33,7 +33,6 @@ use futures::stream::FuturesUnordered;
 
 use async_std::task::{sleep, spawn_local};
 
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::U256;

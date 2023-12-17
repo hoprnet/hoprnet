@@ -20,7 +20,7 @@ pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantCha
 /// `SignificantChainEvents` coming from the Indexer and resolving them as they are
 /// matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait ActionState {
     /// Tries to match the given event against the registered expectations.
     /// Each matched expectation is resolved, unregistered and returned.
@@ -37,7 +37,7 @@ pub trait ActionState {
 pub struct IndexerExpectation {
     /// Required TX hash
     pub tx_hash: Hash,
-    predicate: Box<dyn Fn(&ChainEventType) -> bool>,
+    predicate: Box<dyn Fn(&ChainEventType) -> bool + Send + Sync>,
 }
 
 impl Debug for IndexerExpectation {
@@ -52,7 +52,7 @@ impl IndexerExpectation {
     /// Constructs new expectation given the required TX hash and chain event matcher in that TX.
     pub fn new<F>(tx_hash: Hash, expectation: F) -> Self
     where
-        F: Fn(&ChainEventType) -> bool + 'static,
+        F: Fn(&ChainEventType) -> bool + Send + Sync + 'static,
     {
         Self {
             tx_hash,
@@ -81,7 +81,7 @@ impl Default for IndexerActionTracker {
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl ActionState for IndexerActionTracker {
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
         let matched_keys = self

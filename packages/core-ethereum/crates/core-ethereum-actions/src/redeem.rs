@@ -26,7 +26,7 @@ lazy_static::lazy_static! {
 }
 
 /// Gathers all the ticket redemption related on-chain calls.
-#[async_trait(? Send)]
+#[async_trait]
 pub trait TicketRedeemActions {
     /// Redeems all redeemable tickets in all channels.
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>>;
@@ -95,8 +95,8 @@ where
     on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereumActions<Db> {
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for CoreEthereumActions<Db> {
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(

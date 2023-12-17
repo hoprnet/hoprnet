@@ -318,7 +318,7 @@ pub fn build_chain_components<Db>(
     RpcOperations<JsonRpcClient>,
 )
 where
-    Db: HoprCoreEthereumDbActions + Clone + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
 {
     let rpc_client = JsonRpcClient::new(
         &chain_config.chain.default_provider,
