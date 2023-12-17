@@ -26,6 +26,7 @@ wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream
 wasm-bindgen = { workspace = true, optional = true }
 
 core-types = { workspace = true, default-features = false }
+platform = { workspace = true }
 utils-log = { workspace = true, default-features = false }
 
 [dev-dependencies]

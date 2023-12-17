@@ -155,7 +155,7 @@ mod tests {
         pub delay: std::time::Duration,
     }
 
-    #[async_trait(? Send)]
+    #[async_trait]
     impl Pinging for DelayingPinger {
         async fn ping(&mut self, _peers: Vec<PeerId>) {
             sleep(self.delay).await;

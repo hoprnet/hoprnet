@@ -71,8 +71,8 @@ impl<A: ChannelActions> Display for AutoFundingStrategy<A> {
     }
 }
 
-#[async_trait(? Send)]
-impl<A: ChannelActions> SingularStrategy for AutoFundingStrategy<A> {
+#[async_trait]
+impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A> {
     async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,
@@ -129,7 +129,7 @@ mod tests {
 
     mock! {
         ChannelAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl ChannelActions for ChannelAct {
             async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
             async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;

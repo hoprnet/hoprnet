@@ -18,7 +18,7 @@ use utils_types::primitives::Address;
 #[derive(Debug, Clone)]
 pub struct DbPeerAddressResolver(pub Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>);
 
-#[async_trait(? Send)]
+#[async_trait]
 impl PeerAddressResolver for DbPeerAddressResolver {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
         match self.0.read().await.get_packet_key(onchain_key).await {

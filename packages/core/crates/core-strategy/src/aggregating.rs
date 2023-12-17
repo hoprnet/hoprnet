@@ -196,11 +196,13 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + 'static,
-    A: TicketRedeemActions + Clone + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    A: TicketRedeemActions + Clone + Send + Sync + 'static,
+    T: Send + Sync,
+    U: Send + Sync
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
@@ -374,7 +376,7 @@ mod tests {
 
     mock! {
         TicketRedeemAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
             async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_with_counterparty(

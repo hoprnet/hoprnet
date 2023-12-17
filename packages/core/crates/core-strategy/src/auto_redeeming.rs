@@ -61,8 +61,8 @@ impl<A: TicketRedeemActions> AutoRedeemingStrategy<A> {
     }
 }
 
-#[async_trait(? Send)]
-impl<A: TicketRedeemActions> SingularStrategy for AutoRedeemingStrategy<A> {
+#[async_trait]
+impl<A: TicketRedeemActions + Send + Sync> SingularStrategy for AutoRedeemingStrategy<A> {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("redeeming {ack}");
@@ -134,7 +134,7 @@ mod tests {
 
     mock! {
         TicketRedeemAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
             async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(

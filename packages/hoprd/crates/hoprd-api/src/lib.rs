@@ -86,7 +86,7 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr) {
 
         api.at("/account/addresses").get(account::account_addresses);
         api.at("/account/balances").get(account::account_balances);
-        // api.at("/account/withdraw").get(account::account_withdraw);
+        api.at("/account/withdraw").get(account::account_withdraw);
 
         api
     });

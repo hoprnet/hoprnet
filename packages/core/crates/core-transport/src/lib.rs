@@ -164,7 +164,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),

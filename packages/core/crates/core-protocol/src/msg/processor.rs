@@ -83,7 +83,7 @@ pub enum MsgProcessed {
 /// Implements protocol acknowledgement logic for msg packets
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -91,7 +91,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     fn clone(&self) -> Self {
         Self {
@@ -101,10 +101,10 @@ where
     }
 }
 
-#[async_trait::async_trait(? Send)]
+#[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     type Input = ApplicationData;
 
@@ -360,7 +360,7 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
@@ -583,7 +583,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -1211,7 +1211,7 @@ mod tests {
 
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
                 self.0

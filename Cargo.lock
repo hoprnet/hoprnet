@@ -3462,6 +3462,7 @@ dependencies = [
  "core-types",
  "gloo-timers 0.3.0",
  "js-sys",
+ "platform",
  "ringbuffer",
  "serde",
  "serde-wasm-bindgen",
