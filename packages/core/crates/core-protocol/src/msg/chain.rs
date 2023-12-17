@@ -292,7 +292,7 @@ mod tests {
 
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
                 self.0

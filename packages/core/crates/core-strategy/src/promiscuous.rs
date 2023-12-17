@@ -104,7 +104,7 @@ where
 impl<Db, Net, A> PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
+    Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions,
 {
     pub fn new(
@@ -331,12 +331,12 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<Db, Net, A> SingularStrategy for PromiscuousStrategy<Db, Net, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
-    A: ChannelActions,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Net: NetworkExternalActions + Send + Sync,
+    A: ChannelActions + Send + Sync,
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
@@ -423,7 +423,7 @@ mod tests {
 
     mock! {
         ChannelAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl ChannelActions for ChannelAct {
             async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
             async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;

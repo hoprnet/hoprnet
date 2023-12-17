@@ -39,8 +39,8 @@ impl<R: PeerAddressResolver> PingExternalInteractions<R> {
     }
 }
 
-#[async_trait(? Send)]
-impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
+#[async_trait]
+impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExternalInteractions<R> {
     async fn on_finished_ping(&self, peer: &PeerId, result: Result, version: String) {
         // This logic deserves a larger refactor of the entire heartbeat mechanism, but
         // for now it is suffcient to fill out metadata only on successful pongs.

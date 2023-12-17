@@ -40,7 +40,7 @@ lazy_static::lazy_static! {
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait SingularStrategy: Display {
     /// Strategy event raised at period intervals (typically each 1 minute).
     async fn on_tick(&self) -> Result<()> {
@@ -76,7 +76,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelClo
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
         let to_close = self
@@ -161,7 +161,7 @@ impl Default for MultiStrategyConfig {
 /// which makes it possible (along with different `on_fail_continue` policies) to construct
 /// various logical strategy chains.
 pub struct MultiStrategy {
-    strategies: Vec<Box<dyn SingularStrategy>>,
+    strategies: Vec<Box<dyn SingularStrategy + Send + Sync>>,
     cfg: MultiStrategyConfig,
 }
 
@@ -177,9 +177,9 @@ impl MultiStrategy {
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
-        Net: NetworkExternalActions + 'static,
+        Net: NetworkExternalActions  + Send + Sync + 'static,
     {
-        let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
+        let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
         if cfg.finalize_channel_closure {
             strategies.push(Box::new(ChannelCloseFinalizer {
@@ -256,7 +256,7 @@ impl Display for MultiStrategy {
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {

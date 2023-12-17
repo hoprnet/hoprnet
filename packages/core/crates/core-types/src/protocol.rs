@@ -28,7 +28,7 @@ pub type Tag = u16;
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
 /// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait(? Send)] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
+#[async_trait] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
 pub trait PeerAddressResolver {
     /// Tries to resolve off-chain public key given the on-chain address
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;

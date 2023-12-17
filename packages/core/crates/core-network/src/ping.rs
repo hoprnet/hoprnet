@@ -40,7 +40,7 @@ pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
 }
@@ -51,13 +51,13 @@ pub struct PingConfig {
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait] // not placing the `Send` trait limitations on the trait
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
 
 #[derive(Debug)]
-pub struct Ping<T: PingExternalAPI> {
+pub struct Ping<T: PingExternalAPI + std::marker::Send> {
     config: PingConfig,
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
@@ -66,7 +66,7 @@ pub struct Ping<T: PingExternalAPI> {
 
 type PingStartedRecord = (u64, ControlMessage);
 
-impl<T: PingExternalAPI> Ping<T> {
+impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
     pub fn new(
         config: PingConfig,
         send_ping: HeartbeatSendPingTx,
@@ -98,8 +98,8 @@ impl<T: PingExternalAPI> Ping<T> {
     }
 }
 
-#[async_trait(? Send)]
-impl<T: PingExternalAPI> Pinging for Ping<T> {
+#[async_trait]
+impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     /// Performs multiple concurrent async pings to the specified peers.
     ///
     /// A sliding window mechanism is used to select at most a fixed number of concurrently processed
