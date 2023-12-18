@@ -15,6 +15,7 @@ pub const API_VERSION: &str = "3.0.0";
 #[derive(Clone)]
 pub struct State<'a> {
     pub hopr: Arc<Hopr>,
+    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
     pub config: Arc<Config<'a>>,
 }
@@ -67,17 +68,18 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
-pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr) {
+pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>) {
+    // Prepare alias part of the state
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
     aliases
         .write()
         .await
         .insert("me".to_owned(), hopr.me_peer_id());
 
-    let hopr = Arc::new(hopr);
     let state = State {
-        hopr,
+        hopr: Arc::new(hopr),
         aliases,
+        inbox,
         config: Arc::new(Config::from("openapi.json")),
     };
 
@@ -161,7 +163,6 @@ mod alias {
         tag = "Alias"
     )]
     pub async fn aliases(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let args: AliasPeerId = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases.read()

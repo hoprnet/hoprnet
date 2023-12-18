@@ -152,23 +152,3 @@ pub fn spawn_ack_winning_ticket_handling(
     // This future will never resolve and immitate a running async task that can be joined
     (Box::pin(futures::future::pending()), on_ack_tkt_tx)
 }
-
-/// Helper loop ensuring enqueueing of transport events going out of the module
-pub fn spawn_transport_output<F1, F2>(mut rx: UnboundedReceiver<TransportOutput>, on_final_packet: F1, on_ack: F2) -> Pin<Box<dyn futures::Future<Output = ()>>>
-where
-    F1: Fn(ApplicationData) + 'static,
-    F2: Fn(HalfKeyChallenge) + 'static,
-{
-    spawn_local(async move {
-        while let Some(output) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-            match output {
-                TransportOutput::Received(msg) => (on_final_packet)(msg),
-                TransportOutput::Sent(ack_challenge) => (on_ack)(ack_challenge),
-            }
-        }
-    });
-
-    // TODO: placeholder for the async_std::task::spawn API
-    // This future will never resolve and immitate a running async task that can be joined
-    Box::pin(futures::future::pending())
-}

@@ -3,14 +3,15 @@ pub mod config;
 pub mod errors;
 pub mod token;
 
-use std::{sync::Arc, time::SystemTime, path::Path};
+use std::{sync::Arc, time::SystemTime, path::Path, future::poll_fn, pin::Pin};
 
 use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
-use core_transport::HalfKeyChallenge;
+use futures::Stream;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{IdentityOptions, HoprKeys};
+use hopr_lib::TransportOutput;
 use utils_log::{info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 use crate::cli::CliArgs;
@@ -67,37 +68,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
         }
 
-        // Create the message inbox
-        let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            platform::time::native::current_timestamp()
-        })));
-
-        let inbox_clone = inbox.clone();
-        let on_message = move |data: core_transport::ApplicationData| {
-            let now = Into::<DateTime<Utc>>::into(SystemTime::now()).to_rfc3339();
-            info!("#### NODE RECEIVED MESSAGE [{now}] ####");
-            let ingress = inbox_clone.clone();
-
-            // TODO: Move RLP for backwards compatibility to msg processor pipeline
-            //         let decodedMsg = decodeMessage(data.plain_text)
-            //         log(`Message: ${decodedMsg.msg}`)
-            //         log(`App tag: ${data.application_tag ?? 0}`)
-            //         log(`Latency: ${decodedMsg.latency} ms`)
-            //         metric_latency.observe(decodedMsg.latency)
-
-            //         if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
-            //           log(`RPCh: received message [${decodedMsg.msg}]`)
-            //         }
-
-            async_std::task::spawn_local(async move {
-                ingress.write().await.push(data).await
-            });
-        };
-
-        let on_acknowledgement = |_ack: HalfKeyChallenge| {
-            // TODO: needed by the websockets? 
-        };
-
         // Create the node instance
         info!("Creating the HOPRd node instance from hopr-lib");
         let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
@@ -105,13 +75,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut node = hopr_lib::Hopr::new(
             hoprlib_cfg,
             &hopr_keys.packet_key,
-            &hopr_keys.chain_key,
-            on_message,
-            on_acknowledgement
+            &hopr_keys.chain_key
         );
 
+        let mut ingress = node.ingress();
+        
+        // Create the message inbox
+        let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
+            platform::time::native::current_timestamp()
+        })));
+        
+        let inbox_clone = inbox.clone();
+        let node_ingress = async_std::task::spawn(async move {
+            while let Some(output) = poll_fn(|cx| Pin::new(&mut ingress).poll_next(cx)).await {
+                match output {
+                    TransportOutput::Received(msg) => {
+                        let now = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339();
+                        info!("#### NODE RECEIVED MESSAGE [{now}] ####");
+                        
+                        // TODO: Move RLP for backwards compatibility to msg processor pipeline
+                        //         let decodedMsg = decodeMessage(data.plain_text)
+                        //         log(`Message: ${decodedMsg.msg}`)
+                        //         log(`App tag: ${data.application_tag ?? 0}`)
+                        //         log(`Latency: ${decodedMsg.latency} ms`)
+                        //         metric_latency.observe(decodedMsg.latency)
+                        
+                        //         if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
+                        //           log(`RPCh: received message [${decodedMsg.msg}]`)
+                        //         }
+                            
+                            inbox_clone.write().await.push(msg).await;
+                    },
+                    TransportOutput::Sent(ack_challenge) => {
+                        // TODO: needed by the websockets 
+                    },
+                }}
+            }
+        );
+            
         let wait_til_end_of_time = node.run().await?;
-
+            
         // Show onboarding information
         let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
         let my_peer_id = core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid();
@@ -133,6 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ");
         }
 
+        
         // setup API endpoint
         if cfg.api.enable {
             info!("Creating HOPRd API database");
@@ -152,9 +156,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 core_transport::config::HostType::IPv4(a) |
                 core_transport::config::HostType::Domain(a) => format!("{a}:{}", cfg.api.host.port),
             };
-            futures::join!(wait_til_end_of_time, run_hopr_api(&host_listen, node));
+            futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, node, inbox.clone()));
         } else {
-            wait_til_end_of_time.await;
+            futures::join!(wait_til_end_of_time, node_ingress);
         };
     }
 
