@@ -21,6 +21,7 @@ env_logger = { workspace = true }
 futures = { workspace = true }
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
 serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
 serde_json = { workspace = true }
 tide = "0.16.0"
 utoipa = { version = "4.1" }
