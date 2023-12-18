@@ -28,4 +28,5 @@ utoipa-swagger-ui = { version = "5.0.0" }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true }
+hoprd-inbox = { workspace = true }
 utils-log = { workspace = true }

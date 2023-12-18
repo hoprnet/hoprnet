@@ -3442,6 +3442,7 @@ dependencies = [
  "env_logger",
  "futures",
  "hopr-lib",
+ "hoprd-inbox",
  "libp2p-identity",
  "serde",
  "serde_json",

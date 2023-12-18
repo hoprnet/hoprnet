@@ -7,8 +7,9 @@ mod processes;
 
 
 pub use {
+    core_transport::{TransportOutput, ApplicationData},
+    chain::{Network, ProtocolConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
-    chain::{Network, ProtocolConfig}
 };
 
 use std::{
@@ -21,7 +22,7 @@ use std::{
 use async_lock::RwLock;
 use async_std::task::spawn_local;
 use futures::{
-    Future, channel::mpsc::unbounded, FutureExt, StreamExt
+    Future, channel::mpsc::{unbounded, UnboundedReceiver}, FutureExt, StreamExt
 };
 
 use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions};
@@ -47,11 +48,11 @@ use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, libp2p_identity, p2p_loop, TransportOutput, UniversalTimer,
+    build_ticket_aggregation, libp2p_identity, p2p_loop, UniversalTimer,
 };
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ApplicationData, ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
+    ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
 };
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
@@ -149,14 +150,12 @@ impl std::fmt::Display for HoprLoopComponents {
 }
 
 /// Main builder of the hopr lib components
-pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
+pub fn build_components<FSaveTbf>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
-    on_acknowledgement: FOnSent,
-    on_final_packet: FOnReceived,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
@@ -164,10 +163,9 @@ pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     HoprTransport,
     HoprChain,
     Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>>,
+    UnboundedReceiver<TransportOutput>,
 )
 where
-    FOnReceived: Fn(ApplicationData) + 'static,
-    FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
 {
     let identity: libp2p_identity::Keypair = (&me).into();
@@ -275,7 +273,6 @@ where
     );
 
     let (transport_output_tx, transport_output_rx) = unbounded::<TransportOutput>();
-    let transport_output_process = crate::processes::spawn_transport_output(transport_output_rx, on_final_packet, on_acknowledgement);
 
     let swarm_network_clone = network.clone();
     let tbf_clone = tbf.clone();
@@ -365,13 +362,15 @@ where
         })
     );
 
-    (hopr_transport_api, hopr_chain_api, vec![])
+    // TODO: return join handles for all background running tasks
+    (hopr_transport_api, hopr_chain_api, vec![], transport_output_rx)
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
+    ingress_rx: Option<UnboundedReceiver<TransportOutput>>,
     state: State,
     transport_api: HoprTransport,
     chain_api: HoprChain,
@@ -380,16 +379,7 @@ pub struct Hopr {
 }
 
 impl Hopr {
-    pub fn new<FOnReceived, FOnSent>(
-        mut cfg: config::HoprLibConfig,
-        me: &OffchainKeypair,
-        me_onchain: &ChainKeypair,
-        on_received: FOnReceived, // on packet received
-        on_sent: FOnSent,         // on packet sent
-    ) -> Self
-    where
-        FOnReceived: Fn(ApplicationData) + 'static,
-        FOnSent: Fn(HalfKeyChallenge) + 'static,
+    pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self
     {
         // pre-flight checks
         // Announced limitation for the `providence` release
@@ -462,14 +452,12 @@ impl Hopr {
             };
         };
 
-        let (transport_api, chain_api, _processes) = build_components(
+        let (transport_api, chain_api, _processes, transport_ingress) = build_components(
             cfg.clone(),
             chain_config.clone(),
             me.clone(),
             me_onchain.clone(),
             db,
-            on_sent,
-            on_received,
             tbf,
             save_tbf,
             vec![multiaddress],
@@ -492,12 +480,19 @@ impl Hopr {
         Self {
             state: State::Uninitialized,
             is_public,
+            ingress_rx: Some(transport_ingress),
             me: me.clone(),
             transport_api,
             chain_api,
             chain_cfg: chain_config,
             safe_module_cfg: cfg.safe_module,
         }
+    }
+
+    /// Get the ingress object for messages arriving to this node
+    #[must_use]
+    pub fn ingress(&mut self) -> UnboundedReceiver<TransportOutput> {
+        self.ingress_rx.take().expect("The ingress received can only be taken out once")
     }
 
     pub fn status(&self) -> State {
