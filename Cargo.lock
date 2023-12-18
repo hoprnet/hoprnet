@@ -3446,6 +3446,7 @@ dependencies = [
  "libp2p-identity",
  "serde",
  "serde_json",
+ "serde_with",
  "tide",
  "utils-log",
  "utoipa",

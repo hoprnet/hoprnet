@@ -7,7 +7,7 @@ mod processes;
 
 
 pub use {
-    core_transport::{TransportOutput, ApplicationData},
+    core_transport::{TransportOutput, ApplicationData, HalfKeyChallenge},
     chain::{Network, ProtocolConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
@@ -52,7 +52,7 @@ use core_transport::{
 };
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ChainKeypair, HalfKeyChallenge, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
+    ChainKeypair, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
 };
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
