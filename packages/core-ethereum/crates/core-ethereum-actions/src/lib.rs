@@ -15,13 +15,13 @@ pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
-pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
+pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
     db: Arc<RwLock<Db>>,
     tx_sender: ActionSender,
 }
 
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> CoreEthereumActions<Db> {
     /// Creates new instance.
     pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }

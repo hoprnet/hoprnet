@@ -1,4 +1,5 @@
 use std::{sync::Arc, collections::HashMap};
+use std::fmt::Display;
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
@@ -8,6 +9,7 @@ use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
 use hopr_lib::{Address, Balance, BalanceType, Hopr};
+use hopr_lib::errors::HoprLibError;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -108,6 +110,23 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/account/balances").get(account::balances);
         api.at("/account/withdraw").get(account::withdraw);
 
+        api.at("/channels")
+            .get(channels::list_channels)
+            .post(channels::open_channel);
+
+        api.at("/channels/:channelId")
+            .get(channels::show_channel)
+            .delete(channels::close_channel);
+
+        api.at("/channels/:channelId/fund")
+            .post(channels::fund_channel);
+
+        api.at("/channels/:channelId/tickets")
+            .get(tickets::show_channel_tickets);
+
+        api.at("/tickets")
+            .get(tickets::show_all_tickets);
+
         api
     });
 
@@ -132,9 +151,27 @@ impl Error422 {
     }
 }
 
+impl<T: Display> From<T> for Error422 {
+    fn from(value: T) -> Self {
+        Self::new(value.to_string())
+    }
+}
+
+impl From<Error422> for tide::Body {
+    fn from(value: Error422) -> Self {
+        json!(value).into()
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct RequestStatus {
     pub status: String,
+}
+
+impl From<RequestStatus> for tide::Body {
+    fn from(value: RequestStatus) -> Self {
+        json!(value).into()
+    }
 }
 
 mod alias {
@@ -162,7 +199,7 @@ mod alias {
         ),
         tag = "Alias"
     )]
-    pub async fn aliases(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn aliases(req: Request<State<'_>>) -> tide::Result<Response> {
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases.read()
@@ -341,27 +378,27 @@ mod account {
 
         match hopr.get_balance(BalanceType::Native).await {
             Ok(v) => account_balances.native = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.hopr = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
             Ok(v) => account_balances.safe_native = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.safe_hopr = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
 
         match hopr.safe_allowance().await {
             Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
 
         Ok(Response::builder(200).body(json!(account_balances)).build())
@@ -402,12 +439,365 @@ mod account {
             .await
         {
             Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
-            Err(e) => Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
         }
     }
 }
 
-mod tickets {}
+mod channels {
+    use std::str::FromStr;
+    use futures::TryFutureExt;
+    use core_crypto::types::Hash;
+    use core_ethereum_actions::errors::CoreEthereumActionsError;
+    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use utils_types::traits::ToHex;
+    use super::*;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodeChannel {
+        id: Hash,
+        peer_address: Address,
+        status: ChannelStatus,
+        balance: Balance
+    }
+
+    impl From<ChannelEntry> for NodeChannel {
+        fn from(value: ChannelEntry) -> Self {
+            Self {
+                id: value.get_id(),
+                peer_address: value.destination,
+                status: value.status,
+                balance: value.balance
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodeTopologyChannel {
+        channel_id: Hash,
+        source_address: Address,
+        destination_address: Address,
+        source_peer_id: PeerId,
+        destination_peer_id: PeerId,
+        balance: Balance,
+        status: ChannelStatus,
+        ticket_index: u32,
+        channel_epoch: u32,
+        closure_time: u64
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    struct NodeChannels {
+        incoming: Vec<NodeChannel>,
+        outgoing: Vec<NodeChannel>,
+        all: Vec<NodeTopologyChannel>
+    }
+
+    async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<NodeTopologyChannel, HoprLibError> {
+        Ok(NodeTopologyChannel {
+            channel_id: channel.get_id(),
+            source_address: channel.source,
+            destination_address: channel.destination,
+            source_peer_id: node.chain_key_to_peerid(&channel.source).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+            destination_peer_id: node.chain_key_to_peerid(&channel.destination).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+            balance: channel.balance,
+            status: channel.status,
+            ticket_index: channel.ticket_index.as_u32(),
+            channel_epoch: channel.channel_epoch.as_u32(),
+            closure_time: channel.closure_time.as_u64()
+        })
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        responses(
+            (status = 200, description = "Channels fetched successfully", body = NodeChannels),
+            Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn list_channels(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        let including_closed = bool::from_str(req.param("includingClosed")?)?;
+        let full_topology = bool::from_str(req.param("fullTopology")?)?;
+
+        if full_topology {
+            let hopr_clone = hopr.clone();
+            let topology = hopr.all_channels()
+                .and_then(|channels| async move {
+                    futures::future::try_join_all(
+                        channels
+                            .iter()
+                            .map(|c| query_topology_info(c, hopr_clone.as_ref()))
+
+                    ).await
+                }
+            )
+            .await;
+
+            match topology {
+                Ok(all) => Ok(Response::builder(200).body(json!(NodeChannels { incoming: vec![], outgoing: vec![], all })).build()),
+                Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build())
+            }
+        } else {
+            let channels = hopr.channels_to(&hopr.me_onchain())
+                .and_then(|incoming| async {
+                    let outgoing = hopr.channels_from(&hopr.me_onchain()).await?;
+                    Ok((incoming, outgoing))
+                })
+                .await;
+
+            match channels {
+                Ok((incoming, outgoing)) => {
+                    let channel_info = NodeChannels {
+                        incoming: incoming.into_iter()
+                            .filter_map(|c| (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c)))
+                            .collect(),
+                        outgoing: outgoing.into_iter()
+                            .filter_map(|c| (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c)))
+                            .collect(),
+                        all: vec![],
+                    };
+
+                    Ok(Response::builder(200).body(json!(channel_info)).build())
+                }
+                Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build())
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct OpenChannelRequest {
+        peer_address: Address,
+        amount: Balance
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct OpenChannelReceipt {
+        channel_id: Hash,
+        transaction_receipt: Hash
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        responses(
+            (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
+            (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = RequestStatus),
+            (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn open_channel(mut req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        let open_req: OpenChannelRequest = req.body_json().await?;
+
+        match hopr.open_channel(&open_req.peer_address, &open_req.amount).await {
+            Ok(channel_details) => {
+                Ok(Response::builder(201).body(json!(OpenChannelReceipt {
+                    channel_id: channel_details.channel_id,
+                    transaction_receipt: channel_details.tx_hash
+                })).build())
+            }
+            Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
+                Ok(Response::builder(403).body(RequestStatus { status: "NOT_ENOUGH_BALANCE".into() }).build())
+            },
+            Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
+                Ok(Response::builder(403).body(RequestStatus { status: "NOT_ENOUGH_ALLOWANCE".into() }).build())
+            },
+            Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
+                Ok(Response::builder(409).body(RequestStatus { status: "CHANNEL_ALREADY_OPEN".into() }).build())
+            }
+            Err(e) => {
+                Ok(Response::builder(422).body(Error422::from(e)).build())
+            }
+        }
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        responses(
+            (status = 201, description = "Channel fetched successfully", body = NodeTopologyChannel),
+            (status = 400, description = "Invalid channel id.", body = RequestStatus),
+            (status = 404, description = "Channel not found.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn show_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
+                Ok(Some(channel)) => Ok(Response::builder(200).body(json!(query_topology_info(&channel, hopr.as_ref()).await?)).build()),
+                Ok(None) => Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
+                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CloseChannelReceipt {
+        receipt: Hash,
+        channel_status: ChannelStatus
+    }
+
+    #[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        responses(
+            (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
+            (status = 400, description = "Invalid channel id.", body = RequestStatus),
+            (status = 404, description = "Channel not found.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn close_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => match hopr.close_channel_by_id(channel_id, false).await {
+                Ok(receipt) => {
+                    Ok(Response::builder(200).body(json!(CloseChannelReceipt {
+                        channel_status: receipt.status,
+                        receipt: receipt.tx_hash
+                    })).build())
+                },
+                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                    Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build())
+                },
+                Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
+                    Ok(Response::builder(422).body(RequestStatus { status: "UNSUPPORTED_FEATURE".into() }).build())
+                },
+                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
+        responses(
+            (status = 200, description = "Channel funded successfully", body = String),
+            (status = 400, description = "Invalid channel id.", body = RequestStatus),
+            (status = 404, description = "Channel not found.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn fund_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        let amount = Balance::new_from_str(req.param("amount")?, BalanceType::HOPR);
+
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => {
+                match hopr.fund_channel(&channel_id, &amount).await {
+                    Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
+                    Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) =>
+                        Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
+                    Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                }
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
+
+}
+
+mod tickets {
+    use core_crypto::types::Hash;
+    use core_types::channels::Ticket;
+    use utils_types::traits::ToHex;
+    use super::*;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ChannelTicket {
+        channel_id: Hash,
+        amount: Balance,
+        index: u64,
+        index_offset: u32,
+        win_prob: String,
+        channel_epoch: u32,
+        signature: String,
+    }
+
+    impl From<Ticket> for ChannelTicket {
+        fn from(value: Ticket) -> Self {
+            Self {
+                channel_id: value.channel_id,
+                amount: value.amount,
+                index: value.index,
+                index_offset: value.index_offset,
+                win_prob: value.win_prob().to_string(),
+                channel_epoch: value.channel_epoch,
+                signature: value.signature.expect("impossible to have an unsigned ticket").to_hex()
+            }
+        }
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
+        responses(
+        (status = 200, description = "Channel funded successfully", body = Vec<ChannelTicket>),
+        (status = 400, description = "Invalid channel id.", body = RequestStatus),
+        (status = 404, description = "Channel not found.", body = RequestStatus),
+        Error422,
+        ),
+        tag = "Channels"
+    )]
+    pub(super) async fn show_channel_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
+                Ok(tickets) => {
+                    Ok(Response::builder(200)
+                        .body(json!(tickets.into_iter().map(|t| ChannelTicket::from(t.ticket)).collect::<Vec<_>>()))
+                        .build())
+                },
+                // TODO: impossible to distinguish when the channel does not exists
+                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/tickets"),
+        responses(
+            (status = 200, description = "Channel funded successfully", body = Vec<ChannelTicket>),
+            Error422,
+        ),
+        tag = "Tickets"
+    )]
+    pub(super) async fn show_all_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match hopr.all_tickets().await {
+            Ok(tickets) => {
+                Ok(Response::builder(200)
+                    .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
+                    .build())
+            },
+            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+        }
+    }
+
+}
 
 mod checks {
     use super::*;

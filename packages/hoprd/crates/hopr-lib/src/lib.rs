@@ -26,6 +26,7 @@ use futures::{
 };
 
 use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions};
+use core_ethereum_actions::errors::CoreEthereumActionsError;
 use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry};
 use core_ethereum_types::chain_events::ChainEventType;
 use core_transport::PeerEligibility;
@@ -946,6 +947,18 @@ impl Hopr {
             _ => Err(errors::HoprLibError::GeneralError(
                 "close channel transaction failed".into(),
             )),
+        }
+    }
+
+    pub async fn close_channel_by_id(&self, channel_id: Hash, redeem_before_close: bool) -> errors::Result<CloseChannelResult> {
+        match self.channel_from_hash(&channel_id).await? {
+            Some(channel) => {
+                match channel.orientation(&self.me_onchain()) {
+                    Some((direction, counterparty)) => self.close_channel(&counterparty, direction, redeem_before_close).await,
+                    None => Err(errors::HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments("cannot close channel that is not own".into()))),
+                }
+            }
+            None => Err(errors::HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist))
         }
     }
 

@@ -73,7 +73,7 @@ impl Debug for RustyLevelDbShim {
 }
 
 impl RustyLevelDbShim {
-    #[cfg(not(feature = "wasm"))]
+
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
@@ -350,7 +350,6 @@ mod tests {
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
         use crate::traits::{AsyncKVStorage, BatchOperation};
-        use futures_lite::StreamExt;
 
         let key_1 = "1";
         let value_1 = "abc";

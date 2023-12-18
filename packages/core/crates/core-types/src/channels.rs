@@ -151,6 +151,18 @@ impl ChannelEntry {
             None
         }
     }
+
+    /// Determines the channel's direction and counterparty relative to `me`.
+    /// Returns `None` if neither source nor destination are equal to `me`.
+    pub fn orientation(&self, me: &Address) -> Option<(ChannelDirection, Address)> {
+        if self.source.eq(me) {
+            Some((ChannelDirection::Outgoing, self.destination))
+        } else if self.destination.eq(me) {
+            Some((ChannelDirection::Incoming, self.source))
+        } else {
+            None
+        }
+    }
 }
 
 impl Display for ChannelEntry {
