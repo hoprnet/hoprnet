@@ -12,7 +12,6 @@ pub use {
 };
 
 use std::{
-    collections::HashMap,
     pin::Pin,
     sync::Arc,
     str::FromStr,
@@ -374,7 +373,6 @@ pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
     state: State,
-    aliases: Arc<RwLock<HashMap<String, PeerId>>>,
     transport_api: HoprTransport,
     chain_api: HoprChain,
     chain_cfg: ChainNetworkConfig,
@@ -493,7 +491,6 @@ impl Hopr {
 
         Self {
             state: State::Uninitialized,
-            aliases: Arc::new(RwLock::new(HashMap::new())),
             is_public,
             me: me.clone(),
             transport_api,
@@ -513,22 +510,6 @@ impl Hopr {
 
     pub fn version(&self) -> String {
         String::from(constants::APP_VERSION)
-    }
-
-    pub async fn set_alias(&self, alias: String, peer: PeerId) {
-        self.aliases.write().await.insert(alias, peer);
-    }
-
-    pub async fn remove_alias(&self, alias: &String) {
-        self.aliases.write().await.remove(alias);
-    }
-
-    pub async fn get_alias(&self, alias: &String) -> Option<PeerId> {
-        self.aliases.read().await.get(alias).copied()
-    }
-
-    pub async fn get_aliases(&self) -> HashMap<String, PeerId> {
-        self.aliases.read().await.clone()
     }
 
     pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
@@ -575,11 +556,6 @@ impl Hopr {
         .expect("failed to wait for funds");
 
         info!("Starting hopr node...");
-
-        self.aliases
-            .write()
-            .await
-            .insert("me".to_owned(), *self.transport_api.me());
 
         self.state = State::Initializing;
 

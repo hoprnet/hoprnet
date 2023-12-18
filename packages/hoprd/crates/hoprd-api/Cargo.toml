@@ -19,6 +19,7 @@ async-std = { workspace = true, features = ["attributes"] }
 const_format = "0.2.32"
 env_logger = { workspace = true }
 futures = { workspace = true }
+libp2p-identity = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tide = "0.16.0"
