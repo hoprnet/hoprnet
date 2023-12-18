@@ -9,7 +9,7 @@ use core_strategy::{Strategy, Strategy::AutoRedeeming};
 use core_transport::config::HostConfig;
 use utils_types::primitives::Address;
 
-use hopr_lib::config::HoprLibConfig;
+use hopr_lib::{config::HoprLibConfig, ProtocolsConfig};
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -319,7 +319,14 @@ impl HoprdConfig {
             cfg.hopr.chain.network = network;
         }
 
-        if let Some(x) = cli_args.provider {
+        if let Some(protocol_config) = cli_args.protocol_config_path {
+            cfg.hopr.chain.protocols = ProtocolsConfig::from_str(&platform::file::native::read_to_string(&protocol_config)
+                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?)
+                .map_err(|e| crate::errors::HoprdError::ConfigError(e))?;
+        }
+
+        //   TODO: custom provider is redundant with the introduction of protocol-config.json
+        if let Some(x) = cli_args.provider {        
             cfg.hopr.chain.provider = Some(x)
         };
         cfg.hopr.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
@@ -352,6 +359,11 @@ impl HoprdConfig {
         if skip_validation {
             Ok(cfg)
         } else {
+            if ! cfg.hopr.chain.protocols.supported_networks().iter().any(|network| network == &cfg.hopr.chain.network) {
+                return Err(crate::errors::HoprdError::ValidationError(format!("The specified network '{}' is not listed as supported ({:?})",
+                    cfg.hopr.chain.network, cfg.hopr.chain.protocols.supported_networks())));
+            }
+
             match cfg.validate() {
                 Ok(_) => Ok(cfg),
                 Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
@@ -428,6 +440,37 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
     announce: false
     network: testing
     provider: null
+    protocols:
+      networks:
+        anvil-localhost:
+          chain: anvil
+          environment_type: local
+          version_range: '*'
+          indexer_start_block_number: 5
+          tags: []
+          addresses:
+            network_registry: 0x3aa5ebb10dc797cac828524e59a333d0a371443c
+            network_registry_proxy: 0x68b1d87f95878fe05b998f19b66f4baba5de1aed
+            channels: 0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae
+            token: 0x9a676e781a523b5d0c0e43731313a708cb607508
+            module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
+            node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
+            ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
+            announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
+            node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
+          confirmations: 2
+      chains:
+        anvil:
+          description: Local Ethereum node, akin to Ganache, Hardhat chain
+          chain_id: 31337
+          live: false
+          default_provider: http://127.0.0.1:8545/
+          etherscan_api_url: null
+          max_fee_per_gas: 1 gwei
+          max_priority_fee_per_gas: 0.2 gwei
+          native_token_name: ETH
+          hopr_token_name: wxHOPR
+          tags: null
     check_unrealized_balance: true
   safe_module:
     safe_transaction_service_provider: https:://provider.com/
@@ -484,6 +527,43 @@ mod tests {
                 chain: hopr_lib::config::Chain {
                     announce: false,
                     network: "testing".to_string(),
+                    protocols: hopr_lib::ProtocolsConfig::from_str(r#"
+                    {
+                        "networks": {
+                          "anvil-localhost": {
+                            "chain": "anvil",
+                            "environment_type": "local",
+                            "version_range": "*",
+                            "indexer_start_block_number": 5,
+                            "addresses": {
+                              "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+                              "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+                              "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+                              "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+                              "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+                              "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+                              "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+                              "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+                            },
+                            "confirmations": 2,
+                            "tags": []
+                          }
+                        },
+                        "chains": {
+                          "anvil": {
+                            "description": "Local Ethereum node, akin to Ganache, Hardhat chain",
+                            "chain_id": 31337,
+                            "live": false,
+                            "max_fee_per_gas": "1 gwei",
+                            "max_priority_fee_per_gas": "0.2 gwei",
+                            "default_provider": "http://127.0.0.1:8545/",
+                            "native_token_name": "ETH",
+                            "hopr_token_name": "wxHOPR"
+                          }
+                        }
+                      }
+                    "#).expect("protocol config should be valid"),
                     provider: None,
                     check_unrealized_balance: true,
                 },

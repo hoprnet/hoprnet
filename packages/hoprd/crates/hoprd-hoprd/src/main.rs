@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             
                             inbox_clone.write().await.push(msg).await;
                     },
-                    TransportOutput::Sent(ack_challenge) => {
+                    TransportOutput::Sent(_ack_challenge) => {
                         // TODO: needed by the websockets 
                     },
                 }}

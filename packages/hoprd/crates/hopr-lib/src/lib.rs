@@ -8,7 +8,7 @@ mod processes;
 
 pub use {
     core_transport::{TransportOutput, ApplicationData, HalfKeyChallenge},
-    chain::{Network, ProtocolConfig},
+    chain::{Network, ProtocolsConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
 
@@ -396,10 +396,6 @@ impl Hopr {
             }
         };
 
-        let chain_config =
-            chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.clone().as_deref())
-                .expect("Valid configuration leads to a valid network");
-
         let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG])
             .expect("Could not create a db storage path");
         info!("Initiating the DB at: {db_path}");
@@ -417,7 +413,7 @@ impl Hopr {
 
         info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
         let resolved_environment =
-            crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref())
+            crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref(), &mut cfg.chain.protocols)
                 .expect("Failed to resolve blockchain environment");
         let contract_addresses = SmartContractConfig::from(&resolved_environment);
         info!(
@@ -454,7 +450,7 @@ impl Hopr {
 
         let (transport_api, chain_api, _processes, transport_ingress) = build_components(
             cfg.clone(),
-            chain_config.clone(),
+            resolved_environment.clone(),
             me.clone(),
             me_onchain.clone(),
             db,
@@ -484,7 +480,7 @@ impl Hopr {
             me: me.clone(),
             transport_api,
             chain_api,
-            chain_cfg: chain_config,
+            chain_cfg: resolved_environment,
             safe_module_cfg: cfg.safe_module,
         }
     }

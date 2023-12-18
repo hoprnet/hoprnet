@@ -3,15 +3,15 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use validator::Validate;
+
+
 use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use utils_db::rusty::RustyLevelDbShim;
-use utils_types::primitives::Address;
-
 use core_ethereum_actions::action_queue::ActionQueueConfig;
 use core_ethereum_actions::action_state::IndexerActionTracker;
 use core_ethereum_actions::payload::SafePayloadGenerator;
@@ -21,9 +21,13 @@ use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
+use utils_db::rusty::RustyLevelDbShim;
+use utils_types::primitives::Address;
+
+use crate::errors::HoprLibError;
 
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum EnvironmentType {
     Production,
@@ -47,13 +51,25 @@ impl Display for EnvironmentType {
     }
 }
 
+impl FromStr for EnvironmentType {
+    type Err = HoprLibError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "production" => Ok(Self::Production),
+            "staging" => Ok(Self::Staging),
+            "development" => Ok(Self::Development),
+            "local" => Ok(Self::Local),
+            _ => Err(HoprLibError::GeneralError("Failed to recognize environment type".into()))
+        }
+    }
+}
+
 /// Holds all information we need about the blockchain network
 /// the client is going to use
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ChainOptions {
-    #[serde(skip_deserializing)]
-    pub id: String,
     pub description: String,
     /// >= 0
     pub chain_id: u32,
@@ -73,13 +89,13 @@ pub struct ChainOptions {
 
 /// Holds all information about the protocol network
 /// to be used by the client
-#[derive(Deserialize, Serialize, Clone)]
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
-    #[serde(skip_deserializing)]
-    pub id: String,
     /// must match one of the Network.id
     pub chain: String,
+    #[serde_as(as = "DisplayFromStr")]
     pub environment_type: EnvironmentType,
     /// Node.js-fashioned semver string
     pub version_range: String,
@@ -93,7 +109,7 @@ pub struct Network {
 }
 
 #[serde_as]
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Addresses {
     /// address of contract that manages authorization to access the Hopr network
@@ -175,9 +191,7 @@ fn satisfies(_version: &str, _allowed_versions: &str) -> crate::errors::Result<b
 
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
-    pub fn new(id: &str, maybe_custom_provider: Option<&str>) -> Result<Self, String> {
-        let mut protocol_config = ProtocolConfig::from_str(include_str!("../data/protocol-config.json"))?;
-
+    pub fn new(id: &str, maybe_custom_provider: Option<&str>, protocol_config: &mut ProtocolsConfig) -> Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
@@ -210,14 +224,8 @@ impl ChainNetworkConfig {
                 token: network.addresses.token.to_owned(),
             }),
             Ok(false) => Err(format!(
-                "network {} is not supported, supported networks {:?}",
-                id,
-                protocol_config
-                    .supported_networks()
-                    .iter()
-                    .map(|e| e.id.to_owned())
-                    .collect::<Vec<String>>()
-                    .join(", ")
+                "network {id} is not supported, supported networks {:?}",
+                protocol_config.supported_networks().join(", ")
             )),
             Err(e) => Err(e.to_string()),
         }
@@ -249,50 +257,46 @@ impl From<&ChainNetworkConfig> for SmartContractConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
-pub struct ProtocolConfig {
-    pub networks: std::collections::HashMap<String, Network>,
-    pub chains: std::collections::HashMap<String, ChainOptions>,
+pub struct ProtocolsConfig {
+    pub networks: std::collections::BTreeMap<String, Network>,
+    pub chains: std::collections::BTreeMap<String, ChainOptions>,
 }
 
-impl Default for ProtocolConfig {
+impl Default for ProtocolsConfig {
     fn default() -> Self {
         Self::from_str(include_str!("../data/protocol-config.json"))
             .expect("bundled protocol config should be always valid")
     }
 }
 
-impl FromStr for ProtocolConfig {
+impl FromStr for ProtocolsConfig {
     type Err = String;
 
     /// Reads the protocol config JSON file and returns it
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        let mut protocol_config =
-            (serde_json::from_str::<ProtocolConfig>(data)).map_err(|e| e.to_string())?;
-
-        for (id, env) in protocol_config.networks.iter_mut() {
-            env.id = id.to_owned();
-        }
-
-        for (id, network) in protocol_config.networks.iter_mut() {
-            network.id = id.to_owned();
-        }
-
-        Ok(protocol_config)
+        serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| e.to_string())
     }
 }
 
-impl ProtocolConfig {
-    /// Returns a list of environments which the node is able to work with
-    pub fn supported_networks(&self) -> Vec<Network> {
-        let mut allowed: Vec<Network> = vec![];
+impl std::cmp::PartialEq for ProtocolsConfig {
+    fn eq(&self, other: &Self) -> bool {
+        Vec::from_iter(self.networks.clone()) == Vec::from_iter(other.networks.clone())
+        && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
+    }
+}
 
-        for (_, env) in self.networks.iter() {
+impl ProtocolsConfig {
+    /// Returns a list of environments which the node is able to work with
+    pub fn supported_networks(&self) -> Vec<String> {
+        let mut allowed = vec![];
+
+        for (name, env) in self.networks.iter() {
             let range = env.version_range.to_owned();
 
             if let Ok(true) = satisfies(crate::constants::APP_VERSION_COERCED, range.as_str()) {
-                allowed.push(env.to_owned())
+                allowed.push(name.clone())
             }
         }
 
@@ -392,6 +396,6 @@ mod test {
 
     #[test]
     fn test_default_protocol_config_can_be_deserialized() {
-        let _ = ProtocolConfig::default();
+        let _ = ProtocolsConfig::default();
     }
 }

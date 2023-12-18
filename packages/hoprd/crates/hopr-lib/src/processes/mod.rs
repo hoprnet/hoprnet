@@ -5,13 +5,13 @@ use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use core_strategy::strategy::MultiStrategy;
 use core_types::acknowledgement::AcknowledgedTicket;
 use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver},
+    channel::mpsc::unbounded,
     future::poll_fn,
     pin_mut, Stream, StreamExt,
 };
 
 use core_transport::{
-    libp2p_identity::PeerId, ApplicationData, HalfKeyChallenge, IndexerToProcess, PeerEligibility, TransportOutput,
+    libp2p_identity::PeerId, IndexerToProcess, PeerEligibility,
 };
 
 use core_ethereum_actions::action_state::{ActionState, IndexerActionTracker};
