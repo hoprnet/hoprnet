@@ -143,6 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
             
             // TODO: Authentication, needs implementing
+            // if static token us used, this DB can be removed
             let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
                 utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
             ))));

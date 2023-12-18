@@ -1,5 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, collections::HashMap};
 
+use async_std::sync::RwLock;
+use libp2p_identity::PeerId;
 use serde_json::json;
 use tide::{http::Mime, Request, Response};
 use utoipa::{Modify, OpenApi};
@@ -13,6 +15,7 @@ pub const API_VERSION: &str = "3.0.0";
 #[derive(Clone)]
 pub struct State<'a> {
     pub hopr: Arc<Hopr>,
+    pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
     pub config: Arc<Config<'a>>,
 }
 
@@ -65,17 +68,25 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
 }
 
 pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr) {
+    let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
+    aliases
+        .write()
+        .await
+        .insert("me".to_owned(), hopr.me_peer_id());
+
     let hopr = Arc::new(hopr);
     let state = State {
-        hopr: hopr.clone(),
+        hopr,
+        aliases,
         config: Arc::new(Config::from("openapi.json")),
     };
+
     let mut app = tide::with_state(state.clone());
 
-    app.at(&format!("api-docs/openapi.json"))
+    app.at("api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
 
-    app.at(&format!("{BASE_PATH}/swagger-ui/*")).get(serve_swagger);
+    app.at("swagger-ui/*").get(serve_swagger);
 
     app.at("startedz/").get(checks::startedz);
     app.at("readyz/").get(checks::readyz);
@@ -84,9 +95,16 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr) {
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(state);
 
-        api.at("/account/addresses").get(account::account_addresses);
-        api.at("/account/balances").get(account::account_balances);
-        api.at("/account/withdraw").get(account::account_withdraw);
+        api.at("/aliases")
+            .get(alias::aliases)
+            .post(alias::set_alias);
+        api.at("/aliases/:alias")
+            .get(alias::get_alias)
+            .delete(alias::delete_alias);
+
+        api.at("/account/addresses").get(account::addresses);
+        api.at("/account/balances").get(account::balances);
+        api.at("/account/withdraw").get(account::withdraw);
 
         api
     });
@@ -112,10 +130,158 @@ impl Error422 {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct RequestStatus {
+    pub status: String,
+}
+
+mod alias {
+    use super::*;
+    use std::str::FromStr;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    struct PeerIdArg {
+        pub peer_id: String,
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    struct AliasPeerId {
+        pub alias: String,
+        /// HOPR node's offchain address representing a transport P2P address (PeerId)
+        pub peer_id: String,
+    }
+
+    /// Get each previously set alias and its corresponding PeerId
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/aliases/", BASE_PATH),
+        responses(
+            (status = 200, description = "Each alias with its corresponding PeerId", body = [AliasPeerId]),
+        ),
+        tag = "Alias"
+    )]
+    pub async fn aliases(mut req: Request<State<'_>>) -> tide::Result<Response> {
+        let args: AliasPeerId = req.body_json().await?;
+        let aliases = req.state().aliases.clone();
+
+        let aliases = aliases.read()
+            .await
+            .iter()
+            .map(|(key, value)| {
+                AliasPeerId {
+                    alias: key.clone(),
+                    peer_id: value.to_string(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Response::builder(200).body(json!(aliases)).build())
+    }
+
+    /// Set alias for a peer with a specific PeerId.
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{}/aliases/", BASE_PATH),
+        responses(
+            (status = 201, description = "Alias set successfully.", body = PeerIdArg),
+            (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Alias"
+    )]
+    pub async fn set_alias(mut req: Request<State<'_>>) -> tide::Result<Response> {
+        let args: AliasPeerId = req.body_json().await?;
+        let aliases = req.state().aliases.clone();
+
+        match PeerId::from_str(&args.peer_id) {
+            Ok(peer_id) => {
+                aliases.write().await.insert(args.alias, peer_id.clone());
+                Ok(Response::builder(200)
+                    .body(json!(PeerIdArg{peer_id: peer_id.to_string()}))
+                    .build()
+                )
+            },
+            Err(error) => {
+                Ok(Response::builder(400)
+                    .body(json!(RequestStatus{status: format!("Invalid PeerId '{}': {error}", args.peer_id)}))
+                    .build()
+                )
+            },
+        }
+    }
+
+    /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
+        responses(
+            (status = 200, description = "Get PeerId for an alias", body = int),
+            (status = 404, description = "PeerId not found", body = ErrorNotFound),
+        ),
+        tag = "Alias"
+    )]
+    pub async fn get_alias(req: Request<State<'_>>) -> tide::Result<Response> {
+        let alias = req.param("alias")?.parse::<String>()?;
+        let aliases = req.state().aliases.clone();
+
+        let aliases = aliases.read().await;
+        if let Some(peer_id) = aliases.get(&alias) {
+            Ok(Response::builder(200)
+                .body(json!(PeerIdArg{peer_id: peer_id.to_string()}))
+                .build()
+            )
+        } else {
+            Ok(Response::builder(404)
+                .body(json!(RequestStatus{status: format!("The alias '{alias}' does not exist")}))
+                .build()
+            )
+        }
+    }
+
+    /// Delete an alias.
+    #[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
+        responses(
+            (status = 204, description = "Alias removed successfully", body = int),
+            Error422,   // TOOD: This can never happen
+        ),
+        tag = "Alias"
+    )]
+    pub async fn delete_alias(req: Request<State<'_>>) -> tide::Result<Response> {
+        let alias = req.param("alias")?.parse::<String>()?;
+        let aliases = req.state().aliases.clone();
+
+        let _ = aliases.write().await.remove(&alias);
+
+        Ok(Response::builder(204).build())
+    }
+
+//     .get(alias::get_aliases)
+//     .post(alias::post_aliases);
+// api.at("/aliases/:alias")
+//     .get(alias::set_alias)
+//     .delete(alias::set_alias)
+//     .post(alias::delete_alias);
+
+    // pub async fn remove_alias(&self, alias: &String) {
+    //     ;
+    // }
+
+    // pub async fn get_alias(&self, alias: &String) -> Option<PeerId> {
+    //     self.aliases.read().await.get(alias).copied()
+    // }
+
+    // pub async fn get_aliases(&self) -> HashMap<String, PeerId> {
+    //     self.aliases.read().await.clone()
+    // }
+}
+
 mod account {
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct AccountAddresses {
         pub native: String,
         pub hopr: String,
@@ -133,7 +299,7 @@ mod account {
         ),
         tag = "Account"
     )]
-    pub(super) async fn account_addresses(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn addresses(req: Request<State<'_>>) -> tide::Result<Response> {
         let addresses = AccountAddresses {
             native: req.state().hopr.me_onchain().to_string(),
             hopr: req.state().hopr.me_peer_id().to_string(),
@@ -143,14 +309,12 @@ mod account {
     }
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct AccountBalances {
-        #[serde(rename = "safeNative")]
         pub safe_native: String,
         pub native: String,
-        #[serde(rename = "safeHopr")]
         pub safe_hopr: String,
         pub hopr: String,
-        #[serde(rename = "safeHoprAllowance")]
         pub safe_hopr_allowance: String,
     }
 
@@ -169,7 +333,7 @@ mod account {
         ),
         tag = "Account"
     )]
-    pub(super) async fn account_balances(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn balances(req: Request<State<'_>>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         let mut account_balances = AccountBalances::default();
@@ -203,6 +367,7 @@ mod account {
     }
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct WithdrawRequest {
         currency: BalanceType,
         amount: u128,
@@ -222,7 +387,7 @@ mod account {
         ),
         tag = "Account"
     )]
-    pub(super) async fn account_withdraw(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn withdraw(mut req: Request<State<'_>>) -> tide::Result<Response> {
         let withdraw_req_data: WithdrawRequest = req.body_json().await?;
         let recipient = <Address as std::str::FromStr>::from_str(&withdraw_req_data.address)?;
 
