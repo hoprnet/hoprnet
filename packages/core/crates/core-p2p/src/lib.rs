@@ -219,10 +219,32 @@ pub fn build_p2p_network(
     me: libp2p_identity::Keypair,
     protocol_cfg: ProtocolConfig,
 ) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
+    let mut mplex_config = libp2p_mplex::MplexConfig::new();
+
+    // libp2p default is 128
+    // we use more to accomodate many concurrent messages
+    // FIXME: make value configurable
+    mplex_config.set_max_num_streams(512);
+
+    // libp2p default is 32 Bytes
+    // we use the default for now
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_max_buffer_size(32);
+
+    // libp2p default is 8 KBytes
+    // we use the default for now, max allowed would be 1MB
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_split_send_size(8 * 1024);
+
+    // libp2p default is Block
+    // Alternative is ResetStream
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
+
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
         .authenticate(libp2p_noise::Config::new(&me).expect("signing libp2p-noise static keypair"))
-        .multiplex(libp2p_mplex::MplexConfig::default())
+        .multiplex(mplex_config)
         .timeout(std::time::Duration::from_secs(60))
         .boxed();
 
