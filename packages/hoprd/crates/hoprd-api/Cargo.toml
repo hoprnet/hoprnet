@@ -12,7 +12,9 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+default = ["prometheus"]
+prometheus = ["hopr-lib/prometheus", "dep:utils-metrics"]
+
 
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
@@ -38,3 +40,5 @@ core-transport = { workspace = true }
 core-types = { workspace = true }
 utils-types = { workspace = true }
 utils-log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+

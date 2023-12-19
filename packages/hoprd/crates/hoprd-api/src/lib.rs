@@ -56,7 +56,7 @@ impl Modify for SecurityAddon {
 async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Response> {
     let config = request.state().config.clone();
     let path = request.url().path().to_string();
-    let tail = path.strip_prefix(&format!("{BASE_PATH}/swagger-ui/")).unwrap();
+    let tail = path.strip_prefix(&"swagger-ui/").unwrap();
 
     match utoipa_swagger_ui::serve(tail, config) {
         Ok(swagger_file) => swagger_file
@@ -176,6 +176,7 @@ enum ApiErrorStatus {
     ChannelAlreadyOpen,
     ChannelNotOpen,
     UnsupportedFeature,
+    NodeFailedToParseValidQualityArg,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -1185,6 +1186,241 @@ mod tickets {
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+        }
+    }
+}
+
+mod node {
+    use hopr_lib::{Multiaddr, Health};
+    use tide::Body;
+
+    use super::*;
+
+    /// Get release version of the running node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/version", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node version"),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn version(req: Request<State<'_>>) -> tide::Result<Response> {
+        let version = req.state().hopr.version();
+
+        Ok(Response::builder(200).body(json!({"version": version})).build())
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodePeersReqQuery {
+        quality: Option<f64>
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct HeartbeatInfo {
+        sent: u64,
+        success: u64
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PeerInfo {
+        #[serde_as(as = "DisplayFromStr")]
+        peer_id: PeerId,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        peer_address: Option<Address>,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        multiaddr: Option<Multiaddr>,
+        heartbeats: HeartbeatInfo,
+        last_seen: u128,
+        last_seen_latency: u128,
+        quality: f64,
+        backoff: f64,
+        is_new: bool,
+        reported_version: String,
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodePeersRes {
+        connected: Vec<PeerInfo>,
+        announced: Vec<PeerInfo>
+    }
+
+    /// Lists information for `connected peers` and `announced peers`.
+    /// 
+    /// Connected peers are nodes which are connected to the node while announced peers are
+    /// nodes which have announced to the network.
+    /// 
+    /// Optionally pass `quality` parameter to get only peers with higher or equal quality
+    /// to the specified value.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/peers", BASE_PATH),
+        responses(
+            (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
+            (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn peers(req: Request<State<'_>>) -> tide::Result<Response> {
+        let query_params: NodePeersReqQuery = req.query()?;
+
+        if let Some(quality) = query_params.quality {
+            if quality < 0.0f64 || quality > 1.0f64 {
+                return Ok(Response::builder(400).body(ApiErrorStatus::NodeFailedToParseValidQualityArg).build());
+            }
+        }
+
+        let hopr = req.state().hopr.clone();
+
+        let body = NodePeersRes{
+            connected: hopr.all_network_peers(query_params.quality.unwrap_or(0f64))
+                            .await
+                            .into_iter()
+                            .map(|(address, peer_id, info)| {
+                                PeerInfo {
+                                    peer_id,
+                                    peer_address: address,
+                                    multiaddr: None,
+                                    heartbeats: HeartbeatInfo {
+                                        sent: info.heartbeats_sent,
+                                        success: info.heartbeats_succeeded
+                                    },
+                                    last_seen: info.last_seen as u128,
+                                    last_seen_latency: info.last_seen_latency as u128,
+                                    quality: info.get_average_quality(),
+                                    backoff: info.backoff,
+                                    is_new: info.heartbeats_sent == 0u64,
+                                    reported_version: "TODO: Add version here".into()
+                                }
+                            })
+                            .collect(),
+            announced: vec![]
+        };
+
+        Ok(Response::builder(200).body(json!(body)).build())
+    }
+
+    /// Retrieve Prometheus metrics from the running node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node metrics", body = String),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn metrics(req: Request<State<'_>>) -> tide::Result<Response> {
+        let version = req.state().hopr.version();
+
+        match utils_metrics::metrics::gather_all_metrics() {
+            Ok(metrics) => Ok(Response::builder(200).body(Body::from_string(metrics)).build()),
+            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodeInfoRes {
+        network: String,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        announced_address: Vec<Multiaddr>,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        listening_address: Vec<Multiaddr>,
+        chain: String,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_token: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_channels: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_network_registry: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_node_sage_registry: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_management_module: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_node_safe: Address,
+        is_eligible: bool,
+        #[serde_as(as = "DisplayFromStr")]
+        connectivity_status: Health,
+        channel_closure_period: u64
+    }
+
+    /// Get information about this HOPR Node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/info", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node version"),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn info(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        let chain_config = hopr.chain_config();
+        let network = hopr.network();
+
+        let body = NodeInfoRes {
+            network,
+            announced_address: hopr.local_multiaddresses(),
+            listening_address: hopr.local_multiaddresses(),
+            chain: chain_config.id,
+            hopr_token: chain_config.token,
+            hopr_channels: chain_config.channels,
+            hopr_network_registry: chain_config.network_registry,
+            hopr_node_sage_registry: chain_config.node_safe_registry,
+            hopr_management_module: chain_config.module_implementation,
+            hopr_node_safe: chain_config.node_safe_registry,    // TODO: bad value, what should be here?
+            is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+            connectivity_status: hopr.network_health().await,
+            channel_closure_period: 0u64    // TODO: bad value, what should be here?
+        };
+
+        Ok(Response::builder(200).body(json!(body)).build())
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct EntryNode {
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub multiaddrs: Vec<Multiaddr>,
+        pub is_elligible: bool
+    }
+
+    /// List all known entry nodes with multiaddrs and eligibility.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/entryNodes", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn entry_nodes(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match hopr.get_public_nodes().await {
+            Ok(nodes) => {
+                let mut body = HashMap::new();
+                for (peer_id, address, mas) in nodes.into_iter() {
+                    body.insert(address, EntryNode {
+                        multiaddrs: mas,
+                        is_elligible: hopr.is_allowed_to_access_network(&peer_id).await
+                    });
+                }
+
+                Ok(Response::builder(200).body(json!(body)).build())
+            },
+            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         }
     }
 }
