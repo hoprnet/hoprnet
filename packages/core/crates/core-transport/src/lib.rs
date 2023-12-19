@@ -59,7 +59,7 @@ use futures::{
 use libp2p::request_response::{RequestId, ResponseChannel};
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{error, info};
+use utils_log::{error, info, warn};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -253,6 +253,7 @@ use core_path::selectors::PathSelector;
 use core_protocol::ticket_aggregation::processor::AggregationList;
 use futures::future::{select, Either};
 use futures::pin_mut;
+use core_protocol::errors::ProtocolError;
 use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 use utils_types::traits::PeerIdLike;
@@ -312,9 +313,9 @@ impl HoprTransport {
         self.indexer.clone()
     }
 
-    pub async fn ping(&self, peer: &PeerId) -> Option<std::time::Duration> {
-        if !(self.is_allowed_to_access_network(peer).await) {
-            return None;
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
+        if ! self.is_allowed_to_access_network(peer).await {
+            return Err(errors::HoprTransportError::Api(format!("ping to {peer} not allowed due to network registry")))
         }
 
         let mut pinger = self.ping.write().await;
@@ -332,15 +333,18 @@ impl HoprTransport {
         let start = current_timestamp();
 
         match select(timeout, ping).await {
-            Either::Left(_) => info!("Manual ping to peer '{}' timed out", peer),
+            Either::Left(_) => {
+                warn!("Manual ping to peer '{}' timed out", peer);
+                return Err(ProtocolError::Timeout.into())
+            },
             Either::Right(_) => info!("Manual ping succeeded"),
         };
 
-        self.network
+        Ok(self.network
             .read()
             .await
             .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen) - start)
+            .map(|status| std::time::Duration::from_millis(status.last_seen) - start))
     }
 
     pub async fn send_message(

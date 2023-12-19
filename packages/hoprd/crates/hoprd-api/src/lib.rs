@@ -111,6 +111,11 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/account/balances").get(account::balances);
         api.at("/account/withdraw").get(account::withdraw);
 
+        api.at("/peers/:peerId")
+            .get(peers::show_all_peers)
+            .at("/ping")
+                .post(peers::ping_peer);
+
         api.at("/channels")
             .get(channels::list_channels)
             .post(channels::open_channel);
@@ -169,6 +174,7 @@ struct ApiError {
 enum ApiErrorStatus {
     InvalidInput,
     InvalidChannelId,
+    InvalidPeerId,
     ChannelNotFound,
     TicketsNotFound,
     NotEnoughBalance,
@@ -176,6 +182,7 @@ enum ApiErrorStatus {
     ChannelAlreadyOpen,
     ChannelNotOpen,
     UnsupportedFeature,
+    Timeout,
     NodeFailedToParseValidQualityArg,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
@@ -446,6 +453,90 @@ mod account {
         {
             Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
+    }
+}
+
+mod peers {
+    use std::str::FromStr;
+    use std::time::Duration;
+    use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
+    use hopr_lib::Multiaddr;
+    use serde_with::DurationMilliSeconds;
+    use core_transport::errors::HoprTransportError;
+    use super::*;
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    struct NodePeerInfo {
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub announced: Vec<Multiaddr>,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub observed: Vec<Multiaddr>
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+        responses(
+            (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
+            (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "PeerInfo"
+    )]
+    pub(super) async fn show_all_peers(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match PeerId::from_str(req.param("peerId")?) {
+            Ok(peer) => Ok(
+                Response::builder(200).body(json!(NodePeerInfo {
+                    announced: hopr.multiaddresses_announced_to_dht(&peer).await,
+                    observed: hopr.network_observed_multiaddresses(&peer).await
+                }))
+                .build()
+            ),
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build())
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PingInfo {
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        pub latency: std::time::Duration,
+        pub reported_version: String
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+        responses(
+            (status = 200, description = "Ping successful", body = NodePeerInfo),
+            (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Peers"
+    )]
+    pub(super) async fn ping_peer(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match PeerId::from_str(req.param("peerId")?) {
+            Ok(peer) => match hopr.ping(&peer).await {
+                Ok(latency) => Ok(Response::builder(200)
+                        .body(json!(PingInfo {
+                            latency: latency.unwrap_or(Duration::ZERO),
+                            reported_version: hopr.network_peer_info(&peer)
+                                .await
+                                .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                                .unwrap_or("unknown".into())
+                        }))
+                        .build()
+                ),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(core_protocol::errors::ProtocolError::Timeout))) =>
+                    Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build())
         }
     }
 }
@@ -1191,6 +1282,7 @@ mod tickets {
 }
 
 mod node {
+    use std::str::FromStr;
     use hopr_lib::{Multiaddr, Health};
     use tide::Body;
 
@@ -1315,11 +1407,13 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn metrics(req: Request<State<'_>>) -> tide::Result<Response> {
-        let version = req.state().hopr.version();
-
+    pub(super) async fn metrics(_req: Request<State<'_>>) -> tide::Result<Response> {
         match utils_metrics::metrics::gather_all_metrics() {
-            Ok(metrics) => Ok(Response::builder(200).body(Body::from_string(metrics)).build()),
+            Ok(metrics) => Ok(Response::builder(200)
+                .body(Body::from_string(metrics))
+                .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))
+                .build()
+            ),
             Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         }
     }

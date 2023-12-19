@@ -148,7 +148,7 @@ impl std::str::FromStr for Health {
             "Orange" => Ok(Self::Orange),
             "Yellow" => Ok(Self::Yellow),
             "Green" => Ok(Self::Green),
-            "Unknwon" => Ok(Self::Unknown),
+            "Unknown" => Ok(Self::Unknown),
             _ => Err(format!("Unsupported Health string '{s}'"))
         }
     }

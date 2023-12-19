@@ -14,6 +14,9 @@ pub enum ProtocolError {
     #[error("payment channel was not found")]
     ChannelNotFound,
 
+    #[error("timeout on protocol operation")]
+    Timeout,
+
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 

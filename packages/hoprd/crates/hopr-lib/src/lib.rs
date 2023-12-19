@@ -718,7 +718,7 @@ impl Hopr {
             ));
         }
 
-        Ok(self.transport_api.ping(peer).await)
+        Ok(self.transport_api.ping(peer).await?)
     }
 
     /// Send a message to another peer in the network

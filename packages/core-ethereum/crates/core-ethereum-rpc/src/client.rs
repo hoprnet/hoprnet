@@ -318,7 +318,7 @@ pub mod native {
             let data = resp
                 .text()
                 .await
-                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))?;
+                .map_err(|e| HttpRequestError::UnknownError(format!("body: {}", e.to_string())))?;
 
             //debug!("<- http post response with {}", data.len());
 
