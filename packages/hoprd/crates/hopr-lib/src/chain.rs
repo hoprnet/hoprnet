@@ -3,6 +3,7 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
+use semver::{VersionReq, Version};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
@@ -183,10 +184,14 @@ pub struct ChainNetworkConfig {
 }
 
 /// Check whether the version is allowed
-/// 
-/// TODO: Needs implementing
-fn satisfies(_version: &str, _allowed_versions: &str) -> crate::errors::Result<bool> {
-    Ok(true)
+fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<bool> {
+    let allowed_versions = VersionReq::parse(allowed_versions)
+        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize allowed version string: {}", e)))?;
+
+    let version = Version::from_str(version)
+        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize current lib version string: {}", e)))?;
+
+    Ok(allowed_versions.matches(&version))
 }
 
 impl ChainNetworkConfig {
@@ -397,5 +402,19 @@ mod test {
     #[test]
     fn test_default_protocol_config_can_be_deserialized() {
         let _ = ProtocolsConfig::default();
+    }
+
+    #[test]
+    fn test_version_is_satisfied_should_work_on_ranges() {
+        let actual = satisfies("1.90.0", ">=1.89, <1.93");
+        assert!(actual.is_ok());
+        assert!(actual.unwrap())
+    }
+
+    #[test]
+    fn test_version_is_satisfied_should_work_for_glob() {
+        let actual = satisfies(crate::constants::APP_VERSION_COERCED, "*");
+        assert!(actual.is_ok());
+        assert!(actual.unwrap())
     }
 }

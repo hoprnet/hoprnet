@@ -104,7 +104,7 @@
     "monte_rosa": {
       "chain": "xdai",
       "environment_type": "production",
-      "version_range": "1.89||1.90||1.91||1.92||1.93",
+      "version_range": ">=1.89, <1.93",
       "indexer_start_block_number": 24097267,
       "addresses": {
         "channels": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
