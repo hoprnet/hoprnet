@@ -3359,6 +3359,7 @@ dependencies = [
  "strum 0.25.0",
  "tide",
  "utils-log",
+ "utils-metrics",
  "utils-types",
  "utoipa",
  "utoipa-swagger-ui",
