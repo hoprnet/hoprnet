@@ -184,8 +184,8 @@ def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
 
-# NOTE: this test is first, ensuring that all tests following it have ensured connectivity
-@pytest.mark.asyncio
+# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
+# correct ticket price from api@pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
         others = set(others)
@@ -205,6 +205,14 @@ async def test_hoprd_swarm_connectivity(swarm7):
             for k in default_nodes()
         ]
     )
+
+    ticket_price = await random.choice(list(swarm7.values()))["api"].ticket_price()
+    if ticket_price is not None:
+        global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
+        TICKET_PRICE_PER_HOP = ticket_price
+        AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
+    else:
+        print("Could not get ticket price from API, using default value")
 
 
 def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
@@ -722,3 +730,14 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     native_balance=$(echo ${balances} | jq -r .native)
     """
     assert True
+
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
+    price = await swarm7[peer]["api"].ticket_price()
+
+    assert isinstance(price, int)
+    assert price > 0

@@ -5,7 +5,7 @@ use clap::{ArgAction, Parser};
 use core_strategy::Strategy;
 use core_transport::config::HostConfig;
 use hex;
-use hopr_lib::ProtocolConfig;
+use hopr_lib::ProtocolsConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
@@ -78,7 +78,6 @@ pub struct CliArgs {
         env = "HOPRD_NETWORK",
         help = "ID of the network the node will attempt to connect to",
         required = false,
-        value_parser = PossibleValuesParser::new(ProtocolConfig::default().supported_networks().iter().map(|e| e.id.clone()))
     )]
     pub network: Option<String>,
 
@@ -216,15 +215,6 @@ pub struct CliArgs {
     pub provider: Option<String>,
 
     #[arg(
-        long = "dryRun",
-        help = "List all the options used to run the HOPR node, but quit instead of starting",
-        env = "HOPRD_DRY_RUN",
-        default_value_t = false,
-        action = ArgAction::SetTrue
-    )]
-    pub dry_run: bool,
-
-    #[arg(
         long,
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
@@ -359,8 +349,28 @@ pub struct CliArgs {
     )]
     pub module_address: Option<String>,
 
+    #[arg(
+        long = "protocolConfig",
+        value_name = "HOPRD_PROTOCOL_CONFIG_PATH",
+        help = "Path to the protocol-config.json file",
+        env = "HOPRD_PROTOCOL_CONFIG_PATH"
+    )]
+    pub protocol_config_path: Option<String>,
+
     // ==================================
     /// deprecated
+    #[deprecated]
+    #[arg(
+        long = "dryRun",
+        help = "DEPRECATED",
+        env = "HOPRD_DRY_RUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue
+    )]
+    pub dry_run: bool,
+
+    /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheck",
         help = "DEPRECATED",
@@ -370,10 +380,12 @@ pub struct CliArgs {
     pub health_check: bool,
 
     /// deprecated
+    #[deprecated]
     #[arg(long = "healthCheckHost", help = "DEPRECATED")]
     pub health_check_host: Option<String>,
 
     /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheckPort",
         value_parser = clap::value_parser ! (u16),

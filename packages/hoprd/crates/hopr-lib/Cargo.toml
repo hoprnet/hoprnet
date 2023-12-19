@@ -17,6 +17,7 @@ async-std = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }
 lazy_static = { workspace = true }
+semver = "1.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }

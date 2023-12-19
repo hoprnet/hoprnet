@@ -12,24 +12,12 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-fn validate_network(network: &String) -> Result<(), ValidationError> {
-    if crate::chain::ProtocolConfig::default()
-        .supported_networks()
-        .iter()
-        .any(|n| network == &n.id)
-    {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Unsupported network"))
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
     pub announce: bool,
-    #[validate(custom = "validate_network")]
     pub network: String,
     pub provider: Option<String>,
+    pub protocols: crate::chain::ProtocolsConfig,
     pub check_unrealized_balance: bool,
 }
 
@@ -39,6 +27,7 @@ impl Default for Chain {
             announce: false,
             network: "anvil-localhost".to_owned(),
             provider: None,
+            protocols: crate::chain::ProtocolsConfig::default(),
             check_unrealized_balance: true,
         }
     }
@@ -152,11 +141,11 @@ mod tests {
     #[test]
     fn test_config_should_be_serializable_using_serde() -> Result<(), Box<dyn std::error::Error>> {
         let cfg = HoprLibConfig::default();
-
+        
         let yaml = serde_yaml::to_string(&cfg)?;
         let cfg_after_serde: HoprLibConfig = serde_yaml::from_str(&yaml)?;
         assert_eq!(cfg, cfg_after_serde);
-
+        
         Ok(())
     }
 }

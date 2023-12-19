@@ -3369,6 +3369,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "platform",
+ "semver 1.0.18",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

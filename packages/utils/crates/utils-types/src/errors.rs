@@ -6,7 +6,7 @@ use thiserror::Error;
 pub type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// Listing of some general re-usable errors
-#[derive(Error, Debug, Serialize, Deserialize)]
+#[derive(Error, Debug, Serialize, Deserialize, PartialEq)]
 pub enum GeneralError {
     #[error("failed to parse/deserialize the data")]
     ParseError,
