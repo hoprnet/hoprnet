@@ -192,13 +192,13 @@ def balance_str_to_int(balance: str):
 @pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
-        others = set(others)
+        others2 = set(others)
         while True:
             current_peers = set([x["peer_id"] for x in await me["api"].peers()])
-            if current_peers.intersection(others) == others:
+            if current_peers.intersection(others) == others2:
                 break
             else:
-                current_peers.intersection(others) == others
+                assert current_peers.intersection(others2) == others2
                 await asyncio.sleep(0.5)
 
     await asyncio.gather(
