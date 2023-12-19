@@ -215,15 +215,6 @@ pub struct CliArgs {
     pub provider: Option<String>,
 
     #[arg(
-        long = "dryRun",
-        help = "List all the options used to run the HOPR node, but quit instead of starting",
-        env = "HOPRD_DRY_RUN",
-        default_value_t = false,
-        action = ArgAction::SetTrue
-    )]
-    pub dry_run: bool,
-
-    #[arg(
         long,
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
@@ -367,6 +358,17 @@ pub struct CliArgs {
     pub protocol_config_path: Option<String>,
 
     // ==================================
+    /// deprecated
+
+    #[arg(
+        long = "dryRun",
+        help = "DEPRECATED",
+        env = "HOPRD_DRY_RUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue
+    )]
+    pub dry_run: bool,
+
     /// deprecated
     #[arg(
         long = "healthCheck",
