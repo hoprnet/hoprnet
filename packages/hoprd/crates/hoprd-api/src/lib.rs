@@ -785,7 +785,7 @@ mod messages {
     #[serde(rename_all = "camelCase")]
     struct SendMessageRes {
         pub challenge: HalfKeyChallenge,
-        pub timestamp: Duration,
+        pub timestamp: u128,
     }
 
     #[serde_as]
@@ -795,7 +795,7 @@ mod messages {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Timestamp to filter messages received after this timestamp
-        pub timestamp: Option<Duration>,
+        pub timestamp: Option<u128>,
     }
 
     /// Send a message to another peer using a given path.
@@ -826,7 +826,7 @@ mod messages {
         }
 
         let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap();
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
         match hopr
             .send_message(
                 Box::from(args.body.as_ref()),
@@ -916,11 +916,11 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let args: GetMessageReq = req.body_json().await?;
+        let tag: Tag = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(args.tag)).await {
+        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
@@ -972,11 +972,11 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let args: GetMessageReq = req.body_json().await?;
+        let tag: Tag = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(args.tag)).await {
+        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
@@ -986,8 +986,8 @@ mod messages {
         }
     }
 
-    /// Peek the list of messages currently present in the nodes message inbox.
-    ///
+    /// Peek the list of messages currently present in the nodes message inbox, filtered by tag, 
+    /// and optionally by timestamp (epoch in milliseconds).
     /// The messages are not removed from the inbox.
     #[utoipa::path(
         post,
@@ -1001,12 +1001,13 @@ mod messages {
     )]
     pub async fn peek_all(mut req: Request<State<'_>>) -> tide::Result<Response> {
         let args: GetMessageReq = req.body_json().await?;
+        let ts: Option<Duration> = args.timestamp.map(|ts| Duration::from_millis(ts.try_into().unwrap()));
 
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(Some(args.tag), args.timestamp)
+            .peek_all(Some(args.tag), ts)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
