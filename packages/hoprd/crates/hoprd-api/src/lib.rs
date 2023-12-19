@@ -1,5 +1,5 @@
-use std::{sync::Arc, collections::HashMap};
 use std::error::Error;
+use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
@@ -9,8 +9,8 @@ use tide::{http::Mime, Request, Response};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
-use hopr_lib::{Address, Balance, BalanceType, Hopr};
 use hopr_lib::errors::HoprLibError;
+use hopr_lib::{Address, Balance, BalanceType, Hopr};
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -74,10 +74,7 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
 pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>) {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
-    aliases
-        .write()
-        .await
-        .insert("me".to_owned(), hopr.me_peer_id());
+    aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State {
         hopr: Arc::new(hopr),
@@ -100,9 +97,7 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(state);
 
-        api.at("/aliases")
-            .get(alias::aliases)
-            .post(alias::set_alias);
+        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
         api.at("/aliases/:alias")
             .get(alias::get_alias)
             .delete(alias::delete_alias);
@@ -119,8 +114,7 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
             .get(channels::show_channel)
             .delete(channels::close_channel);
 
-        api.at("/channels/:channelId/fund")
-            .post(channels::fund_channel);
+        api.at("/channels/:channelId/fund").post(channels::fund_channel);
 
         api.at("/channels/:channelId/tickets")
             .get(tickets::show_channel_tickets);
@@ -131,14 +125,11 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/channels/:channelId/tickets/aggregate")
             .post(tickets::aggregate_tickets_in_channel);
 
-        api.at("/tickets")
-            .get(tickets::show_all_tickets);
+        api.at("/tickets").get(tickets::show_all_tickets);
 
-        api.at("/tickets/statistics")
-            .get(tickets::show_ticket_statistics);
+        api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
 
-        api.at("/tickets/redeem")
-            .post(tickets::redeem_all_tickets);
+        api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
 
         api.at("/messages/")
             .post(messages::send_message)
@@ -160,7 +151,7 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
 struct ApiError {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>
+    pub error: Option<String>,
 }
 
 /// Enumerates all API request errors
@@ -188,7 +179,7 @@ impl From<ApiErrorStatus> for ApiError {
                 Some(e)
             } else {
                 None
-            }
+            },
         }
     }
 }
@@ -236,14 +227,13 @@ mod alias {
     pub async fn aliases(req: Request<State<'_>>) -> tide::Result<Response> {
         let aliases = req.state().aliases.clone();
 
-        let aliases = aliases.read()
+        let aliases = aliases
+            .read()
             .await
             .iter()
-            .map(|(key, value)| {
-                AliasPeerId {
-                    alias: key.clone(),
-                    peer_id: value.clone(),
-                }
+            .map(|(key, value)| AliasPeerId {
+                alias: key.clone(),
+                peer_id: value.clone(),
             })
             .collect::<Vec<_>>();
 
@@ -267,9 +257,8 @@ mod alias {
 
         aliases.write().await.insert(args.alias, args.peer_id);
         Ok(Response::builder(200)
-            .body(json!(PeerIdArg{peer_id: args.peer_id}))
-            .build()
-        )
+            .body(json!(PeerIdArg { peer_id: args.peer_id }))
+            .build())
     }
 
     /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
@@ -289,14 +278,12 @@ mod alias {
         let aliases = aliases.read().await;
         if let Some(peer_id) = aliases.get(&alias) {
             Ok(Response::builder(200)
-                .body(json!(PeerIdArg{peer_id: peer_id.clone()}))
-                .build()
-            )
+                .body(json!(PeerIdArg {
+                    peer_id: peer_id.clone()
+                }))
+                .build())
         } else {
-            Ok(Response::builder(404)
-                .body(ApiErrorStatus::InvalidInput)
-                .build()
-            )
+            Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
         }
     }
 
@@ -450,13 +437,13 @@ mod account {
 }
 
 mod channels {
-    use std::str::FromStr;
-    use futures::TryFutureExt;
+    use super::*;
     use core_crypto::types::Hash;
     use core_ethereum_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
+    use futures::TryFutureExt;
+    use std::str::FromStr;
     use utils_types::traits::ToHex;
-    use super::*;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
@@ -468,7 +455,7 @@ mod channels {
         pub peer_address: Address,
         #[serde_as(as = "DisplayFromStr")]
         pub status: ChannelStatus,
-        pub balance: String
+        pub balance: String,
     }
 
     impl From<ChannelEntry> for NodeChannel {
@@ -477,7 +464,7 @@ mod channels {
                 id: value.get_id(),
                 peer_address: value.destination,
                 status: value.status,
-                balance: value.balance.amount().to_string()
+                balance: value.balance.amount().to_string(),
             }
         }
     }
@@ -501,14 +488,14 @@ mod channels {
         pub status: ChannelStatus,
         pub ticket_index: u32,
         pub channel_epoch: u32,
-        pub closure_time: u64
+        pub closure_time: u64,
     }
 
     #[derive(Debug, Clone, serde::Serialize)]
     struct NodeChannels {
         pub incoming: Vec<NodeChannel>,
         pub outgoing: Vec<NodeChannel>,
-        pub all: Vec<NodeTopologyChannel>
+        pub all: Vec<NodeTopologyChannel>,
     }
 
     async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<NodeTopologyChannel, HoprLibError> {
@@ -516,13 +503,19 @@ mod channels {
             channel_id: channel.get_id(),
             source_address: channel.source,
             destination_address: channel.destination,
-            source_peer_id: node.chain_key_to_peerid(&channel.source).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
-            destination_peer_id: node.chain_key_to_peerid(&channel.destination).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+            source_peer_id: node
+                .chain_key_to_peerid(&channel.source)
+                .await?
+                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+            destination_peer_id: node
+                .chain_key_to_peerid(&channel.destination)
+                .await?
+                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
             balance: channel.balance.amount().to_string(),
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
             channel_epoch: channel.channel_epoch.as_u32(),
-            closure_time: channel.closure_time.as_u64()
+            closure_time: channel.closure_time.as_u64(),
         })
     }
 
@@ -542,24 +535,27 @@ mod channels {
 
         if full_topology {
             let hopr_clone = hopr.clone();
-            let topology = hopr.all_channels()
+            let topology = hopr
+                .all_channels()
                 .and_then(|channels| async move {
-                    futures::future::try_join_all(
-                        channels
-                            .iter()
-                            .map(|c| query_topology_info(c, hopr_clone.as_ref()))
-
-                    ).await
-                }
-            )
-            .await;
+                    futures::future::try_join_all(channels.iter().map(|c| query_topology_info(c, hopr_clone.as_ref())))
+                        .await
+                })
+                .await;
 
             match topology {
-                Ok(all) => Ok(Response::builder(200).body(json!(NodeChannels { incoming: vec![], outgoing: vec![], all })).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Ok(all) => Ok(Response::builder(200)
+                    .body(json!(NodeChannels {
+                        incoming: vec![],
+                        outgoing: vec![],
+                        all
+                    }))
+                    .build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             }
         } else {
-            let channels = hopr.channels_to(&hopr.me_onchain())
+            let channels = hopr
+                .channels_to(&hopr.me_onchain())
                 .and_then(|incoming| async {
                     let outgoing = hopr.channels_from(&hopr.me_onchain()).await?;
                     Ok((incoming, outgoing))
@@ -569,18 +565,24 @@ mod channels {
             match channels {
                 Ok((incoming, outgoing)) => {
                     let channel_info = NodeChannels {
-                        incoming: incoming.into_iter()
-                            .filter_map(|c| (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c)))
+                        incoming: incoming
+                            .into_iter()
+                            .filter_map(|c| {
+                                (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                            })
                             .collect(),
-                        outgoing: outgoing.into_iter()
-                            .filter_map(|c| (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c)))
+                        outgoing: outgoing
+                            .into_iter()
+                            .filter_map(|c| {
+                                (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                            })
                             .collect(),
                         all: vec![],
                     };
 
                     Ok(Response::builder(200).body(json!(channel_info)).build())
                 }
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             }
         }
     }
@@ -591,7 +593,7 @@ mod channels {
     struct OpenChannelRequest {
         #[serde_as(as = "DisplayFromStr")]
         pub peer_address: Address,
-        pub amount: String
+        pub amount: String,
     }
 
     #[serde_as]
@@ -601,7 +603,7 @@ mod channels {
         #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
         #[serde_as(as = "DisplayFromStr")]
-        pub transaction_receipt: Hash
+        pub transaction_receipt: Hash,
     }
 
     #[utoipa::path(
@@ -620,25 +622,29 @@ mod channels {
 
         let open_req: OpenChannelRequest = req.body_json().await?;
 
-        match hopr.open_channel(&open_req.peer_address, &Balance::new_from_str(&open_req.amount, BalanceType::HOPR)).await {
-            Ok(channel_details) => {
-                Ok(Response::builder(201).body(json!(OpenChannelReceipt {
+        match hopr
+            .open_channel(
+                &open_req.peer_address,
+                &Balance::new_from_str(&open_req.amount, BalanceType::HOPR),
+            )
+            .await
+        {
+            Ok(channel_details) => Ok(Response::builder(201)
+                .body(json!(OpenChannelReceipt {
                     channel_id: channel_details.channel_id,
                     transaction_receipt: channel_details.tx_hash
-                })).build())
-            }
+                }))
+                .build()),
             Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
-            },
+            }
             Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
-            },
+            }
             Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
                 Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
-            Err(e) => {
-                Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
-            }
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
@@ -658,11 +664,13 @@ mod channels {
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
-                Ok(Some(channel)) => Ok(Response::builder(200).body(json!(query_topology_info(&channel, hopr.as_ref()).await?)).build()),
+                Ok(Some(channel)) => Ok(Response::builder(200)
+                    .body(json!(query_topology_info(&channel, hopr.as_ref()).await?))
+                    .build()),
                 Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
 
@@ -673,7 +681,7 @@ mod channels {
         #[serde_as(as = "DisplayFromStr")]
         pub receipt: Hash,
         #[serde_as(as = "DisplayFromStr")]
-        pub channel_status: ChannelStatus
+        pub channel_status: ChannelStatus,
     }
 
     #[utoipa::path(
@@ -692,21 +700,21 @@ mod channels {
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.close_channel_by_id(channel_id, false).await {
-                Ok(receipt) => {
-                    Ok(Response::builder(200).body(json!(CloseChannelReceipt {
+                Ok(receipt) => Ok(Response::builder(200)
+                    .body(json!(CloseChannelReceipt {
                         channel_status: receipt.status,
                         receipt: receipt.tx_hash
-                    })).build())
-                },
+                    }))
+                    .build()),
                 Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
-                },
+                }
                 Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
-                },
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                }
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
 
@@ -726,18 +734,16 @@ mod channels {
         let amount = Balance::new_from_str(req.param("amount")?, BalanceType::HOPR);
 
         match Hash::from_hex(req.param("channelId")?) {
-            Ok(channel_id) => {
-                match hopr.fund_channel(&channel_id, &amount).await {
-                    Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
-                    Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) =>
-                        Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
-                    Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
+                Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
+                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                    Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
-
 }
 
 mod messages {
@@ -771,7 +777,7 @@ mod messages {
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
         // #[validate(length(min=0, max=3))]        // TODO: issue in serde_as with validator -> no order is correct
         pub path: Option<Vec<PeerId>>,
-        #[validate(range(min=1, max=3))]
+        #[validate(range(min = 1, max = 3))]
         pub hops: Option<u16>,
     }
 
@@ -779,6 +785,17 @@ mod messages {
     #[serde(rename_all = "camelCase")]
     struct SendMessageRes {
         pub challenge: HalfKeyChallenge,
+        pub timestamp: Duration,
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate)]
+    #[serde(rename_all = "camelCase")]
+    struct GetMessageReq {
+        /// The message tag used to filter messages based on application
+        pub tag: u16,
+        /// Timestamp to filter messages received after this timestamp
+        pub timestamp: Option<Duration>,
     }
 
     /// Send a message to another peer using a given path.
@@ -800,12 +817,29 @@ mod messages {
 
         if let Some(path) = &args.path {
             if path.len() > 3 {
-                return Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into())).build())
+                return Ok(Response::builder(422)
+                    .body(ApiErrorStatus::UnknownFailure(
+                        "The path components must contain at most 3 elements".into(),
+                    ))
+                    .build());
             }
         }
 
-        match hopr.send_message(Box::from(args.body.as_ref()), args.peer_id, args.path, args.hops, Some(args.tag)).await {
-            Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes{challenge})).build()),
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap();
+        match hopr
+            .send_message(
+                Box::from(args.body.as_ref()),
+                args.peer_id,
+                args.path,
+                args.hops,
+                Some(args.tag),
+            )
+            .await
+        {
+            Ok(challenge) => Ok(Response::builder(202)
+                .body(json!(SendMessageRes { challenge, timestamp }))
+                .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
@@ -842,7 +876,7 @@ mod messages {
 
         let size = inbox.read().await.size(Some(tag.tag)).await;
 
-        Ok(Response::builder(200).body(json!(Size{size})).build())
+        Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -850,22 +884,18 @@ mod messages {
     struct MessagePopRes {
         tag: u16,
         body: String,
-        received_at: u128
+        received_at: u128,
     }
 
     fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
         if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
-                Ok(data_str) => {
-                    Ok(MessagePopRes{
-                        tag,
-                        body: data_str.into(),
-                        received_at: ts.as_millis()
-                    })
-                },
-                Err(error) => {
-                    Err(format!("Failed to deserialize data into string: {error}"))
-                }
+                Ok(data_str) => Ok(MessagePopRes {
+                    tag,
+                    body: data_str.into(),
+                    received_at: ts.as_millis(),
+                }),
+                Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
             }
         } else {
             Err("No application tag was present despite picking from a tagged inbox".into())
@@ -886,14 +916,14 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let args: GetMessageReq = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
+        if let Some((data, ts)) = inbox.pop(Some(args.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
         } else {
             Ok(Response::builder(404).build())
@@ -918,12 +948,11 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        let messages = inbox.pop_all(Some(tag.tag))
+        let messages: Vec<MessagePopRes> = inbox
+            .pop_all(Some(tag.tag))
             .await
             .into_iter()
-            .filter_map(|(data, ts)| {
-                to_api_message(data, ts).ok()
-            })
+            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200).body(json!(messages)).build())
@@ -943,14 +972,14 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let args: GetMessageReq = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
+        if let Some((data, ts)) = inbox.pop(Some(args.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
         } else {
             Ok(Response::builder(404).build())
@@ -971,16 +1000,16 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek_all(mut req: Request<State<'_>>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let args: GetMessageReq = req.body_json().await?;
+
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        let messages = inbox.peek_all(Some(tag.tag))
+        let messages = inbox
+            .peek_all(Some(args.tag), args.timestamp)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| {
-                to_api_message(data, ts).ok()
-            })
+            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200).body(json!(messages)).build())
@@ -988,13 +1017,13 @@ mod messages {
 }
 
 mod tickets {
+    use super::*;
     use core_crypto::types::Hash;
     use core_protocol::errors::ProtocolError;
     use core_transport::errors::HoprTransportError;
     use core_transport::TicketStatistics;
     use core_types::channels::Ticket;
     use utils_types::traits::ToHex;
-    use super::*;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
@@ -1019,7 +1048,7 @@ mod tickets {
                 index_offset: value.index_offset,
                 win_prob: value.win_prob().to_string(),
                 channel_epoch: value.channel_epoch,
-                signature: value.signature.expect("impossible to have an unsigned ticket").to_hex()
+                signature: value.signature.expect("impossible to have an unsigned ticket").to_hex(),
             }
         }
     }
@@ -1040,15 +1069,16 @@ mod tickets {
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
-                Ok(Some(tickets)) => {
-                    Ok(Response::builder(200)
-                        .body(json!(tickets.into_iter().map(|t| ChannelTicket::from(t.ticket)).collect::<Vec<_>>()))
-                        .build())
-                },
+                Ok(Some(tickets)) => Ok(Response::builder(200)
+                    .body(json!(tickets
+                        .into_iter()
+                        .map(|t| ChannelTicket::from(t.ticket))
+                        .collect::<Vec<_>>()))
+                    .build()),
                 Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
 
@@ -1064,12 +1094,10 @@ mod tickets {
     pub(super) async fn show_all_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match hopr.all_tickets().await {
-            Ok(tickets) => {
-                Ok(Response::builder(200)
-                    .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
-                    .build())
-            },
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            Ok(tickets) => Ok(Response::builder(200)
+                .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
+                .build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
@@ -1085,7 +1113,7 @@ mod tickets {
         pub neglected: u64,
         pub neglected_value: String,
         pub rejected: u64,
-        pub rejected_value: String
+        pub rejected_value: String,
     }
 
     impl From<TicketStatistics> for NodeTicketStatistics {
@@ -1118,7 +1146,7 @@ mod tickets {
         let hopr = req.state().hopr.clone();
         match hopr.ticket_statistics().await.map(NodeTicketStatistics::from) {
             Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
@@ -1135,7 +1163,7 @@ mod tickets {
         let hopr = req.state().hopr.clone();
         match hopr.redeem_all_tickets(false).await {
             Ok(()) => Ok(Response::builder(204).build()),
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
@@ -1156,9 +1184,9 @@ mod tickets {
             Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
                 Ok(count) if count > 0 => Ok(Response::builder(204).build()),
                 Ok(_) => Ok(Response::builder(404).body(ApiErrorStatus::TicketsNotFound).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
 
@@ -1178,13 +1206,15 @@ mod tickets {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
                 Ok(_) => Ok(Response::builder(204).build()),
-                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelNotFound))) =>
-                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotFound).build()),
-                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelClosed))) =>
-                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotOpen).build()),
-                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelNotFound))) => {
+                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotFound).build())
+                }
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelClosed))) => {
+                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotOpen).build())
+                }
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
-            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
         }
     }
 }

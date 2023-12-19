@@ -35,7 +35,7 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
-    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
+    async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)>;
 
     // TODO: consider adding a stream version for `pop_all`
 
@@ -147,7 +147,7 @@ where
 
     /// Peeks all the messages with the given `tag` (ordered oldest to latest) or
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
-    pub async fn peek_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
+    pub async fn peek_all(&self, tag: Option<Tag>, timestamp: Option<Duration>) -> Vec<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return Vec::new();
         }
@@ -155,7 +155,7 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - self.cfg.max_age)
             .await;
-        db.peek_all(tag).await
+        db.peek_all(tag, timestamp).await
     }
 
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
