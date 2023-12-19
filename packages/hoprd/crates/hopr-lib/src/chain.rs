@@ -129,6 +129,8 @@ pub struct Network {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
 }
 
 // duplicate due to issue of wasm_bindgen with proc macros on struct properties
@@ -156,6 +158,8 @@ pub struct Network {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
 }
@@ -216,6 +220,8 @@ pub struct ChainNetworkConfig {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
 }
 
 impl ChainNetworkConfig {
@@ -254,6 +260,7 @@ impl ChainNetworkConfig {
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
+                logs_page_size: network.logs_page_size,
             }),
             Ok(false) => Err(format!(
                 "network {} is not supported, supported networks {:?}",
@@ -381,6 +388,8 @@ where
         max_http_retries: 10,
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
+        tx_confirmations: chain_config.confirmations as usize,
+        logs_page_size: chain_config.logs_page_size,
         ..RpcOperationsConfig::default()
     };
     let rpc_client_cfg = RpcEthereumClientConfig::default();

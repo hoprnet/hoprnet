@@ -40,8 +40,9 @@
       "confirmations": 2,
       "environment_type": "local",
       "indexer_start_block_number": 1,
+      "logs_page_size": 100,
       "tags": [],
-      "tx_polling_interval": 2000,
+      "tx_polling_interval": 1000,
       "version_range": "*"
     },
     "anvil-localhost2": {
@@ -60,8 +61,9 @@
       "confirmations": 2,
       "environment_type": "local",
       "indexer_start_block_number": 1,
+      "logs_page_size": 100,
       "tags": [],
-      "tx_polling_interval": 2000,
+      "tx_polling_interval": 1000,
       "version_range": "*"
     },
     "debug-staging": {
@@ -80,10 +82,11 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29521261,
+      "logs_page_size": 2000,
       "tags": [
         "development"
       ],
-      "tx_polling_interval": 5000,
+      "tx_polling_interval": 3000,
       "version_range": "*"
     },
     "dufour": {
@@ -102,10 +105,11 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 29706814,
+      "logs_page_size": 2000,
       "tags": [
         "etherscan"
       ],
-      "tx_polling_interval": 5000,
+      "tx_polling_interval": 3000,
       "version_range": "2.*"
     },
     "monte_rosa": {
@@ -124,10 +128,11 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 24097267,
+      "logs_page_size": 2000,
       "tags": [
         "etherscan"
       ],
-      "tx_polling_interval": 5000,
+      "tx_polling_interval": 3000,
       "version_range": "1.89||1.90||1.91||1.92||1.93"
     },
     "rotsee": {
@@ -146,10 +151,11 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29690361,
+      "logs_page_size": 2000,
       "tags": [
         "etherscan"
       ],
-      "tx_polling_interval": 5000,
+      "tx_polling_interval": 3000,
       "version_range": "2.*"
     }
   }
