@@ -37,7 +37,7 @@ jobs:
         if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0"
+          version: "v0.7.4"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v24
