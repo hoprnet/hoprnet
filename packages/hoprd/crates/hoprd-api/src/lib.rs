@@ -10,7 +10,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use tide::utils::async_trait;
 use tide::{Middleware, Next, StatusCode};
 use tide::{http::Mime, Request, Response};
-use utoipa::{Modify, OpenApi};
+use utoipa::OpenApi;
 use utoipa_swagger_ui::Config;
 
 use hopr_lib::{Address, Balance, BalanceType, Hopr};
@@ -36,32 +36,59 @@ pub struct InternalState {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        // todo::list_todos,
-        // todo::create_todo,
-        // todo::delete_todo,
-        // todo::mark_done
+        checks::startedz,
+        checks::readyz,
+        checks::healthyz,
+        alias::aliases,
+        alias::set_alias,
+        alias::get_alias,
+        alias::delete_alias,
+        account::addresses,
+        account::balances,
+        account::withdraw,
+        channels::list_channels,
+        channels::open_channel,
+        channels::close_channel,
+        channels::fund_channel,
+        channels::show_channel,
+        messages::send_message,
+        messages::delete_messages,
+        messages::size,
+        messages::pop,
+        messages::pop_all,
+        messages::peek,
+        messages::peek_all,
+        tickets::show_channel_tickets,
+        tickets::show_all_tickets,
+        tickets::show_ticket_statistics,
+        tickets::redeem_all_tickets,
+        tickets::redeem_tickets_in_channel,
+        tickets::aggregate_tickets_in_channel,
+        node::version,
+        node::peers,
+        node::metrics,
+        node::info,
+        node::entry_nodes,
+        peers::show_all_peers,
+        peers::ping_peer
     ),
     components(
         // schemas(todo::Todo, todo::TodoError)
     ),
-    modifiers(&SecurityAddon),
+    // modifiers(&SecurityAddon),
     tags(
-        (name = "todo", description = "Todo items management endpoints.")
+        (name = "Check", description = "HOPR node functionality checks"),
+        (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
+        (name = "Account", description = "HOPR node account endpoints"),
+        (name = "Node", description = "HOPR node information endpoints"),
+        (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Messages", description = "HOPR node message manipulation endpoints"),
+        (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
+        (name = "Peers", description = "HOPR node peer manipulation endpoints"),
     )
 )]
 pub struct ApiDoc;
 
-struct SecurityAddon;
-
-impl Modify for SecurityAddon {
-    fn modify(&self, _openapi: &mut utoipa::openapi::OpenApi) {
-        // let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
-        // components.add_security_scheme(
-        //     "api_key",
-        //     SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("todo_apikey"))),
-        // )
-    }
-}
 
 /// Token-based authentication middleware
 struct TokenBasedAuthenticationMiddleware {}
@@ -205,6 +232,12 @@ pub async fn run_hopr_api(host: &str, cfg: &crate::config::Api, hopr: hopr_lib::
         api.at("/messages/peek").get(messages::peek);
         api.at("/messages/peek-all").get(messages::peek_all);
         api.at("/messages/size").get(messages::size);
+
+        api.at("/node/version").get(node::version);
+        api.at("/node/info").get(node::info);
+        api.at("/node/peers").get(node::peers);
+        api.at("/node/metrics").get(node::metrics);
+        api.at("/node/entryNodes").get(node::entry_nodes);
 
         api
     });
@@ -395,7 +428,7 @@ mod account {
     /// HOPR address is represented by the P2P PeerId and can be used by other node owner to interact with this node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
+        path = const_format::formatcp!("{}/account/addresses", BASE_PATH),
         responses(
             (status = 200, description = "The node's public addresses", body = AddressesAddress),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -429,7 +462,7 @@ mod account {
     /// NATIVE balance of the Node is used to pay for the gas fees for the blockchain.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/balances"),
+        path = const_format::formatcp!("{}/account/balances", BASE_PATH),
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -483,7 +516,7 @@ mod account {
     /// Both NATIVE or HOPR can be withdrawn using this method.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
+        path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -529,7 +562,7 @@ mod peers {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
         responses(
             (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
@@ -562,7 +595,7 @@ mod peers {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
         responses(
             (status = 200, description = "Ping successful", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
@@ -672,7 +705,7 @@ mod channels {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -750,7 +783,7 @@ mod channels {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
@@ -822,7 +855,7 @@ mod channels {
 
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}", BASE_PATH),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -856,7 +889,7 @@ mod channels {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/fund", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1170,7 +1203,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1198,7 +1231,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets"),
+        path = const_format::formatcp!("{}/tickets", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1251,7 +1284,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        path = const_format::formatcp!("{}/tickets/statistics", BASE_PATH),
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1268,7 +1301,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
+        path = const_format::formatcp!("{}/tickets/redeem", BASE_PATH),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1285,7 +1318,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/redeem"),
+        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/redeem", BASE_PATH),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1308,7 +1341,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/aggregate"),
+        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/aggregate", BASE_PATH),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),
             (status = 400, description = "Invalid channel id.", body = ApiError),
