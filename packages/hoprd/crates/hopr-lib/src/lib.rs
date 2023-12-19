@@ -7,7 +7,7 @@ mod processes;
 
 
 pub use {
-    core_transport::{Health, TransportOutput, ApplicationData, HalfKeyChallenge, Multiaddr},
+    core_transport::{config::HostConfig, Health, TransportOutput, ApplicationData, HalfKeyChallenge, Multiaddr},
     chain::{Network, ProtocolsConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
