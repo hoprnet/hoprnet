@@ -537,7 +537,7 @@ mod peers {
         ),
         tag = "PeerInfo"
     )]
-    pub(super) async fn show_all_peers(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn show_all_peers(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(
@@ -570,7 +570,7 @@ mod peers {
         ),
         tag = "Peers"
     )]
-    pub(super) async fn ping_peer(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn ping_peer(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => match hopr.ping(&peer).await {
