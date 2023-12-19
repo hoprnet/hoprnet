@@ -344,3 +344,11 @@ class HoprdAPI:
         """
         status, _ = self.__call_api(TicketsApi, "tickets_redeem_tickets")
         return status
+
+    async def ticket_price(self):
+        """
+        Returns the ticket price in wei.
+        :return: price: int
+        """
+        _, response = self.__call_api(TicketsApi, "tickets_get_ticket_price")
+        return int(response.price) if hasattr(response, "price") else None
