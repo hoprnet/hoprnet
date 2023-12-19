@@ -384,7 +384,7 @@ def swarm7(request):
             while True:
                 with open(f"{node_args['dir']}.log", "r") as f:
                     logs = f.read()
-                    if "waitforfunds: " in logs:
+                    if "still unfunded, " in logs or "node is funded" in logs:
                         break
                 sleep(0.1)
 
