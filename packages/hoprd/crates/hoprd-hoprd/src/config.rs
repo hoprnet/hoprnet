@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -11,55 +12,10 @@ use utils_types::primitives::Address;
 
 use hopr_lib::{config::HoprLibConfig, ProtocolsConfig};
 
-pub const DEFAULT_API_HOST: &str = "127.0.0.1";
-pub const DEFAULT_API_PORT: u16 = 3001;
-
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
-
-pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
-
-fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
-    match &token {
-        Auth::None => Ok(()),
-        Auth::Token(token) => {
-            if token.len() >= MINIMAL_API_TOKEN_LENGTH {
-                // TODO: add more token limitations? alhpanumeric?
-                Ok(())
-            } else {
-                Err(ValidationError::new("The validation token is too short"))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Auth {
-    None,
-    Token(String),
-}
-
-#[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Api {
-    pub enable: bool,
-    /// Auth enum holding the API auth configuration
-    #[validate(custom = "validate_api_auth")]
-    pub auth: Auth,
-    #[validate]
-    pub host: HostConfig,
-}
-
-impl Default for Api {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            auth: Auth::None,
-            host: HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap(),
-        }
-    }
-}
 
 fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
@@ -267,7 +223,7 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), DEFAULT_API_PORT).as_str())
+            cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
                 .map_err(crate::errors::HoprdError::ValidationError)?;
         }
         if let Some(x) = cli_args.api_port {
@@ -376,9 +332,9 @@ impl HoprdConfig {
 
         // redacting sensitive information
         match &mut redacted_cfg.api.auth {
-            crate::config::Auth::None => {}
-            crate::config::Auth::Token(_) => {
-                redacted_cfg.api.auth = crate::config::Auth::Token("<REDACTED>".to_owned())
+            Auth::None => {}
+            Auth::Token(_) => {
+                redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned())
             }
         }
         if redacted_cfg.identity.private_key.is_some() {
