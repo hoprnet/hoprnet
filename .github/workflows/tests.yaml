@@ -74,7 +74,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            .cargo/.package-cache/
+            .cargo/bin/
             .foundry/bin/
 
       - name: Install dependencies
@@ -218,7 +218,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            .cargo/.package-cache/
+            .cargo/bin/
             .foundry/bin/
 
       - name: Test with pytest
