@@ -1,8 +1,3 @@
-pub mod cli;
-pub mod config;
-pub mod errors;
-pub mod token;
-
 use std::{sync::Arc, time::SystemTime, path::Path, future::poll_fn, pin::Pin};
 
 use async_lock::RwLock;
@@ -14,7 +9,7 @@ use hoprd_keypair::key_pair::{IdentityOptions, HoprKeys};
 use hopr_lib::TransportOutput;
 use utils_log::{info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
-use crate::cli::CliArgs;
+use hoprd::cli::CliArgs;
 
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -44,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("The HOPRd node appears to run on DappNode");
         }
 
-        let cfg = config::HoprdConfig::from_cli_args(args, false)?;
+        let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
         info!("Node configuration: {}", cfg.as_redacted_string()?);
 
         // Find or create an identity
@@ -53,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             id_path: cfg.identity.file.clone(),
             password: cfg.identity.password.clone(),
             use_weak_crypto: Some(cfg.test.use_weak_crypto),
-            private_key: cfg.identity.private_key.clone().and_then(|v| cli::parse_private_key(&v).ok()),
+            private_key: cfg.identity.private_key.clone().and_then(|v| hoprd::cli::parse_private_key(&v).ok()),
         };
 
         let hopr_keys = HoprKeys::init(identity_opts)?;
@@ -144,11 +139,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let hoprd_db_path = Path::new(&cfg.hopr.db.data).join("db").join("hoprd")
                 .into_os_string()
                 .into_string()
-                .map_err(|_| errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
+                .map_err(|_| hoprd::errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
             
             // TODO: Authentication, needs implementing
             // if static token us used, this DB can be removed
-            let hoprd_db = Arc::new(RwLock::new(token::HoprdPersistentDb::new(utils_db::db::DB::new(
+            let hoprd_db = Arc::new(RwLock::new(hoprd::token::HoprdPersistentDb::new(utils_db::db::DB::new(
                 utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
             ))));
 
