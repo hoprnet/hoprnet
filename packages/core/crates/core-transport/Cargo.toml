@@ -11,16 +11,14 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["prometheus"]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:gloo-timers",
     "core-ethereum-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
     "core-protocol/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm", "utils-validation/wasm"
+    "utils-db/wasm", "platform/wasm-bindgen", "utils-metrics?/wasm", "utils-types/wasm",  "utils-log/wasm",
 ]
 prometheus = [
     "dep:lazy_static", "dep:utils-metrics",
-    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus",
+    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "core-ethereum-rpc/prometheus"
 ]
 
 [dependencies]
@@ -36,33 +34,20 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
-# wasm-bindgen
-console_error_panic_hook = { version = "0.1.7", optional = true }
-gloo-timers = { workspace = true, optional = true }
-js-sys = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
+core-network = { workspace = true }
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-ethereum-rpc = { workspace = true }
+core-ethereum-types = { workspace = true }
+core-path = { workspace = true }
+core-p2p = { workspace = true }
+core-packet = { workspace = true }
+core-protocol = { workspace = true }
+core-types = { workspace = true }
+utils-db = { workspace = true}
+utils-log = { workspace = true }
+platform = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+utils-types = { workspace = true }
+utils-validation = { workspace = true }
 
-core-network = { workspace = true, default-features = false }
-core-crypto = { workspace = true, default-features = false }
-core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-rpc = { workspace = true, default-features = false }
-core-ethereum-types = { workspace = true, default-features = false }
-core-path = { workspace = true, default-features = false }
-core-p2p = { workspace = true, default-features = false }
-core-packet = { workspace = true, default-features = false }
-core-protocol = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-platform = { workspace = true, default-features = false }
-utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-types = { workspace = true, default-features = false }
-utils-validation = { workspace = true, default-features = false }
-
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']

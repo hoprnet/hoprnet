@@ -12,7 +12,6 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-console_error_panic_hook = { version = "0.1.7", optional = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 ethers = { workspace = true }
@@ -35,17 +34,7 @@ hex-literal = "0.4"
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 hex = { workspace = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
 wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]

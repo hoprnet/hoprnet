@@ -5,7 +5,6 @@ use clap::{ArgAction, Parser};
 use core_strategy::Strategy;
 use core_transport::config::HostConfig;
 use hex;
-use hopr_lib::ProtocolsConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 

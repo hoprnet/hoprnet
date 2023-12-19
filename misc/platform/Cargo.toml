@@ -16,14 +16,14 @@ default = []
 wasm-bindgen = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
 
 [dependencies]
-thiserror = "1.0"
 bitflags = { version = "2.4", optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-js-sys = { workspace = true, optional = true }
+js-sys = { version = "0.3", optional = true }
+thiserror = { workspace = true }
+wasm-bindgen = { version = "0.2", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
+wasm-pack = "0.12.0"
+wasm-opt = "0.112.0"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false

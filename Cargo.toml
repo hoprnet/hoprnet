@@ -1,6 +1,3 @@
-[build]
-rustflags = [ "-Zlocation-detail=none" ]
-
 [workspace]
 
 resolver = "2"
@@ -48,8 +45,6 @@ futures-concurrency = "7.3.0"
 futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
-js-sys = "0.3.64"
-gloo-timers = { version = "0.3.0", features = ["futures"] }
 lazy_static = "1.4.0"
 libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
 libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
@@ -60,13 +55,8 @@ rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
-serde-wasm-bindgen = { version = "0.6" }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
-wasm-pack = "0.12.0"
-wasm-opt = "0.112.0"
-wasm-bindgen = "0.2.86"
-wasm-bindgen-futures = "0.4.36"
 
 bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
 core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
@@ -76,7 +66,6 @@ core-ethereum-rpc = { path = "packages/core-ethereum/crates/core-ethereum-rpc", 
 core-ethereum-types = { path = "packages/core-ethereum/crates/core-ethereum-types", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
-core-misc = { path = "packages/core/crates/core-misc", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-path = { path = "packages/core/crates/core-path", default-features = false }
@@ -89,7 +78,7 @@ hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
 hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false }
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
-platform = { path = "misc/platform"}
+platform = { path = "misc/platform" }
 utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
 utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
