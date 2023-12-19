@@ -10,6 +10,8 @@ use serde_with::{serde_as, DisplayFromStr};
 use tide::utils::async_trait;
 use tide::{Middleware, Next, StatusCode};
 use tide::{http::Mime, Request, Response};
+use tide::http::headers::AUTHORIZATION;
+use tide::http::mime;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::Config;
 
@@ -103,17 +105,14 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware
         match auth.as_ref() {
             config::Auth::None => {},
             config::Auth::Token(token) => {
-                let is_authorized = request.header("Authorization")
+                let is_authorized = request.header(AUTHORIZATION)
                     .map(|auth| { token.as_str() == auth.as_str() })
                     .unwrap_or(false);
 
                 if !is_authorized {
                     let reject_response = Response::builder(StatusCode::Unauthorized)
-                        .header("Content-Type", "application/json")
-                        .body(serde_json::json!({
-                            "status": StatusCode::Unauthorized.to_string(),
-                            "error": "The token is invalid.".to_string()
-                        }))
+                        .content_type(mime::JSON)
+                        .body(ApiErrorStatus::Unauthorized)
                         .build();
 
                     return Ok(reject_response);
@@ -268,7 +267,8 @@ enum ApiErrorStatus {
     ChannelNotOpen,
     UnsupportedFeature,
     Timeout,
-    NodeFailedToParseValidQualityArg,
+    Unauthorized,
+    InvalidQuality,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -1448,7 +1448,7 @@ mod node {
 
         if let Some(quality) = query_params.quality {
             if quality < 0.0f64 || quality > 1.0f64 {
-                return Ok(Response::builder(400).body(ApiErrorStatus::NodeFailedToParseValidQualityArg).build());
+                return Ok(Response::builder(400).body(ApiErrorStatus::InvalidQuality).build());
             }
         }
 
