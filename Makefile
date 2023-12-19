@@ -272,6 +272,7 @@ run-local: ## run HOPRd from local repo
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
+		--protocolConfig $(mydir)scripts/protocol-config-anvil.json \
 		--data /tmp/ \
 		$(args)
 

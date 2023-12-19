@@ -1,0 +1,75 @@
+{
+  "networks": {
+    "anvil-localhost": {
+      "chain": "anvil",
+      "environment_type": "local",
+      "version_range": "*",
+      "indexer_start_block_number": 5,
+      "addresses": {
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      },
+      "confirmations": 2,
+      "tags": []
+    },
+    "anvil-localhost2": {
+      "chain": "anvil",
+      "environment_type": "local",
+      "version_range": "*",
+      "indexer_start_block_number": 5,
+      "addresses": {
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+        "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      },
+      "confirmations": 2,
+      "tags": []
+    },
+    "dufour": {
+      "chain": "xdai",
+      "environment_type": "production",
+      "version_range": "2.*",
+      "indexer_start_block_number": 29706814,
+      "addresses": {
+        "channels": "0x693Bac5ce61c720dDC68533991Ceb41199D8F8ae",
+        "network_registry": "0x582b4b586168621dAf83bEb2AeADb5fb20F8d50d",
+        "network_registry_proxy": "0x2bc6b78B0aA892e97714F0e3b1c74487f92C5884",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x098B275485c406573D042848D66eb9d63fca311C",
+        "node_safe_registry": "0xe15C24a0910311c83aC78B5930d771089E93077b",
+        "module_implementation": "0xB7397C218766eBe6A1A634df523A1a7e412e67eA",
+        "ticket_price_oracle": "0xcA5656Fe6F2d847ACA32cf5f38E51D2054cA1273",
+        "announcements": "0x619eabE23FD0E2291B50a507719aa633fE6069b8"
+      },
+      "confirmations": 8,
+      "tags": [
+        "etherscan"
+      ]
+    }
+  },
+  "chains": {
+    "anvil": {
+      "description": "Local Ethereum node, akin to Ganache, Hardhat chain",
+      "chain_id": 31337,
+      "live": false,
+      "max_fee_per_gas": "1 gwei",
+      "max_priority_fee_per_gas": "0.2 gwei",
+      "default_provider": "http://127.0.0.1:8545/",
+      "native_token_name": "ETH",
+      "hopr_token_name": "wxHOPR"
+    }
+  }
+}
