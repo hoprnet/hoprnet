@@ -20,7 +20,7 @@ use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{debug, error, info, warn};
-use utils_types::primitives::{Address, Balance, BalanceType};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};
 
@@ -177,6 +177,10 @@ impl HoprChain {
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.db.read().await.get_channels().await?)
+    }
+
+    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
+        Ok(self.db.read().await.get_ticket_price().await?)
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
