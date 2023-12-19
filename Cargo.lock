@@ -3453,6 +3453,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "strum 0.25.0",
  "tide",
  "utils-log",
  "utils-types",

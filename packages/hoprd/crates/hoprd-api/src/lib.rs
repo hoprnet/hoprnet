@@ -1,5 +1,5 @@
 use std::{sync::Arc, collections::HashMap};
-use std::fmt::Display;
+use std::error::Error;
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
@@ -155,44 +155,54 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
     app.listen(host).await.expect("the server should run successfully")
 }
 
-#[derive(
-    Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::IntoResponses,
-)]
-#[response(status = 422)]
-pub struct Error422 {
+/// Should not be instantiated directly, but rather through the `ApiErrorStatus`.
+#[derive(Debug, Clone, serde::Serialize)]
+struct ApiError {
     pub status: String,
-    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>
 }
 
-impl Error422 {
-    pub fn new(error: String) -> Self {
+/// Enumerates all API request errors
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+enum ApiErrorStatus {
+    InvalidInput,
+    InvalidChannelId,
+    ChannelNotFound,
+    TicketsNotFound,
+    NotEnoughBalance,
+    NotEnoughAllowance,
+    ChannelAlreadyOpen,
+    ChannelNotOpen,
+    UnsupportedFeature,
+    #[strum(serialize = "UNKNOWN_FAILURE")]
+    UnknownFailure(String),
+}
+
+impl From<ApiErrorStatus> for ApiError {
+    fn from(value: ApiErrorStatus) -> Self {
         Self {
-            status: "UNKNOWN_FAILURE".into(),
-            error,
+            status: value.to_string(),
+            error: if let ApiErrorStatus::UnknownFailure(e) = value {
+                Some(e)
+            } else {
+                None
+            }
         }
     }
 }
 
-impl<T: Display> From<T> for Error422 {
+impl From<ApiErrorStatus> for tide::Body {
+    fn from(value: ApiErrorStatus) -> Self {
+        json!(ApiError::from(value)).into()
+    }
+}
+
+// Errors lead to `UnknownFailure` per default
+impl<T: Error> From<T> for ApiErrorStatus {
     fn from(value: T) -> Self {
-        Self::new(value.to_string())
-    }
-}
-
-impl From<Error422> for tide::Body {
-    fn from(value: Error422) -> Self {
-        json!(value).into()
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct RequestStatus {
-    pub status: String,
-}
-
-impl From<RequestStatus> for tide::Body {
-    fn from(value: RequestStatus) -> Self {
-        json!(value).into()
+        Self::UnknownFailure(value.to_string())
     }
 }
 
@@ -246,8 +256,8 @@ mod alias {
         path = const_format::formatcp!("{}/aliases/", BASE_PATH),
         responses(
             (status = 201, description = "Alias set successfully.", body = PeerIdArg),
-            (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Alias"
     )]
@@ -284,7 +294,7 @@ mod alias {
             )
         } else {
             Ok(Response::builder(404)
-                .body(json!(RequestStatus{status: format!("The alias '{alias}' does not exist")}))
+                .body(ApiErrorStatus::InvalidInput)
                 .build()
             )
         }
@@ -296,7 +306,7 @@ mod alias {
         path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
         responses(
             (status = 204, description = "Alias removed successfully", body = int),
-            Error422,   // TOOD: This can never happen
+            (status = 422, description = "Unknown failure", body = ApiError)   // TOOD: This can never happen
         ),
         tag = "Alias"
     )]
@@ -328,7 +338,7 @@ mod account {
         path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
         responses(
             (status = 200, description = "The node's public addresses", body = AddressesAddress),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
@@ -362,7 +372,7 @@ mod account {
         path = const_format::formatcp!("{BASE_PATH}/account/balances"),
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
@@ -373,27 +383,27 @@ mod account {
 
         match hopr.get_balance(BalanceType::Native).await {
             Ok(v) => account_balances.native = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.hopr = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
             Ok(v) => account_balances.safe_native = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
             Ok(v) => account_balances.safe_hopr = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.safe_allowance().await {
             Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
-            Err(e) => return Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         Ok(Response::builder(200).body(json!(account_balances)).build())
@@ -416,7 +426,7 @@ mod account {
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
@@ -434,7 +444,7 @@ mod account {
             .await
         {
             Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
-            Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 }
@@ -513,7 +523,7 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -538,7 +548,7 @@ mod channels {
 
             match topology {
                 Ok(all) => Ok(Response::builder(200).body(json!(NodeChannels { incoming: vec![], outgoing: vec![], all })).build()),
-                Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             }
         } else {
             let channels = hopr.channels_to(&hopr.me_onchain())
@@ -562,7 +572,7 @@ mod channels {
 
                     Ok(Response::builder(200).body(json!(channel_info)).build())
                 }
-                Err(e) => Ok(Response::builder(422).body(Error422::new(e.to_string())).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             }
         }
     }
@@ -586,9 +596,9 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
-            (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = RequestStatus),
-            (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = RequestStatus),
-            Error422,
+            (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
+            (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -605,16 +615,16 @@ mod channels {
                 })).build())
             }
             Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
-                Ok(Response::builder(403).body(RequestStatus { status: "NOT_ENOUGH_BALANCE".into() }).build())
+                Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
             },
             Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
-                Ok(Response::builder(403).body(RequestStatus { status: "NOT_ENOUGH_ALLOWANCE".into() }).build())
+                Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
             },
             Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
-                Ok(Response::builder(409).body(RequestStatus { status: "CHANNEL_ALREADY_OPEN".into() }).build())
+                Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
             Err(e) => {
-                Ok(Response::builder(422).body(Error422::from(e)).build())
+                Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             }
         }
     }
@@ -624,9 +634,9 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
         responses(
             (status = 201, description = "Channel fetched successfully", body = NodeTopologyChannel),
-            (status = 400, description = "Invalid channel id.", body = RequestStatus),
-            (status = 404, description = "Channel not found.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -636,10 +646,10 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
                 Ok(Some(channel)) => Ok(Response::builder(200).body(json!(query_topology_info(&channel, hopr.as_ref()).await?)).build()),
-                Ok(None) => Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
-                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 
@@ -655,9 +665,9 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
-            (status = 400, description = "Invalid channel id.", body = RequestStatus),
-            (status = 404, description = "Channel not found.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -673,14 +683,14 @@ mod channels {
                     })).build())
                 },
                 Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
-                    Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build())
+                    Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 },
                 Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
-                    Ok(Response::builder(422).body(RequestStatus { status: "UNSUPPORTED_FEATURE".into() }).build())
+                    Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
                 },
-                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 
@@ -689,9 +699,9 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
-            (status = 400, description = "Invalid channel id.", body = RequestStatus),
-            (status = 404, description = "Channel not found.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -704,11 +714,11 @@ mod channels {
                 match hopr.fund_channel(&channel_id, &amount).await {
                     Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
                     Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) =>
-                        Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
-                    Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                        Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
+                    Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
                 }
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 
@@ -764,7 +774,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/", BASE_PATH),
         responses(
             (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageRes),
-            Error422
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
     )]
@@ -774,13 +784,13 @@ mod messages {
 
         if let Some(path) = &args.path {
             if path.len() > 3 {
-                return Ok(Response::builder(422).body(json!(Error422::new("The path components must contain at most 3 elements".into()))).build())
+                return Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into())).build())
             }
         }
 
         match hopr.send_message(Box::from(args.body.as_ref()), args.peer_id, args.path, args.hops, Some(args.tag)).await {
             Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes{challenge})).build()),
-            Err(e) => Ok(Response::builder(422).body(json!(Error422::new(e.to_string()))).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
@@ -828,13 +838,11 @@ mod messages {
     }
 
     fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
-        if data.application_tag.is_none() {
-            Err("No application tag was present despite picking from a tagged inbox".into())
-        } else {
+        if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
                 Ok(data_str) => {
                     Ok(MessagePopRes{
-                        tag: data.application_tag.unwrap_or(0),
+                        tag,
                         body: data_str.into(),
                         received_at: ts.as_millis()
                     })
@@ -843,6 +851,8 @@ mod messages {
                     Err(format!("Failed to deserialize data into string: {error}"))
                 }
             }
+        } else {
+            Err("No application tag was present despite picking from a tagged inbox".into())
         }
     }
 
@@ -855,7 +865,7 @@ mod messages {
         responses(
             (status = 204, description = "Message successfully extracted.", body = MessagePopRes),
             (status = 404, description = "The specified resource was not found."),
-            Error422
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
     )]
@@ -867,7 +877,7 @@ mod messages {
         if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
-                Err(e) => Ok(Response::builder(422).body(json!(Error422::new(e))).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build())
             }
         } else {
             Ok(Response::builder(404).build())
@@ -883,7 +893,7 @@ mod messages {
         responses(
             (status = 200, description = "All message successfully extracted.", body = [MessagePopRes]),
             (status = 404, description = "The specified resource was not found."),
-            Error422
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
     )]
@@ -912,7 +922,7 @@ mod messages {
         responses(
             (status = 204, description = "Message successfully peeked at.", body = MessagePopRes),
             (status = 404, description = "The specified resource was not found."),
-            Error422
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
     )]
@@ -924,7 +934,7 @@ mod messages {
         if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
-                Err(e) => Ok(Response::builder(422).body(json!(Error422::new(e))).build())
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build())
             }
         } else {
             Ok(Response::builder(404).build())
@@ -940,7 +950,7 @@ mod messages {
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = [MessagePopRes]),
             (status = 404, description = "The specified resource was not found."),
-            Error422
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
     )]
@@ -1000,10 +1010,10 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
         responses(
-        (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
-        (status = 400, description = "Invalid channel id.", body = RequestStatus),
-        (status = 404, description = "Channel not found.", body = RequestStatus),
-        Error422,
+            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Channel not found.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
@@ -1017,10 +1027,10 @@ mod tickets {
                         .body(json!(tickets.into_iter().map(|t| ChannelTicket::from(t.ticket)).collect::<Vec<_>>()))
                         .build())
                 },
-                Ok(None) => Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
-                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 
@@ -1029,7 +1039,7 @@ mod tickets {
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
@@ -1041,7 +1051,7 @@ mod tickets {
                     .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
                     .build())
             },
-            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
         }
     }
 
@@ -1082,7 +1092,7 @@ mod tickets {
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
@@ -1090,7 +1100,7 @@ mod tickets {
         let hopr = req.state().hopr.clone();
         match hopr.ticket_statistics().await.map(NodeTicketStatistics::from) {
             Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
-            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
         }
     }
 
@@ -1099,7 +1109,7 @@ mod tickets {
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
-            Error422,
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
@@ -1107,7 +1117,7 @@ mod tickets {
         let hopr = req.state().hopr.clone();
         match hopr.redeem_all_tickets(false).await {
             Ok(()) => Ok(Response::builder(204).build()),
-            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
         }
     }
 
@@ -1116,9 +1126,9 @@ mod tickets {
         path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/redeem"),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
-            (status = 400, description = "Invalid channel id.", body = RequestStatus),
-            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channel"
     )]
@@ -1127,10 +1137,10 @@ mod tickets {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
                 Ok(count) if count > 0 => Ok(Response::builder(204).build()),
-                Ok(_) => Ok(Response::builder(404).body(RequestStatus { status: "TICKETS_NOT_FOUND".into() }).build()),
-                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                Ok(_) => Ok(Response::builder(404).body(ApiErrorStatus::TicketsNotFound).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 
@@ -1139,9 +1149,9 @@ mod tickets {
         path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/aggregate"),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),
-            (status = 400, description = "Invalid channel id.", body = RequestStatus),
-            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = RequestStatus),
-            Error422,
+            (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channel"
     )]
@@ -1151,12 +1161,12 @@ mod tickets {
             Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
                 Ok(_) => Ok(Response::builder(204).build()),
                 Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelNotFound))) =>
-                    Ok(Response::builder(422).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
+                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotFound).build()),
                 Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelClosed))) =>
-                    Ok(Response::builder(422).body(RequestStatus { status: "CHANNEL_NOT_OPEN".into() }).build()),
-                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+                    Ok(Response::builder(422).body(ApiErrorStatus::ChannelNotOpen).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
             },
-            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build())
         }
     }
 }
