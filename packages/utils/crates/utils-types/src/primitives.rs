@@ -780,7 +780,6 @@ impl AutoBinarySerializable for AuthorizationToken {}
 
 impl AuthorizationToken {
     /// Creates new token from the serialized data and id
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(id: String, data: &[u8]) -> Self {
         assert!(data.len() < 2048, "invalid token size");
         Self { id, token: data.into() }

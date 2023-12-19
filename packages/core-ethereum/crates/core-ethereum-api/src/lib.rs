@@ -26,7 +26,6 @@ use crate::errors::{HoprChainError, Result};
 
 use async_std::task::sleep;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfRequestor;
 
 pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;

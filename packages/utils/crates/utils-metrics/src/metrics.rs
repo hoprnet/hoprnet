@@ -17,7 +17,6 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 
 /// A naive merging method for two serialized metric registries.
 /// It performs union of the sets, removing those metrics which have the same name and type.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     let mut merged_metrics = BTreeMap::new();
     let metric_expr =
@@ -73,13 +72,11 @@ where
 
 /// Represents a simple monotonic unsigned integer counter.
 /// Wrapper for IntCounter type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SimpleCounter {
     name: String,
     ctr: IntCounter,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl SimpleCounter {
     /// Retrieves the value of the counter
     pub fn get(&self) -> u64 {
@@ -114,14 +111,12 @@ impl SimpleCounter {
 
 /// Represents a vector of named monotonic unsigned integer counters.
 /// Wrapper for IntCounterVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MultiCounter {
     name: String,
     labels: Vec<String>,
     ctr: IntCounterVec,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MultiCounter {
     /// Returns the name of the counter vector given at construction.
     pub fn name(&self) -> String {
@@ -167,14 +162,12 @@ impl MultiCounter {
 
 /// Represents a simple gauge with floating point values.
 /// Wrapper for Gauge type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug)]
 pub struct SimpleGauge {
     name: String,
     gg: Gauge,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl SimpleGauge {
     /// Increments the gauge by the given value.
     pub fn increment(&self, by: f64) {
@@ -214,7 +207,6 @@ impl SimpleGauge {
 
 /// Represents a vector of gauges with floating point values.
 /// Wrapper for GaugeVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug)]
 pub struct MultiGauge {
     name: String,
@@ -222,7 +214,6 @@ pub struct MultiGauge {
     ctr: GaugeVec,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MultiGauge {
     /// Returns the name of the gauge vector given at construction.
     pub fn name(&self) -> String {
@@ -275,25 +266,6 @@ impl MultiGauge {
     }
 }
 
-/// Convenience helper macro for creating time measurements to a histogram.
-/// The macro will distinguish between WASM and non-WASM case automatically and will evaluate
-/// the SimpleTimer object.
-/// First argument is either SimpleHistogram or MultiHistogram.
-/// If MultiHistogram has been supplied, an additional argument with labels must be passed.
-#[cfg(all(feature = "wasm", not(test)))]
-#[macro_export]
-macro_rules! histogram_start_measure {
-    // SimpleHistogram case
-    ($v:ident) => {
-        $v.wasm_start_measure()
-    };
-    // MultiHistogram case
-    ($v:ident, $l:expr) => {
-        $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect())
-            .map_err(|_| prometheus::Error::Msg("invalid label".into()))
-    };
-}
-
 #[cfg(any(not(feature = "wasm"), test))]
 #[macro_export]
 macro_rules! histogram_start_measure {
@@ -318,20 +290,17 @@ enum TimerVariant {
 }
 
 /// Represents a timer handle.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SimpleTimer {
     inner: TimerVariant,
 }
 
 /// Represents a histogram with floating point values.
 /// Wrapper for Histogram type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SimpleHistogram {
     name: String,
     hh: Histogram,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl SimpleHistogram {
     /// Records a value observation to the histogram.
     pub fn observe(&self, value: f64) {
@@ -402,14 +371,12 @@ impl SimpleHistogram {
 
 /// Represents a vector of histograms with floating point values.
 /// Wrapper for HistogramVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MultiHistogram {
     name: String,
     labels: Vec<String>,
     hh: HistogramVec,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MultiHistogram {
     /// Stops the given timer and records the elapsed duration in seconds to the multi-histogram.
     pub fn record_measure(&self, timer: SimpleTimer) {
@@ -688,186 +655,5 @@ mod tests {
         assert_eq!(metrics1, res4);
 
         assert!(merge_encoded_metrics("", "").trim().is_empty());
-    }
-}
-
-/// Bindings for JS/TS
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::metrics::TimerVariant::Wasm;
-    use crate::metrics::{
-        MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer,
-    };
-    use js_sys::JsString;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_misc::{convert_from_jstrvec, ok_or_jserr};
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen]
-    pub fn gather_all_metrics() -> JsResult<String> {
-        ok_or_jserr!(super::gather_all_metrics())
-    }
-
-    #[wasm_bindgen]
-    pub fn create_counter(name: &str, description: &str) -> JsResult<SimpleCounter> {
-        ok_or_jserr!(SimpleCounter::new(name, description))
-    }
-
-    #[wasm_bindgen]
-    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiCounter> {
-        convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(MultiCounter::new(name, description, bind.as_slice()))
-    }
-
-    #[wasm_bindgen]
-    impl MultiCounter {
-        #[wasm_bindgen(js_name = "increment_by")]
-        pub fn _increment_by(&self, label_values: Vec<JsString>, by: u64) {
-            convert_from_jstrvec!(label_values, bind);
-            self.increment_by(bind.as_slice(), by);
-        }
-
-        #[wasm_bindgen(js_name = "increment")]
-        pub fn _increment(&self, label_values: Vec<JsString>) {
-            convert_from_jstrvec!(label_values, bind);
-            self.increment(bind.as_slice())
-        }
-
-        #[wasm_bindgen(js_name = "get")]
-        pub fn _get(&self, label_values: Vec<JsString>) -> JsResult<u64> {
-            convert_from_jstrvec!(label_values, bind);
-            self.get(bind.as_slice())
-                .ok_or(JsValue::from_str("label value does not exist"))
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn create_gauge(name: &str, description: &str) -> JsResult<SimpleGauge> {
-        ok_or_jserr!(SimpleGauge::new(name, description))
-    }
-
-    #[wasm_bindgen]
-    pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiGauge> {
-        convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(MultiGauge::new(name, description, bind.as_slice()))
-    }
-
-    #[wasm_bindgen]
-    impl MultiGauge {
-        #[wasm_bindgen(js_name = "increment_by")]
-        pub fn _increment_by(&self, label_values: Vec<JsString>, by: f64) {
-            convert_from_jstrvec!(label_values, bind);
-            self.increment(bind.as_slice(), by);
-        }
-
-        #[wasm_bindgen(js_name = "increment")]
-        pub fn _increment(&self, label_values: Vec<JsString>) {
-            convert_from_jstrvec!(label_values, bind);
-            self.increment(bind.as_slice(), 1.0)
-        }
-
-        #[wasm_bindgen(js_name = "decrement_by")]
-        pub fn _decrement_by(&self, label_values: Vec<JsString>, by: f64) {
-            convert_from_jstrvec!(label_values, bind);
-            self.decrement(bind.as_slice(), by);
-        }
-
-        #[wasm_bindgen(js_name = "decrement")]
-        pub fn _decrement(&self, label_values: Vec<JsString>) {
-            convert_from_jstrvec!(label_values, bind);
-            self.decrement(bind.as_slice(), 1.0)
-        }
-
-        #[wasm_bindgen(js_name = "set")]
-        pub fn _set(&self, label_values: Vec<JsString>, value: f64) {
-            convert_from_jstrvec!(label_values, bind);
-            self.set(bind.as_slice(), value);
-        }
-
-        #[wasm_bindgen(js_name = "get")]
-        pub fn _get(&self, label_values: Vec<JsString>) -> Result<f64, JsValue> {
-            convert_from_jstrvec!(label_values, bind);
-            self.get(bind.as_slice())
-                .ok_or(JsValue::from_str("label value does not exist"))
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn create_histogram(name: &str, description: &str) -> Result<SimpleHistogram, JsValue> {
-        create_histogram_with_buckets(name, description, &[] as &[f64; 0])
-    }
-
-    #[wasm_bindgen]
-    pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> JsResult<SimpleHistogram> {
-        ok_or_jserr!(SimpleHistogram::new(name, description, buckets.into()))
-    }
-
-    #[wasm_bindgen]
-    impl SimpleHistogram {
-        #[wasm_bindgen(js_name = "start_measure")]
-        pub fn wasm_start_measure(&self) -> SimpleTimer {
-            SimpleTimer {
-                inner: Wasm {
-                    start_ts: js_sys::Date::now() / 1000.0,
-                    new_ts: || js_sys::Date::now() / 1000.0,
-                    labels: vec![],
-                },
-            }
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn create_multi_histogram(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiHistogram> {
-        create_multi_histogram_with_buckets(name, description, &[] as &[f64; 0], labels)
-    }
-
-    #[wasm_bindgen]
-    pub fn create_multi_histogram_with_buckets(
-        name: &str,
-        description: &str,
-        buckets: &[f64],
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiHistogram> {
-        convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(MultiHistogram::new(name, description, buckets.into(), bind.as_slice()))
-    }
-
-    #[wasm_bindgen]
-    impl MultiHistogram {
-        #[wasm_bindgen(js_name = "observe")]
-        pub fn _observe(&self, label_values: Vec<JsString>, value: f64) {
-            convert_from_jstrvec!(label_values, bind);
-            self.observe(bind.as_slice(), value)
-        }
-
-        #[wasm_bindgen(js_name = "start_measure")]
-        pub fn wasm_start_measure(&self, label_values: Vec<JsString>) -> JsResult<SimpleTimer> {
-            convert_from_jstrvec!(label_values, bind);
-            match self.hh.get_metric_with_label_values(bind.as_slice()) {
-                Ok(_) => Ok(SimpleTimer {
-                    inner: Wasm {
-                        start_ts: js_sys::Date::now() / 1000.0,
-                        new_ts: || js_sys::Date::now() / 1000.0,
-                        labels: label_values.into_iter().map(String::from).collect(),
-                    },
-                }),
-                Err(x) => Err(JsValue::from(x.to_string())),
-            }
-        }
-
-        #[wasm_bindgen(js_name = "get_sample_count")]
-        pub fn _get_sample_count(&self, label_values: Vec<JsString>) -> JsResult<u64> {
-            convert_from_jstrvec!(label_values, bind);
-            self.get_sample_count(bind.as_slice())
-                .ok_or(JsValue::from_str("label value does not exist"))
-        }
-
-        #[wasm_bindgen(js_name = "get_sample_sum")]
-        pub fn _get_sample_sum(&self, label_values: Vec<JsString>) -> JsResult<f64> {
-            convert_from_jstrvec!(label_values, bind);
-            self.get_sample_sum(bind.as_slice())
-                .ok_or(JsValue::from_str("label value does not exist"))
-        }
     }
 }
