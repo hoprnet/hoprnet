@@ -568,7 +568,7 @@ mod peers {
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "PeerInfo"
+        tag = "Peers"
     )]
     pub(super) async fn show_all_peers(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -609,7 +609,7 @@ mod peers {
             Ok(peer) => match hopr.ping(&peer).await {
                 Ok(latency) => Ok(Response::builder(200)
                         .body(json!(PingInfo {
-                            latency: latency.unwrap_or(Duration::ZERO),
+                            latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                             reported_version: hopr.network_peer_info(&peer)
                                 .await
                                 .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
