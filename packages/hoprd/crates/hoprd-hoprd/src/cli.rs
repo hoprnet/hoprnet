@@ -359,7 +359,7 @@ pub struct CliArgs {
 
     // ==================================
     /// deprecated
-
+    #[deprecated]
     #[arg(
         long = "dryRun",
         help = "DEPRECATED",
@@ -370,6 +370,7 @@ pub struct CliArgs {
     pub dry_run: bool,
 
     /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheck",
         help = "DEPRECATED",
@@ -379,10 +380,12 @@ pub struct CliArgs {
     pub health_check: bool,
 
     /// deprecated
+    #[deprecated]
     #[arg(long = "healthCheckHost", help = "DEPRECATED")]
     pub health_check_host: Option<String>,
 
     /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheckPort",
         value_parser = clap::value_parser ! (u16),
