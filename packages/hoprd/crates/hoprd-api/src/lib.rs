@@ -458,11 +458,15 @@ mod channels {
     use utils_types::traits::ToHex;
     use super::*;
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct NodeChannel {
+        #[serde_as(as = "DisplayFromStr")]
         pub id: Hash,
+        #[serde_as(as = "DisplayFromStr")]
         pub peer_address: Address,
+        #[serde_as(as = "DisplayFromStr")]
         pub status: ChannelStatus,
         pub balance: String
     }
@@ -482,14 +486,18 @@ mod channels {
     #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct NodeTopologyChannel {
+        #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
+        #[serde_as(as = "DisplayFromStr")]
         pub source_address: Address,
+        #[serde_as(as = "DisplayFromStr")]
         pub destination_address: Address,
         #[serde_as(as = "DisplayFromStr")]
         pub source_peer_id: PeerId,
         #[serde_as(as = "DisplayFromStr")]
         pub destination_peer_id: PeerId,
         pub balance: String,
+        #[serde_as(as = "DisplayFromStr")]
         pub status: ChannelStatus,
         pub ticket_index: u32,
         pub channel_epoch: u32,
@@ -577,17 +585,22 @@ mod channels {
         }
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct OpenChannelRequest {
+        #[serde_as(as = "DisplayFromStr")]
         pub peer_address: Address,
         pub amount: String
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct OpenChannelReceipt {
+        #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
+        #[serde_as(as = "DisplayFromStr")]
         pub transaction_receipt: Hash
     }
 
@@ -653,10 +666,13 @@ mod channels {
         }
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct CloseChannelReceipt {
+        #[serde_as(as = "DisplayFromStr")]
         pub receipt: Hash,
+        #[serde_as(as = "DisplayFromStr")]
         pub channel_status: ChannelStatus
     }
 
@@ -980,9 +996,11 @@ mod tickets {
     use utils_types::traits::ToHex;
     use super::*;
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct ChannelTicket {
+        #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
         pub amount: String,
         pub index: u64,
