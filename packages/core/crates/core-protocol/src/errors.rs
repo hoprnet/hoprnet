@@ -8,6 +8,12 @@ pub enum ProtocolError {
     #[error("tx queue is full, retry later")]
     Retry,
 
+    #[error("payment channel is closed")]
+    ChannelClosed,
+
+    #[error("payment channel was not found")]
+    ChannelNotFound,
+
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 

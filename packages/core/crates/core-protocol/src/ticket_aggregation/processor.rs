@@ -642,11 +642,11 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                             }
                         }
                     }
-                    TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket, request) => {
+                    TicketAggregationToProcess::ToReceive(destination, aggregated_ticket, request) => {
                         match aggregated_ticket {
                             Ok(ticket) => match processor.handle_aggregated_ticket(ticket.clone()).await {
                                 Ok(acked_ticket) => {
-                                    Some(TicketAggregationProcessed::Receive(_destination, acked_ticket, request))
+                                    Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                 }
                                 Err(e) => {
                                     debug!("Error while handling aggregated ticket {}", e);

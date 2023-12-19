@@ -32,6 +32,8 @@ hopr-lib = { workspace = true }
 hoprd-inbox = { workspace = true }
 core-crypto = { workspace = true }
 core-ethereum-actions = { workspace = true }
+core-protocol = { workspace = true }
+core-transport = { workspace = true }
 core-types = { workspace = true }
 utils-types = { workspace = true }
 utils-log = { workspace = true }

@@ -89,7 +89,7 @@ mod arrays {
             // can be optimized using MaybeUninit
             let mut data = Vec::with_capacity(N);
             for _ in 0..N {
-                match (seq.next_element())? {
+                match seq.next_element()? {
                     Some(val) => data.push(val),
                     None => return Err(serde::de::Error::invalid_length(N, &self)),
                 }
@@ -425,28 +425,32 @@ impl From<HalfKey> for HalfKeyChallenge {
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
-pub struct Hash {
-    hash: [u8; Self::SIZE],
-}
+pub struct Hash([u8; Self::SIZE]);
 
 impl Default for Hash {
     fn default() -> Self {
-        Self {
-            hash: [0u8; Self::SIZE],
-        }
+        Self([0u8; Self::SIZE])
     }
 }
 
 impl Debug for Hash {
     // Intentionally same as Display
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_hex().as_str())
+        write!(f, "{}", self.to_hex())
     }
 }
 
 impl Display for Hash {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_hex().as_str())
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl FromStr for Hash {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::from_hex(s)
     }
 }
 
@@ -454,13 +458,13 @@ impl Hash {
     pub fn new(hash: &[u8]) -> Self {
         assert_eq!(hash.len(), Self::SIZE, "invalid length");
         let mut ret = Hash::default();
-        ret.hash.copy_from_slice(hash);
+        ret.0.copy_from_slice(hash);
         ret
     }
 
     /// Convenience method that creates a new hash by hashing this.
     pub fn hash(&self) -> Self {
-        Self::create(&[&self.hash])
+        Self::create(&[&self.0])
     }
 }
 
@@ -469,10 +473,8 @@ impl BinarySerializable for Hash {
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut ret = Self {
-                hash: [0u8; Self::SIZE],
-            };
-            ret.hash.copy_from_slice(data);
+            let mut ret = Self([0u8; Self::SIZE]);
+            ret.0.copy_from_slice(data);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -480,7 +482,7 @@ impl BinarySerializable for Hash {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.hash.into()
+        self.0.into()
     }
 }
 
@@ -490,35 +492,33 @@ impl Hash {
     pub fn create(inputs: &[&[u8]]) -> Self {
         let mut hash = EthDigest::default();
         inputs.iter().for_each(|v| hash.update(v));
-        let mut ret = Hash {
-            hash: [0u8; Self::SIZE],
-        };
-        hash.finalize_into(&mut ret.hash);
+        let mut ret = Self([0u8; Self::SIZE]);
+        hash.finalize_into(&mut ret.0);
         ret
     }
 }
 
 impl From<[u8; Self::SIZE]> for Hash {
     fn from(hash: [u8; Self::SIZE]) -> Self {
-        Hash { hash }
+        Self(hash)
     }
 }
 
 impl From<Hash> for [u8; Hash::SIZE] {
     fn from(value: Hash) -> Self {
-        value.hash
+        value.0
     }
 }
 
 impl From<Hash> for primitive_types::H256 {
     fn from(value: Hash) -> Self {
-        value.hash.into()
+        value.0.into()
     }
 }
 
 impl From<primitive_types::H256> for Hash {
     fn from(value: primitive_types::H256) -> Self {
-        Self { hash: value.0 }
+        Self(value.0)
     }
 }
 
@@ -1109,7 +1109,7 @@ impl Signature {
 
     fn sign<S>(data: &[u8], private_key: &[u8], signing_method: S) -> Signature
     where
-        S: Fn(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)>,
+        S: FnOnce(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)>,
     {
         let key = SigningKey::from_bytes(private_key.into()).expect("invalid signing key");
         let (sig, rec) = signing_method(&key, data).expect("signing failed");
@@ -1140,7 +1140,7 @@ impl Signature {
 
     fn verify<V>(&self, message: &[u8], public_key: &[u8], verifier: V) -> bool
     where
-        V: Fn(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()>,
+        V: FnOnce(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()>,
     {
         let pub_key = VerifyingKey::from_sec1_bytes(public_key).expect("invalid public key");
 

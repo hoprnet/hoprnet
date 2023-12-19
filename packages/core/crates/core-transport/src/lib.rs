@@ -227,15 +227,15 @@ impl ChannelEventEmitter {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub losing: u32,
+    pub losing: u64,
     pub win_proportion: f64,
-    pub unredeemed: u32,
+    pub unredeemed: u64,
     pub unredeemed_value: utils_types::primitives::Balance,
-    pub redeemed: u32,
+    pub redeemed: u64,
     pub redeemed_value: utils_types::primitives::Balance,
-    pub neglected: u32,
+    pub neglected: u64,
     pub neglected_value: utils_types::primitives::Balance,
-    pub rejected: u32,
+    pub rejected: u64,
     pub rejected_value: utils_types::primitives::Balance,
 }
 
@@ -253,6 +253,7 @@ use core_path::selectors::PathSelector;
 use core_protocol::ticket_aggregation::processor::AggregationList;
 use futures::future::{select, Either};
 use futures::pin_mut;
+use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 use utils_types::traits::PeerIdLike;
 
@@ -414,12 +415,13 @@ impl HoprTransport {
                 if let Some(c) = c {
                     Ok(c)
                 } else {
-                    Err(errors::HoprTransportError::Api(format!(
-                        "aggregate tickets: no channel entry found for hash '{}'",
-                        &channel
-                    )))
+                    Err(core_protocol::errors::ProtocolError::ChannelNotFound.into())
                 }
             })?;
+
+        if entry.status != ChannelStatus::Open {
+            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into())
+        }
 
         Ok(self
             .ticket_aggregate_actions
@@ -551,30 +553,32 @@ impl HoprTransport {
             } else {
                 0f64
             },
-            losing: losing as u32,
-            unredeemed: acked_ticket_amounts.len() as u32,
+            losing: losing as u64,
+            unredeemed: acked_ticket_amounts.len() as u64,
             unredeemed_value: total_value,
-            redeemed: db.get_redeemed_tickets_count().await? as u32,
+            redeemed: db.get_redeemed_tickets_count().await? as u64,
             redeemed_value: db.get_redeemed_tickets_value().await?,
-            neglected: db.get_neglected_tickets_count().await? as u32,
+            neglected: db.get_neglected_tickets_count().await? as u64,
             neglected_value: db.get_neglected_tickets_value().await?,
-            rejected: db.get_rejected_tickets_count().await? as u32,
+            rejected: db.get_rejected_tickets_count().await? as u64,
             rejected_value: db.get_rejected_tickets_value().await?,
         })
     }
 
-    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
+    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         let db = self.db.read().await;
 
         let channel = db.get_channel(channel).await?;
 
         if let Some(channel) = channel {
             if channel.destination == self.me_onchain {
-                return Ok(db.get_acknowledged_tickets(Some(channel)).await?);
+                Ok(Some(db.get_acknowledged_tickets(Some(channel)).await?))
+            } else {
+                Ok(None)
             }
+        } else {
+            Ok(None)
         }
-
-        Ok(vec![])
     }
 
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {

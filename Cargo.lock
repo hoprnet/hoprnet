@@ -3441,6 +3441,8 @@ dependencies = [
  "const_format",
  "core-crypto",
  "core-ethereum-actions",
+ "core-protocol",
+ "core-transport",
  "core-types",
  "env_logger",
  "futures",

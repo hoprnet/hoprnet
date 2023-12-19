@@ -125,8 +125,20 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/channels/:channelId/tickets")
             .get(tickets::show_channel_tickets);
 
+        api.at("/channels/:channelId/tickets/redeem")
+            .post(tickets::redeem_tickets_in_channel);
+
+        api.at("/channels/:channelId/tickets/aggregate")
+            .post(tickets::aggregate_tickets_in_channel);
+
         api.at("/tickets")
             .get(tickets::show_all_tickets);
+
+        api.at("/tickets/statistics")
+            .get(tickets::show_ticket_statistics);
+
+        api.at("/tickets/redeem")
+            .post(tickets::redeem_all_tickets);
 
         api.at("/messages/")
             .post(messages::send_message)
@@ -403,7 +415,7 @@ mod account {
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
         responses(
-            (status = 200, description = "The node;s funds have been withdrawn", body = AccountBalances),
+            (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
             Error422,
         ),
         tag = "Account"
@@ -436,13 +448,13 @@ mod channels {
     use utils_types::traits::ToHex;
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct NodeChannel {
-        id: Hash,
-        peer_address: Address,
-        status: ChannelStatus,
-        balance: Balance
+        pub id: Hash,
+        pub peer_address: Address,
+        pub status: ChannelStatus,
+        pub balance: String
     }
 
     impl From<ChannelEntry> for NodeChannel {
@@ -451,31 +463,34 @@ mod channels {
                 id: value.get_id(),
                 peer_address: value.destination,
                 status: value.status,
-                balance: value.balance
+                balance: value.balance.amount().to_string()
             }
         }
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct NodeTopologyChannel {
-        channel_id: Hash,
-        source_address: Address,
-        destination_address: Address,
-        source_peer_id: PeerId,
-        destination_peer_id: PeerId,
-        balance: Balance,
-        status: ChannelStatus,
-        ticket_index: u32,
-        channel_epoch: u32,
-        closure_time: u64
+        pub channel_id: Hash,
+        pub source_address: Address,
+        pub destination_address: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        pub source_peer_id: PeerId,
+        #[serde_as(as = "DisplayFromStr")]
+        pub destination_peer_id: PeerId,
+        pub balance: String,
+        pub status: ChannelStatus,
+        pub ticket_index: u32,
+        pub channel_epoch: u32,
+        pub closure_time: u64
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize)]
     struct NodeChannels {
-        incoming: Vec<NodeChannel>,
-        outgoing: Vec<NodeChannel>,
-        all: Vec<NodeTopologyChannel>
+        pub incoming: Vec<NodeChannel>,
+        pub outgoing: Vec<NodeChannel>,
+        pub all: Vec<NodeTopologyChannel>
     }
 
     async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<NodeTopologyChannel, HoprLibError> {
@@ -485,7 +500,7 @@ mod channels {
             destination_address: channel.destination,
             source_peer_id: node.chain_key_to_peerid(&channel.source).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
             destination_peer_id: node.chain_key_to_peerid(&channel.destination).await?.ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
-            balance: channel.balance,
+            balance: channel.balance.amount().to_string(),
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
             channel_epoch: channel.channel_epoch.as_u32(),
@@ -552,18 +567,18 @@ mod channels {
         }
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct OpenChannelRequest {
-        peer_address: Address,
-        amount: Balance
+        pub peer_address: Address,
+        pub amount: String
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct OpenChannelReceipt {
-        channel_id: Hash,
-        transaction_receipt: Hash
+        pub channel_id: Hash,
+        pub transaction_receipt: Hash
     }
 
     #[utoipa::path(
@@ -582,7 +597,7 @@ mod channels {
 
         let open_req: OpenChannelRequest = req.body_json().await?;
 
-        match hopr.open_channel(&open_req.peer_address, &open_req.amount).await {
+        match hopr.open_channel(&open_req.peer_address, &Balance::new_from_str(&open_req.amount, BalanceType::HOPR)).await {
             Ok(channel_details) => {
                 Ok(Response::builder(201).body(json!(OpenChannelReceipt {
                     channel_id: channel_details.channel_id,
@@ -628,11 +643,11 @@ mod channels {
         }
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct CloseChannelReceipt {
-        receipt: Hash,
-        channel_status: ChannelStatus
+        pub receipt: Hash,
+        pub channel_status: ChannelStatus
     }
 
     #[utoipa::path(
@@ -719,7 +734,6 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate)]
     #[serde(rename_all = "camelCase")]
-
     struct SendMessageReq {
         /// The message tag used to filter messages based on application
         pub tag: u16,
@@ -737,7 +751,6 @@ mod messages {
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
-
     struct SendMessageRes {
         pub challenge: HalfKeyChallenge,
     }
@@ -950,27 +963,30 @@ mod messages {
 
 mod tickets {
     use core_crypto::types::Hash;
+    use core_protocol::errors::ProtocolError;
+    use core_transport::errors::HoprTransportError;
+    use core_transport::TicketStatistics;
     use core_types::channels::Ticket;
     use utils_types::traits::ToHex;
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct ChannelTicket {
-        channel_id: Hash,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: String,
-        channel_epoch: u32,
-        signature: String,
+        pub channel_id: Hash,
+        pub amount: String,
+        pub index: u64,
+        pub index_offset: u32,
+        pub win_prob: String,
+        pub channel_epoch: u32,
+        pub signature: String,
     }
 
     impl From<Ticket> for ChannelTicket {
         fn from(value: Ticket) -> Self {
             Self {
                 channel_id: value.channel_id,
-                amount: value.amount,
+                amount: value.amount.amount().to_string(),
                 index: value.index,
                 index_offset: value.index_offset,
                 win_prob: value.win_prob().to_string(),
@@ -984,7 +1000,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
         responses(
-        (status = 200, description = "Channel funded successfully", body = Vec<ChannelTicket>),
+        (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
         (status = 400, description = "Invalid channel id.", body = RequestStatus),
         (status = 404, description = "Channel not found.", body = RequestStatus),
         Error422,
@@ -996,12 +1012,12 @@ mod tickets {
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
-                Ok(tickets) => {
+                Ok(Some(tickets)) => {
                     Ok(Response::builder(200)
                         .body(json!(tickets.into_iter().map(|t| ChannelTicket::from(t.ticket)).collect::<Vec<_>>()))
                         .build())
                 },
-                // TODO: impossible to distinguish when the channel does not exists
+                Ok(None) => Ok(Response::builder(404).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
                 Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
             },
             Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
@@ -1012,7 +1028,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
-            (status = 200, description = "Channel funded successfully", body = Vec<ChannelTicket>),
+            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             Error422,
         ),
         tag = "Tickets"
@@ -1029,6 +1045,120 @@ mod tickets {
         }
     }
 
+    #[derive(Debug, Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodeTicketStatistics {
+        pub win_proportion: f64,
+        pub unredeemed: u64,
+        pub unredeemed_value: String,
+        pub redeemed: u64,
+        pub redeemed_value: String,
+        pub losing_tickets: u64,
+        pub neglected: u64,
+        pub neglected_value: String,
+        pub rejected: u64,
+        pub rejected_value: String
+    }
+
+    impl From<TicketStatistics> for NodeTicketStatistics {
+        fn from(value: TicketStatistics) -> Self {
+            Self {
+                win_proportion: value.win_proportion,
+                unredeemed: value.unredeemed,
+                unredeemed_value: value.unredeemed_value.amount().to_string(),
+                redeemed: value.redeemed,
+                redeemed_value: value.redeemed_value.amount().to_string(),
+                losing_tickets: value.losing,
+                neglected: value.neglected,
+                neglected_value: value.neglected_value.amount().to_string(),
+                rejected: value.rejected,
+                rejected_value: value.rejected_value.amount().to_string(),
+            }
+        }
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        responses(
+            (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
+            Error422,
+        ),
+        tag = "Tickets"
+    )]
+    pub(super) async fn show_ticket_statistics(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match hopr.ticket_statistics().await.map(NodeTicketStatistics::from) {
+            Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
+            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+        }
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
+        responses(
+            (status = 200, description = "Tickets redeemed successfully."),
+            Error422,
+        ),
+        tag = "Tickets"
+    )]
+    pub(super) async fn redeem_all_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match hopr.redeem_all_tickets(false).await {
+            Ok(()) => Ok(Response::builder(204).build()),
+            Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+        }
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/redeem"),
+        responses(
+            (status = 200, description = "Tickets redeemed successfully."),
+            (status = 400, description = "Invalid channel id.", body = RequestStatus),
+            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channel"
+    )]
+    pub(super) async fn redeem_tickets_in_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
+                Ok(count) if count > 0 => Ok(Response::builder(204).build()),
+                Ok(_) => Ok(Response::builder(404).body(RequestStatus { status: "TICKETS_NOT_FOUND".into() }).build()),
+                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/aggregate"),
+        responses(
+            (status = 204, description = "Tickets successfully aggregated"),
+            (status = 400, description = "Invalid channel id.", body = RequestStatus),
+            (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = RequestStatus),
+            Error422,
+        ),
+        tag = "Channel"
+    )]
+    pub(super) async fn aggregate_tickets_in_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match Hash::from_hex(req.param("channelId")?) {
+            Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
+                Ok(_) => Ok(Response::builder(204).build()),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelNotFound))) =>
+                    Ok(Response::builder(422).body(RequestStatus { status: "CHANNEL_NOT_FOUND".into() }).build()),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(ProtocolError::ChannelClosed))) =>
+                    Ok(Response::builder(422).body(RequestStatus { status: "CHANNEL_NOT_OPEN".into() }).build()),
+                Err(e) => Ok(Response::builder(422).body(Error422::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(RequestStatus { status: "INVALID_CHANNELID".into() }).build())
+        }
+    }
 }
 
 mod checks {

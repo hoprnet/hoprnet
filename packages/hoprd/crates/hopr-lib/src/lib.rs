@@ -803,7 +803,7 @@ impl Hopr {
 
     // Ticket ========
     /// Get all tickets in a channel specified by Hash
-    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
+    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         Ok(self.transport_api.tickets_in_channel(channel).await?)
     }
 
@@ -999,7 +999,7 @@ impl Hopr {
         Ok(())
     }
 
-    pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<()> {
+    pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<usize> {
         if self.status() != State::Running {
             return Err(crate::errors::HoprLibError::GeneralError(
                 "Node is not ready for on-chain operations".into(),
@@ -1007,18 +1007,20 @@ impl Hopr {
         }
 
         let channel = self.chain_api.db().read().await.get_channel(channel).await?;
+        let mut redeem_count = 0;
 
         if let Some(channel) = channel {
             if channel.destination == self.chain_api.me_onchain() {
                 // We do not await the on-chain confirmation
-                self.chain_api
+                redeem_count = self.chain_api
                     .actions_ref()
                     .redeem_tickets_in_channel(&channel, only_aggregated)
-                    .await?;
+                    .await?
+                    .len();
             }
         }
 
-        Ok(())
+        Ok(redeem_count)
     }
 
     pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
