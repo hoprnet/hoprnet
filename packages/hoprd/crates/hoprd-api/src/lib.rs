@@ -39,7 +39,7 @@ pub struct State<'a> {
         (name = "todo", description = "Todo items management endpoints.")
     )
 )]
-struct ApiDoc;
+pub struct ApiDoc;
 
 struct SecurityAddon;
 
