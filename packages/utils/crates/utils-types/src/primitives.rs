@@ -1,5 +1,4 @@
 use ethnum::{u256, AsU256};
-use getrandom::getrandom;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -7,6 +6,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 use std::str::FromStr;
+use rand::RngCore;
+use rand::rngs::OsRng;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -54,8 +55,7 @@ impl Address {
     pub fn random() -> Self {
         // Uses getrandom, because it cannot bring in dependency on core-crypto
         let mut addr = [0u8; Self::SIZE];
-        getrandom(&mut addr[..]).unwrap();
-
+        OsRng.fill_bytes(&mut addr[..]);
         Self(addr)
     }
 
@@ -780,7 +780,6 @@ impl AutoBinarySerializable for AuthorizationToken {}
 
 impl AuthorizationToken {
     /// Creates new token from the serialized data and id
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(id: String, data: &[u8]) -> Self {
         assert!(data.len() < 2048, "invalid token size");
         Self { id, token: data.into() }

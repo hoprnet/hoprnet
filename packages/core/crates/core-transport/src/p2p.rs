@@ -181,7 +181,7 @@ pub async fn p2p_loop(
                         }
                     },
                     NetworkEvent::PeerOffline(_peer) => {
-                        // NOTE: this functionality is not needed after swtich to rust-libp2p
+                        // NOTE: this functionality is not needed after switch to rust-libp2p
                     },
                     NetworkEvent::Register(peer, origin, metadata) => {
                         debug!("Network event: registering peer '{peer}'");

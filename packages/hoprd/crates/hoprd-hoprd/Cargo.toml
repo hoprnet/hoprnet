@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
-tokio = { version = "1.33", default-features = false }
+# tokio = { version = "1.33", default-features = false }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
@@ -26,12 +26,6 @@ serde_json = "1.0"
 strum = "0.25"
 thiserror = "1.0"
 validator = { workspace = true }
-
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { workspace = true, optional = true }
-serde-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
 
 core-transport = { workspace = true }
 core-network = { workspace = true }
@@ -53,23 +47,9 @@ utils-validation = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
 default = ["prometheus"]
 wasm = [
-    "dep:wasm-bindgen",
-    "dep:wasm-bindgen-futures",
-    "dep:serde-wasm-bindgen",
-    "dep:js-sys",
     "core-transport/wasm",
     "core-network/wasm",
     "core-strategy/wasm",
@@ -84,7 +64,5 @@ wasm = [
     "utils-log/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
-    "utils-validation/wasm",
 ]
-prometheus = ["hopr-lib/prometheus", "core-transport/prometheus", "dep:utils-metrics"]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+prometheus = [ "dep:utils-metrics", "hopr-lib/prometheus", "core-transport/prometheus", "core-strategy/prometheus", "core-network/prometheus", "core-ethereum-indexer/prometheus" ]

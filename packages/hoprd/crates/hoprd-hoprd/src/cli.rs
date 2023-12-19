@@ -5,7 +5,6 @@ use clap::{ArgAction, Parser};
 use core_strategy::Strategy;
 use core_transport::config::HostConfig;
 use hex;
-use hopr_lib::ProtocolsConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
@@ -121,7 +120,7 @@ pub struct CliArgs {
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
-        default_value_t = crate::config::Api::default().enable
+        default_value_t = hoprd_api::config::Api::default().enable
     )]
     pub api: bool,
 
@@ -148,7 +147,7 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         hide = true,
-        default_value_t = crate::config::Api::default().auth == crate::config::Auth::None
+        default_value_t = hoprd_api::config::Api::default().auth == hoprd_api::config::Auth::None
     )]
     pub disable_api_authentication: bool,
 

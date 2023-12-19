@@ -12,38 +12,23 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-lock = "2.7.0"
-async-trait = "0.1"
-console_error_panic_hook = { version = "0.1.7", optional = true }
-gloo-timers = { workspace = true, optional = true }
+async-lock = { workspace = true }
+async-trait = { workspace = true }
 ringbuffer = "0.15.0"
+serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 validator = { workspace = true }
-js-sys = { version = "0.3.63", optional = true }
-serde = { workspace = true, features = ["derive"] }
-serde-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
-wasm-bindgen = { workspace = true, optional = true }
 
-core-types = { workspace = true, default-features = false }
+core-types = { workspace = true }
 platform = { workspace = true }
-utils-log = { workspace = true, default-features = false }
+utils-log = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 tempfile = "3"
 
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = []
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-types/wasm", "utils-log/wasm" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+wasm = [ "core-types/wasm", "utils-log/wasm" ]
+

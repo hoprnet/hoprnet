@@ -7,7 +7,7 @@ mod processes;
 
 
 pub use {
-    core_transport::{TransportOutput, ApplicationData, HalfKeyChallenge},
+    core_transport::{config::HostConfig, Health, TransportOutput, ApplicationData, HalfKeyChallenge, Multiaddr},
     chain::{Network, ProtocolsConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
@@ -52,7 +52,7 @@ use core_transport::{
 };
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ChainKeypair, Hash, Health, HoprTransport, Keypair, Multiaddr, OffchainKeypair,
+    ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair,
 };
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
@@ -372,6 +372,7 @@ pub struct Hopr {
     is_public: bool,
     ingress_rx: Option<UnboundedReceiver<TransportOutput>>,
     state: State,
+    network: String,
     transport_api: HoprTransport,
     chain_api: HoprChain,
     chain_cfg: ChainNetworkConfig,
@@ -475,6 +476,7 @@ impl Hopr {
 
         Self {
             state: State::Uninitialized,
+            network: cfg.chain.network,
             is_public,
             ingress_rx: Some(transport_ingress),
             me: me.clone(),
@@ -501,6 +503,10 @@ impl Hopr {
 
     pub fn version(&self) -> String {
         String::from(constants::APP_VERSION)
+    }
+    
+    pub fn network(&self) -> String {
+        self.network.clone()
     }
 
     pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
@@ -712,7 +718,7 @@ impl Hopr {
             ));
         }
 
-        Ok(self.transport_api.ping(peer).await)
+        Ok(self.transport_api.ping(peer).await?)
     }
 
     /// Send a message to another peer in the network
@@ -795,6 +801,25 @@ impl Hopr {
     /// Get all data collected from the network relevant for a PeerId
     pub async fn network_peer_info(&self, peer: &PeerId) -> Option<core_transport::PeerStatus> {
         self.transport_api.network_peer_info(peer).await
+    }
+
+    /// Get peers connected peers with quality higher than some value
+    pub async fn all_network_peers(&self, minimum_quality: f64) -> Vec<(Option<Address>, PeerId, core_transport::PeerStatus)> {
+        futures::stream::iter(self.transport_api.network_connected_peers().await)
+            .filter_map(|peer| async move {
+                if let Some(info) = self.transport_api.network_peer_info(&peer).await {
+                    if info.get_average_quality() >= minimum_quality { Some((peer, info)) } else { None }
+                } else { None }
+            })
+            .filter_map(|(peer_id, info)| async move {
+                let address = self.peerid_to_chain_key(&peer_id)
+                    .await
+                    .ok()
+                    .flatten();
+                Some((address, peer_id, info))
+            })
+            .collect::<Vec<_>>()
+            .await
     }
 
     // Ticket ========

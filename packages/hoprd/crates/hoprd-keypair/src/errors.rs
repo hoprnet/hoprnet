@@ -1,5 +1,4 @@
 use core_crypto::errors::CryptoError;
-use getrandom::Error as RandomError;
 use hex::FromHexError;
 use platform::error::PlatformError;
 use serde_json::Error as JsonError;
@@ -7,9 +6,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum KeyPairError {
-    #[error("could not retrieve random bytes: {0}")]
-    EntropyError(#[from] RandomError),
-
     #[error("file system error: {0}")]
     FileSystemError(#[from] PlatformError),
 

@@ -145,11 +145,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
         ))));
 
-        let host_listen = match cfg.api.host.address {
+        let host_listen = match &cfg.api.host.address {
             core_transport::config::HostType::IPv4(a) |
             core_transport::config::HostType::Domain(a) => format!("{a}:{}", cfg.api.host.port),
         };
-        futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, node, inbox.clone()));
+        futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, &cfg.api, node, inbox.clone()));
     } else {
         futures::join!(wait_til_end_of_time, node_ingress);
     };

@@ -139,6 +139,21 @@ impl std::fmt::Display for Health {
     }
 }
 
+impl std::str::FromStr for Health {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Red" => Ok(Self::Red),
+            "Orange" => Ok(Self::Orange),
+            "Yellow" => Ok(Self::Yellow),
+            "Green" => Ok(Self::Green),
+            "Unknown" => Ok(Self::Unknown),
+            _ => Err(format!("Unsupported Health string '{s}'"))
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),

@@ -1,3 +1,6 @@
+pub mod config;
+
+use std::{sync::Arc, collections::HashMap};
 use std::error::Error;
 use std::{collections::HashMap, sync::Arc};
 
@@ -5,8 +8,12 @@ use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
+use tide::utils::async_trait;
+use tide::{Middleware, Next, StatusCode};
 use tide::{http::Mime, Request, Response};
-use utoipa::{Modify, OpenApi};
+use tide::http::headers::AUTHORIZATION;
+use tide::http::mime;
+use utoipa::OpenApi;
 use utoipa_swagger_ui::Config;
 
 use hopr_lib::errors::HoprLibError;
@@ -17,46 +24,112 @@ pub const API_VERSION: &str = "3.0.0";
 
 #[derive(Clone)]
 pub struct State<'a> {
+    pub hopr: Arc<Hopr>,            // checks
+    pub config: Arc<Config<'a>>,    // swagger
+}
+
+#[derive(Clone)]
+pub struct InternalState {
+    pub auth: Arc<crate::config::Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
-    pub config: Arc<Config<'a>>,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        // todo::list_todos,
-        // todo::create_todo,
-        // todo::delete_todo,
-        // todo::mark_done
+        checks::startedz,
+        checks::readyz,
+        checks::healthyz,
+        alias::aliases,
+        alias::set_alias,
+        alias::get_alias,
+        alias::delete_alias,
+        account::addresses,
+        account::balances,
+        account::withdraw,
+        channels::list_channels,
+        channels::open_channel,
+        channels::close_channel,
+        channels::fund_channel,
+        channels::show_channel,
+        messages::send_message,
+        messages::delete_messages,
+        messages::size,
+        messages::pop,
+        messages::pop_all,
+        messages::peek,
+        messages::peek_all,
+        tickets::show_channel_tickets,
+        tickets::show_all_tickets,
+        tickets::show_ticket_statistics,
+        tickets::redeem_all_tickets,
+        tickets::redeem_tickets_in_channel,
+        tickets::aggregate_tickets_in_channel,
+        node::version,
+        node::peers,
+        node::metrics,
+        node::info,
+        node::entry_nodes,
+        peers::show_all_peers,
+        peers::ping_peer
     ),
     components(
         // schemas(todo::Todo, todo::TodoError)
     ),
-    modifiers(&SecurityAddon),
+    // modifiers(&SecurityAddon),
     tags(
-        (name = "todo", description = "Todo items management endpoints.")
+        (name = "Check", description = "HOPR node functionality checks"),
+        (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
+        (name = "Account", description = "HOPR node account endpoints"),
+        (name = "Node", description = "HOPR node information endpoints"),
+        (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Messages", description = "HOPR node message manipulation endpoints"),
+        (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
+        (name = "Peers", description = "HOPR node peer manipulation endpoints"),
     )
 )]
 pub struct ApiDoc;
 
-struct SecurityAddon;
 
-impl Modify for SecurityAddon {
-    fn modify(&self, _openapi: &mut utoipa::openapi::OpenApi) {
-        // let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
-        // components.add_security_scheme(
-        //     "api_key",
-        //     SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("todo_apikey"))),
-        // )
+/// Token-based authentication middleware
+struct TokenBasedAuthenticationMiddleware {}
+
+/// Implementation of the middleware
+#[async_trait]
+impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware
+{
+    async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
+        let auth = request.state().auth.clone();
+
+        match auth.as_ref() {
+            config::Auth::None => {},
+            config::Auth::Token(token) => {
+                let is_authorized = request.header(AUTHORIZATION)
+                    .map(|auth| { token.as_str() == auth.as_str() })
+                    .unwrap_or(false);
+
+                if !is_authorized {
+                    let reject_response = Response::builder(StatusCode::Unauthorized)
+                        .content_type(mime::JSON)
+                        .body(ApiErrorStatus::Unauthorized)
+                        .build();
+
+                    return Ok(reject_response);
+                }
+            },
+        }
+
+        // Go forward to the next middleware or request handler
+        Ok(next.run(request).await)
     }
 }
 
 async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Response> {
     let config = request.state().config.clone();
     let path = request.url().path().to_string();
-    let tail = path.strip_prefix(&format!("{BASE_PATH}/swagger-ui/")).unwrap();
+    let tail = path.strip_prefix(&"swagger-ui/").unwrap();
 
     match utoipa_swagger_ui::serve(tail, config) {
         Ok(swagger_file) => swagger_file
@@ -71,15 +144,14 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
-pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>) {
+pub async fn run_hopr_api(host: &str, cfg: &crate::config::Api, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>) {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State {
         hopr: Arc::new(hopr),
-        aliases,
-        inbox,
+
         config: Arc::new(Config::from("openapi.json")),
     };
 
@@ -95,7 +167,14 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
     app.at("healthyz/").get(checks::healthyz);
 
     app.at(&format!("{BASE_PATH}")).nest({
-        let mut api = tide::with_state(state);
+        let mut api = tide::with_state(InternalState {
+            auth: Arc::new(cfg.auth.clone()),
+            hopr: state.hopr.clone(),
+            inbox,
+            aliases,
+        });
+
+        api.with(TokenBasedAuthenticationMiddleware{});
 
         api.at("/aliases").get(alias::aliases).post(alias::set_alias);
         api.at("/aliases/:alias")
@@ -105,6 +184,11 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/account/addresses").get(account::addresses);
         api.at("/account/balances").get(account::balances);
         api.at("/account/withdraw").get(account::withdraw);
+
+        api.at("/peers/:peerId")
+            .get(peers::show_all_peers)
+            .at("/ping")
+                .post(peers::ping_peer);
 
         api.at("/channels")
             .get(channels::list_channels)
@@ -140,6 +224,12 @@ pub async fn run_hopr_api(host: &str, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<ho
         api.at("/messages/peek-all").get(messages::peek_all);
         api.at("/messages/size").get(messages::size);
 
+        api.at("/node/version").get(node::version);
+        api.at("/node/info").get(node::info);
+        api.at("/node/peers").get(node::peers);
+        api.at("/node/metrics").get(node::metrics);
+        api.at("/node/entryNodes").get(node::entry_nodes);
+
         api
     });
 
@@ -160,6 +250,7 @@ struct ApiError {
 enum ApiErrorStatus {
     InvalidInput,
     InvalidChannelId,
+    InvalidPeerId,
     ChannelNotFound,
     TicketsNotFound,
     NotEnoughBalance,
@@ -167,6 +258,9 @@ enum ApiErrorStatus {
     ChannelAlreadyOpen,
     ChannelNotOpen,
     UnsupportedFeature,
+    Timeout,
+    Unauthorized,
+    InvalidQuality,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -224,7 +318,7 @@ mod alias {
         ),
         tag = "Alias"
     )]
-    pub async fn aliases(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req.state().aliases.clone();
 
         let aliases = aliases
@@ -251,7 +345,7 @@ mod alias {
         ),
         tag = "Alias"
     )]
-    pub async fn set_alias(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerId = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
@@ -271,7 +365,7 @@ mod alias {
         ),
         tag = "Alias"
     )]
-    pub async fn get_alias(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let aliases = req.state().aliases.clone();
 
@@ -297,7 +391,7 @@ mod alias {
         ),
         tag = "Alias"
     )]
-    pub async fn delete_alias(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
         let aliases = req.state().aliases.clone();
 
@@ -322,14 +416,14 @@ mod account {
     /// HOPR address is represented by the P2P PeerId and can be used by other node owner to interact with this node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
+        path = const_format::formatcp!("{}/account/addresses", BASE_PATH),
         responses(
             (status = 200, description = "The node's public addresses", body = AddressesAddress),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
-    pub(super) async fn addresses(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn addresses(req: Request<InternalState>) -> tide::Result<Response> {
         let addresses = AccountAddresses {
             native: req.state().hopr.me_onchain().to_string(),
             hopr: req.state().hopr.me_peer_id().to_string(),
@@ -356,14 +450,14 @@ mod account {
     /// NATIVE balance of the Node is used to pay for the gas fees for the blockchain.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/balances"),
+        path = const_format::formatcp!("{}/account/balances", BASE_PATH),
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
-    pub(super) async fn balances(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn balances(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         let mut account_balances = AccountBalances::default();
@@ -410,14 +504,14 @@ mod account {
     /// Both NATIVE or HOPR can be withdrawn using this method.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
+        path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
     )]
-    pub(super) async fn withdraw(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn withdraw(mut req: Request<InternalState>) -> tide::Result<Response> {
         let withdraw_req_data: WithdrawRequest = req.body_json().await?;
         let recipient = <Address as std::str::FromStr>::from_str(&withdraw_req_data.address)?;
 
@@ -432,6 +526,90 @@ mod account {
         {
             Ok(receipt) => Ok(Response::builder(200).body(json!({"receipt": receipt})).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
+    }
+}
+
+mod peers {
+    use std::str::FromStr;
+    use std::time::Duration;
+    use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
+    use hopr_lib::Multiaddr;
+    use serde_with::DurationMilliSeconds;
+    use core_transport::errors::HoprTransportError;
+    use super::*;
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    struct NodePeerInfo {
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub announced: Vec<Multiaddr>,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub observed: Vec<Multiaddr>
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        responses(
+            (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
+            (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Peers"
+    )]
+    pub(super) async fn show_all_peers(req: Request<InternalState>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match PeerId::from_str(req.param("peerId")?) {
+            Ok(peer) => Ok(
+                Response::builder(200).body(json!(NodePeerInfo {
+                    announced: hopr.multiaddresses_announced_to_dht(&peer).await,
+                    observed: hopr.network_observed_multiaddresses(&peer).await
+                }))
+                .build()
+            ),
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build())
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PingInfo {
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        pub latency: std::time::Duration,
+        pub reported_version: String
+    }
+
+    #[utoipa::path(
+        post,
+        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        responses(
+            (status = 200, description = "Ping successful", body = NodePeerInfo),
+            (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Peers"
+    )]
+    pub(super) async fn ping_peer(req: Request<InternalState>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+        match PeerId::from_str(req.param("peerId")?) {
+            Ok(peer) => match hopr.ping(&peer).await {
+                Ok(latency) => Ok(Response::builder(200)
+                        .body(json!(PingInfo {
+                            latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
+                            reported_version: hopr.network_peer_info(&peer)
+                                .await
+                                .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                                .unwrap_or("unknown".into())
+                        }))
+                        .build()
+                ),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(core_protocol::errors::ProtocolError::Timeout))) =>
+                    Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build()),
+                Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build())
+            },
+            Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build())
         }
     }
 }
@@ -521,14 +699,14 @@ mod channels {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
     )]
-    pub(super) async fn list_channels(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn list_channels(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         let including_closed = bool::from_str(req.param("includingClosed")?)?;
         let full_topology = bool::from_str(req.param("fullTopology")?)?;
@@ -608,7 +786,7 @@ mod channels {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
@@ -617,7 +795,7 @@ mod channels {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn open_channel(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         let open_req: OpenChannelRequest = req.body_json().await?;
@@ -659,7 +837,7 @@ mod channels {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn show_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn show_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -686,7 +864,7 @@ mod channels {
 
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}", BASE_PATH),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -695,7 +873,7 @@ mod channels {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn close_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn close_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -720,7 +898,7 @@ mod channels {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/fund", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -729,7 +907,7 @@ mod channels {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn fund_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn fund_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         let amount = Balance::new_from_str(req.param("amount")?, BalanceType::HOPR);
 
@@ -811,7 +989,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn send_message(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn send_message(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: SendMessageReq = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
@@ -853,7 +1031,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn delete_messages(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.query()?;
         let inbox = req.state().inbox.clone();
 
@@ -870,7 +1048,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn size(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.query()?;
         let inbox = req.state().inbox.clone();
 
@@ -915,7 +1093,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn pop(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
@@ -943,7 +1121,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn pop_all(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
@@ -971,7 +1149,7 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn peek(mut req: Request<State<'_>>) -> tide::Result<Response> {
+    pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
@@ -999,10 +1177,10 @@ mod messages {
         ),
         tag = "Messages"
     )]
-    pub async fn peek_all(mut req: Request<State<'_>>) -> tide::Result<Response> {
+
+    pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: GetMessageReq = req.body_json().await?;
         let ts: Option<Duration> = args.timestamp.map(|ts| Duration::from_millis(ts.try_into().unwrap()));
-
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1056,7 +1234,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1065,7 +1243,7 @@ mod tickets {
         ),
         tag = "Channels"
     )]
-    pub(super) async fn show_channel_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn show_channel_tickets(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -1085,14 +1263,14 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets"),
+        path = const_format::formatcp!("{}/tickets", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_all_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn show_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match hopr.all_tickets().await {
             Ok(tickets) => Ok(Response::builder(200)
@@ -1136,14 +1314,14 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        path = const_format::formatcp!("{}/tickets/statistics", BASE_PATH),
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_ticket_statistics(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn show_ticket_statistics(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match hopr.ticket_statistics().await.map(NodeTicketStatistics::from) {
             Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
@@ -1153,14 +1331,14 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
+        path = const_format::formatcp!("{}/tickets/redeem", BASE_PATH),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn redeem_all_tickets(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn redeem_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match hopr.redeem_all_tickets(false).await {
             Ok(()) => Ok(Response::builder(204).build()),
@@ -1170,7 +1348,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/redeem"),
+        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/redeem", BASE_PATH),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1179,7 +1357,7 @@ mod tickets {
         ),
         tag = "Channel"
     )]
-    pub(super) async fn redeem_tickets_in_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn redeem_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
@@ -1193,7 +1371,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/channel/{{channelId}}/tickets/aggregate"),
+        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/aggregate", BASE_PATH),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -1202,7 +1380,7 @@ mod tickets {
         ),
         tag = "Channel"
     )]
-    pub(super) async fn aggregate_tickets_in_channel(req: Request<State<'_>>) -> tide::Result<Response> {
+    pub(super) async fn aggregate_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
@@ -1216,6 +1394,244 @@ mod tickets {
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidChannelId).build()),
+        }
+    }
+}
+
+mod node {
+    use std::str::FromStr;
+    use hopr_lib::{Multiaddr, Health};
+    use tide::Body;
+
+    use super::*;
+
+    /// Get release version of the running node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/version", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node version"),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
+        let version = req.state().hopr.version();
+
+        Ok(Response::builder(200).body(json!({"version": version})).build())
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodePeersReqQuery {
+        quality: Option<f64>
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct HeartbeatInfo {
+        sent: u64,
+        success: u64
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PeerInfo {
+        #[serde_as(as = "DisplayFromStr")]
+        peer_id: PeerId,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        peer_address: Option<Address>,
+        #[serde_as(as = "Option<DisplayFromStr>")]
+        multiaddr: Option<Multiaddr>,
+        heartbeats: HeartbeatInfo,
+        last_seen: u128,
+        last_seen_latency: u128,
+        quality: f64,
+        backoff: f64,
+        is_new: bool,
+        reported_version: String,
+    }
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodePeersRes {
+        connected: Vec<PeerInfo>,
+        announced: Vec<PeerInfo>
+    }
+
+    /// Lists information for `connected peers` and `announced peers`.
+    /// 
+    /// Connected peers are nodes which are connected to the node while announced peers are
+    /// nodes which have announced to the network.
+    /// 
+    /// Optionally pass `quality` parameter to get only peers with higher or equal quality
+    /// to the specified value.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/peers", BASE_PATH),
+        responses(
+            (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
+            (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn peers(req: Request<InternalState>) -> tide::Result<Response> {
+        let query_params: NodePeersReqQuery = req.query()?;
+
+        if let Some(quality) = query_params.quality {
+            if quality < 0.0f64 || quality > 1.0f64 {
+                return Ok(Response::builder(400).body(ApiErrorStatus::InvalidQuality).build());
+            }
+        }
+
+        let hopr = req.state().hopr.clone();
+
+        let body = NodePeersRes{
+            connected: hopr.all_network_peers(query_params.quality.unwrap_or(0f64))
+                            .await
+                            .into_iter()
+                            .map(|(address, peer_id, info)| {
+                                PeerInfo {
+                                    peer_id,
+                                    peer_address: address,
+                                    multiaddr: None,
+                                    heartbeats: HeartbeatInfo {
+                                        sent: info.heartbeats_sent,
+                                        success: info.heartbeats_succeeded
+                                    },
+                                    last_seen: info.last_seen as u128,
+                                    last_seen_latency: info.last_seen_latency as u128,
+                                    quality: info.get_average_quality(),
+                                    backoff: info.backoff,
+                                    is_new: info.heartbeats_sent == 0u64,
+                                    reported_version: "TODO: Add version here".into()
+                                }
+                            })
+                            .collect(),
+            announced: vec![]
+        };
+
+        Ok(Response::builder(200).body(json!(body)).build())
+    }
+
+    /// Retrieve Prometheus metrics from the running node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node metrics", body = String),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
+        match utils_metrics::metrics::gather_all_metrics() {
+            Ok(metrics) => Ok(Response::builder(200)
+                .body(Body::from_string(metrics))
+                .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))
+                .build()
+            ),
+            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NodeInfoRes {
+        network: String,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        announced_address: Vec<Multiaddr>,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        listening_address: Vec<Multiaddr>,
+        chain: String,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_token: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_channels: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_network_registry: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_node_sage_registry: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_management_module: Address,
+        #[serde_as(as = "DisplayFromStr")]
+        hopr_node_safe: Address,
+        is_eligible: bool,
+        #[serde_as(as = "DisplayFromStr")]
+        connectivity_status: Health,
+        channel_closure_period: u64
+    }
+
+    /// Get information about this HOPR Node.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/info", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node version"),
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn info(req: Request<InternalState>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        let chain_config = hopr.chain_config();
+        let network = hopr.network();
+
+        let body = NodeInfoRes {
+            network,
+            announced_address: hopr.local_multiaddresses(),
+            listening_address: hopr.local_multiaddresses(),
+            chain: chain_config.id,
+            hopr_token: chain_config.token,
+            hopr_channels: chain_config.channels,
+            hopr_network_registry: chain_config.network_registry,
+            hopr_node_sage_registry: chain_config.node_safe_registry,
+            hopr_management_module: chain_config.module_implementation,
+            hopr_node_safe: chain_config.node_safe_registry,    // TODO: bad value, what should be here?
+            is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+            connectivity_status: hopr.network_health().await,
+            channel_closure_period: 0u64    // TODO: bad value, what should be here?
+        };
+
+        Ok(Response::builder(200).body(json!(body)).build())
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct EntryNode {
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        pub multiaddrs: Vec<Multiaddr>,
+        pub is_elligible: bool
+    }
+
+    /// List all known entry nodes with multiaddrs and eligibility.
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/entryNodes", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn entry_nodes(req: Request<InternalState>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match hopr.get_public_nodes().await {
+            Ok(nodes) => {
+                let mut body = HashMap::new();
+                for (peer_id, address, mas) in nodes.into_iter() {
+                    body.insert(address, EntryNode {
+                        multiaddrs: mas,
+                        is_elligible: hopr.is_allowed_to_access_network(&peer_id).await
+                    });
+                }
+
+                Ok(Response::builder(200).body(json!(body)).build())
+            },
+            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
         }
     }
 }

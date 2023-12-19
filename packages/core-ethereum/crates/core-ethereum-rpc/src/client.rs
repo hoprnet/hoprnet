@@ -192,7 +192,6 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub mod native {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
@@ -221,6 +220,7 @@ pub mod native {
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
+    /// `surf` works also for Browsers in WASM environments.
     #[derive(Clone, Debug)]
     pub struct SurfRequestor(surf::Client);
 
@@ -318,7 +318,7 @@ pub mod native {
             let data = resp
                 .text()
                 .await
-                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))?;
+                .map_err(|e| HttpRequestError::UnknownError(format!("body: {}", e.to_string())))?;
 
             //debug!("<- http post response with {}", data.len());
 
