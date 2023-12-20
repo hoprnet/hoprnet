@@ -180,19 +180,6 @@ pub async fn p2p_loop(
                             let _ = swarm.disconnect_peer_id(peer);
                         }
                     },
-                    NetworkEvent::PeerOffline(_peer) => {
-                        // NOTE: this functionality is not needed after switch to rust-libp2p
-                    },
-                    NetworkEvent::Register(peer, origin, metadata) => {
-                        debug!("Network event: registering peer '{peer}'");
-                        let mut writer = network.write().await;
-                        (*writer).add_with_metadata(&peer, origin, metadata)
-                    },
-                    NetworkEvent::Unregister(peer) => {
-                        debug!("Network event: unregistering peer '{peer}'");
-                        let mut writer = network.write().await;
-                        (*writer).remove(&peer)
-                    },
                 },
                 Inputs::Acknowledgement(task) => match task {
                     AckProcessed::Receive(peer, reply) => {

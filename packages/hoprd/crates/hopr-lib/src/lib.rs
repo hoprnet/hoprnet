@@ -27,7 +27,7 @@ use futures::{
 use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions, errors::CoreEthereumActionsError, action_state::{IndexerActionTracker, ActionState}};
 use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
 use core_ethereum_types::chain_events::ChainEventType;
-use core_transport::{PeerEligibility, IndexerToProcess, ExternalNetworkInteractions, PeerOrigin, NetworkEvent, NetworkExternalActions};
+use core_transport::{PeerEligibility, IndexerToProcess, ExternalNetworkInteractions, PeerOrigin, Network};
 use core_transport::TicketStatistics;
 use core_types::protocol::TagBloomFilter;
 use core_types::{
@@ -159,7 +159,7 @@ pub fn to_chain_events_refresh_process<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network_actions: ExternalNetworkInteractions
+    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -182,7 +182,11 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            network_actions.emit(NetworkEvent::Register(peer.clone(), PeerOrigin::NetworkRegistry, None));
+                            let mut net = network.write().await;
+                            if ! net.has(&peer) {
+                                debug!("Network event: registering peer '{peer}'");
+                                net.add_with_metadata(&peer, PeerOrigin::NetworkRegistry, None);
+                            }
 
                             transport_indexer_actions
                                 .emit_indexer_update(IndexerToProcess::Announce(peer, mas))
@@ -244,19 +248,24 @@ where
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {
+                                let peer_id = pk.to_peerid();
+
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
-                                        pk.to_peerid(),
+                                        peer_id.clone(),
                                         allowed.clone().into()
                                     ))
                                     .await;
-
+                                
                                 match allowed {
                                     core_ethereum_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        network_actions.emit(NetworkEvent::Register(pk.to_peerid(), PeerOrigin::NetworkRegistry, None));
+                                        let mut net = network.write().await;
+                                        if ! net.has(&peer_id) {
+                                            net.add_with_metadata(&peer_id, PeerOrigin::NetworkRegistry, None);
+                                        }
                                     },
                                     core_ethereum_types::chain_events::NetworkRegistryStatus::Denied => {
-                                        network_actions.emit(NetworkEvent::Register(pk.to_peerid(), PeerOrigin::NetworkRegistry, None));
+                                        network.write().await.remove(&peer_id);
                                     },
                                 };
                             }
@@ -344,7 +353,7 @@ where
         channel_graph.clone(),
         indexer_updater.clone(),
         action_queue.action_state(),
-        ExternalNetworkInteractions::new(network_events_tx.clone())
+        network.clone()
     );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
@@ -895,11 +904,6 @@ impl Hopr {
     /// Get measured network health
     pub async fn network_health(&self) -> Health {
         self.transport_api.network_health().await
-    }
-
-    /// Unregister a peer from the network
-    pub async fn unregister(&self, peer: &PeerId) {
-        self.transport_api.network_unregister(peer).await
     }
 
     /// List all peers connected to this

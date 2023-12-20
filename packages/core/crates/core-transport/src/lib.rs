@@ -23,7 +23,9 @@ pub use {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    core_network::network::{NetworkExternalActions, NetworkEvent, Health, PeerStatus, PeerOrigin},
+    core_network::network::{
+        Network, NetworkExternalActions, NetworkEvent, Health, PeerStatus, PeerOrigin
+    },
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
@@ -36,7 +38,7 @@ use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{NetworkConfig, Network},
+    network::NetworkConfig,
     ping::Ping,
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
@@ -515,18 +517,6 @@ impl HoprTransport {
 
     pub async fn network_health(&self) -> Health {
         self.network.read().await.health()
-    }
-
-    pub async fn network_unregister(&self, peer: &PeerId) {
-        let mut change_notifier = self.network_change_notifier.clone();
-
-        match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
-            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(*peer)) {
-                Ok(_) => {}
-                Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
-            },
-            Err(e) => error!("The receiver for network updates was dropped: {}", e),
-        }
     }
 
     pub async fn network_connected_peers(&self) -> Vec<PeerId> {
