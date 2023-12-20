@@ -1062,7 +1062,8 @@ mod messages {
     struct MessagePopRes {
         tag: u16,
         body: String,
-        received_at: u128,
+        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        received_at: std::time::Duration,
     }
 
     fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
