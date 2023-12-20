@@ -166,8 +166,7 @@ where
                     .get_mut(&specific_tag)
                     .map(|buf| {
                         buf.iter()
-                            .filter(|w| w.ts >= timestamp)
-                            .map(|w| (w.payload.clone(), w.ts))
+                            .filter_map(|w| if w.ts >= timestamp { Some((w.payload.clone(), w.ts)) } else { None } )
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_else(Vec::<(M, Duration)>::new)
