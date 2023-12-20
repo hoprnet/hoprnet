@@ -2,7 +2,7 @@ pub mod config;
 
 use std::{sync::Arc, collections::HashMap};
 use std::error::Error;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
