@@ -1057,6 +1057,7 @@ mod messages {
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct MessagePopRes {
