@@ -314,6 +314,7 @@ mod alias {
         path = const_format::formatcp!("{}/aliases/", BASE_PATH),
         responses(
             (status = 200, description = "Each alias with its corresponding PeerId", body = [AliasPeerId]),
+            (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         tag = "Alias"
     )]
@@ -340,6 +341,7 @@ mod alias {
         responses(
             (status = 201, description = "Alias set successfully.", body = PeerIdArg),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Alias"
@@ -360,7 +362,8 @@ mod alias {
         path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
         responses(
             (status = 200, description = "Get PeerId for an alias", body = int),
-            (status = 404, description = "PeerId not found", body = ErrorNotFound),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "PeerId not found", body = ApiError),
         ),
         tag = "Alias"
     )]
@@ -386,6 +389,7 @@ mod alias {
         path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
         responses(
             (status = 204, description = "Alias removed successfully", body = int),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)   // TOOD: This can never happen
         ),
         tag = "Alias"
@@ -418,6 +422,7 @@ mod account {
         path = const_format::formatcp!("{}/account/addresses", BASE_PATH),
         responses(
             (status = 200, description = "The node's public addresses", body = AddressesAddress),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
@@ -452,6 +457,7 @@ mod account {
         path = const_format::formatcp!("{}/account/balances", BASE_PATH),
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
@@ -506,6 +512,7 @@ mod account {
         path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Account"
@@ -553,6 +560,7 @@ mod peers {
         responses(
             (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Peers"
@@ -586,6 +594,7 @@ mod peers {
         responses(
             (status = 200, description = "Ping successful", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Peers"
@@ -701,6 +710,7 @@ mod channels {
         path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Channels"
@@ -788,6 +798,7 @@ mod channels {
         path = const_format::formatcp!("{}/channels", BASE_PATH),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -831,6 +842,7 @@ mod channels {
         responses(
             (status = 201, description = "Channel fetched successfully", body = NodeTopologyChannel),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -867,6 +879,7 @@ mod channels {
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -901,6 +914,7 @@ mod channels {
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -985,6 +999,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/", BASE_PATH),
         responses(
             (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageRes),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Messages"
@@ -1028,6 +1043,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/", BASE_PATH),
         responses(
             (status = 204, description = "Messages successfully deleted."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Messages"
     )]
@@ -1045,6 +1061,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/size/", BASE_PATH),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = Size),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Messages"
     )]
@@ -1090,6 +1107,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/pop", BASE_PATH),
         responses(
             (status = 204, description = "Message successfully extracted.", body = MessagePopRes),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1118,6 +1136,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/pop-all", BASE_PATH),
         responses(
             (status = 200, description = "All message successfully extracted.", body = [MessagePopRes]),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1146,6 +1165,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/peek", BASE_PATH),
         responses(
             (status = 204, description = "Message successfully peeked at.", body = MessagePopRes),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1174,6 +1194,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages/peek-all", BASE_PATH),
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = [MessagePopRes]),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1239,6 +1260,7 @@ mod tickets {
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1267,6 +1289,7 @@ mod tickets {
         path = const_format::formatcp!("{}/tickets", BASE_PATH),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
@@ -1318,6 +1341,7 @@ mod tickets {
         path = const_format::formatcp!("{}/tickets/statistics", BASE_PATH),
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
@@ -1335,6 +1359,7 @@ mod tickets {
         path = const_format::formatcp!("{}/tickets/redeem", BASE_PATH),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Tickets"
@@ -1353,6 +1378,7 @@ mod tickets {
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1376,6 +1402,7 @@ mod tickets {
         responses(
             (status = 204, description = "Tickets successfully aggregated"),
             (status = 400, description = "Invalid channel id.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1412,6 +1439,7 @@ mod node {
         path = const_format::formatcp!("{}/node/version", BASE_PATH),
         responses(
             (status = 200, description = "Fetched node version"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Node"
     )]
@@ -1473,6 +1501,7 @@ mod node {
         responses(
             (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         tag = "Node"
     )]
@@ -1521,6 +1550,7 @@ mod node {
         path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
         responses(
             (status = 200, description = "Fetched node metrics", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Node"
@@ -1613,6 +1643,7 @@ mod node {
         path = const_format::formatcp!("{}/node/entryNodes", BASE_PATH),
         responses(
             (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Node"
@@ -1659,7 +1690,7 @@ mod checks {
         path = "readyz",
         responses(
             (status = 200, description = "The node is ready to accept connections"),
-            (status = 412, description = "The node is not ready to accept connections", ),
+            (status = 412, description = "The node is not ready to accept connections"),
         )
     )]
     pub(super) async fn readyz(req: Request<State<'_>>) -> tide::Result<Response> {
