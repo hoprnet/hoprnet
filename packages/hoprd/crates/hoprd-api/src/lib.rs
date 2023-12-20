@@ -973,7 +973,8 @@ mod messages {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Timestamp to filter messages received after this timestamp
-        pub timestamp: Option<u128>,
+        #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
+        pub timestamp: Option<std::time::Duration>,
     }
 
     /// Send a message to another peer using a given path.
