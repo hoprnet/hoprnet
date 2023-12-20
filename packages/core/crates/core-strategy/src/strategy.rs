@@ -177,7 +177,7 @@ impl MultiStrategy {
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
-        Net: NetworkExternalActions  + Send + Sync + 'static,
+        Net: NetworkExternalActions + Send + Sync + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 

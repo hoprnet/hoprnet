@@ -23,9 +23,7 @@ pub use {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    core_network::network::{
-        Network, NetworkExternalActions, NetworkEvent, Health, PeerStatus, PeerOrigin
-    },
+    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
@@ -35,12 +33,7 @@ pub use {
 
 use async_lock::RwLock;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_network::{
-    heartbeat::Heartbeat,
-    messaging::ControlMessage,
-    network::NetworkConfig,
-    ping::Ping,
-};
+use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_protocol::{
@@ -54,9 +47,7 @@ use core_types::{
     protocol::TagBloomFilter,
 };
 use futures::{
-    channel::mpsc::{
-        Receiver, UnboundedReceiver, UnboundedSender
-    },
+    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -250,11 +241,11 @@ use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
+use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
+use core_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use core_protocol::errors::ProtocolError;
-use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 use utils_types::traits::PeerIdLike;
 
@@ -311,8 +302,10 @@ impl HoprTransport {
     }
 
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
-        if ! self.is_allowed_to_access_network(peer).await {
-            return Err(errors::HoprTransportError::Api(format!("ping to {peer} not allowed due to network registry")))
+        if !self.is_allowed_to_access_network(peer).await {
+            return Err(errors::HoprTransportError::Api(format!(
+                "ping to {peer} not allowed due to network registry"
+            )));
         }
 
         let mut pinger = self.ping.write().await;
@@ -332,12 +325,13 @@ impl HoprTransport {
         match select(timeout, ping).await {
             Either::Left(_) => {
                 warn!("Manual ping to peer '{}' timed out", peer);
-                return Err(ProtocolError::Timeout.into())
-            },
+                return Err(ProtocolError::Timeout.into());
+            }
             Either::Right(_) => info!("Manual ping succeeded"),
         };
 
-        Ok(self.network
+        Ok(self
+            .network
             .read()
             .await
             .get_peer_status(peer)
@@ -421,7 +415,7 @@ impl HoprTransport {
             })?;
 
         if entry.status != ChannelStatus::Open {
-            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into())
+            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into());
         }
 
         Ok(self

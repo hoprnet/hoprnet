@@ -7,15 +7,13 @@ use utils_log::{debug, warn};
 use async_std::task::sleep;
 use platform::time::native::current_timestamp;
 
-
-
 fn get_timestamp() -> Duration {
     current_timestamp()
 }
 
 /// Represents a periodically timed ticks in a loop with the given period.
 /// Could be later extended so it supports multiple different periods and multiple actions.
-pub async fn execute_on_tick<F>(cycle: Duration , action: impl Fn() -> F)
+pub async fn execute_on_tick<F>(cycle: Duration, action: impl Fn() -> F)
 where
     F: std::future::Future<Output = ()> + Send,
 {

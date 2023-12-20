@@ -58,7 +58,7 @@ where
     B: InboxBackend<Tag, ApplicationData>,
 {
     /// Creates new instance given the configuration.
-    /// 
+    ///
     /// Uses `std::time::SystemTime` as timestamping function.
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || {
@@ -94,8 +94,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         true
     }
@@ -108,8 +107,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)()- self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.count(tag).await
     }
 
@@ -122,8 +120,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         return db.pop(tag).await;
     }
@@ -137,8 +134,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         return db.peek(tag).await;
     }
@@ -151,8 +147,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.peek_all(tag).await
     }
 
@@ -164,8 +159,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.pop_all(tag).await
     }
 }
@@ -182,7 +176,7 @@ mod tests {
         let cfg = MessageInboxConfiguration {
             capacity: 4,
             max_age: std::time::Duration::from_secs(2),
-            excluded_tags: vec![2]
+            excluded_tags: vec![2],
         };
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);

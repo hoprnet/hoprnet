@@ -20,7 +20,7 @@ struct PayloadWrapper<M: std::marker::Send> {
 pub struct RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
-    M: Clone + std::marker::Send + std::marker::Sync
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,

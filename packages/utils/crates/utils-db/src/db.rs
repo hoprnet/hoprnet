@@ -225,7 +225,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         // let mut data_stream = Box::into_pin(self.backend.iterate_range(start, end)?);
         let mut data_iteration = self.backend.iterate_range(start, end)?;
 
-
         // fail fast for the first value that cannot be deserialized
         while let Some(value) = data_iteration.next() {
             let value =

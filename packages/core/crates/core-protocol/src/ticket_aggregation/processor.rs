@@ -618,10 +618,13 @@ where
 impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>
 where
     T: Send,
-    U: Send
+    U: Send,
 {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+    ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
@@ -709,7 +712,7 @@ where
 impl<T, U> Stream for TicketAggregationInteraction<T, U>
 where
     T: Send,
-    U: Send
+    U: Send,
 {
     type Item = TicketAggregationProcessed<T, U>;
 

@@ -228,8 +228,12 @@ pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String
 ///
 /// * `network` - Name of the network that nodes run in
 /// * `staking_address` - Addresses of staking accounts
-/// * `eligibilities` - Array of eligibility 
-pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address: &String, eligibilities: &String) -> Result<(), HelperErrors> {
+/// * `eligibilities` - Array of eligibility
+pub fn child_process_call_foundry_set_eligibility(
+    network: &str,
+    staking_address: &String,
+    eligibilities: &String,
+) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let set_eligibility_args = vec![
         "script",
@@ -250,7 +254,10 @@ pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address
 ///
 /// * `network` - Name of the network that nodes run in
 /// * `staking_address` - Addresses of staking accounts
-pub fn child_process_call_foundry_sync_eligibility(network: &str, staking_address: &String) -> Result<(), HelperErrors> {
+pub fn child_process_call_foundry_sync_eligibility(
+    network: &str,
+    staking_address: &String,
+) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let sync_eligibility_args = vec![
         "script",

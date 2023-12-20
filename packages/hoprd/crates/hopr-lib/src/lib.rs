@@ -4,31 +4,32 @@ pub mod constants;
 pub mod errors;
 mod helpers;
 
-
 pub use {
-    core_transport::{config::HostConfig, Health, TransportOutput, ApplicationData, HalfKeyChallenge, Multiaddr},
     chain::{Network as ChainNetwork, ProtocolsConfig},
+    core_transport::{config::HostConfig, ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
 
-use std::{
-    pin::Pin,
-    sync::Arc,
-    str::FromStr,
-    time::Duration, future::poll_fn, collections::HashMap
-};
+use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
 
 use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{
-    Future, channel::mpsc::{unbounded, UnboundedReceiver}, StreamExt, Stream, pin_mut, FutureExt
+    channel::mpsc::{unbounded, UnboundedReceiver},
+    pin_mut, Future, FutureExt, Stream, StreamExt,
 };
 
-use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions, errors::CoreEthereumActionsError, action_state::{IndexerActionTracker, ActionState}};
+use core_ethereum_actions::{
+    action_state::{ActionState, IndexerActionTracker},
+    channels::ChannelActions,
+    errors::CoreEthereumActionsError,
+    node::NodeActions,
+    redeem::TicketRedeemActions,
+};
 use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
 use core_ethereum_types::chain_events::ChainEventType;
-use core_transport::{PeerEligibility, IndexerToProcess, ExternalNetworkInteractions, PeerOrigin, Network};
 use core_transport::TicketStatistics;
+use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use core_types::protocol::TagBloomFilter;
 use core_types::{
     account::AccountEntry,
@@ -45,25 +46,22 @@ use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_ethereum_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
-use core_transport::{
-    build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, libp2p_identity, p2p_loop, execute_on_tick,
-};
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
-    ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair,
+    build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
+    build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
+use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{error, info};
 use utils_types::primitives::{Snapshot, U256};
 
+use crate::chain::ChainNetworkConfig;
 use crate::chain::SmartContractConfig;
+use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
-use crate::chain::ChainNetworkConfig;
-use crate::config::HoprLibConfig;
-
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use platform::time::native::current_timestamp;
@@ -88,7 +86,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     Uninitialized = 0,
@@ -107,7 +104,6 @@ pub struct CloseChannelResult {
     pub tx_hash: Hash,
     pub status: core_types::channels::ChannelStatus,
 }
-
 
 /// Enum differentiator for loop component futures.
 ///
@@ -159,7 +155,7 @@ pub fn to_chain_events_refresh_process<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>
+    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -207,7 +203,6 @@ where
                         }
                     } else {
                         debug!("Skipping announcements for myself ({peer})");
-                        
                     }
                 }
                 ChainEventType::ChannelOpened(channel) |
@@ -258,7 +253,7 @@ where
                                         allowed.clone().into()
                                     ))
                                     .await;
-                                
+
                                 match allowed {
                                     core_ethereum_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         let mut net = network.write().await;
@@ -304,8 +299,7 @@ where
 {
     let identity: libp2p_identity::Keypair = (&me).into();
 
-    let (network, network_events_rx) =
-        build_network(identity.public().to_peer_id(), cfg.network_options);
+    let (network, network_events_rx) = build_network(identity.public().to_peer_id(), cfg.network_options);
 
     info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
     async_std::task::block_on(async {
@@ -363,7 +357,7 @@ where
         channel_graph.clone(),
         indexer_updater.clone(),
         action_queue.action_state(),
-        network.clone()
+        network.clone(),
     );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
@@ -383,8 +377,11 @@ where
     let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
     spawn(async move {
         while let Some(ack) = poll_fn(|cx| Pin::new(&mut on_ack_tkt_rx).poll_next(cx)).await {
-            let _ =
-                core_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(&*multi_strategy_ack_ticket, &ack).await;
+            let _ = core_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
+                &*multi_strategy_ack_ticket,
+                &ack,
+            )
+            .await;
         }
     });
 
@@ -430,7 +427,12 @@ where
     spawn(async move {
         let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents> + Send>>> = vec![
             Box::pin(indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing)),
-            Box::pin(async move { action_queue.action_loop().map(|_| HoprLoopComponents::OutgoingOnchainTxQueue).await }),
+            Box::pin(async move {
+                action_queue
+                    .action_loop()
+                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                    .await
+            }),
         ];
 
         let mut futs = crate::helpers::to_futures_unordered(chain_events);
@@ -446,9 +448,13 @@ where
     });
 
     let mut processes: HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send>>> = HashMap::new();
-    processes.insert(HoprLoopComponents::Heartbeat, Box::pin(async move { heartbeat.heartbeat_loop().await }));
-    processes.insert(HoprLoopComponents::Swarm, Box::pin(
-        p2p_loop(
+    processes.insert(
+        HoprLoopComponents::Heartbeat,
+        Box::pin(async move { heartbeat.heartbeat_loop().await }),
+    );
+    processes.insert(
+        HoprLoopComponents::Swarm,
+        Box::pin(p2p_loop(
             String::from(constants::APP_VERSION),
             identity,
             swarm_network_clone,
@@ -465,9 +471,11 @@ where
             cfg.protocol,
             transport_output_tx,
             on_ack_tkt_tx,
-    )));
-    processes.insert(HoprLoopComponents::StrategyTick, Box::pin(
-        execute_on_tick(Duration::from_secs(60), move || {
+        )),
+    );
+    processes.insert(
+        HoprLoopComponents::StrategyTick,
+        Box::pin(execute_on_tick(Duration::from_secs(60), move || {
             let multistrategy_clone = multistrategy_clone.clone();
 
             async move {
@@ -475,19 +483,23 @@ where
                 let _ = multistrategy_clone.on_tick().await;
                 info!("strategy tick done");
             }
-        })));
-    processes.insert(HoprLoopComponents::BloomFilterSave, Box::pin(
-        execute_on_tick(Duration::from_secs(90), move || {
+        })),
+    );
+    processes.insert(
+        HoprLoopComponents::BloomFilterSave,
+        Box::pin(execute_on_tick(Duration::from_secs(90), move || {
             let tbf_clone = tbf_clone.clone();
             let save_tbf = save_tbf.clone();
-            
+
             async move {
-                let bloom = tbf_clone.read().await.clone();     // Clone to immediately release the lock
+                let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
                 (save_tbf)(bloom.to_bytes());
             }
-        })));
+        })),
+    );
 
-    let processes = processes.into_iter()
+    let processes = processes
+        .into_iter()
         .map(|(tag, process)| process.map(|_| tag))
         .collect::<Vec<_>>();
 
@@ -537,8 +549,8 @@ impl Hopr {
             }
         };
 
-        let db_path: String = join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG])
-            .expect("Could not create a db storage path");
+        let db_path: String =
+            join(&[&cfg.db.data, "db", crate::constants::DB_VERSION_TAG]).expect("Could not create a db storage path");
         info!("Initiating the DB at: {db_path}");
 
         if cfg.db.force_initialize {
@@ -553,9 +565,12 @@ impl Hopr {
         )));
 
         info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
-        let resolved_environment =
-            crate::chain::ChainNetworkConfig::new(&cfg.chain.network, cfg.chain.provider.as_deref(), &mut cfg.chain.protocols)
-                .expect("Failed to resolve blockchain environment");
+        let resolved_environment = crate::chain::ChainNetworkConfig::new(
+            &cfg.chain.network,
+            cfg.chain.provider.as_deref(),
+            &mut cfg.chain.protocols,
+        )
+        .expect("Failed to resolve blockchain environment");
         let contract_addresses = SmartContractConfig::from(&resolved_environment);
         info!(
             "Resolved contract addresses for myself as '{}': {:?}",
@@ -630,7 +645,9 @@ impl Hopr {
     /// Get the ingress object for messages arriving to this node
     #[must_use]
     pub fn ingress(&mut self) -> UnboundedReceiver<TransportOutput> {
-        self.ingress_rx.take().expect("The ingress received can only be taken out once")
+        self.ingress_rx
+            .take()
+            .expect("The ingress received can only be taken out once")
     }
 
     pub fn status(&self) -> State {
@@ -644,7 +661,7 @@ impl Hopr {
     pub fn version(&self) -> String {
         String::from(constants::APP_VERSION)
     }
-    
+
     pub fn network(&self) -> String {
         self.network.clone()
     }
@@ -814,7 +831,7 @@ impl Hopr {
         info!("# STARTED NODE");
         info!("ID {}", self.transport_api.me());
         info!("Protocol version {}", constants::APP_VERSION);
-            
+
         Ok(futures::future::pending())
     }
 
@@ -923,18 +940,24 @@ impl Hopr {
     }
 
     /// Get peers connected peers with quality higher than some value
-    pub async fn all_network_peers(&self, minimum_quality: f64) -> Vec<(Option<Address>, PeerId, core_transport::PeerStatus)> {
+    pub async fn all_network_peers(
+        &self,
+        minimum_quality: f64,
+    ) -> Vec<(Option<Address>, PeerId, core_transport::PeerStatus)> {
         futures::stream::iter(self.transport_api.network_connected_peers().await)
             .filter_map(|peer| async move {
                 if let Some(info) = self.transport_api.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= minimum_quality { Some((peer, info)) } else { None }
-                } else { None }
+                    if info.get_average_quality() >= minimum_quality {
+                        Some((peer, info))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             })
             .filter_map(|(peer_id, info)| async move {
-                let address = self.peerid_to_chain_key(&peer_id)
-                    .await
-                    .ok()
-                    .flatten();
+                let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
                 Some((address, peer_id, info))
             })
             .collect::<Vec<_>>()
@@ -1094,15 +1117,23 @@ impl Hopr {
         }
     }
 
-    pub async fn close_channel_by_id(&self, channel_id: Hash, redeem_before_close: bool) -> errors::Result<CloseChannelResult> {
+    pub async fn close_channel_by_id(
+        &self,
+        channel_id: Hash,
+        redeem_before_close: bool,
+    ) -> errors::Result<CloseChannelResult> {
         match self.channel_from_hash(&channel_id).await? {
-            Some(channel) => {
-                match channel.orientation(&self.me_onchain()) {
-                    Some((direction, counterparty)) => self.close_channel(&counterparty, direction, redeem_before_close).await,
-                    None => Err(errors::HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments("cannot close channel that is not own".into()))),
+            Some(channel) => match channel.orientation(&self.me_onchain()) {
+                Some((direction, counterparty)) => {
+                    self.close_channel(&counterparty, direction, redeem_before_close).await
                 }
-            }
-            None => Err(errors::HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist))
+                None => Err(errors::HoprLibError::ChainError(
+                    CoreEthereumActionsError::InvalidArguments("cannot close channel that is not own".into()),
+                )),
+            },
+            None => Err(errors::HoprLibError::ChainError(
+                CoreEthereumActionsError::ChannelDoesNotExist,
+            )),
         }
     }
 
@@ -1157,7 +1188,8 @@ impl Hopr {
         if let Some(channel) = channel {
             if channel.destination == self.chain_api.me_onchain() {
                 // We do not await the on-chain confirmation
-                redeem_count = self.chain_api
+                redeem_count = self
+                    .chain_api
                     .actions_ref()
                     .redeem_tickets_in_channel(&channel, only_aggregated)
                     .await?

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use hopr_lib::HostConfig;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";

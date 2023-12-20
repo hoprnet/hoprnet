@@ -3,30 +3,28 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
-use semver::{VersionReq, Version};
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
-
-use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_path::channel_graph::ChannelGraph;
-use core_transport::{ChainKeypair, Keypair};
 use core_ethereum_actions::action_queue::ActionQueueConfig;
 use core_ethereum_actions::action_state::IndexerActionTracker;
 use core_ethereum_actions::payload::SafePayloadGenerator;
+use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use core_ethereum_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
+use core_path::channel_graph::ChannelGraph;
+use core_transport::{ChainKeypair, Keypair};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
 use crate::errors::HoprLibError;
-
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -61,7 +59,9 @@ impl FromStr for EnvironmentType {
             "staging" => Ok(Self::Staging),
             "development" => Ok(Self::Development),
             "local" => Ok(Self::Local),
-            _ => Err(HoprLibError::GeneralError("Failed to recognize environment type".into()))
+            _ => Err(HoprLibError::GeneralError(
+                "Failed to recognize environment type".into(),
+            )),
         }
     }
 }
@@ -196,7 +196,11 @@ fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<boo
 
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
-    pub fn new(id: &str, maybe_custom_provider: Option<&str>, protocol_config: &mut ProtocolsConfig) -> Result<Self, String> {
+    pub fn new(
+        id: &str,
+        maybe_custom_provider: Option<&str>,
+        protocol_config: &mut ProtocolsConfig,
+    ) -> Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
@@ -288,7 +292,7 @@ impl FromStr for ProtocolsConfig {
 impl std::cmp::PartialEq for ProtocolsConfig {
     fn eq(&self, other: &Self) -> bool {
         Vec::from_iter(self.networks.clone()) == Vec::from_iter(other.networks.clone())
-        && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
+            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
     }
 }
 

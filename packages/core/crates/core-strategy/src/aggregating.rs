@@ -202,7 +202,7 @@ where
     Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
     A: TicketRedeemActions + Clone + Send + Sync + 'static,
     T: Send + Sync,
-    U: Send + Sync
+    U: Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;

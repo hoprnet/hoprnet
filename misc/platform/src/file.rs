@@ -6,8 +6,9 @@ pub mod native {
     };
 
     pub fn read_to_string(file_path: &str) -> Result<String> {
-        fs::read_to_string(file_path)
-            .map_err(|e| PlatformError::GeneralError(format!("Failed to read the file '{}' with error: {}", file_path, e)))
+        fs::read_to_string(file_path).map_err(|e| {
+            PlatformError::GeneralError(format!("Failed to read the file '{}' with error: {}", file_path, e))
+        })
     }
 
     pub fn read_file(file_path: &str) -> Result<Box<[u8]>> {
@@ -44,7 +45,7 @@ pub mod native {
         R: AsRef<[u8]>,
     {
         if let Some(parent_dir_path) = Path::new(path).parent() {
-            if ! parent_dir_path.is_dir() {
+            if !parent_dir_path.is_dir() {
                 fs::create_dir_all(&parent_dir_path)
                     .map_err(|e| PlatformError::GeneralError(format!("Failed to create dir '{}': {}", path, e)))?
             }
