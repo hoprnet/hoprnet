@@ -185,7 +185,8 @@ where
                             let mut net = network.write().await;
                             if ! net.has(&peer) {
                                 debug!("Network event: registering peer '{peer}'");
-                                net.add_with_metadata(&peer, PeerOrigin::NetworkRegistry, None);
+                                net.add(&peer, PeerOrigin::NetworkRegistry);
+                                net.store_peer_multiaddresses(&peer, mas.clone());
                             }
 
                             transport_indexer_actions
@@ -206,6 +207,7 @@ where
                         }
                     } else {
                         debug!("Skipping announcements for myself ({peer})");
+                        
                     }
                 }
                 ChainEventType::ChannelOpened(channel) |
@@ -302,8 +304,16 @@ where
 {
     let identity: libp2p_identity::Keypair = (&me).into();
 
-    let (network, network_events_tx, network_events_rx) =
+    let (network, network_events_rx) =
         build_network(identity.public().to_peer_id(), cfg.network_options);
+
+    info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
+    async_std::task::block_on(async {
+        network
+            .write()
+            .await
+            .store_peer_multiaddresses(&identity.public().to_peer_id(), my_multiaddresses.clone());
+    });
 
     let addr_resolver = DbPeerAddressResolver(db.clone());
 
@@ -404,7 +414,6 @@ where
         db.clone(),
         ping,
         network.clone(),
-        network_events_tx,
         indexer_updater,
         packet_actions.writer(),
         ticket_aggregation.writer(),
@@ -512,8 +521,7 @@ pub struct Hopr {
 }
 
 impl Hopr {
-    pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self
-    {
+    pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self {
         // pre-flight checks
         // Announced limitation for the `providence` release
         if !cfg.chain.announce {
@@ -660,9 +668,7 @@ impl Hopr {
         self.chain_cfg.clone()
     }
 
-    pub async fn run(
-        &mut self,
-    ) -> errors::Result<impl Future<Output = ()>> {
+    pub async fn run(&mut self) -> errors::Result<impl Future<Output = ()>> {
         if self.state != State::Uninitialized {
             return Err(errors::HoprLibError::GeneralError(
                 "Cannot start the hopr node multiple times".to_owned(),
@@ -879,7 +885,7 @@ impl Hopr {
         Ok(self.transport_api.aggregate_tickets(channel).await?)
     }
 
-    /// List all multiaddresses announced
+    /// List all multiaddresses announced by this node
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
         self.transport_api.local_multiaddresses()
     }

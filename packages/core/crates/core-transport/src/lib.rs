@@ -53,16 +53,15 @@ use core_types::{
     channels::{ChannelEntry, Ticket},
     protocol::TagBloomFilter,
 };
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::future::poll_fn;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
+    channel::mpsc::{
+        Receiver, UnboundedReceiver, UnboundedSender
+    },
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
-use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{error, info, warn};
+use utils_log::{info, warn};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -91,7 +90,6 @@ pub fn build_network(
     cfg: NetworkConfig,
 ) -> (
     Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    Sender<NetworkEvent>,
     Receiver<NetworkEvent>,
 ) {
     let (network_events_tx, network_events_rx) =
@@ -100,10 +98,10 @@ pub fn build_network(
     let network = Arc::new(RwLock::new(Network::new(
         peer_id,
         cfg,
-        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
+        adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
     )));
 
-    (network, network_events_tx, network_events_rx)
+    (network, network_events_rx)
 }
 
 pub fn build_ticket_aggregation<Db>(
@@ -268,7 +266,6 @@ pub struct HoprTransport {
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    network_change_notifier: Sender<NetworkEvent>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -284,7 +281,6 @@ impl HoprTransport {
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-        change_notifier: Sender<NetworkEvent>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -298,7 +294,6 @@ impl HoprTransport {
             db,
             ping: Arc::new(RwLock::new(ping)),
             network,
-            network_change_notifier: change_notifier,
             indexer,
             pkt_sender,
             ticket_aggregate_actions,
@@ -323,7 +318,7 @@ impl HoprTransport {
         let mut pinger = self.ping.write().await;
 
         // TODO: add timeout on the p2p transport layer
-        let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
+        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
@@ -346,7 +341,7 @@ impl HoprTransport {
             .read()
             .await
             .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen) - start))
+            .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
     }
 
     pub async fn send_message(

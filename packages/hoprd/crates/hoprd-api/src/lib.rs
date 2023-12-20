@@ -1392,11 +1392,15 @@ mod tickets {
 }
 
 mod node {
-    use std::str::FromStr;
-    use hopr_lib::{Multiaddr, Health};
-    use tide::Body;
-
     use super::*;
+    use futures::StreamExt;
+    use hopr_lib::{Multiaddr, Health};
+    
+    #[cfg(all(feature = "prometheus", not(test)))]
+    use {
+        std::str::FromStr,
+        tide::Body
+    };
 
     /// Get release version of the running node.
     #[utoipa::path(
@@ -1481,34 +1485,76 @@ mod node {
 
         let hopr = req.state().hopr.clone();
 
+        let quality = query_params.quality.unwrap_or(0f64);
+        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await)
+            .filter_map(|peer| {
+                let hopr = hopr.clone();
+
+                async move {
+                    if let Some(info) = hopr.network_peer_info(&peer).await {
+                        if info.get_average_quality() >= quality { Some((peer, info)) } else { None }
+                    } else { None }
+                }
+            })
+            .filter_map(|(peer_id, info)| {
+                let hopr = hopr.clone();
+            
+                async move {
+                    let address = hopr.peerid_to_chain_key(&peer_id)
+                        .await
+                        .ok()
+                        .flatten();
+
+                    // WARNING: Only in Providence are all peers public
+                    let multiaddresses = hopr.multiaddresses_announced_to_dht(&peer_id).await;
+
+                    Some((address, peer_id, multiaddresses, info))
+                }
+            })
+            .map(|(address, peer_id, mas,  info)| {
+                PeerInfo {
+                    peer_id,
+                    peer_address: address,
+                    multiaddr: mas.first().map(|ma| ma.clone()),
+                    heartbeats: HeartbeatInfo {
+                        sent: info.heartbeats_sent,
+                        success: info.heartbeats_succeeded
+                    },
+                    last_seen: info.last_seen as u128,
+                    last_seen_latency: info.last_seen_latency as u128,
+                    quality: info.get_average_quality(),
+                    backoff: info.backoff,
+                    is_new: info.heartbeats_sent == 0u64,
+                    reported_version: info.metadata().get(&"protocol_version".to_owned()).map(|v| v.clone()).unwrap_or("UNKNOWN".to_string())
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
+
         let body = NodePeersRes{
-            connected: hopr.all_network_peers(query_params.quality.unwrap_or(0f64))
-                            .await
-                            .into_iter()
-                            .map(|(address, peer_id, info)| {
-                                PeerInfo {
-                                    peer_id,
-                                    peer_address: address,
-                                    multiaddr: None,
-                                    heartbeats: HeartbeatInfo {
-                                        sent: info.heartbeats_sent,
-                                        success: info.heartbeats_succeeded
-                                    },
-                                    last_seen: info.last_seen as u128,
-                                    last_seen_latency: info.last_seen_latency as u128,
-                                    quality: info.get_average_quality(),
-                                    backoff: info.backoff,
-                                    is_new: info.heartbeats_sent == 0u64,
-                                    reported_version: "TODO: Add version here".into()
-                                }
-                            })
-                            .collect(),
-            announced: vec![]
+            connected: all_network_peers.clone(),
+            announced: all_network_peers
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
     }
 
+    #[cfg(any(not(feature = "prometheus"), test))]
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
+        responses(
+            (status = 200, description = "Fetched node metrics", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Node"
+    )]
+    pub(super) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
+        Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
+    }
+
+    #[cfg(all(feature = "prometheus", not(test)))]
     /// Retrieve Prometheus metrics from the running node.
     #[utoipa::path(
         get,
@@ -1556,6 +1602,7 @@ mod node {
         is_eligible: bool,
         #[serde_as(as = "DisplayFromStr")]
         connectivity_status: Health,
+        /// Channel closure period in seconds
         channel_closure_period: u64
     }
 
@@ -1565,6 +1612,7 @@ mod node {
         path = const_format::formatcp!("{}/node/info", BASE_PATH),
         responses(
             (status = 200, description = "Fetched node version"),
+            (status = 422, description = "Unknown failure", body = ApiError)
         ),
         tag = "Node"
     )]
@@ -1572,25 +1620,31 @@ mod node {
         let hopr = req.state().hopr.clone();
 
         let chain_config = hopr.chain_config();
+        let safe_config = hopr.get_safe_config();
         let network = hopr.network();
 
-        let body = NodeInfoRes {
-            network,
-            announced_address: hopr.local_multiaddresses(),
-            listening_address: hopr.local_multiaddresses(),
-            chain: chain_config.id,
-            hopr_token: chain_config.token,
-            hopr_channels: chain_config.channels,
-            hopr_network_registry: chain_config.network_registry,
-            hopr_node_sage_registry: chain_config.node_safe_registry,
-            hopr_management_module: chain_config.module_implementation,
-            hopr_node_safe: chain_config.node_safe_registry,    // TODO: bad value, what should be here?
-            is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
-            connectivity_status: hopr.network_health().await,
-            channel_closure_period: 0u64    // TODO: bad value, what should be here?
-        };
-
-        Ok(Response::builder(200).body(json!(body)).build())
+        match hopr.get_channel_closure_notice_period().await {
+            Ok(channel_closure_notice_period) => {
+                let body = NodeInfoRes {
+                    network,
+                    announced_address: hopr.local_multiaddresses(),
+                    listening_address: hopr.local_multiaddresses(),
+                    chain: chain_config.id,
+                    hopr_token: chain_config.token,
+                    hopr_channels: chain_config.channels,
+                    hopr_network_registry: chain_config.network_registry,
+                    hopr_node_sage_registry: chain_config.node_safe_registry,
+                    hopr_management_module: chain_config.module_implementation,
+                    hopr_node_safe: safe_config.safe_address,
+                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+                    connectivity_status: hopr.network_health().await,
+                    channel_closure_period: channel_closure_notice_period.as_secs() as u64
+                };
+        
+                Ok(Response::builder(200).body(json!(body)).build())
+            },
+            Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build())
+        }
     }
 
     #[serde_as]
