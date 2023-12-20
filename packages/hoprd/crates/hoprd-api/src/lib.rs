@@ -2,12 +2,11 @@ pub mod config;
 
 use std::{sync::Arc, collections::HashMap};
 use std::error::Error;
-use std::collections::HashMap;
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::utils::async_trait;
 use tide::{Middleware, Next, StatusCode};
 use tide::{http::Mime, Request, Response};
@@ -1074,7 +1073,7 @@ mod messages {
                 Ok(data_str) => Ok(MessagePopRes {
                     tag,
                     body: data_str.into(),
-                    received_at: ts.as_millis(),
+                    received_at: ts,
                 }),
                 Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
             }
@@ -1183,12 +1182,11 @@ mod messages {
 
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: GetMessageReq = req.body_json().await?;
-        let ts: Option<Duration> = args.timestamp.map(|ts| Duration::from_millis(ts.try_into().unwrap()));
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(Some(args.tag), ts)
+            .peek_all(Some(args.tag), args.timestamp)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
