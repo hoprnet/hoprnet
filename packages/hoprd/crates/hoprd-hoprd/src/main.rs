@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::SystemTime, path::Path, future::poll_fn, pin::Pin};
+use std::{sync::Arc, time::SystemTime, future::poll_fn, pin::Pin};
 
 use async_lock::RwLock;
 use chrono::{DateTime, Utc};
@@ -129,28 +129,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ");
     }
 
-    
     // setup API endpoint
     if cfg.api.enable {
-        info!("Creating HOPRd API database");
-
-        let hoprd_db_path = Path::new(&cfg.hopr.db.data).join("db").join("hoprd")
-            .into_os_string()
-            .into_string()
-            .map_err(|_| hoprd::errors::HoprdError::FileError("failed to construct the HOPRd API database path".into()))?;
-        
-        // TODO: Authentication, needs implementing
-        // if static token us used, this DB can be removed
-        let hoprd_db = Arc::new(RwLock::new(hoprd::token::HoprdPersistentDb::new(utils_db::db::DB::new(
-            utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
-        ))));
+        info!("Running HOPRd with the API...");
 
         let host_listen = match &cfg.api.host.address {
             core_transport::config::HostType::IPv4(a) |
             core_transport::config::HostType::Domain(a) => format!("{a}:{}", cfg.api.host.port),
         };
+
         futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, &cfg.api, node, inbox.clone()));
     } else {
+        info!("Running HOPRd without the API...");
+
         futures::join!(wait_til_end_of_time, node_ingress);
     };
 

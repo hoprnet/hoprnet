@@ -74,10 +74,8 @@ pub struct InternalState {
         peers::show_all_peers,
         peers::ping_peer
     ),
-    components(
-        // schemas(todo::Todo, todo::TodoError)
-    ),
-    // modifiers(&SecurityAddon),
+    components(),
+    modifiers(),
     tags(
         (name = "Check", description = "HOPR node functionality checks"),
         (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
@@ -508,13 +506,14 @@ mod account {
         Ok(Response::builder(200).body(json!(account_balances)).build())
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct WithdrawRequest {
         currency: BalanceType,
         amount: u128,
-        // TODO: add validations here
-        address: String,
+        #[serde_as(as = "DisplayFromStr")]
+        address: Address,
     }
 
     /// Withdraw funds from this node to the ethereum wallet address.
@@ -532,13 +531,12 @@ mod account {
     )]
     pub(super) async fn withdraw(mut req: Request<InternalState>) -> tide::Result<Response> {
         let withdraw_req_data: WithdrawRequest = req.body_json().await?;
-        let recipient = <Address as std::str::FromStr>::from_str(&withdraw_req_data.address)?;
 
         match req
             .state()
             .hopr
             .withdraw(
-                recipient,
+                withdraw_req_data.address,
                 Balance::new(withdraw_req_data.amount.into(), withdraw_req_data.currency),
             )
             .await
@@ -960,7 +958,7 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-        // #[validate(length(min=0, max=3))]        // TODO: issue in serde_as with validator -> no order is correct
+        // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
         pub path: Option<Vec<PeerId>>,
         #[validate(range(min=1, max=3))]
         pub hops: Option<u16>,

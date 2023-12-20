@@ -3,12 +3,11 @@ pub mod config;
 pub mod constants;
 pub mod errors;
 mod helpers;
-mod processes;
 
 
 pub use {
     core_transport::{config::HostConfig, Health, TransportOutput, ApplicationData, HalfKeyChallenge, Multiaddr},
-    chain::{Network, ProtocolsConfig},
+    chain::{Network as ChainNetwork, ProtocolsConfig},
     utils_types::primitives::{Address, Balance, BalanceType},
 };
 
@@ -16,19 +15,19 @@ use std::{
     pin::Pin,
     sync::Arc,
     str::FromStr,
-    time::Duration
+    time::Duration, future::poll_fn, collections::HashMap
 };
 
 use async_lock::RwLock;
-use async_std::task::spawn_local;
+use async_std::task::spawn;
 use futures::{
-    Future, channel::mpsc::{unbounded, UnboundedReceiver}, FutureExt, StreamExt
+    Future, channel::mpsc::{unbounded, UnboundedReceiver}, StreamExt, Stream, pin_mut, FutureExt
 };
 
-use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions, errors::CoreEthereumActionsError};
-use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry};
+use core_ethereum_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions, errors::CoreEthereumActionsError, action_state::{IndexerActionTracker, ActionState}};
+use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
 use core_ethereum_types::chain_events::ChainEventType;
-use core_transport::PeerEligibility;
+use core_transport::{PeerEligibility, IndexerToProcess, ExternalNetworkInteractions, PeerOrigin, NetworkEvent, NetworkExternalActions};
 use core_transport::TicketStatistics;
 use core_types::protocol::TagBloomFilter;
 use core_types::{
@@ -48,7 +47,7 @@ use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, libp2p_identity, p2p_loop, UniversalTimer,
+    build_ticket_aggregation, libp2p_identity, p2p_loop, execute_on_tick,
 };
 use core_transport::libp2p_identity::PeerId;
 use core_transport::{
@@ -114,11 +113,12 @@ pub struct CloseChannelResult {
 ///
 /// Used to differentiate the type of the future that exits the loop premateruly
 /// by tagging it as an enum.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
-    Timer,
+    StrategyTick,
+    BloomFilterSave,
     Indexing,
     OutgoingOnchainTxQueue,
 }
@@ -140,13 +140,136 @@ impl std::fmt::Display for HoprLoopComponents {
                 f,
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
-            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
+            HoprLoopComponents::StrategyTick => write!(f, "tick wake up the strategies to perform an action"),
             HoprLoopComponents::Indexing => write!(f, "initial indexing operation into the DB"),
+            HoprLoopComponents::BloomFilterSave => write!(f, "initial indexing operation into the DB"),
             HoprLoopComponents::OutgoingOnchainTxQueue => {
                 write!(f, "on-chain transaction queue component for outgoing transactions")
             }
         }
     }
+}
+
+pub fn to_chain_events_refresh_process<Db, S>(
+    me: PeerId,
+    me_onchain: Address,
+    db: Arc<RwLock<Db>>,
+    multi_strategy: Arc<MultiStrategy>,
+    event_stream: S,
+    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    transport_indexer_actions: core_transport::IndexerActions,
+    indexer_action_tracker: Arc<IndexerActionTracker>,
+    network_actions: ExternalNetworkInteractions
+) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
+where
+    Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
+    S: Stream<Item = SignificantChainEvent> + Send + 'static,
+{
+    Box::pin(async move {
+        pin_mut!(event_stream);
+        while let Some(event) = event_stream.next().await {
+            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+            info!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
+
+            match event.event_type {
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    if peer != me {
+                        // decapsulate the `p2p/<peer_id>` to remove duplicities
+                        let mas = multiaddresses
+                            .into_iter()
+                            .map(|ma| core_transport::decapsulate_p2p_protocol(&ma))
+                            .filter(|v| !v.is_empty())
+                            .collect::<Vec<_>>();
+
+                        if ! mas.is_empty() {
+                            network_actions.emit(NetworkEvent::Register(peer.clone(), PeerOrigin::NetworkRegistry, None));
+
+                            transport_indexer_actions
+                                .emit_indexer_update(IndexerToProcess::Announce(peer, mas))
+                                .await;
+
+                            if db
+                                .read()
+                                .await
+                                .is_allowed_to_access_network(&address)
+                                .await
+                                .unwrap_or(false)
+                            {
+                                transport_indexer_actions
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
+                                    .await;
+                            }
+                        }
+                    } else {
+                        debug!("Skipping announcements for myself ({peer})");
+                    }
+                }
+                ChainEventType::ChannelOpened(channel) |
+                ChainEventType::ChannelClosureInitiated(channel) |
+                ChainEventType::ChannelClosed(channel) |
+                ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
+                ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
+                ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
+                    let maybe_direction = channel.direction(&me_onchain);
+                    let change = channel_graph.write().await.update_channel(channel);
+
+                    // Check if this is our own channel
+                    if let Some(own_channel_direction) = maybe_direction {
+                        if let Some(change_set) = change {
+                            for channel_change in change_set {
+                                let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                    &*multi_strategy,
+                                    &channel,
+                                    own_channel_direction,
+                                    channel_change,
+                                )
+                                .await;
+                            }
+                        } else if channel.status == core_types::channels::ChannelStatus::Open {
+                            // Emit Opening event if the channel did not exist before in the graph
+                            let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                &*multi_strategy,
+                                &channel,
+                                own_channel_direction,
+                                core_types::channels::ChannelChange::Status {
+                                    left: core_types::channels::ChannelStatus::Closed,
+                                    right: core_types::channels::ChannelStatus::Open,
+                                },
+                            )
+                            .await;
+                        }
+                    }
+                }
+                ChainEventType::NetworkRegistryUpdate(address, allowed) => {
+                    match db.read().await.get_packet_key(&address).await {
+                        Ok(pk) => {
+                            if let Some(pk) = pk {
+                                transport_indexer_actions
+                                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
+                                        pk.to_peerid(),
+                                        allowed.clone().into()
+                                    ))
+                                    .await;
+
+                                match allowed {
+                                    core_ethereum_types::chain_events::NetworkRegistryStatus::Allowed => {
+                                        network_actions.emit(NetworkEvent::Register(pk.to_peerid(), PeerOrigin::NetworkRegistry, None));
+                                    },
+                                    core_ethereum_types::chain_events::NetworkRegistryStatus::Denied => {
+                                        network_actions.emit(NetworkEvent::Register(pk.to_peerid(), PeerOrigin::NetworkRegistry, None));
+                                    },
+                                };
+                            }
+                        }
+                        Err(e) => error!("on_network_registry_node_allowed failed with: {}", e),
+                    }
+                }
+                ChainEventType::NodeSafeRegistered(safe_address) => info!("node safe registered {safe_address}"),
+            }
+        }
+
+        error!("The chain update process of HOPR objects should never stop")
+    })
 }
 
 /// Main builder of the hopr lib components
@@ -162,11 +285,11 @@ pub fn build_components<FSaveTbf>(
 ) -> (
     HoprTransport,
     HoprChain,
-    Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>>,
+    HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send + Sync>>>,
     UnboundedReceiver<TransportOutput>,
 )
 where
-    FSaveTbf: Fn(Box<[u8]>) + 'static,
+    FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
 {
     let identity: libp2p_identity::Keypair = (&me).into();
 
@@ -212,7 +335,7 @@ where
 
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
 
-    let indexer_refreshing_loop = crate::processes::spawn_refresh_process_for_chain_events(
+    let indexer_refreshing_loop = to_chain_events_refresh_process(
         me.public().to_peerid(),
         core_transport::Keypair::public(&me_onchain).to_address(),
         db.clone(),
@@ -221,6 +344,7 @@ where
         channel_graph.clone(),
         indexer_updater.clone(),
         action_queue.action_state(),
+        ExternalNetworkInteractions::new(network_events_tx.clone())
     );
 
     let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
@@ -236,7 +360,14 @@ where
     );
 
     // on acknowledged ticket notifier
-    let (winning_ticket_process, on_ack_tkt_tx) = crate::processes::spawn_ack_winning_ticket_handling(multi_strategy.clone());
+    let multi_strategy_ack_ticket = multi_strategy.clone();
+    let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
+    spawn(async move {
+        while let Some(ack) = poll_fn(|cx| Pin::new(&mut on_ack_tkt_rx).poll_next(cx)).await {
+            let _ =
+                core_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(&*multi_strategy_ack_ticket, &ack).await;
+        }
+    });
 
     let tbf = Arc::new(RwLock::new(tbf));
 
@@ -278,18 +409,10 @@ where
     let tbf_clone = tbf.clone();
     let multistrategy_clone = multi_strategy.clone();
 
-    // NOTE: This would normally be passed as ready loops and triggered in the
-    // Hopr object's run, but with TS not fully migrated, these processes have to be
-    // spawned to make sure that announce and registrations pass
-    spawn_local(async move {
-        let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-            Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
-            Box::pin(async move {
-                action_queue
-                    .action_loop()
-                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
-                    .await
-            }),
+    spawn(async move {
+        let chain_events: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents> + Send>>> = vec![
+            Box::pin(indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing)),
+            Box::pin(async move { action_queue.action_loop().map(|_| HoprLoopComponents::OutgoingOnchainTxQueue).await }),
         ];
 
         let mut futs = crate::helpers::to_futures_unordered(chain_events);
@@ -304,69 +427,69 @@ where
         }
     });
 
-    let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-        Box::pin(async move { heartbeat.heartbeat_loop().map(|_| HoprLoopComponents::Heartbeat).await }),
-        Box::pin(
-            p2p_loop(
-                String::from(constants::APP_VERSION),
-                identity,
-                swarm_network_clone,
-                network_events_rx,
-                indexer_update_rx,
-                ack_actions,
-                packet_actions,
-                ticket_aggregation,
-                core_transport::api::HeartbeatRequester::new(hb_ping_rx),
-                core_transport::api::HeartbeatResponder::new(hb_pong_tx),
-                core_transport::api::ManualPingRequester::new(ping_rx),
-                core_transport::api::HeartbeatResponder::new(pong_tx),
-                my_multiaddresses,
-                cfg.protocol,
-                transport_output_tx,
-                on_ack_tkt_tx,
-            )
-            .map(|_| HoprLoopComponents::Swarm),
-        ),
-        Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(60))
-                .timer_loop(|| async {
-                    info!("doing strategy tick");
-                    let _ = multistrategy_clone.on_tick().await;
-                    info!("strategy tick done");
-                })
-                .map(|_| HoprLoopComponents::Timer)
-                .await
-        }),
-        Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(90))
-                .timer_loop(|| async {
-                    let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
-                    (save_tbf)(bloom.to_bytes());
-                })
-                .map(|_| HoprLoopComponents::Timer)
-                .await
-        }),
-    ];
+    let mut processes: HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send>>> = HashMap::new();
+    processes.insert(HoprLoopComponents::Heartbeat, Box::pin(async move { heartbeat.heartbeat_loop().await }));
+    processes.insert(HoprLoopComponents::Swarm, Box::pin(
+        p2p_loop(
+            String::from(constants::APP_VERSION),
+            identity,
+            swarm_network_clone,
+            network_events_rx,
+            indexer_update_rx,
+            ack_actions,
+            packet_actions,
+            ticket_aggregation,
+            core_transport::api::HeartbeatRequester::new(hb_ping_rx),
+            core_transport::api::HeartbeatResponder::new(hb_pong_tx),
+            core_transport::api::ManualPingRequester::new(ping_rx),
+            core_transport::api::HeartbeatResponder::new(pong_tx),
+            my_multiaddresses,
+            cfg.protocol,
+            transport_output_tx,
+            on_ack_tkt_tx,
+    )));
+    processes.insert(HoprLoopComponents::StrategyTick, Box::pin(
+        execute_on_tick(Duration::from_secs(60), move || {
+            let multistrategy_clone = multistrategy_clone.clone();
 
-    async_std::task::spawn_local(Box::pin(async move {
-            let mut futs = crate::helpers::to_futures_unordered(ready_loops);
-
-            while let Some(process) = futs.next().await {
-                if process.can_finish() {
-                    continue;
-                } else {
-                    error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                    panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-                }
+            async move {
+                info!("doing strategy tick");
+                let _ = multistrategy_clone.on_tick().await;
+                info!("strategy tick done");
             }
-        })
-    );
+        })));
+    processes.insert(HoprLoopComponents::BloomFilterSave, Box::pin(
+        execute_on_tick(Duration::from_secs(90), move || {
+            let tbf_clone = tbf_clone.clone();
+            let save_tbf = save_tbf.clone();
+            
+            async move {
+                let bloom = tbf_clone.read().await.clone();     // Clone to immediately release the lock
+                (save_tbf)(bloom.to_bytes());
+            }
+        })));
+
+    let processes = processes.into_iter()
+        .map(|(tag, process)| process.map(|_| tag))
+        .collect::<Vec<_>>();
+
+    spawn(async move {
+        let mut futs = crate::helpers::to_futures_unordered(processes);
+
+        while let Some(process) = futs.next().await {
+            if process.can_finish() {
+                continue;
+            } else {
+                error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+                panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
+            }
+        }
+    });
 
     // TODO: return join handles for all background running tasks
-    (hopr_transport_api, hopr_chain_api, vec![], transport_output_rx)
+    (hopr_transport_api, hopr_chain_api, HashMap::new(), transport_output_rx)
 }
 
-// #[derive(Clone)]
 pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
@@ -676,21 +799,7 @@ impl Hopr {
         info!("# STARTED NODE");
         info!("ID {}", self.transport_api.me());
         info!("Protocol version {}", constants::APP_VERSION);
-
-        // let processes = self.processes.take().expect("processes should be present in the node");
-
-        // Ok(Box::pin(async move {
-        //     let mut futs = crate::helpers::to_futures_unordered(processes);
-
-        //     while let Some(process) = futs.next().await {
-        //         if process.can_finish() {
-        //             continue;
-        //         } else {
-        //             error!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-        //             panic!("CRITICAL: the core chain loop unexpectedly stopped: '{}'", process);
-        //         }
-        //     }
-        // }))
+            
         Ok(futures::future::pending())
     }
 

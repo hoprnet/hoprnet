@@ -13,7 +13,6 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
         Auth::None => Ok(()),
         Auth::Token(token) => {
             if token.len() >= MINIMAL_API_TOKEN_LENGTH {
-                // TODO: add more token limitations? alhpanumeric?
                 Ok(())
             } else {
                 Err(ValidationError::new("The validation token is too short"))

@@ -31,7 +31,7 @@ use utils_types::{
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use futures::stream::FuturesUnordered;
 
-use async_std::task::{sleep, spawn_local};
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -604,16 +604,24 @@ impl<T, U> TicketAggregationActions<T, U> {
 }
 
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
-pub struct TicketAggregationInteraction<T, U> {
+pub struct TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     ack_event_queue: (
         Sender<TicketAggregationToProcess<T, U>>,
         Receiver<TicketAggregationProcessed<T, U>>,
     ),
 }
 
-impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
+impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send
+{
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
@@ -681,7 +689,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
             }
         });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });
@@ -698,7 +706,11 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
     }
 }
 
-impl<T, U> Stream for TicketAggregationInteraction<T, U> {
+impl<T, U> Stream for TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send
+{
     type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {

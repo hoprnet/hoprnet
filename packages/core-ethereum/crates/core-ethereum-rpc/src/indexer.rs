@@ -21,7 +21,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         &'a self,
         start_block_number: u64,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
         if filter.is_empty() {
             return Err(FilterIsEmpty);
         }
@@ -197,7 +197,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
@@ -297,7 +297,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,

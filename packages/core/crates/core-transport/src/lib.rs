@@ -14,6 +14,7 @@ pub enum TransportOutput {
 
 pub use {
     crate::{
+        adaptors::network::ExternalNetworkInteractions,
         multiaddrs::decapsulate_p2p_protocol,
         processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
@@ -22,12 +23,12 @@ pub use {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    core_network::network::{Health, PeerStatus},
+    core_network::network::{NetworkExternalActions, NetworkEvent, Health, PeerStatus, PeerOrigin},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
-    timer::UniversalTimer,
+    timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
@@ -35,7 +36,7 @@ use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{Network, NetworkConfig, NetworkEvent},
+    network::{NetworkConfig, Network},
     ping::Ping,
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
@@ -108,7 +109,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -148,7 +149,7 @@ pub fn build_index_updater<Db>(
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     let (indexer_update_tx, indexer_update_rx) =
         futures::channel::mpsc::channel::<IndexerProcessed>(processes::indexer::INDEXER_UPDATE_QUEUE_SIZE);
@@ -245,7 +246,6 @@ pub struct PublicNodesResult {
     pub multiaddrs: Vec<Multiaddr>,
 }
 
-use core_network::network::PeerOrigin;
 use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;

@@ -282,5 +282,5 @@ pub trait HoprIndexerRpcOperations {
         &'a self,
         start_block_number: u64,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }

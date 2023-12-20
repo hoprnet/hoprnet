@@ -31,7 +31,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike};
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
-use async_std::task::{sleep, spawn_local};
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -583,7 +583,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -745,7 +745,7 @@ impl PacketInteraction {
                 }
             });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });

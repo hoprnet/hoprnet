@@ -37,8 +37,6 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
-    // TODO: consider adding a stream version for `pop_all`
-
     /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
 }
