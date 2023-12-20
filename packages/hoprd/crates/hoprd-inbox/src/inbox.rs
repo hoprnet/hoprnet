@@ -34,7 +34,8 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
-    /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
+    /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them. 
+    /// If the optional parameter `timestamp` is provided, only entries more recent than this are returned.
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)>;
 
     // TODO: consider adding a stream version for `pop_all`
