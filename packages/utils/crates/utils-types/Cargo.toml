@@ -19,6 +19,7 @@ hex = { workspace = true }
 primitive-types = "0.12.1"
 libp2p-identity = { workspace = true }
 rand = "0.8.5"
+rlp = "0.5.2" # TODO: remove in 3.0
 regex = "1"
 ringbuffer = "0.15.0"
 serde = { workspace = true }

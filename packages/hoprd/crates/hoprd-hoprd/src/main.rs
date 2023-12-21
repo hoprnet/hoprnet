@@ -7,7 +7,7 @@ use futures::Stream;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{IdentityOptions, HoprKeys};
 use hopr_lib::TransportOutput;
-use utils_log::{info, warn};
+use utils_log::{error, info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 use hoprd::cli::CliArgs;
 
@@ -82,22 +82,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node_ingress = async_std::task::spawn(async move {
         while let Some(output) = poll_fn(|cx| Pin::new(&mut ingress).poll_next(cx)).await {
             match output {
-                TransportOutput::Received(msg) => {
-                    let now = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339();
-                    info!("#### NODE RECEIVED MESSAGE [{now}] ####");
-                    
-                    // TODO: Move RLP for backwards compatibility to msg processor pipeline
-                    //         let decodedMsg = decodeMessage(data.plain_text)
-                    //         log(`Message: ${decodedMsg.msg}`)
-                    //         log(`App tag: ${data.application_tag ?? 0}`)
-                    //         log(`Latency: ${decodedMsg.latency} ms`)
-                    //         metric_latency.observe(decodedMsg.latency)
-                    
-                    //         if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
-                    //           log(`RPCh: received message [${decodedMsg.msg}]`)
-                    //         }
-                        
-                        inbox_clone.write().await.push(msg).await;
+                TransportOutput::Received(data) => {
+                    let recv_at = SystemTime::now();
+
+                    // TODO: remove RLP in 3.0
+                    match utils_types::rlp::decode(&data.plain_text) {
+                        Ok((msg, sent)) => {
+                            let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
+                            info!(r#"
+                            #### NODE RECEIVED MESSAGE [{}] ####
+                            Message: {}
+                            App tag: {}
+                            Latency: {}ms
+                            "#,
+                                DateTime::<Utc>::from(recv_at).to_rfc3339(),
+                                String::from_utf8_lossy(&msg),
+                                data.application_tag.unwrap_or(0),
+                                latency.as_millis()
+                            );
+                        }
+                        Err(_) => error!("RLP decoding failed")
+                    }
+
+                    inbox_clone.write().await.push(data).await;
                 },
                 TransportOutput::Sent(_ack_challenge) => {
                     // TODO: needed by the websockets 
@@ -128,7 +135,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Node version: {version}
         ");
     }
-
     
     // setup API endpoint
     if cfg.api.enable {
@@ -145,11 +151,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             utils_db::rusty::RustyLevelDbShim::new(&hoprd_db_path, true),
         ))));
 
+        // TODO: remove RLP in 3.0
+        let msg_encoder = |data: &[u8]| utils_types::rlp::encode(data, platform::time::native::current_timestamp());
+
         let host_listen = match &cfg.api.host.address {
             core_transport::config::HostType::IPv4(a) |
             core_transport::config::HostType::Domain(a) => format!("{a}:{}", cfg.api.host.port),
         };
-        futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, &cfg.api, node, inbox.clone()));
+        futures::join!(wait_til_end_of_time, node_ingress, run_hopr_api(&host_listen, &cfg.api, node, inbox.clone(), Some(msg_encoder)));
     } else {
         futures::join!(wait_til_end_of_time, node_ingress);
     };

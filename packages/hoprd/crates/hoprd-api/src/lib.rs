@@ -27,12 +27,15 @@ pub struct State<'a> {
     pub config: Arc<Config<'a>>,    // swagger
 }
 
+pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
+
 #[derive(Clone)]
 pub struct InternalState {
     pub auth: Arc<crate::config::Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
+    pub msg_encoder: Option<MessageEncoder>
 }
 
 #[derive(OpenApi)]
@@ -143,7 +146,7 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
-pub async fn run_hopr_api(host: &str, cfg: &crate::config::Api, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>) {
+pub async fn run_hopr_api(host: &str, cfg: &crate::config::Api, hopr: hopr_lib::Hopr, inbox: Arc<RwLock<hoprd_inbox::Inbox>>, msg_encoder: Option<MessageEncoder>) {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
     aliases
@@ -172,6 +175,7 @@ pub async fn run_hopr_api(host: &str, cfg: &crate::config::Api, hopr: hopr_lib::
         let mut api = tide::with_state(InternalState {
             auth: Arc::new(cfg.auth.clone()),
             hopr: state.hopr.clone(),
+            msg_encoder,
             inbox,
             aliases,
         });
@@ -990,13 +994,20 @@ mod messages {
         let args: SendMessageReq = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
+        // Use the message encoder, if any
+        let msg_body = req.state()
+            .msg_encoder
+            .as_ref()
+            .map(|enc| enc(args.body.as_bytes()))
+            .unwrap_or(Box::from(args.body.as_bytes()));
+
         if let Some(path) = &args.path {
             if path.len() > 3 {
                 return Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The path components must contain at most 3 elements".into())).build())
             }
         }
 
-        match hopr.send_message(Box::from(args.body.as_ref()), args.peer_id, args.path, args.hops, Some(args.tag)).await {
+        match hopr.send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag)).await {
             Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes{challenge})).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
