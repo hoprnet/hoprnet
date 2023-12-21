@@ -209,7 +209,7 @@ lint-sol: ## run linter for Solidity
 
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
-	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+	cargo fmt --check
 
 .PHONY: lint-python
 lint-python: ## run linter for Python
