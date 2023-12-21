@@ -35,7 +35,7 @@ pub struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
-    pub msg_encoder: Option<MessageEncoder>
+    pub msg_encoder: Option<MessageEncoder>,
 }
 
 #[derive(OpenApi)]
@@ -148,7 +148,7 @@ pub async fn run_hopr_api(
     cfg: &crate::config::Api,
     hopr: hopr_lib::Hopr,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    msg_encoder: Option<MessageEncoder>
+    msg_encoder: Option<MessageEncoder>,
 ) {
     // Prepare alias part of the state
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
@@ -1004,7 +1004,8 @@ mod messages {
         let hopr = req.state().hopr.clone();
 
         // Use the message encoder, if any
-        let msg_body = req.state()
+        let msg_body = req
+            .state()
             .msg_encoder
             .as_ref()
             .map(|enc| enc(args.body.as_bytes()))
@@ -1021,13 +1022,7 @@ mod messages {
         }
 
         match hopr
-            .send_message(
-                msg_body,
-                args.peer_id,
-                args.path,
-                args.hops,
-                Some(args.tag),
-            )
+            .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
             .await
         {
             Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes { challenge })).build()),

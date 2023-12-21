@@ -96,7 +96,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match utils_types::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
                             let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
-                            info!(r#"
+                            info!(
+                                r#"
                             #### NODE RECEIVED MESSAGE [{}] ####
                             Message: {}
                             App tag: {}
@@ -108,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 latency.as_millis()
                             );
                         }
-                        Err(_) => error!("RLP decoding failed")
+                        Err(_) => error!("RLP decoding failed"),
                     }
 
                     inbox_clone.write().await.push(data).await;
