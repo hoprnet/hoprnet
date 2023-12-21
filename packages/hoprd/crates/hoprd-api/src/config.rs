@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use hopr_lib::HostConfig;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
@@ -13,7 +13,6 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
         Auth::None => Ok(()),
         Auth::Token(token) => {
             if token.len() >= MINIMAL_API_TOKEN_LENGTH {
-                // TODO: add more token limitations? alhpanumeric?
                 Ok(())
             } else {
                 Err(ValidationError::new("The validation token is too short"))

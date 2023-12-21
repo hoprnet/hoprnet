@@ -73,7 +73,6 @@ impl Debug for RustyLevelDbShim {
 }
 
 impl RustyLevelDbShim {
-
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
@@ -176,11 +175,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
-        Ok(Box::new(RustyLevelDbIterator::new(
-            i,
-            &prefix,
-            suffix_size as usize,
-        )))
+        Ok(Box::new(RustyLevelDbIterator::new(i, &prefix, suffix_size as usize)))
     }
 
     fn iterate_range(

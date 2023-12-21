@@ -149,7 +149,7 @@ impl std::str::FromStr for Health {
             "Yellow" => Ok(Self::Yellow),
             "Green" => Ok(Self::Green),
             "Unknown" => Ok(Self::Unknown),
-            _ => Err(format!("Unsupported Health string '{s}'"))
+            _ => Err(format!("Unsupported Health string '{s}'")),
         }
     }
 }
@@ -157,9 +157,6 @@ impl std::str::FromStr for Health {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
-    PeerOffline(PeerId),
-    Register(PeerId, PeerOrigin, Option<HashMap<String, String>>),
-    Unregister(PeerId),
 }
 
 impl std::fmt::Display for NetworkEvent {
@@ -412,9 +409,6 @@ impl<T: NetworkExternalActions> Network<T> {
                 } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored
                         .insert(entry.id, self.network_actions_api.create_timestamp());
-                } else if entry.quality < self.cfg.quality_offline_threshold {
-                    self.network_actions_api
-                        .emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
             }
 

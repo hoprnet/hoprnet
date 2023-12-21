@@ -14,6 +14,7 @@ pub enum TransportOutput {
 
 pub use {
     crate::{
+        adaptors::network::ExternalNetworkInteractions,
         multiaddrs::decapsulate_p2p_protocol,
         processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
@@ -22,22 +23,17 @@ pub use {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    core_network::network::{Health, PeerStatus},
+    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
-    timer::UniversalTimer,
+    timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_network::{
-    heartbeat::Heartbeat,
-    messaging::ControlMessage,
-    network::{Network, NetworkConfig, NetworkEvent},
-    ping::Ping,
-};
+use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_protocol::{
@@ -50,16 +46,13 @@ use core_types::{
     channels::{ChannelEntry, Ticket},
     protocol::TagBloomFilter,
 };
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::future::poll_fn;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
+    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
-use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{error, info, warn};
+use utils_log::{info, warn};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -88,7 +81,6 @@ pub fn build_network(
     cfg: NetworkConfig,
 ) -> (
     Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    Sender<NetworkEvent>,
     Receiver<NetworkEvent>,
 ) {
     let (network_events_tx, network_events_rx) =
@@ -97,10 +89,10 @@ pub fn build_network(
     let network = Arc::new(RwLock::new(Network::new(
         peer_id,
         cfg,
-        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
+        adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
     )));
 
-    (network, network_events_tx, network_events_rx)
+    (network, network_events_rx)
 }
 
 pub fn build_ticket_aggregation<Db>(
@@ -108,7 +100,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -148,7 +140,7 @@ pub fn build_index_updater<Db>(
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     let (indexer_update_tx, indexer_update_rx) =
         futures::channel::mpsc::channel::<IndexerProcessed>(processes::indexer::INDEXER_UPDATE_QUEUE_SIZE);
@@ -245,16 +237,15 @@ pub struct PublicNodesResult {
     pub multiaddrs: Vec<Multiaddr>,
 }
 
-use core_network::network::PeerOrigin;
 use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
+use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
+use core_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use core_protocol::errors::ProtocolError;
-use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 use utils_types::traits::PeerIdLike;
 
@@ -266,7 +257,6 @@ pub struct HoprTransport {
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    network_change_notifier: Sender<NetworkEvent>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -282,7 +272,6 @@ impl HoprTransport {
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-        change_notifier: Sender<NetworkEvent>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -296,7 +285,6 @@ impl HoprTransport {
             db,
             ping: Arc::new(RwLock::new(ping)),
             network,
-            network_change_notifier: change_notifier,
             indexer,
             pkt_sender,
             ticket_aggregate_actions,
@@ -314,14 +302,16 @@ impl HoprTransport {
     }
 
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
-        if ! self.is_allowed_to_access_network(peer).await {
-            return Err(errors::HoprTransportError::Api(format!("ping to {peer} not allowed due to network registry")))
+        if !self.is_allowed_to_access_network(peer).await {
+            return Err(errors::HoprTransportError::Api(format!(
+                "ping to {peer} not allowed due to network registry"
+            )));
         }
 
         let mut pinger = self.ping.write().await;
 
         // TODO: add timeout on the p2p transport layer
-        let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
+        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
@@ -335,16 +325,17 @@ impl HoprTransport {
         match select(timeout, ping).await {
             Either::Left(_) => {
                 warn!("Manual ping to peer '{}' timed out", peer);
-                return Err(ProtocolError::Timeout.into())
-            },
+                return Err(ProtocolError::Timeout.into());
+            }
             Either::Right(_) => info!("Manual ping succeeded"),
         };
 
-        Ok(self.network
+        Ok(self
+            .network
             .read()
             .await
             .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen) - start))
+            .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
     }
 
     pub async fn send_message(
@@ -424,7 +415,7 @@ impl HoprTransport {
             })?;
 
         if entry.status != ChannelStatus::Open {
-            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into())
+            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into());
         }
 
         Ok(self
@@ -515,18 +506,6 @@ impl HoprTransport {
 
     pub async fn network_health(&self) -> Health {
         self.network.read().await.health()
-    }
-
-    pub async fn network_unregister(&self, peer: &PeerId) {
-        let mut change_notifier = self.network_change_notifier.clone();
-
-        match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
-            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(*peer)) {
-                Ok(_) => {}
-                Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
-            },
-            Err(e) => error!("The receiver for network updates was dropped: {}", e),
-        }
     }
 
     pub async fn network_connected_peers(&self) -> Vec<PeerId> {

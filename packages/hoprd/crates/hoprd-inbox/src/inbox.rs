@@ -37,8 +37,6 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
-    // TODO: consider adding a stream version for `pop_all`
-
     /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
 }
@@ -60,7 +58,7 @@ where
     B: InboxBackend<Tag, ApplicationData>,
 {
     /// Creates new instance given the configuration.
-    /// 
+    ///
     /// Uses `std::time::SystemTime` as timestamping function.
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || {
@@ -96,8 +94,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         true
     }
@@ -110,8 +107,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)()- self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.count(tag).await
     }
 
@@ -124,8 +120,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         return db.pop(tag).await;
     }
@@ -139,8 +134,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         return db.peek(tag).await;
     }
@@ -153,8 +147,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.peek_all(tag).await
     }
 
@@ -166,8 +159,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - self.cfg.max_age)
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.pop_all(tag).await
     }
 }
@@ -184,7 +176,7 @@ mod tests {
         let cfg = MessageInboxConfiguration {
             capacity: 4,
             max_age: std::time::Duration::from_secs(2),
-            excluded_tags: vec![2]
+            excluded_tags: vec![2],
         };
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);

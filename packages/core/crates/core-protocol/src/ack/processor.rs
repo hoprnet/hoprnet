@@ -16,7 +16,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
-use async_std::task::spawn_local;
+use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -244,7 +244,10 @@ pub struct AcknowledgementInteraction {
 
 impl AcknowledgementInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+    ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
 
@@ -296,7 +299,7 @@ impl AcknowledgementInteraction {
             }
         });
 
-        spawn_local(async move {
+        spawn(async move {
             processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 

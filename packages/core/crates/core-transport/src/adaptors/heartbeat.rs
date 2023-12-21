@@ -30,7 +30,7 @@ impl HeartbeatExternalApi for HeartbeatExternalInteractions {
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
     async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {
-        let reader = self.network.write().await;
+        let reader = self.network.read().await;
         (*reader).find_peers_to_ping(from_timestamp)
     }
 }

@@ -111,31 +111,13 @@ pub async fn p2p_loop(
 ) {
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg);
 
-    let mut valid_mas: Vec<multiaddr::Multiaddr> = vec![];
-    for multiaddress in my_multiaddresses.iter() {
-        // NOTE: Due to lack of STUN the passed in multiaddresses are believed to be correct after
-        // the first successful listen. Relevant for Providence, but not beyond.
-        if !valid_mas.is_empty() {
-            valid_mas.push(multiaddress.clone());
-            continue;
-        }
-
-        match swarm.listen_on(multiaddress.clone()) {
-            Ok(_) => {
-                valid_mas.push(multiaddress.clone());
-                swarm.add_external_address(multiaddress.clone());
-            }
-            Err(e) => {
-                error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
-            }
+    for multiaddress in my_multiaddresses.into_iter() {
+        if let Err(e) = swarm.listen_on(multiaddress.clone()) {
+            error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
         }
     }
 
-    info!("Registering own external multiaddresses: {:?}", valid_mas);
-    network
-        .write()
-        .await
-        .store_peer_multiaddresses(swarm.local_peer_id(), valid_mas);
+    assert!(swarm.listeners().count() > 0, "Failed to listen on any multiaddress");
 
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
@@ -179,19 +161,6 @@ pub async fn p2p_loop(
                         if swarm.is_connected(&peer) {
                             let _ = swarm.disconnect_peer_id(peer);
                         }
-                    },
-                    NetworkEvent::PeerOffline(_peer) => {
-                        // NOTE: this functionality is not needed after switch to rust-libp2p
-                    },
-                    NetworkEvent::Register(peer, origin, metadata) => {
-                        debug!("Network event: registering peer '{peer}'");
-                        let mut writer = network.write().await;
-                        (*writer).add_with_metadata(&peer, origin, metadata)
-                    },
-                    NetworkEvent::Unregister(peer) => {
-                        debug!("Network event: unregistering peer '{peer}'");
-                        let mut writer = network.write().await;
-                        (*writer).remove(&peer)
                     },
                 },
                 Inputs::Acknowledgement(task) => match task {
@@ -283,7 +252,7 @@ pub async fn p2p_loop(
                         }
                     },
                     IndexerProcessed::Announce(peer, multiaddresses) => {
-                        debug!("Indexer: Announcing peer {peer} with multiaddresses {:?}", &multiaddresses);
+                        debug!("Indexer: Verifying a connection to an announced peer {peer} with multiaddresses {:?}", &multiaddresses);
                         for multiaddress in multiaddresses.iter() {
                             if !swarm.is_connected(&peer) {
                                 match swarm.dial(multiaddress.clone()) {
@@ -297,15 +266,6 @@ pub async fn p2p_loop(
                                         error!("Failed to dial an announced peer '{}': {}, skipping the address", &peer, e);
                                     }
                                 }
-                            }
-                        }
-
-                        // TODO: awaiting in this loop is a malpractice, but this behavior will be handled by STUN later
-                        {
-                            let mut net = network.write().await;
-                            net.store_peer_multiaddresses(&peer, multiaddresses);
-                            if &peer != swarm.local_peer_id() {
-                                net.add(&peer, PeerOrigin::Initialization)
                             }
                         }
                     }
@@ -499,8 +459,9 @@ pub async fn p2p_loop(
                 } => {
                     debug!("Connection established with {:?}", peer_id);
                     if allowed_peers.contains(&peer_id) {
-                        if ! (*network.read().await).has(&peer_id) {
-                            (*network.write().await).add(&peer_id, PeerOrigin::IncomingConnection)
+                        let mut net = network.write().await;
+                        if ! net.has(&peer_id) {
+                            net.add(&peer_id, PeerOrigin::IncomingConnection)
                         }
                     } else {
                         debug!("DISCONNECTION (based on network registry) for PEER ID {:?}", peer_id);

@@ -227,7 +227,7 @@ fmt-sol: ## run code formatter for Solidity
 
 .PHONY: fmt-rust
 fmt-rust: ## run code formatter for Rust
-	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
+	cargo fmt
 
 .PHONY: fmt-python
 fmt-python: ## run code formatter for Python

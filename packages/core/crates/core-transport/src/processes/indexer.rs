@@ -8,7 +8,7 @@ use std::{pin::Pin, sync::Arc};
 use utils_log::{error, warn};
 use utils_types::traits::PeerIdLike;
 
-use async_std::task::spawn_local;
+use async_std::task::spawn;
 
 use core_ethereum_types::chain_events::NetworkRegistryStatus;
 
@@ -58,12 +58,12 @@ impl IndexerActions {
         emitter: Sender<IndexerProcessed>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + 'static,
+        Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
     {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(INDEXER_UPDATE_QUEUE_SIZE);
 
-        spawn_local(async move {
+        spawn(async move {
             let mut emitter = emitter;
             let db_local: Arc<RwLock<Db>> = db.clone();
 

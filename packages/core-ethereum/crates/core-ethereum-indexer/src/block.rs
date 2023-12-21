@@ -14,7 +14,7 @@ use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
 
-use async_std::task::spawn_local;
+use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -96,9 +96,9 @@ impl Default for IndexerConfig {
 #[derive(Debug, Clone)]
 pub struct Indexer<T, U, V>
 where
-    T: HoprIndexerRpcOperations + 'static,
-    U: ChainLogHandler + 'static,
-    V: HoprCoreEthereumDbActions + 'static,
+    T: HoprIndexerRpcOperations + Send + 'static,
+    U: ChainLogHandler + Send + 'static,
+    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
@@ -109,9 +109,9 @@ where
 
 impl<T, U, V> Indexer<T, U, V>
 where
-    T: HoprIndexerRpcOperations + 'static,
-    U: ChainLogHandler + 'static,
-    V: HoprCoreEthereumDbActions + 'static,
+    T: HoprIndexerRpcOperations + Send + 'static,
+    U: ChainLogHandler + Send + 'static,
+    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
@@ -188,7 +188,7 @@ where
         let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
 
         let finalization = self.cfg.finalization;
-        spawn_local(async move {
+        spawn(async move {
             let mut tx = Some(tx);
 
             let mut block_stream = rpc
@@ -272,7 +272,7 @@ where
             }
         });
 
-        spawn_local(async move {
+        spawn(async move {
             let rx = rx_proc;
 
             pin_mut!(rx);
@@ -376,7 +376,7 @@ pub mod tests {
                 &'a self,
                 start_block_number: u64,
                 filter: LogFilter,
-            ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
+            ) -> core_ethereum_rpc::errors::Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
         }
     }
 

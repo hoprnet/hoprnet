@@ -2,7 +2,6 @@ use std::net::ToSocketAddrs;
 
 use proc_macro_regex::regex;
 
-
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
 #[inline]
@@ -27,12 +26,12 @@ mod tests {
 
     #[test]
     fn test_valid_domains_for_does_not_look_like_a_domain() {
-        assert!(! looks_like_domain(".org"));
-        assert!(! looks_like_domain("-hoprnet-.org"));
+        assert!(!looks_like_domain(".org"));
+        assert!(!looks_like_domain("-hoprnet-.org"));
     }
 
     #[test]
     fn test_valid_domains_should_be_reachable() {
-        assert!(! is_reachable_domain("google.com"));
+        assert!(!is_reachable_domain("google.com"));
     }
 }
