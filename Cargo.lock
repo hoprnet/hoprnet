@@ -3321,6 +3321,7 @@ dependencies = [
  "hoprd-api",
  "hoprd-inbox",
  "hoprd-keypair",
+ "lazy_static",
  "platform",
  "proc-macro-regex",
  "serde",

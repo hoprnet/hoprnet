@@ -11,14 +11,19 @@ use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use utils_log::{error, info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleHistogram;
+
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
-// // Metrics
-// TODO: introduce RLP
-// const metric_latency = create_histogram_with_buckets(
-//   'hoprd_histogram_message_latency_ms',
-//   'Histogram of measured received message latencies',
-//   new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
-// )
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_MESSAGE_LATENCY: SimpleHistogram = SimpleHistogram::new(
+        "hoprd_histogram_message_latency_ms",
+        "Histogram of measured received message latencies in milliseconds",
+        vec![10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0]
+    ).unwrap();
+}
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -96,6 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match utils_types::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
                             let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
+
                             info!(
                                 r#"
                             #### NODE RECEIVED MESSAGE [{}] ####
@@ -108,6 +114,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 data.application_tag.unwrap_or(0),
                                 latency.as_millis()
                             );
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_MESSAGE_LATENCY.observe(latency.as_millis() as f64);
                         }
                         Err(_) => error!("RLP decoding failed"),
                     }

@@ -17,6 +17,7 @@ chrono = "0.4.26"
 env_logger = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"
@@ -63,4 +64,12 @@ wasm = [
     "utils-metrics?/wasm",
     "utils-types/wasm",
 ]
-prometheus = [ "dep:utils-metrics", "hopr-lib/prometheus", "core-transport/prometheus", "core-strategy/prometheus", "core-network/prometheus", "core-ethereum-indexer/prometheus" ]
+prometheus = [
+    "dep:utils-metrics",
+    "dep:lazy_static",
+    "hopr-lib/prometheus",
+    "core-transport/prometheus",
+    "core-strategy/prometheus",
+    "core-network/prometheus",
+    "core-ethereum-indexer/prometheus"
+]
