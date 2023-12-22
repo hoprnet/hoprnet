@@ -162,9 +162,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         // compare the current_index with index, if current_index is smaller than index, set to index
         if current_index < index {
             let _evicted = self.db.set(prefixed_key, &index).await?;
-            // Ignoring evicted value
-            // flush the db after setter
-            self.db.flush().await?;
         }
         Ok(())
     }
@@ -345,8 +342,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         //     self.cached_unrealized_value
         //         .insert(v.ticket.channel_id, current_unrealized_value.add(&v.ticket.amount));
         // }
-
-        self.db.flush().await?;
 
         Ok(())
     }
@@ -585,8 +580,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = get_acknowledged_ticket_key(ticket)?;
         if self.db.contains(key.clone()).await {
-            self.db.set(key, ticket).await.map(|_| ())?;
-            self.db.flush().await
+            self.db.set(key, ticket).await.map(|_| ())
         } else {
             Err(DbError::NotFound)
         }
