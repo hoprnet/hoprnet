@@ -226,7 +226,7 @@ pub fn build_p2p_network(
     // libp2p default is 128
     // we use more to accomodate many concurrent messages
     // FIXME: make value configurable
-    mplex_config.set_max_num_streams(512);
+    mplex_config.set_max_num_streams(1024);
 
     // libp2p default is 32 Bytes
     // we use the default for now
