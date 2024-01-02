@@ -27,13 +27,16 @@ where
 
         match select(timeout, todo).await {
             Either::Left(_) => warn!("Timer tick interrupted by timeout"),
-            Either::Right(_) => debug!("Timer tick finished"),
+            Either::Right(_) => {
+                debug!("Timer tick finished");
+
+                let action_duration = get_timestamp().saturating_sub(start);
+                if let Some(remaining) = cycle.checked_sub(action_duration) {
+                    debug!("Universal timer sleeping for: {}ms", remaining.as_millis());
+                    sleep(remaining).await
+                }
+            },
         };
 
-        let action_duration = get_timestamp().saturating_sub(start);
-        if let Some(remaining) = action_duration.checked_sub(cycle) {
-            debug!("Universal timer sleeping for: {}ms", remaining.as_millis());
-            sleep(remaining).await
-        }
     }
 }
