@@ -128,7 +128,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
 async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Response> {
     let config = request.state().config.clone();
     let path = request.url().path().to_string();
-    let tail = path.strip_prefix(&"swagger-ui/").unwrap();
+    let tail = path.strip_prefix("/swagger-ui/").unwrap();
 
     match utoipa_swagger_ui::serve(tail, config) {
         Ok(swagger_file) => swagger_file
@@ -157,15 +157,15 @@ pub async fn run_hopr_api(
     let state = State {
         hopr: Arc::new(hopr),
 
-        config: Arc::new(Config::from("openapi.json")),
+        config: Arc::new(Config::from("/api-docs/openapi.json")),
     };
 
     let mut app = tide::with_state(state.clone());
 
-    app.at("api-docs/openapi.json")
+    app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
 
-    app.at("swagger-ui/*").get(serve_swagger);
+    app.at("/swagger-ui/*").get(serve_swagger);
 
     app.at("startedz/").get(checks::startedz);
     app.at("readyz/").get(checks::readyz);
