@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannels, channels::NodeTopologyChannel,
-            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::Tag,
+            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, 
@@ -217,9 +217,9 @@ pub async fn run_hopr_api(
 
     app.at("/swagger-ui/*").get(serve_swagger);
 
-    app.at("/startedz/").get(checks::startedz);
-    app.at("/readyz/").get(checks::readyz);
-    app.at("/healthyz/").get(checks::healthyz);
+    app.at("/startedz").get(checks::startedz);
+    app.at("/readyz").get(checks::readyz);
+    app.at("/healthyz").get(checks::healthyz);
 
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(InternalState {
@@ -369,7 +369,7 @@ mod alias {
     /// Get each previously set alias and its corresponding PeerId
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/aliases/", BASE_PATH),
+        path = const_format::formatcp!("{}/aliases", BASE_PATH),
         responses(
             (status = 200, description = "Each alias with its corresponding PeerId", body = [AliasPeerId]),
             (status = 401, description = "Invalid authorization token.", body = ApiError)
@@ -398,7 +398,11 @@ mod alias {
     /// Set alias for a peer with a specific PeerId.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/aliases/", BASE_PATH),
+        path = const_format::formatcp!("{}/aliases", BASE_PATH),
+        request_body(
+            content = AliasPeerId,
+            description = "Alias name along with the PeerId to be aliased",
+            content_type = "application/json"),
         responses(
             (status = 201, description = "Alias set successfully.", body = PeerIdArg),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
@@ -588,6 +592,10 @@ mod account {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
+        request_body(
+            content = WithdrawRequest,
+            description = "Withdraw request specification",
+            content_type = "application/json"),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -629,8 +637,10 @@ mod peers {
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub announced: Vec<Multiaddr>,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub observed: Vec<Multiaddr>,
     }
 
@@ -669,6 +679,7 @@ mod peers {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct PingInfo {
         #[serde_as(as = "DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
         pub latency: std::time::Duration,
         pub reported_version: String,
     }
@@ -806,7 +817,7 @@ mod channels {
         })
     }
 
-    #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[serde(default, rename_all = "camelCase")]
     pub struct ChannelsQuery {
         including_closed: bool,
@@ -816,9 +827,7 @@ mod channels {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/channels", BASE_PATH),
-        params(
-            ("channelId" = ChannelsQuery, Query, description = "Indicates whether to fetch also closed channels and/or the entire topology")
-        ),
+        params(ChannelsQuery),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -902,14 +911,20 @@ mod channels {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_id: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub transaction_receipt: Hash,
     }
 
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/channels", BASE_PATH),
+        request_body(
+            content = OpenChannelRequest,
+            description = "Open channel request specification",
+            content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -991,8 +1006,10 @@ mod channels {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub receipt: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_status: ChannelStatus,
     }
 
@@ -1079,8 +1096,8 @@ mod messages {
 
     use super::*;
 
-    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-    pub(crate) struct Tag {
+    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+    pub(crate) struct TagQuery {
         pub tag: u16,
     }
 
@@ -1121,7 +1138,10 @@ mod messages {
     /// number of HOPS, if no path is given.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/messages/", BASE_PATH),
+        path = const_format::formatcp!("{}/messages", BASE_PATH),
+        request_body(
+            content = SendMessageReq,
+            content_type = "application/json"),
         responses(
             (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1166,7 +1186,8 @@ mod messages {
     /// Delete messages from nodes message inbox.
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{}/messages/", BASE_PATH),
+        path = const_format::formatcp!("{}/messages", BASE_PATH),
+        params(TagQuery),
         responses(
             (status = 204, description = "Messages successfully deleted."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1177,7 +1198,7 @@ mod messages {
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.query()?;
+        let tag: TagQuery = req.query()?;
         let inbox = req.state().inbox.clone();
 
         inbox.write().await.pop_all(Some(tag.tag)).await;
@@ -1187,7 +1208,8 @@ mod messages {
     /// Get size of filtered message inbox for a specific tag
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/messages/size/", BASE_PATH),
+        path = const_format::formatcp!("{}/messages/size", BASE_PATH),
+        params(TagQuery),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = Size),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1198,7 +1220,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.query()?;
+        let tag: TagQuery = req.query()?;
         let inbox = req.state().inbox.clone();
 
         let size = inbox.read().await.size(Some(tag.tag)).await;
@@ -1235,6 +1257,9 @@ mod messages {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/messages/pop", BASE_PATH),
+        request_body(
+            content = Tag,
+            content_type = "application/json"),
         responses(
             (status = 204, description = "Message successfully extracted.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1247,7 +1272,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let tag: TagQuery = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1267,6 +1292,9 @@ mod messages {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/messages/pop-all", BASE_PATH),
+        request_body(
+            content = Tag,
+            content_type = "application/json"),
         responses(
             (status = 200, description = "All message successfully extracted.", body = [MessagePopRes]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1279,7 +1307,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let tag: TagQuery = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1299,6 +1327,9 @@ mod messages {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/messages/peek", BASE_PATH),
+        request_body(
+            content = Tag,
+            content_type = "application/json"),
         responses(
             (status = 204, description = "Message successfully peeked at.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1311,7 +1342,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let tag: TagQuery = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1331,6 +1362,9 @@ mod messages {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/messages/peek-all", BASE_PATH),
+        request_body(
+            content = Tag,
+            content_type = "application/json"),
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = [MessagePopRes]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1343,7 +1377,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: Tag = req.body_json().await?;
+        let tag: TagQuery = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1401,6 +1435,7 @@ mod tickets {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_id: Hash,
         pub amount: String,
         pub index: u64,
@@ -1650,7 +1685,7 @@ mod node {
         Ok(Response::builder(200).body(json!({"version": version})).build())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersReqQuery {
         quality: Option<f64>,
@@ -1702,6 +1737,7 @@ mod node {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/node/peers", BASE_PATH),
+        params(NodePeersReqQuery),
         responses(
             (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
@@ -1813,8 +1849,10 @@ mod node {
     pub(crate) struct NodeInfoRes {
         network: String,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         announced_address: Vec<Multiaddr>,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         listening_address: Vec<Multiaddr>,
         chain: String,
         #[serde_as(as = "DisplayFromStr")]
@@ -1837,6 +1875,7 @@ mod node {
         hopr_node_safe: Address,
         is_eligible: bool,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         connectivity_status: Health,
         /// Channel closure period in seconds
         channel_closure_period: u64,
@@ -1891,6 +1930,7 @@ mod node {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct EntryNode {
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
         pub is_elligible: bool,
     }
