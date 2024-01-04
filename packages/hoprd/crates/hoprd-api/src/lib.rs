@@ -272,7 +272,7 @@ pub async fn run_hopr_api(
         api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
         api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
 
-        api.at("/messages/")
+        api.at("/messages")
             .post(messages::send_message)
             .delete(messages::delete_messages);
         api.at("/messages/pop").get(messages::pop);
@@ -825,9 +825,11 @@ mod channels {
     }
 
     #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
-    #[serde(default, rename_all = "camelCase")]
-    pub struct ChannelsQuery {
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct ChannelsQuery {
+        #[serde(default)]
         including_closed: bool,
+        #[serde(default)]
         full_topology: bool
     }
 
@@ -906,6 +908,10 @@ mod channels {
     #[serde_as]
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
+    #[schema(example = json!({
+        "amount": "10",
+        "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
+    }))]
     pub(crate) struct OpenChannelRequest {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -1116,6 +1122,15 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
+    #[schema(example = json!({
+      "body": "Test message",
+      "hops": 1,
+      "path": [
+        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+      ],
+      "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+      "tag": 20
+    }))]
     pub(crate) struct SendMessageReq {
         /// The message tag used to filter messages based on application
         pub tag: u16,
@@ -1169,7 +1184,7 @@ mod messages {
             .msg_encoder
             .as_ref()
             .map(|enc| enc(args.body.as_bytes()))
-            .unwrap_or(Box::from(args.body.as_bytes()));
+            .unwrap_or_else(|| Box::from(args.body.as_bytes()));
 
         if let Some(path) = &args.path {
             if path.len() > 3 {
@@ -1265,8 +1280,10 @@ mod messages {
         post,
         path = const_format::formatcp!("{}/messages/pop", BASE_PATH),
         request_body(
-            content = Tag,
-            content_type = "application/json"),
+            content = TagQuery,
+            description = "Tag of message queue to pop from",
+            content_type = "application/json"
+        ),
         responses(
             (status = 204, description = "Message successfully extracted.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1300,8 +1317,10 @@ mod messages {
         post,
         path = const_format::formatcp!("{}/messages/pop-all", BASE_PATH),
         request_body(
-            content = Tag,
-            content_type = "application/json"),
+            content = TagQuery,
+            description = "Tag of message queue to pop from",
+            content_type = "application/json"
+        ),
         responses(
             (status = 200, description = "All message successfully extracted.", body = [MessagePopRes]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1335,8 +1354,10 @@ mod messages {
         post,
         path = const_format::formatcp!("{}/messages/peek", BASE_PATH),
         request_body(
-            content = Tag,
-            content_type = "application/json"),
+            content = TagQuery,
+            description = "Tag of message queue to peek from",
+            content_type = "application/json"
+        ),
         responses(
             (status = 204, description = "Message successfully peeked at.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1370,8 +1391,10 @@ mod messages {
         post,
         path = const_format::formatcp!("{}/messages/peek-all", BASE_PATH),
         request_body(
-            content = Tag,
-            content_type = "application/json"),
+            content = TagQuery,
+            description = "Tag of message queue to peek from",
+            content_type = "application/json"
+        ),
         responses(
             (status = 200, description = "All messages successfully peeked at.", body = [MessagePopRes]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
