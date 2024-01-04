@@ -576,8 +576,10 @@ mod peers {
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub announced: Vec<Multiaddr>,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub observed: Vec<Multiaddr>,
     }
 
@@ -610,6 +612,7 @@ mod peers {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct PingInfo {
         #[serde_as(as = "DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
         pub latency: std::time::Duration,
         pub reported_version: String,
     }
@@ -831,8 +834,10 @@ mod channels {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_id: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub transaction_receipt: Hash,
     }
 
@@ -911,8 +916,10 @@ mod channels {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub receipt: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_status: ChannelStatus,
     }
 
@@ -1285,6 +1292,7 @@ mod tickets {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_id: Hash,
         pub amount: String,
         pub index: u64,
@@ -1676,8 +1684,10 @@ mod node {
     pub(crate) struct NodeInfoRes {
         network: String,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         announced_address: Vec<Multiaddr>,
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         listening_address: Vec<Multiaddr>,
         chain: String,
         #[serde_as(as = "DisplayFromStr")]
@@ -1700,6 +1710,7 @@ mod node {
         hopr_node_safe: Address,
         is_eligible: bool,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         connectivity_status: Health,
         /// Channel closure period in seconds
         channel_closure_period: u64,
@@ -1751,6 +1762,7 @@ mod node {
     #[serde(rename_all = "camelCase")]
     pub(crate) struct EntryNode {
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
         pub is_elligible: bool,
     }
