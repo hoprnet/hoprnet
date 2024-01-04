@@ -13,13 +13,13 @@ use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
 use tide::{Middleware, Next, StatusCode};
-use utoipa::{Modify, OpenApi};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
+use crate::config::Auth;
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{Address, Balance, BalanceType, Hopr};
-use crate::config::Auth;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -124,7 +124,7 @@ pub struct InternalState {
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, 
+            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes
         )
     ),
     modifiers(&SecurityAddon),
@@ -148,7 +148,12 @@ impl Modify for SecurityAddon {
         let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
         components.add_security_scheme(
             "api_token",
-            SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Bearer).bearer_format("base64").build())
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("base64")
+                    .build(),
+            ),
         )
     }
 }
@@ -286,6 +291,7 @@ pub async fn run_hopr_api(
         api.at("/node/info").get(node::info);
         api.at("/node/peers").get(node::peers);
         api.at("/node/entryNodes").get(node::entry_nodes);
+        api.at("/node/metrics").get(node::metrics);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         api.at("/node/metrics").get(node::metrics);
@@ -899,13 +905,15 @@ mod channels {
                         incoming: incoming
                             .into_iter()
                             .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                                (query.including_closed || c.status != ChannelStatus::Closed)
+                                    .then(|| NodeChannel::from(c))
                             })
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
                             .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                                (query.including_closed || c.status != ChannelStatus::Closed)
+                                    .then(|| NodeChannel::from(c))
                             })
                             .collect(),
                         all: vec![],
@@ -1485,8 +1493,16 @@ mod tickets {
         let hopr = req.state().hopr.clone();
 
         match hopr.get_ticket_price().await {
-            Ok(Some(price)) => Ok(Response::builder(200).body(json!(TicketPriceResponse{price: price.to_string()})).build()),
-            Ok(None) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The ticket price is not available".into())).build()),
+            Ok(Some(price)) => Ok(Response::builder(200)
+                .body(json!(TicketPriceResponse {
+                    price: price.to_string()
+                }))
+                .build()),
+            Ok(None) => Ok(Response::builder(422)
+                .body(ApiErrorStatus::UnknownFailure(
+                    "The ticket price is not available".into(),
+                ))
+                .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
@@ -1724,7 +1740,6 @@ mod node {
     use futures::StreamExt;
     use hopr_lib::{Health, Multiaddr};
 
-    #[cfg(all(feature = "prometheus", not(test)))]
     use {std::str::FromStr, tide::Body};
 
     /// Get release version of the running node.
@@ -1880,8 +1895,15 @@ mod node {
         Ok(Response::builder(200).body(json!(body)).build())
     }
 
-    /// Retrieve Prometheus metrics from the running node.
     #[cfg(all(feature = "prometheus", not(test)))]
+    use utils_metrics::metrics::gather_all_metrics as collect_metrics;
+
+    #[cfg(any(not(feature = "prometheus"), test))]
+    fn collect_metrics() -> Result<String, ApiErrorStatus> {
+        Err(ApiErrorStatus::UnknownFailure("BUILT WITHOUT METRICS SUPPORT".into()))
+    }
+
+    /// Retrieve Prometheus metrics from the running node.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
@@ -1895,8 +1917,8 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(super) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
-        match utils_metrics::metrics::gather_all_metrics() {
+    pub(crate) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
+        match collect_metrics() {
             Ok(metrics) => Ok(Response::builder(200)
                 .body(Body::from_string(metrics))
                 .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))

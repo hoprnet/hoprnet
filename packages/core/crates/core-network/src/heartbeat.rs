@@ -126,11 +126,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
                     let this_round_actual_duration = current_timestamp().saturating_sub(start);
 
-                    let time_to_wait_for_next_round = this_round_planned_duration.saturating_sub(this_round_actual_duration);
+                    let time_to_wait_for_next_round =
+                        this_round_planned_duration.saturating_sub(this_round_actual_duration);
 
                     debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}");
-                    sleep(time_to_wait_for_next_round).await  
-                },
+                    sleep(time_to_wait_for_next_round).await
+                }
             };
 
             #[cfg(all(feature = "prometheus", not(test)))]

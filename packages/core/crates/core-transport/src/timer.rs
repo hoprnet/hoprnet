@@ -35,8 +35,7 @@ where
                     debug!("Universal timer sleeping for: {}ms", remaining.as_millis());
                     sleep(remaining).await
                 }
-            },
+            }
         };
-
     }
 }
