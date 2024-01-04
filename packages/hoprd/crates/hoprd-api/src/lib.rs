@@ -429,7 +429,10 @@ mod alias {
     /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
+        path = const_format::formatcp!("{}/aliases/{{alias}}", BASE_PATH),
+        params(
+            ("alias" = String, Path, description = "Alias to be shown"),
+        ),
         responses(
             (status = 200, description = "Get PeerId for an alias", body = int),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -459,7 +462,10 @@ mod alias {
     /// Delete an alias.
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{}/aliases/:alias", BASE_PATH),
+        path = const_format::formatcp!("{}/aliases/{{alias}}", BASE_PATH),
+        params(
+            ("alias" = String, Path, description = "Alias to be shown"),
+        ),
         responses(
             (status = 204, description = "Alias removed successfully", body = int),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -592,11 +598,10 @@ mod account {
     ///
     /// Both NATIVE or HOPR can be withdrawn using this method.
     #[utoipa::path(
-        get,
+        post,
         path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
         request_body(
             content = WithdrawRequest,
-            description = "Withdraw request specification",
             content_type = "application/json"),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
@@ -1139,7 +1144,7 @@ mod messages {
     /// The message can be sent either over a specified path or using a specified
     /// number of HOPS, if no path is given.
     #[utoipa::path(
-        get,
+        post,
         path = const_format::formatcp!("{}/messages", BASE_PATH),
         request_body(
             content = SendMessageReq,
@@ -1222,10 +1227,10 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.query()?;
+        let query: TagQuery = req.query()?;
         let inbox = req.state().inbox.clone();
 
-        let size = inbox.read().await.size(Some(tag.tag)).await;
+        let size = inbox.read().await.size(Some(query.tag)).await;
 
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
@@ -1426,7 +1431,7 @@ mod tickets {
         let hopr = req.state().hopr.clone();
 
         match hopr.get_ticket_price().await {
-            Ok(Some(price)) => Ok(Response::builder(204).body(json!(TicketPriceResponse{price: price.to_string()})).build()),
+            Ok(Some(price)) => Ok(Response::builder(200).body(json!(TicketPriceResponse{price: price.to_string()})).build()),
             Ok(None) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The ticket price is not available".into())).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
