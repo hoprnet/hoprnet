@@ -38,11 +38,13 @@ impl TokenAuthenticator {
     pub fn authenticate_request(&self, authorization_header_value: Option<&str>) -> bool {
         if let Some(expected_token) = &self.0 {
             if let Some((auth_type, token)) = authorization_header_value.and_then(|h| h.split_once(' ')) {
-                return (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token;
+                (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token
+            } else {
+                false
             }
+        } else {
+            true
         }
-
-        false
     }
 }
 
