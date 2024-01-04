@@ -78,7 +78,11 @@ WORKDIR /app/hoprnet/packages/hoprd
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
+# Set max memory to 1.5GB, assuming Docker will be set to `-m 2g`.
+# This makes Node.js run GC more frequently as it approaches the memory bounds
+# so it won't reach the maximum memory given by Docker.
+# Can be configured differently by the user if needed.
+ENV NODE_OPTIONS="--max_old_space_size=1542 --experimental-wasm-modules"
 
 # Admin web server
 EXPOSE 3000
