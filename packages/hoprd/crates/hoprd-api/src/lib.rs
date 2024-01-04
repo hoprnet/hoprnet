@@ -13,11 +13,13 @@ use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
 use tide::{Middleware, Next, StatusCode};
-use utoipa::OpenApi;
+use utoipa::{Modify, OpenApi};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa_swagger_ui::Config;
 
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{Address, Balance, BalanceType, Hopr};
+use crate::config::Auth;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -30,9 +32,38 @@ pub struct State<'a> {
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
+pub struct TokenAuthenticator(Option<String>);
+
+impl TokenAuthenticator {
+    pub fn authenticate_request(&self, authorization_header_value: Option<&str>) -> bool {
+        if let Some(expected_token) = &self.0 {
+            if let Some((auth_type, token)) = authorization_header_value.and_then(|h| h.split_once(' ')) {
+                return (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token;
+            }
+        }
+
+        false
+    }
+}
+
+impl From<config::Auth> for TokenAuthenticator {
+    fn from(value: Auth) -> Self {
+        match value {
+            Auth::None => Self(None),
+            Auth::Token(token) => {
+                if !token.is_empty() {
+                    Self(Some(general_purpose::STANDARD.encode(token)))
+                } else {
+                    Self(None)
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct InternalState {
-    pub auth: Arc<crate::config::Auth>,
+    pub auth: Arc<TokenAuthenticator>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
@@ -76,7 +107,7 @@ pub struct InternalState {
         node::metrics,
         node::info,
         node::entry_nodes,
-        peers::show_all_peers,
+        peers::show_peer_info,
         peers::ping_peer
     ),
     components(
@@ -85,7 +116,7 @@ pub struct InternalState {
             alias::PeerIdArg, alias::AliasPeerId,
             account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
-            channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
+            channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannels, channels::NodeTopologyChannel,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::Tag,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
@@ -93,7 +124,7 @@ pub struct InternalState {
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, 
         )
     ),
-    modifiers(),
+    modifiers(&SecurityAddon),
     tags(
         (name = "Checks", description = "HOPR node functionality checks"),
         (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
@@ -107,6 +138,18 @@ pub struct InternalState {
 )]
 pub struct ApiDoc;
 
+pub struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
+        components.add_security_scheme(
+            "api_token",
+            SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Bearer).bearer_format("base64").build())
+        )
+    }
+}
+
 /// Token-based authentication middleware
 struct TokenBasedAuthenticationMiddleware;
 
@@ -116,26 +159,15 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        match auth.as_ref() {
-            config::Auth::None => {}
-            config::Auth::Token(token) => {
-                // TODO: consider changing this to Bearer, this is misusing the spec which should be "user:password" for Basic
-                let expected_header = format!("Basic {}", general_purpose::STANDARD.encode(token));
+        let is_authorized = auth.authenticate_request(request.header(AUTHORIZATION).map(|v| v.as_str()));
 
-                let is_authorized = request
-                    .header(AUTHORIZATION)
-                    .map(|actual_header| expected_header.as_str() == actual_header.as_str())
-                    .unwrap_or(false);
+        if !is_authorized {
+            let reject_response = Response::builder(StatusCode::Unauthorized)
+                .content_type(mime::JSON)
+                .body(ApiErrorStatus::Unauthorized)
+                .build();
 
-                if !is_authorized {
-                    let reject_response = Response::builder(StatusCode::Unauthorized)
-                        .content_type(mime::JSON)
-                        .body(ApiErrorStatus::Unauthorized)
-                        .build();
-
-                    return Ok(reject_response);
-                }
-            }
+            return Ok(reject_response);
         }
 
         // Go forward to the next middleware or request handler
@@ -191,7 +223,7 @@ pub async fn run_hopr_api(
 
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(InternalState {
-            auth: Arc::new(cfg.auth.clone()),
+            auth: Arc::new(cfg.auth.clone().into()),
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,
@@ -210,7 +242,7 @@ pub async fn run_hopr_api(
         api.at("/account/withdraw").get(account::withdraw);
 
         api.at("/peers/:peerId")
-            .get(peers::show_all_peers)
+            .get(peers::show_peer_info)
             .at("/ping")
             .post(peers::ping_peer);
 
@@ -342,7 +374,10 @@ mod alias {
             (status = 200, description = "Each alias with its corresponding PeerId", body = [AliasPeerId]),
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
-        tag = "Alias"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Alias",
     )]
     pub async fn aliases(req: Request<InternalState>) -> tide::Result<Response> {
         let aliases = req.state().aliases.clone();
@@ -370,7 +405,10 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Alias"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Alias",
     )]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: AliasPeerId = req.body_json().await?;
@@ -391,7 +429,10 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
-        tag = "Alias"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Alias",
     )]
     pub async fn get_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
@@ -418,7 +459,10 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)   // TOOD: This can never happen
         ),
-        tag = "Alias"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Alias",
     )]
     pub async fn delete_alias(req: Request<InternalState>) -> tide::Result<Response> {
         let alias = req.param("alias")?.parse::<String>()?;
@@ -451,7 +495,10 @@ mod account {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Account"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Account",
     )]
     pub(super) async fn addresses(req: Request<InternalState>) -> tide::Result<Response> {
         let addresses = AccountAddresses {
@@ -486,7 +533,10 @@ mod account {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Account"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Account",
     )]
     pub(super) async fn balances(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -543,7 +593,10 @@ mod account {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Account"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Account",
     )]
     pub(super) async fn withdraw(mut req: Request<InternalState>) -> tide::Result<Response> {
         let withdraw_req_data: WithdrawRequest = req.body_json().await?;
@@ -584,15 +637,21 @@ mod peers {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        params(
+            ("peerId" = String, Path, description = "PeerID of the requested peer")
+        ),
         responses(
             (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Peers"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Peers",
     )]
-    pub(super) async fn show_all_peers(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn show_peer_info(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(Response::builder(200)
@@ -617,13 +676,19 @@ mod peers {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        params(
+            ("peerId" = String, Path, description = "PeerID of the requested peer")
+        ),
         responses(
             (status = 200, description = "Ping successful", body = NodePeerInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Peers"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Peers",
     )]
     pub(super) async fn ping_peer(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -741,9 +806,9 @@ mod channels {
         })
     }
 
-    #[derive(Debug, Default, Copy, Clone, Deserialize)]
+    #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::ToSchema)]
     #[serde(default, rename_all = "camelCase")]
-    struct ChannelsQuery {
+    pub struct ChannelsQuery {
         including_closed: bool,
         full_topology: bool
     }
@@ -751,12 +816,18 @@ mod channels {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/channels", BASE_PATH),
+        params(
+            ("channelId" = ChannelsQuery, Query, description = "Indicates whether to fetch also closed channels and/or the entire topology")
+        ),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Channels"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Channels",
     )]
     pub(super) async fn list_channels(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -846,7 +917,10 @@ mod channels {
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Channels"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Channels",
     )]
     pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -882,6 +956,9 @@ mod channels {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 201, description = "Channel fetched successfully", body = NodeTopologyChannel),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -889,7 +966,10 @@ mod channels {
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Channels"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Channels",
     )]
     pub(super) async fn show_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -919,6 +999,9 @@ mod channels {
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{}/channels/{{channelId}}", BASE_PATH),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -926,7 +1009,10 @@ mod channels {
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Channels"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Channels",
     )]
     pub(super) async fn close_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -954,6 +1040,9 @@ mod channels {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/channels/{{channelId}}/fund", BASE_PATH),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
@@ -961,7 +1050,10 @@ mod channels {
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Channels"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Channels",
     )]
     pub(super) async fn fund_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -987,7 +1079,7 @@ mod messages {
 
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     pub(crate) struct Tag {
         pub tag: u16,
     }
@@ -1035,7 +1127,10 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Messages"
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Messages",
     )]
     pub async fn send_message(mut req: Request<InternalState>) -> tide::Result<Response> {
         let args: SendMessageReq = req.body_json().await?;
@@ -1076,7 +1171,10 @@ mod messages {
             (status = 204, description = "Messages successfully deleted."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
-        tag = "Messages"
+        tag = "Messages",
+        security(
+            ("api_token" = [])
+        )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
         let tag: Tag = req.query()?;
@@ -1093,6 +1191,9 @@ mod messages {
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = Size),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1140,6 +1241,9 @@ mod messages {
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
+        security(
+            ("api_token" = [])
+        ),
         tag = "Messages"
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
@@ -1168,6 +1272,9 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1198,6 +1305,9 @@ mod messages {
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
+        security(
+            ("api_token" = [])
+        ),
         tag = "Messages"
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
@@ -1226,6 +1336,9 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1267,6 +1380,9 @@ mod tickets {
             (status = 200, description = "Current ticket price", body = TicketPriceResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -1311,12 +1427,18 @@ mod tickets {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/channels/{{channelId}}/tickets", BASE_PATH),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Channels"
     )]
@@ -1345,6 +1467,9 @@ mod tickets {
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -1398,6 +1523,9 @@ mod tickets {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
+        security(
+            ("api_token" = [])
+        ),
         tag = "Tickets"
     )]
     pub(super) async fn show_ticket_statistics(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1416,6 +1544,9 @@ mod tickets {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
+        security(
+            ("api_token" = [])
+        ),
         tag = "Tickets"
     )]
     pub(super) async fn redeem_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1429,12 +1560,18 @@ mod tickets {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/redeem", BASE_PATH),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Channel"
     )]
@@ -1453,12 +1590,18 @@ mod tickets {
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/aggregate", BASE_PATH),
+        params(
+            ("channelId" = String, Path, description = "ID of the channel.")
+        ),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Channel"
     )]
@@ -1495,6 +1638,9 @@ mod node {
         responses(
             (status = 200, description = "Fetched node version"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Node"
     )]
@@ -1560,6 +1706,9 @@ mod node {
             (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Node"
     )]
@@ -1633,7 +1782,8 @@ mod node {
         Ok(Response::builder(200).body(json!(body)).build())
     }
 
-    #[cfg(any(not(feature = "prometheus"), test))]
+    /// Retrieve Prometheus metrics from the running node.
+    #[cfg(all(feature = "prometheus", not(test)))]
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
@@ -1642,21 +1792,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
-        tag = "Node"
-    )]
-    pub(super) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
-        Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
-    }
-
-    #[cfg(all(feature = "prometheus", not(test)))]
-    /// Retrieve Prometheus metrics from the running node.
-    #[utoipa::path(
-        get,
-        path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
-        responses(
-            (status = 200, description = "Fetched node metrics", body = String),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
+        security(
+            ("api_token" = [])
         ),
         tag = "Node"
     )]
@@ -1713,6 +1850,9 @@ mod node {
             (status = 200, description = "Fetched node version"),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
+        security(
+            ("api_token" = [])
+        ),
         tag = "Node"
     )]
     pub(super) async fn info(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1763,6 +1903,9 @@ mod node {
             (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
         ),
         tag = "Node"
     )]
