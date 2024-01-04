@@ -171,9 +171,9 @@ pub async fn run_hopr_api(
 
     app.at("/swagger-ui/*").get(serve_swagger);
 
-    app.at("startedz/").get(checks::startedz);
-    app.at("readyz/").get(checks::readyz);
-    app.at("healthyz/").get(checks::healthyz);
+    app.at("/startedz/").get(checks::startedz);
+    app.at("/readyz/").get(checks::readyz);
+    app.at("/healthyz/").get(checks::healthyz);
 
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(InternalState {
@@ -639,7 +639,7 @@ mod channels {
     use core_ethereum_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
-    use std::str::FromStr;
+    use serde::Deserialize;
     use utils_types::traits::ToHex;
 
     #[serde_as]
@@ -716,6 +716,13 @@ mod channels {
         })
     }
 
+    #[derive(Debug, Default, Copy, Clone, Deserialize)]
+    #[serde(default, rename_all = "camelCase")]
+    struct ChannelsQuery {
+        including_closed: bool,
+        full_topology: bool
+    }
+
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{}/channels", BASE_PATH),
@@ -728,10 +735,9 @@ mod channels {
     )]
     pub(super) async fn list_channels(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        let including_closed = bool::from_str(req.param("includingClosed")?)?;
-        let full_topology = bool::from_str(req.param("fullTopology")?)?;
+        let query: ChannelsQuery = req.query()?;
 
-        if full_topology {
+        if query.full_topology {
             let hopr_clone = hopr.clone();
             let topology = hopr
                 .all_channels()
@@ -766,13 +772,13 @@ mod channels {
                         incoming: incoming
                             .into_iter()
                             .filter_map(|c| {
-                                (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                                (query.including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
                             })
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
                             .filter_map(|c| {
-                                (including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
+                                (query.including_closed || c.status != ChannelStatus::Closed).then(|| NodeChannel::from(c))
                             })
                             .collect(),
                         all: vec![],
