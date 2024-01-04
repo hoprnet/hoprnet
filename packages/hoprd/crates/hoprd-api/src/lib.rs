@@ -38,6 +38,7 @@ impl TokenAuthenticator {
     pub fn authenticate_request(&self, authorization_header_value: Option<&str>) -> bool {
         if let Some(expected_token) = &self.0 {
             if let Some((auth_type, token)) = authorization_header_value.and_then(|h| h.split_once(' ')) {
+                // TODO: Remove Basic and only keep "Bearer" once clients migrate
                 (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token
             } else {
                 false
@@ -114,12 +115,12 @@ pub struct InternalState {
     ),
     components(
         schemas(
-            ApiError, ApiErrorStatus,
+            ApiError,
             alias::PeerIdArg, alias::AliasPeerId,
             account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
-            channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel,
+            channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
@@ -284,9 +285,11 @@ pub async fn run_hopr_api(
         api.at("/node/version").get(node::version);
         api.at("/node/info").get(node::info);
         api.at("/node/peers").get(node::peers);
-        api.at("/node/metrics").get(node::metrics);
         api.at("/node/entryNodes").get(node::entry_nodes);
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        api.at("/node/metrics").get(node::metrics);
+        
         api
     });
 
@@ -295,6 +298,10 @@ pub async fn run_hopr_api(
 
 /// Should not be instantiated directly, but rather through the `ApiErrorStatus`.
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "status": "INVALID_INPUT",
+    "error": "Invalid value passed in parameter 'XYZ'"
+}))]
 struct ApiError {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -302,7 +309,7 @@ struct ApiError {
 }
 
 /// Enumerates all API request errors
-#[derive(Debug, Clone, PartialEq, Eq, strum::Display, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
@@ -352,7 +359,8 @@ mod alias {
     use super::*;
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
     pub(crate) struct PeerIdArg {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -361,6 +369,11 @@ mod alias {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "alias": "Alice",
+        "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+    }))]
+    #[serde(rename_all = "camelCase")]
     pub(crate) struct AliasPeerId {
         pub alias: String,
         #[serde_as(as = "DisplayFromStr")]
@@ -824,11 +837,12 @@ mod channels {
     }
 
     #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
-    #[serde(rename_all = "camelCase")]
+    #[into_params(parameter_in = Query)]
+    #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQuery {
-        #[serde(default)]
+        #[schema(required = false)]
         including_closed: bool,
-        #[serde(default)]
+        #[schema(required = false)]
         full_topology: bool
     }
 
@@ -1066,11 +1080,23 @@ mod channels {
         }
     }
 
+    
+    #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct FundRequest {
+        amount: String
+    }
+
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{}/channels/{{channelId}}/fund", BASE_PATH),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
+        ),
+        request_body(
+            content = FundRequest,
+            description = "Amount of HOPR to fund the channel",
+            content_type = "application/json",
         ),
         responses(
             (status = 200, description = "Channel funded successfully", body = String),
@@ -1086,7 +1112,9 @@ mod channels {
     )]
     pub(super) async fn fund_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        let amount = Balance::new_from_str(req.param("amount")?, BalanceType::HOPR);
+        let fund_req: FundRequest = req.query()?;
+
+        let amount = Balance::new_from_str(&fund_req.amount, BalanceType::HOPR);
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
@@ -1627,7 +1655,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/redeem", BASE_PATH),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets/redeem", BASE_PATH),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -1657,7 +1685,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channel/{{channelId}}/tickets/aggregate", BASE_PATH),
+        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets/aggregate", BASE_PATH),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -1718,13 +1746,14 @@ mod node {
         Ok(Response::builder(200).body(json!({"version": version})).build())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
-    #[serde(rename_all = "camelCase")]
+    #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+    #[into_params(parameter_in = Query)]
     pub(crate) struct NodePeersReqQuery {
+        #[schema(required = false)]
         quality: Option<f64>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct HeartbeatInfo {
         sent: u64,
@@ -1732,7 +1761,7 @@ mod node {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct PeerInfo {
         #[serde_as(as = "DisplayFromStr")]
@@ -1753,7 +1782,7 @@ mod node {
         reported_version: String,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersRes {
         connected: Vec<PeerInfo>,
@@ -1990,7 +2019,7 @@ mod node {
                 let mut body = HashMap::new();
                 for (peer_id, address, mas) in nodes.into_iter() {
                     body.insert(
-                        address,
+                        address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
                             is_elligible: hopr.is_allowed_to_access_network(&peer_id).await,
