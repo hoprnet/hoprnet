@@ -119,7 +119,7 @@ pub struct InternalState {
             account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
-            channels::NodeChannels, channels::NodeTopologyChannel,
+            channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
@@ -275,10 +275,10 @@ pub async fn run_hopr_api(
         api.at("/messages")
             .post(messages::send_message)
             .delete(messages::delete_messages);
-        api.at("/messages/pop").get(messages::pop);
-        api.at("/messages/pop-all").get(messages::pop_all);
-        api.at("/messages/peek").get(messages::peek);
-        api.at("/messages/peek-all").get(messages::peek_all);
+        api.at("/messages/pop").post(messages::pop);
+        api.at("/messages/pop-all").post(messages::pop_all);
+        api.at("/messages/peek").post(messages::peek);
+        api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
 
         api.at("/node/version").get(node::version);
@@ -738,7 +738,6 @@ mod channels {
     use core_ethereum_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
-    use serde::Deserialize;
     use utils_types::traits::ToHex;
 
     #[serde_as]
@@ -824,7 +823,7 @@ mod channels {
         })
     }
 
-    #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+    #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelsQuery {
         #[serde(default)]
@@ -1120,7 +1119,7 @@ mod messages {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     #[schema(example = json!({
       "body": "Test message",
@@ -1148,9 +1147,12 @@ mod messages {
         pub hops: Option<u16>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct SendMessageRes {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
     }
 
@@ -1163,6 +1165,7 @@ mod messages {
         path = const_format::formatcp!("{}/messages", BASE_PATH),
         request_body(
             content = SendMessageReq,
+            description = "Body of a message to send",
             content_type = "application/json"),
         responses(
             (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageRes),
