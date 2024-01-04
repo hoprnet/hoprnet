@@ -166,7 +166,7 @@ function setup_node() {
     RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
-      --api-token "${api_token}" \
+      --disableApiAuthentication \
       --data="${dir}" \
       --host="${host}:${p2p_port}" \
       --identity="${id_file}" \

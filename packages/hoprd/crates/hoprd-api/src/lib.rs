@@ -64,6 +64,7 @@ pub struct InternalState {
         messages::pop_all,
         messages::peek,
         messages::peek_all,
+        tickets::price,
         tickets::show_channel_tickets,
         tickets::show_all_tickets,
         tickets::show_ticket_statistics,
@@ -78,10 +79,23 @@ pub struct InternalState {
         peers::show_all_peers,
         peers::ping_peer
     ),
-    components(),
+    components(
+        schemas(
+            ApiError, ApiErrorStatus,
+            alias::PeerIdArg, alias::AliasPeerId,
+            account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
+            peers::NodePeerInfo, peers::PingInfo,
+            channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
+            channels::NodeChannels, channels::NodeTopologyChannel,
+            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::Tag,
+            tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
+            node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
+            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, 
+        )
+    ),
     modifiers(),
     tags(
-        (name = "Check", description = "HOPR node functionality checks"),
+        (name = "Checks", description = "HOPR node functionality checks"),
         (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
         (name = "Account", description = "HOPR node account endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
@@ -220,9 +234,8 @@ pub async fn run_hopr_api(
             .post(tickets::aggregate_tickets_in_channel);
 
         api.at("/tickets").get(tickets::show_all_tickets);
-
+        api.at("/tickets/price").get(tickets::price);
         api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
-
         api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
 
         api.at("/messages/")
@@ -247,7 +260,7 @@ pub async fn run_hopr_api(
 }
 
 /// Should not be instantiated directly, but rather through the `ApiErrorStatus`.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 struct ApiError {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -255,7 +268,7 @@ struct ApiError {
 }
 
 /// Enumerates all API request errors
-#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display, utoipa::ToSchema)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
@@ -305,17 +318,19 @@ mod alias {
     use super::*;
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    struct PeerIdArg {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct PeerIdArg {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub peer_id: PeerId,
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    struct AliasPeerId {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct AliasPeerId {
         pub alias: String,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub peer_id: PeerId,
     }
 
@@ -418,9 +433,9 @@ mod alias {
 mod account {
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct AccountAddresses {
+    pub(crate) struct AccountAddresses {
         pub native: String,
         pub hopr: String,
     }
@@ -447,9 +462,9 @@ mod account {
         Ok(Response::builder(200).body(json!(addresses)).build())
     }
 
-    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct AccountBalances {
+    pub(crate) struct AccountBalances {
         pub safe_native: String,
         pub native: String,
         pub safe_hopr: String,
@@ -507,12 +522,13 @@ mod account {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct WithdrawRequest {
+    pub(crate) struct WithdrawRequest {
         currency: BalanceType,
         amount: u128,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         address: Address,
     }
 
@@ -557,8 +573,8 @@ mod peers {
     use std::time::Duration;
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
-    struct NodePeerInfo {
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         pub announced: Vec<Multiaddr>,
         #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -590,9 +606,9 @@ mod peers {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct PingInfo {
+    pub(crate) struct PingInfo {
         #[serde_as(as = "DurationMilliSeconds<u64>")]
         pub latency: std::time::Duration,
         pub reported_version: String,
@@ -643,14 +659,17 @@ mod channels {
     use utils_types::traits::ToHex;
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodeChannel {
+    pub(crate) struct NodeChannel {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub id: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub peer_address: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub status: ChannelStatus,
         pub balance: String,
     }
@@ -667,29 +686,35 @@ mod channels {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodeTopologyChannel {
+    pub(crate) struct NodeTopologyChannel {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub channel_id: Hash,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub source_address: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub destination_address: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub source_peer_id: PeerId,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub destination_peer_id: PeerId,
         pub balance: String,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub status: ChannelStatus,
         pub ticket_index: u32,
         pub channel_epoch: u32,
         pub closure_time: u64,
     }
 
-    #[derive(Debug, Clone, serde::Serialize)]
-    struct NodeChannels {
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    pub(crate) struct NodeChannels {
         pub incoming: Vec<NodeChannel>,
         pub outgoing: Vec<NodeChannel>,
         pub all: Vec<NodeTopologyChannel>,
@@ -792,18 +817,19 @@ mod channels {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct OpenChannelRequest {
+    pub(crate) struct OpenChannelRequest {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub peer_address: Address,
         pub amount: String,
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct OpenChannelReceipt {
+    pub(crate) struct OpenChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
         #[serde_as(as = "DisplayFromStr")]
@@ -881,9 +907,9 @@ mod channels {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct CloseChannelReceipt {
+    pub(crate) struct CloseChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
         pub receipt: Hash,
         #[serde_as(as = "DisplayFromStr")]
@@ -961,37 +987,39 @@ mod messages {
 
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    struct Tag {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct Tag {
         pub tag: u16,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    struct Size {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct Size {
         pub size: usize,
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct SendMessageReq {
+    pub(crate) struct SendMessageReq {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Message to be transmitted over the network
         pub body: String,
         /// The recipient HOPR PeerId
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         pub peer_id: PeerId,
         #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
         // #[validate(length(min=0, max=3))]        // NOTE: issue in serde_as with validator -> no order is correct
+        #[schema(value_type = Option<Vec<String>>)]
         pub path: Option<Vec<PeerId>>,
         #[validate(range(min = 1, max = 3))]
         pub hops: Option<u16>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct SendMessageRes {
+    pub(crate) struct SendMessageRes {
         pub challenge: HalfKeyChallenge,
     }
 
@@ -1077,9 +1105,9 @@ mod messages {
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct MessagePopRes {
+    pub(crate) struct MessagePopRes {
         tag: u16,
         body: String,
         received_at: u128,
@@ -1226,10 +1254,36 @@ mod tickets {
     use core_types::channels::Ticket;
     use utils_types::traits::ToHex;
 
-    #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct ChannelTicket {
+    pub(crate) struct TicketPriceResponse {
+        pub price: String,
+    }
+
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{}/tickets/price", BASE_PATH),
+        responses(
+            (status = 200, description = "Current ticket price", body = TicketPriceResponse),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        tag = "Tickets"
+    )]
+    pub(super) async fn price(req: Request<InternalState>) -> tide::Result<Response> {
+        let hopr = req.state().hopr.clone();
+
+        match hopr.get_ticket_price().await {
+            Ok(Some(price)) => Ok(Response::builder(204).body(json!(TicketPriceResponse{price: price.to_string()})).build()),
+            Ok(None) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure("The ticket price is not available".into())).build()),
+            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
         pub channel_id: Hash,
         pub amount: String,
@@ -1304,9 +1358,9 @@ mod tickets {
         }
     }
 
-    #[derive(Debug, Clone, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodeTicketStatistics {
+    pub(crate) struct NodeTicketStatistics {
         pub win_proportion: f64,
         pub unredeemed: u64,
         pub unredeemed_value: String,
@@ -1450,28 +1504,31 @@ mod node {
         Ok(Response::builder(200).body(json!({"version": version})).build())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodePeersReqQuery {
+    pub(crate) struct NodePeersReqQuery {
         quality: Option<f64>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct HeartbeatInfo {
+    pub(crate) struct HeartbeatInfo {
         sent: u64,
         success: u64,
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct PeerInfo {
+    pub(crate) struct PeerInfo {
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         peer_id: PeerId,
         #[serde_as(as = "Option<DisplayFromStr>")]
+        #[schema(value_type = Option<String>)]
         peer_address: Option<Address>,
         #[serde_as(as = "Option<DisplayFromStr>")]
+        #[schema(value_type = Option<String>)]
         multiaddr: Option<Multiaddr>,
         heartbeats: HeartbeatInfo,
         last_seen: u128,
@@ -1482,9 +1539,9 @@ mod node {
         reported_version: String,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodePeersRes {
+    pub(crate) struct NodePeersRes {
         connected: Vec<PeerInfo>,
         announced: Vec<PeerInfo>,
     }
@@ -1614,9 +1671,9 @@ mod node {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct NodeInfoRes {
+    pub(crate) struct NodeInfoRes {
         network: String,
         #[serde_as(as = "Vec<DisplayFromStr>")]
         announced_address: Vec<Multiaddr>,
@@ -1624,16 +1681,22 @@ mod node {
         listening_address: Vec<Multiaddr>,
         chain: String,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_token: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_channels: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_network_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_node_sage_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_management_module: Address,
         #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         hopr_node_safe: Address,
         is_eligible: bool,
         #[serde_as(as = "DisplayFromStr")]
@@ -1684,9 +1747,9 @@ mod node {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    struct EntryNode {
+    pub(crate) struct EntryNode {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         pub multiaddrs: Vec<Multiaddr>,
         pub is_elligible: bool,
@@ -1732,11 +1795,12 @@ mod checks {
     /// Check whether the node is started.
     #[utoipa::path(
         get,
-        path = "startedz",
+        path = "/startedz",
         responses(
             (status = 200, description = "The node is stared and running"),
             (status = 412, description = "The node is not started and running"),
-        )
+        ),
+        tag = "Checks"
     )]
     pub(super) async fn startedz(req: Request<State<'_>>) -> tide::Result<Response> {
         is_running(req).await
@@ -1745,11 +1809,12 @@ mod checks {
     /// Check whether the node is ready to accept connections.
     #[utoipa::path(
         get,
-        path = "readyz",
+        path = "/readyz",
         responses(
             (status = 200, description = "The node is ready to accept connections"),
             (status = 412, description = "The node is not ready to accept connections"),
-        )
+        ),
+        tag = "Checks"
     )]
     pub(super) async fn readyz(req: Request<State<'_>>) -> tide::Result<Response> {
         is_running(req).await
@@ -1758,11 +1823,12 @@ mod checks {
     /// Check whether the node is healthy
     #[utoipa::path(
         get,
-        path = "healthyz",
+        path = "/healthyz",
         responses(
             (status = 200, description = "The node is healthy"),
             (status = 412, description = "The node is not healthy"),
-        )
+        ),
+        tag = "Checks"
     )]
     pub(super) async fn healthyz(req: Request<State<'_>>) -> tide::Result<Response> {
         is_running(req).await
