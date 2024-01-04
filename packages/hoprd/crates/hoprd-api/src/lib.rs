@@ -293,9 +293,6 @@ pub async fn run_hopr_api(
         api.at("/node/entryNodes").get(node::entry_nodes);
         api.at("/node/metrics").get(node::metrics);
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        api.at("/node/metrics").get(node::metrics);
-
         api
     });
 
