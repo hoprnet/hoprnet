@@ -117,8 +117,6 @@ pub async fn p2p_loop(
         }
     }
 
-    assert!(swarm.listeners().count() > 0, "Failed to listen on any multiaddress");
-
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
 
