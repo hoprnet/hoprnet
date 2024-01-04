@@ -4,7 +4,7 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use futures::Stream;
-use hopr_lib::TransportOutput;
+use hopr_lib::{ApplicationData, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
@@ -107,8 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             #### NODE RECEIVED MESSAGE [{}] ####
                             Message: {}
                             App tag: {}
-                            Latency: {}ms
-                            "#,
+                            Latency: {}ms"#,
                                 DateTime::<Utc>::from(recv_at).to_rfc3339(),
                                 String::from_utf8_lossy(&msg),
                                 data.application_tag.unwrap_or(0),
@@ -117,11 +116,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_MESSAGE_LATENCY.observe(latency.as_millis() as f64);
+
+                            inbox_clone.write().await.push(ApplicationData {
+                                application_tag: data.application_tag,
+                                plain_text: msg
+                            }).await;
                         }
                         Err(_) => error!("RLP decoding failed"),
                     }
-
-                    inbox_clone.write().await.push(data).await;
                 }
                 TransportOutput::Sent(_ack_challenge) => {
                     // TODO: needed by the websockets
