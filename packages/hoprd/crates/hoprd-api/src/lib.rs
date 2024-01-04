@@ -1136,9 +1136,11 @@ mod messages {
 
     use super::*;
 
-    #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+    #[into_params(parameter_in = Query)]
     pub(crate) struct TagQuery {
-        pub tag: u16,
+        #[schema(required = false)]
+        pub tag: Option<u16>,
     }
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -1254,7 +1256,7 @@ mod messages {
         let tag: TagQuery = req.query()?;
         let inbox = req.state().inbox.clone();
 
-        inbox.write().await.pop_all(Some(tag.tag)).await;
+        inbox.write().await.pop_all(tag.tag).await;
         Ok(Response::builder(204).build())
     }
 
@@ -1276,12 +1278,12 @@ mod messages {
         let query: TagQuery = req.query()?;
         let inbox = req.state().inbox.clone();
 
-        let size = inbox.read().await.size(Some(query.tag)).await;
+        let size = inbox.read().await.size(query.tag).await;
 
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MessagePopRes {
         tag: u16,
@@ -1331,9 +1333,12 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
+        if let Some((data, ts)) = inbox.pop(tag.tag).await {
             match to_api_message(data, ts) {
-                Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
+                Ok(message) => { 
+                    utils_log::debug!("popped: {:?}", message);
+                    Ok(Response::builder(204).body(json!(message)).build())
+                },
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
         } else {
@@ -1369,7 +1374,7 @@ mod messages {
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .pop_all(Some(tag.tag))
+            .pop_all(tag.tag)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
@@ -1405,7 +1410,7 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        if let Some((data, ts)) = inbox.pop(Some(tag.tag)).await {
+        if let Some((data, ts)) = inbox.peek(tag.tag).await {
             match to_api_message(data, ts) {
                 Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
@@ -1443,7 +1448,7 @@ mod messages {
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(Some(tag.tag))
+            .peek_all(tag.tag)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
