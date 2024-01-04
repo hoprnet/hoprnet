@@ -295,7 +295,7 @@ pub async fn run_hopr_api(
 
         #[cfg(all(feature = "prometheus", not(test)))]
         api.at("/node/metrics").get(node::metrics);
-        
+
         api
     });
 
@@ -849,7 +849,7 @@ mod channels {
         #[schema(required = false)]
         including_closed: bool,
         #[schema(required = false)]
-        full_topology: bool
+        full_topology: bool,
     }
 
     #[utoipa::path(
@@ -1088,11 +1088,10 @@ mod channels {
         }
     }
 
-    
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct FundRequest {
-        amount: String
+        amount: String,
     }
 
     #[utoipa::path(
