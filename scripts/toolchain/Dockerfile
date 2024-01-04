@@ -30,10 +30,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
-# Gets yarn executable
-COPY .yarn .yarn/
-
-COPY Makefile package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock Cargo.toml ./
+COPY Makefile rust-toolchain.toml Cargo.toml ./
 
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 

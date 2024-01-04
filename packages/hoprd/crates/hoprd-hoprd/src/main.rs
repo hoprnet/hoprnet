@@ -117,10 +117,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_MESSAGE_LATENCY.observe(latency.as_millis() as f64);
 
-                            inbox_clone.write().await.push(ApplicationData {
-                                application_tag: data.application_tag,
-                                plain_text: msg
-                            }).await;
+                            inbox_clone
+                                .write()
+                                .await
+                                .push(ApplicationData {
+                                    application_tag: data.application_tag,
+                                    plain_text: msg,
+                                })
+                                .await;
                         }
                         Err(_) => error!("RLP decoding failed"),
                     }
