@@ -4,6 +4,7 @@ use std::error::Error;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use base64::{engine::general_purpose, Engine};
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
@@ -93,7 +94,7 @@ pub struct InternalState {
 pub struct ApiDoc;
 
 /// Token-based authentication middleware
-struct TokenBasedAuthenticationMiddleware {}
+struct TokenBasedAuthenticationMiddleware;
 
 /// Implementation of the middleware
 #[async_trait]
@@ -104,9 +105,12 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
         match auth.as_ref() {
             config::Auth::None => {}
             config::Auth::Token(token) => {
+                // TODO: consider changing this to Bearer, this is misusing the spec which should be "user:password" for Basic
+                let expected_header = format!("Basic {}", general_purpose::STANDARD.encode(token));
+
                 let is_authorized = request
                     .header(AUTHORIZATION)
-                    .map(|auth| token.as_str() == auth.as_str())
+                    .map(|actual_header| expected_header.as_str() == actual_header.as_str())
                     .unwrap_or(false);
 
                 if !is_authorized {
