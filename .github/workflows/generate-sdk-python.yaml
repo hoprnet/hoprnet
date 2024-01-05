@@ -90,9 +90,10 @@ jobs:
         run: |
           nix develop -c make build-docs-api
 
-      - name: Generate Python SDK
+      - name: Generate SDK Python
         run: |
           curl -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config.json --output hoprd-sdk-python.zip
+          sleep 999999999
           unzip ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
@@ -101,7 +102,7 @@ jobs:
         with:
             token: ${{ secrets.GH_RUNNER_TOKEN }}
             path: ./hoprd-sdk-python
-            commit-message: "Update Python SDK to version ${{ steps.setup.outputs.current_version }}"
+            commit-message: "Update SDK Python to version ${{ steps.setup.outputs.current_version }}"
             title: "Bump SDK to ${{ steps.setup.outputs.current_version }}"
             body-path: .github/files/pr-python-sdk.md
             branch: bot/bump-${{ steps.setup.outputs.current_version }}
