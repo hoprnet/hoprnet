@@ -5,6 +5,8 @@
 **/.idea
 **/gha-creds-*.json
 
+openapi.spec.json
+
 # Exclude databases resulting from local execution of hoprd
 /*.swp
 

@@ -4,27 +4,12 @@
 space := $(subst ,, )
 mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
-# Gets all packages that include a Rust crates
-# Disable automatic compilation of SC bindings. Can still be done manually.
-WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
-
-# Gets all individual crates such that they can get built
-CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
-
-# base names of all crates
-CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
-
-# No need to lint Foundry-generated Rust bindings
-LINTABLE_CRATES_NAMES := $(filter-out bindings,$(CRATES_NAMES))
 
 # Gets all solidity files which can be modified
 SOLIDITY_SRC_FILES := $(shell find ./packages/ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
 SOLIDITY_TEST_FILES := $(shell find ./packages/ethereum/contracts/test -type f -name "*.sol")
 SOLIDITY_SCRIPT_FILES := $(shell find ./packages/ethereum/contracts/script -type f -name "*.sol")
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
-
-# define specific crate for hopli which is a native helper
-HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
 # note: $(mydir) ends with '/'
@@ -63,16 +48,6 @@ init: ## initialize repository (idempotent operation)
 	for gh in `find .githooks/ -type f`; do \
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
-
-.PHONY: $(HOPLI_CRATE)
-$(HOPLI_CRATE): ## builds hopli Rust crates with cargo
-	echo "use cargo build"
-# install the package
-	cargo install --path $@ --force
-
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES)
-$(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
-	$(MAKE) -C $@ install
 
 .PHONY: deps-ci
 deps-ci: ## Installs dependencies when running in CI
@@ -142,10 +117,6 @@ cargo-download: ## download vendored Cargo dependencies
 	$(cargo) vendor --versioned-dirs vendor/cargo
 	$(cargo) fetch
 
-.PHONY: build
-build: ## build all packages
-build: build-cargo
-
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
@@ -155,11 +126,9 @@ build-solidity-types: ## generate Solidity typings
 	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
 		echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 
-.PHONY: build-cargo
-build-cargo: ## build cargo packages and create boilerplate JS code
-build-cargo: build-solidity-types
-# build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
-# Skip building Rust crates
+.PHONY: build
+build: ## build all packages
+build: build-solidity-types
 	$(cargo) build
 
 .PHONY: build-yellowpaper
@@ -168,7 +137,7 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs
-build-docs: build-docs-api
+	echo "Deprecated"
 
 .PHONY: clean
 clean: # Cleanup build directories
@@ -511,14 +480,18 @@ endif
 	bash "${script}"
 
 .PHONY: generate-python-sdk
-generate-python-sdk: ## generate Python SDK via Swagger Codegen
-generate-python-sdk: build-docs-api			# not using the official swagger-codegen-cli as it does not offer a multiplatform image
+generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
+generate-python-sdk:
+	$(cargo) build -p hoprd-api
+
+	target/debug/hoprd-api-schema >| openapi.spec.json
+
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
-		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
+		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
 		-c /local/scripts/python-sdk-config.json
-	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
+	#patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help
 help:
