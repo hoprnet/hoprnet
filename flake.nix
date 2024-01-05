@@ -6,7 +6,8 @@
   # using bugfix for macos libcurl:
   # https://github.com/oxalica/rust-overlay/pull/149
   inputs.rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
-  inputs.crane.url = github:ipetkov/crane;
+  #inputs.crane.url = github:ipetkov/crane;
+  inputs.crane.url = "git+file:///Users/tbr/work/hopr/crane";
 
   inputs.rust-overlay.inputs = {
     nixpkgs.follows = "nixpkgs";
@@ -35,8 +36,8 @@
             openssl
           ];
           crateNameFromCargoToml = craneLib.crateNameFromCargoToml {
-              cargoToml = ./packages/hoprd/crates/hoprd-hoprd/Cargo.toml;
-            };
+            cargoToml = ./packages/hoprd/crates/hoprd-hoprd/Cargo.toml;
+          };
           commonArgs = {
             inherit (crateNameFromCargoToml) pname version;
             inherit src buildInputs nativeBuildInputs;
