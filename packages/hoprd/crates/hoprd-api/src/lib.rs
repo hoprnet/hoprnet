@@ -625,6 +625,8 @@ mod account {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct WithdrawRequest {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
         currency: BalanceType,
         amount: u128,
         #[serde_as(as = "DisplayFromStr")]
@@ -1152,6 +1154,9 @@ mod channels {
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "amount": 1000
+    }))]
     pub(crate) struct FundRequest {
         pub amount: String,
     }
