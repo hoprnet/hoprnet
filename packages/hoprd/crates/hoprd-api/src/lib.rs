@@ -618,6 +618,11 @@ mod account {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+      "amount": 20000,
+      "currency": "HOPR"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct WithdrawRequest {
         currency: BalanceType,
@@ -743,7 +748,7 @@ mod peers {
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
         responses(
-            (status = 200, description = "Ping successful", body = NodePeerInfo),
+            (status = 200, description = "Ping successful", body = PingInfo),
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
