@@ -23,8 +23,8 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.base_branch }}
+        # with:
+        #   ref: ${{ inputs.base_branch }}
 
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
