@@ -15,7 +15,8 @@ COPY packages packages/
 COPY misc misc/
 COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
 
-RUN cargo build --release \
+RUN make build-solidity-types \
+    && cargo build --release \
     && cargo install --root ./artifacts --path packages/hoprd/crates/hoprd-hoprd/
 
 # Debian 11.7
