@@ -1657,7 +1657,7 @@ mod tickets {
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
         responses(
-            (status = 200, description = "Tickets redeemed successfully."),
+            (status = 204, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
