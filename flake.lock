@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "crane": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1704463269,
+        "narHash": "sha256-C0WCgJytEHDa0WPbJ2joUo9hEQlzsWAVXBZ6fRd/hDI=",
+        "ref": "refs/heads/master",
+        "rev": "67851d60508af238f68ace71bb42cb1fa54da37f",
+        "revCount": 483,
+        "type": "git",
+        "url": "file:///Users/tbr/work/hopr/crane"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///Users/tbr/work/hopr/crane"
+      }
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -72,6 +92,7 @@
     },
     "root": {
       "inputs": {
+        "crane": "crane",
         "flake-parts": "flake-parts",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"
@@ -95,6 +116,7 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "rev": "647bff9f5e10d7f1756d86eee09831e6b1b06430",
         "type": "github"
       }
     },
