@@ -83,6 +83,11 @@ ENV DEBUG 'hopr*'
 # so it won't reach the maximum memory given by Docker.
 # Can be configured differently by the user if needed.
 ENV NODE_OPTIONS="--max_old_space_size=1542 --experimental-wasm-modules"
+# Increase thread pool size from 4 to 16, to prevent synchronous operations from
+# blocking the event loop. This could be higher but each thread has a static
+# memory overhead, so keeping this lower is beneficial in terms of minimal
+# memory footprint.
+ENV UV_THREADPOOL_SIZE 16
 
 # Admin web server
 EXPOSE 3000
