@@ -256,7 +256,7 @@ jobs:
   #   secrets: inherit
 
   generate_sdk_python:
-    name: Python SDK
+    name: SDK Python
     # if: contains(github.event.pull_request.labels.*.name, 'release')
     # needs:
     #   - create_release
