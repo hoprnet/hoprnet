@@ -241,7 +241,9 @@ pub async fn run_hopr_api(
 
         api.with(TokenBasedAuthenticationMiddleware {});
 
-        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
+        api.at("/aliases").get(alias::aliases)
+            .post(alias::set_alias);
+
         api.at("/aliases/:alias")
             .get(alias::get_alias)
             .delete(alias::delete_alias);
@@ -365,6 +367,9 @@ mod alias {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct PeerIdArg {
         #[serde_as(as = "DisplayFromStr")]
@@ -391,7 +396,10 @@ mod alias {
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
         responses(
-            (status = 200, description = "Each alias with its corresponding PeerId", body = HashMap<String, String>),
+            (status = 200, description = "Each alias with its corresponding PeerId", body = HashMap<String, String>, example = json!({
+                    "alice": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+                    "me": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS"
+            })),
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
@@ -484,7 +492,7 @@ mod alias {
         responses(
             (status = 204, description = "Alias removed successfully"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)   // TOOD: This can never happen
+            (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
         ),
         security(
             ("api_token" = [])
@@ -505,6 +513,10 @@ mod account {
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct AccountAddresses {
         pub native: String,
@@ -537,6 +549,13 @@ mod account {
     }
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "hopr": "2000000000000000000000 HOPR",
+        "native": "9999563581204904000 Native",
+        "safeHopr": "2000000000000000000000 HOPR",
+        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935 HOPR",
+        "safeNative": "10000000000000000000 Native"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct AccountBalances {
         pub safe_native: String,
@@ -657,6 +676,14 @@ mod peers {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+          "announced": [
+            "/ip4/10.0.2.100/tcp/19093"
+          ],
+          "observed": [
+            "/ip4/10.0.2.100/tcp/19093"
+          ]
+    }))]
     pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
@@ -698,6 +725,10 @@ mod peers {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "latency": 200,
+        "reportedVersion": "2.1.0"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct PingInfo {
         #[serde_as(as = "DurationMilliSeconds<u64>")]
@@ -708,7 +739,7 @@ mod peers {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
+        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}/ping"),
         params(
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
@@ -784,6 +815,18 @@ mod channels {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+      "balance": "10000000000000000000",
+      "channelEpoch": 1,
+      "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+      "closureTime": 0,
+      "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+      "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+      "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+      "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+      "status": "Open",
+      "ticketIndex": 0
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTopologyChannel {
         #[serde_as(as = "DisplayFromStr")]
@@ -811,6 +854,18 @@ mod channels {
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+          "all": [],
+          "incoming": [],
+          "outgoing": [
+            {
+              "balance": "10000000000000000010",
+              "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+              "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+              "status": "Open"
+            }
+          ]
+    }))]
     pub(crate) struct NodeChannels {
         pub incoming: Vec<NodeChannel>,
         pub outgoing: Vec<NodeChannel>,
@@ -938,6 +993,10 @@ mod channels {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+        "transactionReceipt": "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
@@ -1033,6 +1092,10 @@ mod channels {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+      "channelStatus": "PendingToClose",
+      "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelReceipt {
         #[serde_as(as = "DisplayFromStr")]
@@ -1181,6 +1244,9 @@ mod messages {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+         "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct SendMessageRes {
         #[serde_as(as = "DisplayFromStr")]
@@ -1286,6 +1352,11 @@ mod messages {
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+          "body": "Test message 1",
+          "receivedAt": 1704453953073i64,
+          "tag": 20
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MessagePopRes {
         tag: u16,
@@ -1514,6 +1585,15 @@ mod tickets {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "amount": "100",
+        "channelEpoch": 1,
+        "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+        "index": 0,
+        "indexOffset": 1,
+        "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
+        "winProb": "1"
+      }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
@@ -1601,6 +1681,18 @@ mod tickets {
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+      "losingTickets": 0,
+      "neglected": 0,
+      "neglectedValue": "0",
+      "redeemed": 1,
+      "redeemedValue": "100",
+      "rejected": 0,
+      "rejectedValue": "0",
+      "unredeemed": 2,
+      "unredeemedValue": "200",
+      "winProportion": 1
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTicketStatistics {
         pub win_proportion: f64,
@@ -1750,6 +1842,9 @@ mod node {
     use {std::str::FromStr, tide::Body};
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+        "version": "2.1.0"
+    }))]
     pub(crate) struct NodeVersion {
         pub version: String
     }
@@ -1777,14 +1872,14 @@ mod node {
     #[into_params(parameter_in = Query)]
     pub(crate) struct NodePeersReqQuery {
         #[schema(required = false)]
-        quality: Option<f64>,
+        pub quality: Option<f64>,
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct HeartbeatInfo {
-        sent: u64,
-        success: u64,
+        pub sent: u64,
+        pub success: u64,
     }
 
     #[serde_as]
@@ -1793,27 +1888,27 @@ mod node {
     pub(crate) struct PeerInfo {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        peer_id: PeerId,
+        pub peer_id: PeerId,
         #[serde_as(as = "Option<DisplayFromStr>")]
         #[schema(value_type = Option<String>)]
-        peer_address: Option<Address>,
+        pub peer_address: Option<Address>,
         #[serde_as(as = "Option<DisplayFromStr>")]
         #[schema(value_type = Option<String>)]
-        multiaddr: Option<Multiaddr>,
-        heartbeats: HeartbeatInfo,
-        last_seen: u128,
-        last_seen_latency: u128,
-        quality: f64,
-        backoff: f64,
-        is_new: bool,
-        reported_version: String,
+        pub multiaddr: Option<Multiaddr>,
+        pub heartbeats: HeartbeatInfo,
+        pub last_seen: u128,
+        pub last_seen_latency: u128,
+        pub quality: f64,
+        pub backoff: f64,
+        pub is_new: bool,
+        pub reported_version: String,
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersRes {
-        connected: Vec<PeerInfo>,
-        announced: Vec<PeerInfo>,
+        pub connected: Vec<PeerInfo>,
+        pub announced: Vec<PeerInfo>,
     }
 
     /// Lists information for `connected peers` and `announced peers`.
@@ -1901,7 +1996,7 @@ mod node {
 
         let body = NodePeersRes {
             connected: all_network_peers.clone(),
-            announced: all_network_peers,
+            announced: all_network_peers, // TODO: currently these are the same, since everybody has to announce
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
@@ -2036,7 +2131,12 @@ mod node {
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/entryNodes"),
         responses(
-            (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
+            (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>, example = json!({
+                "0x188c4462b75e46f0c7262d7f48d182447b93a93c": {
+                    "isElligible": true,
+                    "multiaddrs": ["/ip4/10.0.2.100/tcp/19091"]
+                }
+            })),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
