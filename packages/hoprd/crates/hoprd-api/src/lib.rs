@@ -263,7 +263,8 @@ pub async fn run_hopr_api(
             .get(channels::show_channel)
             .delete(channels::close_channel);
 
-        api.at("/channels/:channelId/fund").post(channels::fund_channel);
+        api.at("/channels/:channelId/fund")
+            .post(channels::fund_channel);
 
         api.at("/channels/:channelId/tickets")
             .get(tickets::show_channel_tickets);
@@ -852,7 +853,7 @@ mod channels {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/channels", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
         params(ChannelsQuery),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannels),
@@ -952,7 +953,7 @@ mod channels {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channels", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
         request_body(
             content = OpenChannelRequest,
             description = "Open channel request specification",
@@ -1007,7 +1008,7 @@ mod channels {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 201, description = "Channel fetched successfully", body = NodeTopologyChannel),
+            (status = 200, description = "Channel fetched successfully", body = NodeTopologyChannel),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -1047,7 +1048,7 @@ mod channels {
 
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{}/channels/{{channelId}}", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -1087,14 +1088,13 @@ mod channels {
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
-    #[serde(rename_all = "camelCase")]
     pub(crate) struct FundRequest {
         amount: String,
     }
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channels/{{channelId}}/fund", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
