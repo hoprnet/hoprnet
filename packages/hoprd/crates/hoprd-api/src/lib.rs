@@ -302,19 +302,19 @@ pub async fn run_hopr_api(
     app.listen(host).await.expect("the server should run successfully")
 }
 
-/// Should not be instantiated directly, but rather through the `ApiErrorStatus`.
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "status": "INVALID_INPUT",
     "error": "Invalid value passed in parameter 'XYZ'"
 }))]
-struct ApiError {
+pub(crate) struct ApiError {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
 /// Enumerates all API request errors
+/// Note that `ApiError` should not be instantiated directly, but always rather through the `ApiErrorStatus`.
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
@@ -1155,7 +1155,7 @@ mod channels {
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "amount": 1000
+        "amount": "1000"
     }))]
     pub(crate) struct FundRequest {
         pub amount: String,
@@ -2045,6 +2045,25 @@ mod node {
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(example = json!({
+      "announcedAddress": [
+        "/ip4/10.0.2.100/tcp/19092"
+      ],
+      "chain": "anvil-localhost",
+      "channelClosurePeriod": 15,
+      "connectivityStatus": "Green",
+      "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+      "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+      "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+      "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
+      "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+      "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+      "isEligible": true,
+      "listeningAddress": [
+        "/ip4/10.0.2.100/tcp/19092"
+      ],
+      "network": "anvil-localhost"
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoRes {
         network: String,
