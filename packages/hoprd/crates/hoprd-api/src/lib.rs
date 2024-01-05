@@ -1322,7 +1322,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 204, description = "Message successfully extracted.", body = MessagePopRes),
+            (status = 200, description = "Message successfully extracted.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1339,9 +1339,8 @@ mod messages {
         let inbox = inbox.write().await;
         if let Some((data, ts)) = inbox.pop(tag.tag).await {
             match to_api_message(data, ts) {
-                Ok(message) => { 
-                    utils_log::debug!("popped: {:?}", message);
-                    Ok(Response::builder(204).body(json!(message)).build())
+                Ok(message) => {
+                    Ok(Response::builder(200).body(json!(message)).build())
                 },
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
@@ -1399,7 +1398,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 204, description = "Message successfully peeked at.", body = MessagePopRes),
+            (status = 200, description = "Message successfully peeked at.", body = MessagePopRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1416,7 +1415,7 @@ mod messages {
         let inbox = inbox.write().await;
         if let Some((data, ts)) = inbox.peek(tag.tag).await {
             match to_api_message(data, ts) {
-                Ok(message) => Ok(Response::builder(204).body(json!(message)).build()),
+                Ok(message) => Ok(Response::builder(200).body(json!(message)).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
         } else {
