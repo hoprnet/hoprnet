@@ -38,7 +38,7 @@ impl TokenAuthenticator {
     pub fn authenticate_request(&self, authorization_header_value: Option<&str>) -> bool {
         if let Some(expected_token) = &self.0 {
             if let Some((auth_type, token)) = authorization_header_value.and_then(|h| h.split_once(' ')) {
-                // TODO: Remove Basic and only keep "Bearer" once clients migrate
+                // TODO: Remove "Basic" and only keep "Bearer" once clients migrate
                 (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token
             } else {
                 false
@@ -122,6 +122,7 @@ pub struct InternalState {
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
+            messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes
@@ -1349,6 +1350,11 @@ mod messages {
         }
     }
 
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    pub(crate) struct InboxMessagesRes {
+        pub messages: Vec<MessagePopRes>
+    }
+
     /// Get the list of messages currently present in the nodes message inbox.
     ///
     /// The messages are removed from the inbox.
@@ -1361,7 +1367,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All message successfully extracted.", body = [MessagePopRes]),
+            (status = 200, description = "All message successfully extracted.", body = InboxMessagesRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1383,7 +1389,7 @@ mod messages {
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
-        Ok(Response::builder(200).body(json!(messages)).build())
+        Ok(Response::builder(200).body(json!(InboxMessagesRes { messages })).build())
     }
 
     /// Peek the oldest message currently present in the nodes message inbox.
@@ -1435,7 +1441,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All messages successfully peeked at.", body = [MessagePopRes]),
+            (status = 200, description = "All messages successfully peeked at.", body = InboxMessagesRes),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1457,7 +1463,7 @@ mod messages {
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
-        Ok(Response::builder(200).body(json!(messages)).build())
+        Ok(Response::builder(200).body(json!(InboxMessagesRes { messages })).build())
     }
 }
 
