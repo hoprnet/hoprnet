@@ -1,6 +1,14 @@
 {
-  "packageName": "hoprd_sdk",
-  "projectName": "hoprd-sdk",
-  "packageVersion": "2.0.0-rc.1",
-  "packageUrl": "https://github.com/hoprnet/hoprd-sdk-python"
+  "specURL": "https://raw.githubusercontent.com/hoprnet/hoprnet/master/packages/hoprd/rest-api-v3-spec.yaml",
+  "lang": "python",
+  "type": "CLIENT",
+  "options": {
+    "additionalProperties": {
+      "packageName": "hoprd_sdk",
+      "projectName": "hoprd-sdk",
+      "packageVersion": "latest",
+      "packageUrl": "https://github.com/hoprnet/hoprd-sdk-python"
+    }
+  },
+  "codegenVersion": "V3"
 }
