@@ -263,8 +263,7 @@ pub async fn run_hopr_api(
             .get(channels::show_channel)
             .delete(channels::close_channel);
 
-        api.at("/channels/:channelId/fund")
-            .post(channels::fund_channel);
+        api.at("/channels/:channelId/fund").post(channels::fund_channel);
 
         api.at("/channels/:channelId/tickets")
             .get(tickets::show_channel_tickets);
@@ -1751,7 +1750,7 @@ mod node {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     pub(crate) struct NodeVersion {
-        pub version: String
+        pub version: String,
     }
 
     /// Get release version of the running node.
@@ -1770,7 +1769,7 @@ mod node {
     pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
         let version = req.state().hopr.version();
 
-        Ok(Response::builder(200).body(json!(NodeVersion{ version })).build())
+        Ok(Response::builder(200).body(json!(NodeVersion { version })).build())
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
