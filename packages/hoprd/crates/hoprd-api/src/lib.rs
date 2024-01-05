@@ -125,7 +125,7 @@ pub struct InternalState {
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes
+            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersion
         )
     ),
     modifiers(&SecurityAddon),
@@ -373,7 +373,7 @@ mod alias {
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+    #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "alias": "Alice",
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
@@ -389,9 +389,9 @@ mod alias {
     /// Get each previously set alias and its corresponding PeerId
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/aliases", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/aliases"),
         responses(
-            (status = 200, description = "Each alias with its corresponding PeerId", body = [AliasPeerId]),
+            (status = 200, description = "Each alias with its corresponding PeerId", body = HashMap<String, String>),
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
@@ -406,11 +406,8 @@ mod alias {
             .read()
             .await
             .iter()
-            .map(|(key, value)| AliasPeerId {
-                alias: key.clone(),
-                peer_id: value.clone(),
-            })
-            .collect::<Vec<_>>();
+            .map(|(key, value)| (key.clone(), value.to_string()))
+            .collect::<HashMap<String, String>>();
 
         Ok(Response::builder(200).body(json!(aliases)).build())
     }
@@ -418,7 +415,7 @@ mod alias {
     /// Set alias for a peer with a specific PeerId.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/aliases", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/aliases"),
         request_body(
             content = AliasPeerId,
             description = "Alias name along with the PeerId to be aliased",
@@ -447,12 +444,12 @@ mod alias {
     /// Get alias for the PeerId (Hopr address) that have this alias assigned to it.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/aliases/{{alias}}", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
         params(
             ("alias" = String, Path, description = "Alias to be shown"),
         ),
         responses(
-            (status = 200, description = "Get PeerId for an alias", body = int),
+            (status = 200, description = "Get PeerId for an alias", body = PeerIdArg),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
@@ -480,12 +477,12 @@ mod alias {
     /// Delete an alias.
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{}/aliases/{{alias}}", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
         params(
             ("alias" = String, Path, description = "Alias to be shown"),
         ),
         responses(
-            (status = 204, description = "Alias removed successfully", body = int),
+            (status = 204, description = "Alias removed successfully"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)   // TOOD: This can never happen
         ),
@@ -519,7 +516,7 @@ mod account {
     /// HOPR address is represented by the P2P PeerId and can be used by other node owner to interact with this node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/account/addresses", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
         responses(
             (status = 200, description = "The node's public addresses", body = AddressesAddress),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -557,7 +554,7 @@ mod account {
     /// NATIVE balance of the Node is used to pay for the gas fees for the blockchain.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/account/balances", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/account/balances"),
         responses(
             (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -617,7 +614,7 @@ mod account {
     /// Both NATIVE or HOPR can be withdrawn using this method.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/account/withdraw", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
         request_body(
             content = WithdrawRequest,
             content_type = "application/json"),
@@ -671,7 +668,7 @@ mod peers {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
         params(
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
@@ -711,7 +708,7 @@ mod peers {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/peers/{{peerId}}", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
         params(
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
@@ -846,9 +843,9 @@ mod channels {
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQuery {
         #[schema(required = false)]
-        including_closed: bool,
+        pub including_closed: bool,
         #[schema(required = false)]
-        full_topology: bool,
+        pub full_topology: bool,
     }
 
     #[utoipa::path(
@@ -1089,7 +1086,7 @@ mod channels {
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     pub(crate) struct FundRequest {
-        amount: String,
+        pub amount: String,
     }
 
     #[utoipa::path(
@@ -1115,10 +1112,10 @@ mod channels {
         ),
         tag = "Channels",
     )]
-    pub(super) async fn fund_channel(req: Request<InternalState>) -> tide::Result<Response> {
+    pub(super) async fn fund_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        let fund_req: FundRequest = req.query()?;
 
+        let fund_req: FundRequest = req.body_json().await?;
         let amount = Balance::new_from_str(&fund_req.amount, BalanceType::HOPR);
 
         match Hash::from_hex(req.param("channelId")?) {
@@ -1197,7 +1194,7 @@ mod messages {
     /// number of HOPS, if no path is given.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/messages", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages"),
         request_body(
             content = SendMessageReq,
             description = "Body of a message to send",
@@ -1246,7 +1243,7 @@ mod messages {
     /// Delete messages from nodes message inbox.
     #[utoipa::path(
         delete,
-        path = const_format::formatcp!("{}/messages", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages"),
         params(TagQuery),
         responses(
             (status = 204, description = "Messages successfully deleted."),
@@ -1268,7 +1265,7 @@ mod messages {
     /// Get size of filtered message inbox for a specific tag
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/messages/size", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages/size"),
         params(TagQuery),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = Size),
@@ -1316,7 +1313,7 @@ mod messages {
     /// The message is removed from the inbox.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/messages/pop", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages/pop"),
         request_body(
             content = TagQuery,
             description = "Tag of message queue to pop from",
@@ -1360,7 +1357,7 @@ mod messages {
     /// The messages are removed from the inbox.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/messages/pop-all", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
         request_body(
             content = TagQuery,
             description = "Tag of message queue to pop from",
@@ -1397,7 +1394,7 @@ mod messages {
     /// The message is not removed from the inbox.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/messages/peek", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages/peek"),
         request_body(
             content = TagQuery,
             description = "Tag of message queue to peek from",
@@ -1434,7 +1431,7 @@ mod messages {
     /// The messages are not removed from the inbox.
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/messages/peek-all", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
             content = TagQuery,
             description = "Tag of message queue to peek from",
@@ -1484,7 +1481,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/tickets/price", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/tickets/price"),
         responses(
             (status = 200, description = "Current ticket price", body = TicketPriceResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1544,7 +1541,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -1580,7 +1577,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/tickets", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
             (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1635,7 +1632,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/tickets/statistics", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1656,7 +1653,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/tickets/redeem", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
         responses(
             (status = 200, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1677,12 +1674,12 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets/redeem", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Tickets redeemed successfully."),
+            (status = 204, description = "Tickets redeemed successfully."),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
@@ -1695,6 +1692,7 @@ mod tickets {
     )]
     pub(super) async fn redeem_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
+
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
                 Ok(count) if count > 0 => Ok(Response::builder(204).build()),
@@ -1707,7 +1705,7 @@ mod tickets {
 
     #[utoipa::path(
         post,
-        path = const_format::formatcp!("{}/channels/{{channelId}}/tickets/aggregate", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -1725,6 +1723,7 @@ mod tickets {
     )]
     pub(super) async fn aggregate_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
+
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.aggregate_tickets(&channel_id).await {
                 Ok(_) => Ok(Response::builder(204).build()),
@@ -1748,12 +1747,17 @@ mod node {
 
     use {std::str::FromStr, tide::Body};
 
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    pub(crate) struct NodeVersion {
+        pub version: String
+    }
+
     /// Get release version of the running node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/node/version", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/node/version"),
         responses(
-            (status = 200, description = "Fetched node version"),
+            (status = 200, description = "Fetched node version", body = NodeVersion),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -1764,7 +1768,7 @@ mod node {
     pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
         let version = req.state().hopr.version();
 
-        Ok(Response::builder(200).body(json!({"version": version})).build())
+        Ok(Response::builder(200).body(json!(NodeVersion{ version })).build())
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
@@ -1819,10 +1823,10 @@ mod node {
     /// to the specified value.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/node/peers", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/node/peers"),
         params(NodePeersReqQuery),
         responses(
-            (status = 200, description = "Successfully returned observed peers", body=NodePeersRes),
+            (status = 200, description = "Successfully returned observed peers", body = NodePeersRes),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
@@ -1912,7 +1916,7 @@ mod node {
     /// Retrieve Prometheus metrics from the running node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/node/metrics", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
         responses(
             (status = 200, description = "Fetched node metrics", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1974,9 +1978,9 @@ mod node {
     /// Get information about this HOPR Node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/node/info", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/node/info"),
         responses(
-            (status = 200, description = "Fetched node version"),
+            (status = 200, description = "Fetched node version", body = NodeInfoRes),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -2028,7 +2032,7 @@ mod node {
     /// List all known entry nodes with multiaddrs and eligibility.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{}/node/entryNodes", BASE_PATH),
+        path = const_format::formatcp!("{BASE_PATH}/node/entryNodes"),
         responses(
             (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
