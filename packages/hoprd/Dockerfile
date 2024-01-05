@@ -12,6 +12,7 @@ RUN mv /app/hoprnet-toolchain/.cargo . && \
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/
+COPY misc misc/
 COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
 
 RUN cargo build --release \

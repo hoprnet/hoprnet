@@ -1337,9 +1337,7 @@ mod messages {
         let inbox = inbox.write().await;
         if let Some((data, ts)) = inbox.pop(tag.tag).await {
             match to_api_message(data, ts) {
-                Ok(message) => {
-                    Ok(Response::builder(200).body(json!(message)).build())
-                },
+                Ok(message) => Ok(Response::builder(200).body(json!(message)).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::UnknownFailure(e)).build()),
             }
         } else {
@@ -1349,7 +1347,7 @@ mod messages {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     pub(crate) struct InboxMessagesRes {
-        pub messages: Vec<MessagePopRes>
+        pub messages: Vec<MessagePopRes>,
     }
 
     /// Get the list of messages currently present in the nodes message inbox.
@@ -1386,7 +1384,9 @@ mod messages {
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
-        Ok(Response::builder(200).body(json!(InboxMessagesRes { messages })).build())
+        Ok(Response::builder(200)
+            .body(json!(InboxMessagesRes { messages }))
+            .build())
     }
 
     /// Peek the oldest message currently present in the nodes message inbox.
@@ -1460,7 +1460,9 @@ mod messages {
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
             .collect::<Vec<_>>();
 
-        Ok(Response::builder(200).body(json!(InboxMessagesRes { messages })).build())
+        Ok(Response::builder(200)
+            .body(json!(InboxMessagesRes { messages }))
+            .build())
     }
 }
 
