@@ -92,9 +92,13 @@ jobs:
 
       - name: Generate SDK Python
         run: |
+          echo "Generate code using online service"
           curl -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config.json --output hoprd-sdk-python.zip
-          rm -rf ./hoprd-sdk-python/{*,.swagger-codegen,.swagger-codegen-ignore,.travis.yml}
+          echo "Removing auto-generated files"
+          rm -rf ./hoprd-sdk-python/{*,.swagger-codegen,.swagger-codegen-ignore,.travis.yml,.gitignore}
+          echo "Copy contents of auto generated code into repository"
           unzip -o ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
+          echo "Fix auto generated code"
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
       - name: Create Pull Request
