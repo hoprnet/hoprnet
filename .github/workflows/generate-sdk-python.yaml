@@ -93,7 +93,8 @@ jobs:
       - name: Generate SDK Python
         run: |
           curl -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config.json --output hoprd-sdk-python.zip
-          unzip ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
+          rm -rf ./hoprd-sdk-python/{*,.swagger-codegen,.swagger-codegen-ignore,.travis.yml}
+          unzip -o ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
       - name: Create Pull Request
