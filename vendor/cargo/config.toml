@@ -1,0 +1,12 @@
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor/cargo"
+
+[install]
+root = ".cargo"
+
+# Nightly only
+#[build]
+#rustflags = [ "-Zlocation-detail=none" ]
