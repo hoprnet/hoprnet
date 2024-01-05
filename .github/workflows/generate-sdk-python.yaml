@@ -26,14 +26,6 @@ jobs:
         with:
           ref: ${{ inputs.base_branch }}
 
-      - name: Checkout hoprd-python-sdk repository
-        uses: actions/checkout@v4
-        with:
-          repository: hoprnet/hoprd-sdk-python
-          path: "./hoprd-sdk-python"
-          token: ${{ secrets.GH_RUNNER_TOKEN }}
-          ref: ${{ inputs.base_branch }}
-
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
@@ -76,6 +68,15 @@ jobs:
             target/
             .cargo/.package-cache/
 
+      # Doing the checkout after restoring the cache
+      - name: Checkout hoprd-python-sdk repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprd-sdk-python
+          path: "./hoprd-sdk-python"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          ref: ${{ inputs.base_branch }}
+
       - name: Setup
         id: setup
         run: |
@@ -92,7 +93,6 @@ jobs:
       - name: Generate Python SDK
         run: |
           curl -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config.json --output hoprd-sdk-python.zip
-          sleep 10000000
           unzip ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
