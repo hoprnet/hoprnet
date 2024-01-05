@@ -92,6 +92,7 @@ jobs:
       - name: Generate Python SDK
         run: |
           curl -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config.json --output hoprd-sdk-python.zip
+          sleep 10000000
           unzip ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
