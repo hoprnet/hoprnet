@@ -2,13 +2,14 @@ pub mod config;
 
 use std::error::Error;
 use std::{collections::HashMap, sync::Arc};
+use std::str::FromStr;
 
 use async_std::sync::RwLock;
 use base64::{engine::general_purpose, Engine};
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
-use tide::http::headers::AUTHORIZATION;
+use tide::http::headers::{AUTHORIZATION, HeaderName, HeaderValues};
 use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
@@ -32,17 +33,29 @@ pub struct State<'a> {
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
-pub struct TokenAuthenticator(Option<String>);
+struct Tokens {
+    raw: String,
+    basic_encoded: String,
+    bearer_encoded: String
+}
+
+pub struct TokenAuthenticator(Option<Tokens>);
 
 impl TokenAuthenticator {
-    pub fn authenticate_request(&self, authorization_header_value: Option<&str>) -> bool {
+    pub fn authenticate_request<'a, H: Iterator<Item = (&'a HeaderName, &'a HeaderValues)>>(&self, request_headers: H) -> bool {
+        const AUTH_HEADER: HeaderName = AUTHORIZATION;
+        let token_header = HeaderName::from_str("x-auth-token").unwrap();
+
         if let Some(expected_token) = &self.0 {
-            if let Some((auth_type, token)) = authorization_header_value.and_then(|h| h.split_once(' ')) {
-                // TODO: Remove "Basic" and only keep "Bearer" once clients migrate
-                (auth_type == "Bearer" || auth_type == "Basic") && token == expected_token
-            } else {
-                false
-            }
+            let auth_headers = request_headers
+                .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || token_header.eq(n)).then_some((n, v.as_str())))
+                .collect::<Vec<_>>();
+
+            !auth_headers.is_empty() && (
+                auth_headers.contains(&(&AUTHORIZATION, &format!("Basic {}", expected_token.basic_encoded))) || // TODO: remove "Basic" once clients migrate
+                auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token.bearer_encoded))) ||
+                auth_headers.contains(&(&token_header, &expected_token.raw))
+            )
         } else {
             true
         }
@@ -51,11 +64,15 @@ impl TokenAuthenticator {
 
 impl From<config::Auth> for TokenAuthenticator {
     fn from(value: Auth) -> Self {
-        match value {
+        match &value {
             Auth::None => Self(None),
             Auth::Token(token) => {
                 if !token.is_empty() {
-                    Self(Some(general_purpose::STANDARD.encode(token)))
+                    Self(Some(Tokens {
+                        raw: token.clone(),
+                        bearer_encoded: general_purpose::STANDARD.encode(token),
+                        basic_encoded: general_purpose::STANDARD.encode(format!("{}:", token))
+                    }))
                 } else {
                     Self(None)
                 }
@@ -168,7 +185,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let is_authorized = auth.authenticate_request(request.header(AUTHORIZATION).map(|v| v.as_str()));
+        let is_authorized = auth.authenticate_request(request.iter());
 
         if !is_authorized {
             let reject_response = Response::builder(StatusCode::Unauthorized)
@@ -239,7 +256,7 @@ pub async fn run_hopr_api(
             aliases,
         });
 
-        api.with(TokenBasedAuthenticationMiddleware {});
+        api.with(TokenBasedAuthenticationMiddleware);
 
         api.at("/aliases").get(alias::aliases).post(alias::set_alias);
 
