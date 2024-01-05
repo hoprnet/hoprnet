@@ -85,6 +85,31 @@ impl From<IndexerProcessed> for Inputs {
     }
 }
 
+use std::net::ToSocketAddrs;
+
+fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
+    let mut out = multiaddr::Multiaddr::empty();
+
+    for proto in ma.iter() {
+        match proto {
+            multiaddr::Protocol::Dns4(domain) | multiaddr::Protocol::Dns6(domain) => {
+                let p = format!("{domain}:443")
+                    .to_socket_addrs()
+                    .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
+                    .collect::<Vec<_>>()
+                    .first()
+                    .unwrap()
+                    .ip();
+
+                out.push(p.into());
+            }
+            _ => out.push(proto),
+        }
+    }
+
+    Ok(out)
+}
+
 /// Main p2p loop that will instantiate a new libp2p::Swarm instance and setup listening and reacting pipelines
 /// running in a neverending loop future.
 ///
@@ -109,11 +134,18 @@ pub async fn p2p_loop(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
-    let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg);
+    let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg).await;
 
-    for multiaddress in my_multiaddresses.into_iter() {
-        if let Err(e) = swarm.listen_on(multiaddress.clone()) {
-            error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
+    for multiaddress in my_multiaddresses.iter() {
+        match alter_multiaddress_to_allow_listening(multiaddress) {
+            Ok(ma) => {
+                if let Err(e) = swarm.listen_on(ma.clone()) {
+                    error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
+                } else {
+                    info!("Successfully started listening on {ma} (from {multiaddress})")
+                }
+            }
+            Err(_) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping"),
         }
     }
 

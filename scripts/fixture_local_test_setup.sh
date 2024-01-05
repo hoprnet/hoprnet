@@ -308,6 +308,7 @@ function setup_node() {
       --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
+      --protocolConfig ${protocol_config} \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -353,7 +354,8 @@ for p in "${all_ports[@]}"; do
 done
 # }}}
 
-declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
+cp "${mydir}/../scripts/protocol-config-anvil.json" /tmp/protocol-config.json
+declare protocol_config=/tmp/protocol-config.json
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{

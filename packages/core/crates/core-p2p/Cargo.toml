@@ -21,8 +21,7 @@ wasm = [
 futures = { workspace = true }
 futures-lite = { workspace = true }
 getrandom = { workspace = true, optional = true}
-# a better separation of tcp + async-std for non wasm case could be designed
-libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
+libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp", "dns"] }
 libp2p-mplex = { workspace = true }
 libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
 serde = { workspace = true, features = ["derive"]}

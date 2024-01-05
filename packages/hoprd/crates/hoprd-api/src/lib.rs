@@ -241,8 +241,7 @@ pub async fn run_hopr_api(
 
         api.with(TokenBasedAuthenticationMiddleware {});
 
-        api.at("/aliases").get(alias::aliases)
-            .post(alias::set_alias);
+        api.at("/aliases").get(alias::aliases).post(alias::set_alias);
 
         api.at("/aliases/:alias")
             .get(alias::get_alias)
@@ -1791,7 +1790,7 @@ mod tickets {
         security(
             ("api_token" = [])
         ),
-        tag = "Channel"
+        tag = "Channels"
     )]
     pub(super) async fn redeem_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -1822,7 +1821,7 @@ mod tickets {
         security(
             ("api_token" = [])
         ),
-        tag = "Channel"
+        tag = "Channels"
     )]
     pub(super) async fn aggregate_tickets_in_channel(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
