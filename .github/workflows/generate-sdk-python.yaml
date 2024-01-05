@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Automatic pipeline that triggers the update of the Python SDK
+# Automatic pipeline that triggers the update of the SDK Python
 #################################################################################
 name: SDK Python
 
