@@ -87,8 +87,7 @@ jobs:
 
       - name: Generate Docs
         run: |
-          nix develop
-          make build-docs-api
+          nix develop -c make build-docs-api
 
       - name: Generate Python SDK
         run: |
