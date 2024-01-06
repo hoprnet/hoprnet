@@ -1,4 +1,5 @@
 use std::{future::poll_fn, pin::Pin, sync::Arc, time::SystemTime};
+use std::str::FromStr;
 
 use async_lock::RwLock;
 use chrono::{DateTime, Utc};
@@ -30,7 +31,7 @@ fn setup_logger(level: log::LevelFilter) {
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{} {} {}] {}",
-                humantime::format_rfc3339(SystemTime::now()),
+                humantime::format_rfc3339_seconds(SystemTime::now()),
                 record.level(),
                 record.target(),
                 message
@@ -47,7 +48,11 @@ fn setup_logger(level: log::LevelFilter) {
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    setup_logger(log::LevelFilter::Debug); // TODO: make log level configurable from config/cli
+    setup_logger(std::env::var("RUST_LOG")
+        .map_err(|_| ())
+        .and_then(|level| log::LevelFilter::from_str(&level).map_err(|_| ()))
+        .unwrap_or(log::LevelFilter::Debug)
+    );
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
