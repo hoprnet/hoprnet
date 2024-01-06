@@ -290,11 +290,12 @@ function setup_node() {
   # Using a mix of CLI parameters and env variables to ensure
   # both work.
   env \
-    DEBUG="hopr*" \
+    RUST_LOG="debug" \
+    RUST_BACKTRACE=1 \
     NODE_ENV=development \
-    HOPRD_HEARTBEAT_INTERVAL=2500 \
-    HOPRD_HEARTBEAT_THRESHOLD=2500 \
-    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_HEARTBEAT_INTERVAL=3 \
+    HOPRD_HEARTBEAT_THRESHOLD=3 \
+    HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     target/debug/hoprd \
       --data="${dir}" \
@@ -388,18 +389,20 @@ reuse_pregenerated_identities
 create_local_safes
 
 
+# TODO: use localhost instead of 127.0.0.1 on nodes 1,3,5 and 7
+
 log "Setting up nodes"
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "127.0.0.1" "--announce"
 # use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
-setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "localhost" "--announce"
-setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" " --announce"
-setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" " --announce"
+setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "127.0.0.1" "--announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" "--announce"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "127.0.0.1" "--announce"
 # should not be able to talk to the rest
 setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "127.0.0.1" "--announce --network anvil-localhost2"
 # node n7 will be the only one NOT registered
-setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "localhost" "--announce"
+setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "127.0.0.1" "--announce"
 # }}}
 
 # DO NOT MOVE THIS STEP
@@ -439,7 +442,8 @@ wait_for_api_ready http://127.0.0.1:13307/
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
+# TODO: change 127.0.0.1 to localhost
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "127.0.0.1" "--announce"
 
 wait_for_api_ready http://127.0.0.1:13301/
 # }}}

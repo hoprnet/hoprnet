@@ -18,7 +18,6 @@ prometheus = ["hopr-lib/prometheus", "dep:utils-metrics"]
 
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
-base64 = "0.21"
 const_format = "0.2.32"
 env_logger = { workspace = true }
 futures = { workspace = true }

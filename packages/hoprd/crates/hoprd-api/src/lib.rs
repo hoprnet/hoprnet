@@ -5,7 +5,6 @@ use std::{collections::HashMap, sync::Arc};
 use std::str::FromStr;
 
 use async_std::sync::RwLock;
-use base64::{engine::general_purpose, Engine};
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
@@ -14,7 +13,7 @@ use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
 use tide::{Middleware, Next, StatusCode};
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
@@ -33,57 +32,27 @@ pub struct State<'a> {
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
-struct Tokens {
-    raw: String,
-    basic_encoded: String,
-    bearer_encoded: String
-}
+pub fn authenticate_request<'a, H: Iterator<Item = (&'a HeaderName, &'a HeaderValues)>>(auth: &Auth, request_headers: H) -> bool {
+    let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
 
-pub struct TokenAuthenticator(Option<Tokens>);
-
-impl TokenAuthenticator {
-    pub fn authenticate_request<'a, H: Iterator<Item = (&'a HeaderName, &'a HeaderValues)>>(&self, request_headers: H) -> bool {
-        const AUTH_HEADER: HeaderName = AUTHORIZATION;
-        let token_header = HeaderName::from_str("x-auth-token").unwrap();
-
-        if let Some(expected_token) = &self.0 {
+    match auth {
+        Auth::Token(expected_token) => {
             let auth_headers = request_headers
-                .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || token_header.eq(n)).then_some((n, v.as_str())))
+                .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
                 .collect::<Vec<_>>();
 
             !auth_headers.is_empty() && (
-                auth_headers.contains(&(&AUTHORIZATION, &format!("Basic {}", expected_token.basic_encoded))) || // TODO: remove "Basic" once clients migrate
-                auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token.bearer_encoded))) ||
-                auth_headers.contains(&(&token_header, &expected_token.raw))
+                auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token))) ||
+                auth_headers.contains(&(&x_auth_header, &expected_token))
             )
-        } else {
-            true
-        }
-    }
-}
-
-impl From<config::Auth> for TokenAuthenticator {
-    fn from(value: Auth) -> Self {
-        match &value {
-            Auth::None => Self(None),
-            Auth::Token(token) => {
-                if !token.is_empty() {
-                    Self(Some(Tokens {
-                        raw: token.clone(),
-                        bearer_encoded: general_purpose::STANDARD.encode(token),
-                        basic_encoded: general_purpose::STANDARD.encode(format!("{}:", token))
-                    }))
-                } else {
-                    Self(None)
-                }
-            }
-        }
+        },
+        Auth::None => true
     }
 }
 
 #[derive(Clone)]
 pub struct InternalState {
-    pub auth: Arc<TokenAuthenticator>,
+    pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
@@ -165,14 +134,18 @@ impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         let components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
         components.add_security_scheme(
-            "api_token",
+            "bearer_token",
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
-                    .bearer_format("base64")
+                    .bearer_format("token")
                     .build(),
             ),
-        )
+        );
+        components.add_security_scheme(
+            "api_token",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token")))
+        );
     }
 }
 
@@ -185,7 +158,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let is_authorized = auth.authenticate_request(request.iter());
+        let is_authorized = authenticate_request(auth.as_ref(), request.iter());
 
         if !is_authorized {
             let reject_response = Response::builder(StatusCode::Unauthorized)
@@ -232,7 +205,6 @@ pub async fn run_hopr_api(
 
     let state = State {
         hopr: Arc::new(hopr),
-
         config: Arc::new(Config::from("/api-docs/openapi.json")),
     };
 
@@ -249,7 +221,7 @@ pub async fn run_hopr_api(
 
     app.at(&format!("{BASE_PATH}")).nest({
         let mut api = tide::with_state(InternalState {
-            auth: Arc::new(cfg.auth.clone().into()),
+            auth: Arc::new(cfg.auth.clone()),
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,

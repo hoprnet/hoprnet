@@ -14,7 +14,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
-env_logger = { workspace = true }
+femme = "2.2.1"
 futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }

@@ -27,7 +27,7 @@ lazy_static::lazy_static! {
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    femme::with_level(femme::LevelFilter::Debug);
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
