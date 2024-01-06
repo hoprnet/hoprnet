@@ -3,7 +3,7 @@ use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
 use core_types::channels::{ChannelDirection, ChannelStatus};
-use utils_log::{debug, error, info};
+use log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::action_queue::PendingAction;

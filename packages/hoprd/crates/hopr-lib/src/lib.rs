@@ -38,7 +38,7 @@ use core_types::{
 };
 
 use utils_db::db::DB;
-use utils_log::debug;
+use log::debug;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
 use core_ethereum_api::HoprChain;
@@ -54,7 +54,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::{error, info};
+use log::{error, info};
 use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;

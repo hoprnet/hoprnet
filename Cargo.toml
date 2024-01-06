@@ -27,7 +27,6 @@ members = [
     "packages/hoprd/crates/hoprd-inbox",
     "packages/hoprd/crates/hoprd-keypair",
     "packages/utils/crates/utils-db",
-    "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-types",
     "packages/utils/crates/utils-validation"
@@ -50,6 +49,7 @@ libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
 libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+log = "0.4.20"
 multiaddr = "0.18.0"
 rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
 serde = { version = "1.0", features = ["derive"] }
@@ -80,7 +80,6 @@ hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = f
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
 platform = { path = "misc/platform" }
 utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
-utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }

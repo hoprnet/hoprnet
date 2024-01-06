@@ -3,7 +3,7 @@ use core_ethereum_actions::redeem::TicketRedeemActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use utils_log::info;
+use log::info;
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;

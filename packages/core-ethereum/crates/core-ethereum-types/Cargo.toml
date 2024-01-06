@@ -22,7 +22,7 @@ bindings = { workspace = true }
 core-crypto = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -37,4 +37,4 @@ hex = { workspace = true }
 
 [features]
 default = []
-wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
+wasm = [ "core-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]

@@ -19,7 +19,7 @@ use core_types::{
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use utils_log::{debug, error};
+use log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,

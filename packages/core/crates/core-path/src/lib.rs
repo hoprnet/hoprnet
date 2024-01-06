@@ -11,7 +11,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::protocol::PeerAddressResolver;
 use std::sync::Arc;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::error;
+use log::error;
 use utils_types::primitives::Address;
 
 /// DB backed packet key to chain key resolver

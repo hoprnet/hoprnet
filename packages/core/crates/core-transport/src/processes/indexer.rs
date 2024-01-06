@@ -5,7 +5,7 @@ use core_network::{network::Network, PeerId};
 use core_p2p::libp2p_swarm::derive_prelude::Multiaddr;
 use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
 use std::{pin::Pin, sync::Arc};
-use utils_log::{error, warn};
+use log::{error, warn};
 use utils_types::traits::PeerIdLike;
 
 use async_std::task::spawn;

@@ -10,7 +10,7 @@ use core_types::channels::{generate_channel_id, ChannelEntry};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, U256};
 
 use crate::action_queue::{ActionSender, PendingAction};

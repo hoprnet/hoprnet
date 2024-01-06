@@ -8,7 +8,7 @@ use hopr_lib::{ApplicationData, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
-use utils_log::{error, info, warn};
+use log::{error, info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -25,9 +25,29 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+fn setup_logger(level: log::LevelFilter) {
+    if let Err(e) = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                humantime::format_rfc3339(SystemTime::now()),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(level)
+        .level_for("libp2p_mplex", log::LevelFilter::Info)
+        .level_for("multistream_select", log::LevelFilter::Info)
+        .chain(std::io::stdout())
+        .apply() {
+        eprintln!("failed to setup logger: {e}")
+    }
+}
+
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    femme::with_level(femme::LevelFilter::Debug);
+    setup_logger(log::LevelFilter::Debug); // TODO: make log level configurable from config/cli
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();

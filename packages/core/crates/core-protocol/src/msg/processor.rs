@@ -24,7 +24,7 @@ use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, Unack
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
-use utils_log::{debug, error, warn};
+use log::{debug, error, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -808,7 +808,7 @@ mod tests {
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use utils_log::debug;
+    use log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,

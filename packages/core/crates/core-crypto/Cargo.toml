@@ -37,7 +37,7 @@ thiserror = { workspace = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
 platform = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -46,4 +46,4 @@ parameterized = "1.0"
 
 [features]
 default = []
-wasm = ["dep:getrandom", "platform/wasm-bindgen", "utils-log/wasm", "utils-types/wasm" ]
+wasm = ["dep:getrandom", "platform/wasm-bindgen", "utils-types/wasm" ]

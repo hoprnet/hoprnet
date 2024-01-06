@@ -14,7 +14,7 @@ default = ["prometheus"]
 wasm = [
     "core-ethereum-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
     "core-protocol/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "utils-metrics?/wasm", "utils-types/wasm",  "utils-log/wasm",
+    "utils-db/wasm", "platform/wasm-bindgen", "utils-metrics?/wasm", "utils-types/wasm",
 ]
 prometheus = [
     "dep:lazy_static", "dep:utils-metrics",
@@ -45,7 +45,7 @@ core-packet = { workspace = true }
 core-protocol = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true}
-utils-log = { workspace = true }
+log = { workspace = true }
 platform = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }

@@ -18,7 +18,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use validator::Validate;
 
 use platform::time::native::current_timestamp;

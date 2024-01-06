@@ -52,7 +52,7 @@ use futures::{
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
 use std::sync::Arc;
-use utils_log::{info, warn};
+use log::{info, warn};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -384,7 +384,7 @@ impl HoprTransport {
 
         match self.pkt_sender.clone().send_packet(app_data, path) {
             Ok(mut awaiter) => {
-                utils_log::debug!("Awaiting the HalfKeyChallenge");
+                log::debug!("Awaiting the HalfKeyChallenge");
                 Ok(awaiter
                     .consume_and_wait(std::time::Duration::from_millis(
                         crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,

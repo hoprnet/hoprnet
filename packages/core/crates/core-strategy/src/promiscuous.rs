@@ -3,7 +3,7 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;

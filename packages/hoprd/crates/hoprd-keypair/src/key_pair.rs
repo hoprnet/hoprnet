@@ -15,7 +15,7 @@ use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use utils_log::{error, info};
+use log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 

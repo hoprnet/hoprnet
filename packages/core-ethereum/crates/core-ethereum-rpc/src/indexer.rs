@@ -4,8 +4,8 @@ use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, TryStreamExt};
 use std::pin::Pin;
-use utils_log::debug;
-use utils_log::error;
+use log::debug;
+use log::error;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
@@ -100,7 +100,7 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
-    use utils_log::debug;
+    use log::debug;
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;

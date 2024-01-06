@@ -31,7 +31,7 @@ core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-rpc = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true, default-features = false }
 
@@ -42,5 +42,5 @@ mockall = "0.11"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-ethereum-db/wasm", "core-ethereum-rpc/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm" ]
+wasm = [ "core-ethereum-db/wasm", "core-ethereum-rpc/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-metrics?/wasm", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus" ]

@@ -39,6 +39,6 @@ core-protocol = { workspace = true }
 core-transport = { workspace = true }
 core-types = { workspace = true }
 utils-types = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 

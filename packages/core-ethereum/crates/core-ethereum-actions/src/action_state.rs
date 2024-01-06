@@ -9,7 +9,7 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{debug, error};
+use log::{debug, error};
 
 use crate::errors::{CoreEthereumActionsError, Result};
 

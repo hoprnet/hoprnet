@@ -22,7 +22,7 @@ use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 use crate::action_state::{ActionState, IndexerExpectation};

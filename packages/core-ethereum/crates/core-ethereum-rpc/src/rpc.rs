@@ -11,7 +11,7 @@ use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryCl
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_log::debug;
+use log::debug;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 

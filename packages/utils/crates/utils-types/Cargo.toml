@@ -26,12 +26,12 @@ serde = { workspace = true }
 thiserror = "1.0"
 
 platform = { workspace = true }
-utils-log = { workspace = true, default-features = false }
+log = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4"
 
 [features]
 default = []
-wasm = [ "dep:getrandom", "utils-log/wasm", "platform/wasm-bindgen" ]
+wasm = [ "dep:getrandom", "platform/wasm-bindgen" ]
 

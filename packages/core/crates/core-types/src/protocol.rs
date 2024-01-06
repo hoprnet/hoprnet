@@ -7,7 +7,7 @@ use core_crypto::types::OffchainPublicKey;
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::warn;
+use log::warn;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::{AutoBinarySerializable, BinarySerializable};

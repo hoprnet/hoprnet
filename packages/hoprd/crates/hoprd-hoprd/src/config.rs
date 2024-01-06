@@ -176,7 +176,7 @@ impl From<HoprdConfig> for HoprLibConfig {
 
 use platform::file::native::read_to_string;
 
-use utils_log::debug;
+use log::debug;
 
 use crate::errors::HoprdError;
 

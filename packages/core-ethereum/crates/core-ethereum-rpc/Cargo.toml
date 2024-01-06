@@ -36,7 +36,7 @@ core-crypto = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-types = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
@@ -52,6 +52,6 @@ mockall = "0.11.4"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm" ]
+wasm = [ "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics"]
 reqwest = ["dep:reqwest"]

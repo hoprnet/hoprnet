@@ -3,7 +3,7 @@ use core_network::{
     PeerId,
 };
 use futures::channel::mpsc::Sender;
-use utils_log::error;
+use log::error;
 
 use platform::time::native::current_timestamp;
 

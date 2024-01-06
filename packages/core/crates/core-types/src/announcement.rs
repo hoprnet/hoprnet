@@ -8,7 +8,7 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use utils_log::debug;
+use log::debug;
 use utils_types::{
     errors::GeneralError::{self, InvalidInput, NonSpecificError},
     primitives::Address,

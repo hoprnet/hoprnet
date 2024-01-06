@@ -22,7 +22,7 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::{
     primitives::{Balance, BalanceType},
     traits::PeerIdLike,

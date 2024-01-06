@@ -5,7 +5,7 @@ use crate::errors::{
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use utils_log::{debug, info};
+use log::{debug, info};
 use utils_types::primitives::{Address, Balance};
 
 /// Performs validations of the given unacknowledged ticket and channel.

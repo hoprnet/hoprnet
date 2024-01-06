@@ -14,7 +14,7 @@ default = ["prometheus"]
 wasm = [
     "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm", "core-ethereum-indexer/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
+    "utils-db/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus", "core-ethereum-actions/prometheus", "core-ethereum-indexer/prometheus"]
 
@@ -38,7 +38,7 @@ core-ethereum-types = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 

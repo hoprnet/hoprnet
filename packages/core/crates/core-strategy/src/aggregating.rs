@@ -15,7 +15,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 

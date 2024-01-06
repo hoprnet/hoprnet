@@ -14,7 +14,7 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
-femme = "2.2.1"
+fern = "0.6.2"
 futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
@@ -38,10 +38,11 @@ hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 utils-validation = { workspace = true }
+humantime = "2.1.0"
 
 [dev-dependencies]
 tempfile = "3"
@@ -60,7 +61,6 @@ wasm = [
     "hoprd-keypair/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-log/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
 ]

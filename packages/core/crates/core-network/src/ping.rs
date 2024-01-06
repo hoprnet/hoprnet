@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
 use libp2p_identity::PeerId;
 
-use utils_log::{debug, error, info};
+use log::{debug, error, info};
 
 use platform::time::native::current_timestamp;
 

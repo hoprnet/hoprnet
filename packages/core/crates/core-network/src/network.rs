@@ -11,7 +11,7 @@ use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
-use utils_log::{info, warn};
+use log::{info, warn};
 use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -316,7 +316,7 @@ impl<T: NetworkExternalActions> Network<T> {
     /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let now = self.network_actions_api.create_timestamp();
-        utils_log::debug!("Registering peer '{}' with origin {}", peer, origin);
+        log::debug!("Registering peer '{}' with origin {}", peer, origin);
 
         // assumes disjoint sets
         let has_entry = self.entries.contains_key(peer);

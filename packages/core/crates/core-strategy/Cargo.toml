@@ -32,7 +32,7 @@ core-protocol = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-actions = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 platform = { workspace = true }
 utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true }
@@ -48,5 +48,5 @@ futures = "0.3.28"
 
 [features]
 default = ["prometheus"]
-wasm = ["dep:getrandom", "utils-log/wasm", ]
+wasm = ["dep:getrandom" ]
 prometheus = [ "dep:utils-metrics", "core-network/prometheus", "core-protocol/prometheus", "core-ethereum-actions/prometheus" ]

@@ -14,7 +14,7 @@ use utils_db::{
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_log::{debug, error, info};
+use log::{debug, error, info};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -631,7 +631,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel_to dest: {}", dest);
+        //log::debug!("DB: get_channel_to dest: {}", dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
@@ -649,7 +649,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         channel: &ChannelEntry,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        //utils_log::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
+        //log::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
@@ -720,7 +720,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
-        //utils_log::debug!("DB: update_latest_block_number to {}", number);
+        //log::debug!("DB: update_latest_block_number to {}", number);
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
         let _ = self.db.set(key, &number).await?;
         Ok(())
@@ -732,7 +732,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel {}", channel);
+        //log::debug!("DB: get_channel {}", channel);
         let key = utils_db::db::Key::new_with_prefix(channel, CHANNEL_PREFIX)?;
         self.db.get_or_none::<ChannelEntry>(key).await
     }
@@ -930,7 +930,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
+        //log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(src, dest), CHANNEL_PREFIX)?;
         self.db.get_or_none(key).await
     }
@@ -992,7 +992,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_hopr_balance(&self) -> Result<Balance> {
-        //utils_log::debug!("DB: get_hopr_balance");
+        //log::debug!("DB: get_hopr_balance");
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         self.db
@@ -1014,7 +1014,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_ticket_price(&self) -> Result<Option<U256>> {
-        //utils_log::debug!("DB: get_ticket_price");
+        //log::debug!("DB: get_ticket_price");
         let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
 
         self.db.get_or_none::<U256>(key).await

@@ -13,7 +13,7 @@ use futures::{stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{debug, error, warn};
+use log::{debug, error, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
 use async_std::task::spawn;

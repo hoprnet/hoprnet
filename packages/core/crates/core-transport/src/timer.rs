@@ -2,7 +2,7 @@ use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
 use std::time::Duration;
-use utils_log::{debug, warn};
+use log::{debug, warn};
 
 use async_std::task::sleep;
 use platform::time::native::current_timestamp;

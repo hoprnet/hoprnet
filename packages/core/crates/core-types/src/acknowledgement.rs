@@ -14,7 +14,7 @@ use core_crypto::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::debug;
+use log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,

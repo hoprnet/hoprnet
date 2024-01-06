@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
-use utils_log::{debug, info};
+use log::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::{histogram_start_measure, metrics::SimpleHistogram};
