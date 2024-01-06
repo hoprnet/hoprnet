@@ -8,7 +8,7 @@ use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
-use tide::http::headers::{AUTHORIZATION, HeaderName, HeaderValues};
+use tide::http::headers::{AUTHORIZATION, HeaderName};
 use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
@@ -31,24 +31,6 @@ pub struct State<'a> {
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
-
-pub fn authenticate_request<'a, H: Iterator<Item = (&'a HeaderName, &'a HeaderValues)>>(auth: &Auth, request_headers: H) -> bool {
-    let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
-
-    match auth {
-        Auth::Token(expected_token) => {
-            let auth_headers = request_headers
-                .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
-                .collect::<Vec<_>>();
-
-            !auth_headers.is_empty() && (
-                auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token))) ||
-                auth_headers.contains(&(&x_auth_header, &expected_token))
-            )
-        },
-        Auth::None => true
-    }
-}
 
 #[derive(Clone)]
 pub struct InternalState {
@@ -148,7 +130,6 @@ impl Modify for SecurityAddon {
         );
     }
 }
-
 /// Token-based authentication middleware
 struct TokenBasedAuthenticationMiddleware;
 
@@ -158,7 +139,23 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let is_authorized = authenticate_request(auth.as_ref(), request.iter());
+        let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
+
+        let is_authorized = match auth.as_ref() {
+            Auth::Token(expected_token) => {
+                let auth_headers = request
+                    .iter()
+                    .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .collect::<Vec<_>>();
+
+                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
+                !auth_headers.is_empty() && (
+                    auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token))) ||
+                    auth_headers.contains(&(&x_auth_header, &expected_token))
+                )
+            },
+            Auth::None => true
+        };
 
         if !is_authorized {
             let reject_response = Response::builder(StatusCode::Unauthorized)
@@ -171,6 +168,38 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
 
         // Go forward to the next middleware or request handler
         Ok(next.run(request).await)
+    }
+}
+
+/// Custom request logging middleware
+struct LogRequestMiddleware(log::Level);
+
+#[async_trait]
+impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
+    async fn handle(&self, mut req: Request<T>, next: Next<'_, T>) -> tide::Result {
+        struct LogMiddlewareHasBeenRun;
+
+        if req.ext::<LogMiddlewareHasBeenRun>().is_some() {
+            return Ok(next.run(req).await);
+        }
+        req.set_ext(LogMiddlewareHasBeenRun);
+
+        let peer_addr = req.peer_addr().map(String::from);
+        let path = req.url().path().to_owned();
+        let method = req.method().to_string();
+        let response = next.run(req).await;
+        let status = response.status();
+
+        log::log!(
+            self.0,
+            r#"{} "{method} {path}" {status} {}"#,
+            peer_addr.as_deref().unwrap_or("-"),
+            response
+                .len()
+                .map(|l| l.to_string())
+                .unwrap_or_else(|| String::from("-")),
+        );
+        Ok(response)
     }
 }
 
@@ -209,6 +238,8 @@ pub async fn run_hopr_api(
     };
 
     let mut app = tide::with_state(state.clone());
+
+    app.with(LogRequestMiddleware(log::Level::Debug));
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
