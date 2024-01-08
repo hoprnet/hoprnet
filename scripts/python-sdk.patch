@@ -1,31 +1,14 @@
 diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd-sdk-python/hoprd_sdk/api_client.py > ./hoprnet/scripts/python-sdk.patch
---- hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py	2024-01-08 09:11:27.386319003 +0100
-+++ hoprd-sdk-python/hoprd_sdk/api_client.py	2024-01-08 09:08:38.628917346 +0100
-@@ -10,21 +10,22 @@
- """
- from __future__ import absolute_import
- 
-+import atexit
- import datetime
- import json
- import mimetypes
--from multiprocessing.pool import ThreadPool
+--- sdk2/hoprd_sdk/api_client.py	2023-12-12 11:27:49
++++ hoprd-sdk-python/hoprd_sdk/api_client.py	2023-12-12 11:14:03
+@@ -17,6 +17,7 @@
  import os
  import re
  import tempfile
-+from multiprocessing.pool import ThreadPool
++import atexit
  
  # python 2 and python 3 compatibility library
  import six
- from six.moves.urllib.parse import quote
- 
--from hoprd_sdk.configuration import Configuration
- import hoprd_sdk.models
- from hoprd_sdk import rest
-+from hoprd_sdk.configuration import Configuration
- 
- 
- class ApiClient(object):
 @@ -49,90 +50,120 @@
  
      PRIMITIVE_TYPES = (float, bool, bytes, six.text_type) + six.integer_types
@@ -47,11 +30,10 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
 +        "datetime": datetime.datetime,
 +        "object": object,
      }
++    _pool = None
  
 -    def __init__(self, configuration=None, header_name=None, header_value=None,
 -                 cookie=None):
-+    _pool = None
-+
 +    def __init__(
 +        self, configuration=None, header_name=None, header_value=None, cookie=None
 +    ):
@@ -60,24 +42,25 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
          self.configuration = configuration
  
 -        self.pool = ThreadPool()
++        # self.pool = ThreadPool()
          self.rest_client = rest.RESTClientObject(configuration)
          self.default_headers = {}
          if header_name is not None:
              self.default_headers[header_name] = header_value
          self.cookie = cookie
          # Set default User-Agent.
--        self.user_agent = 'Swagger-Codegen/latest/python'
+-        self.user_agent = 'Swagger-Codegen/2.0.0-rc.1/python'
 +        self.user_agent = "Swagger-Codegen/2.0.0-rc.1/python"
-+
-+    def __enter__(self):
-+        return self
-+
-+    def __exit__(self, exc_type, exc_value, traceback):
-+        self.close()
  
 -    def __del__(self):
 -        self.pool.close()
 -        self.pool.join()
++    def __enter__(self):
++        return self
+ 
++    def __exit__(self, exc_type, exc_value, traceback):
++        self.close()
++
 +    def close(self):
 +        if self._pool:
 +            self._pool.close()
@@ -87,7 +70,7 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
 +            if hasattr(atexit, "unregister"):
 +                atexit.unregister(self.close)
 +
-+    @property
+     @property
 +    def pool(self):
 +        """Create thread pool on first request, avoids instantiating unused threadpool
 +        for blocking clients."""
@@ -96,8 +79,8 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
 +            self._pool = ThreadPool()
 +
 +        return self._pool
- 
-     @property
++
++    @property
      def user_agent(self):
          """User agent for this API client"""
 -        return self.default_headers['User-Agent']
@@ -234,15 +217,14 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
 -            obj_dict = {obj.attribute_map[attr]: getattr(obj, attr)
 -                        for attr, _ in six.iteritems(obj.swagger_types)
 -                        if getattr(obj, attr) is not None}
--
--        return {key: self.sanitize_for_serialization(val)
--                for key, val in six.iteritems(obj_dict)}
 +            obj_dict = {
 +                obj.attribute_map[attr]: getattr(obj, attr)
 +                for attr, _ in six.iteritems(obj.swagger_types)
 +                if getattr(obj, attr) is not None
 +            }
-+
+ 
+-        return {key: self.sanitize_for_serialization(val)
+-                for key, val in six.iteritems(obj_dict)}
 +        return {
 +            key: self.sanitize_for_serialization(val)
 +            for key, val in six.iteritems(obj_dict)
@@ -250,25 +232,22 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
  
      def deserialize(self, response, response_type):
          """Deserializes response into an object.
-@@ -242,16 +279,16 @@
-         if data is None:
+@@ -243,15 +280,15 @@
              return None
  
--        if type(klass) == str:
+         if type(klass) == str:
 -            if klass.startswith('list['):
 -                sub_kls = re.match(r'list\[(.*)\]', klass).group(1)
 -                return [self.__deserialize(sub_data, sub_kls)
 -                        for sub_data in data]
--
++            if klass.startswith("list["):
++                sub_kls = re.match(r"list\[(.*)\]", klass).group(1)
++                return [self.__deserialize(sub_data, sub_kls) for sub_data in data]
+ 
 -            if klass.startswith('dict('):
 -                sub_kls = re.match(r'dict\(([^,]*), (.*)\)', klass).group(2)
 -                return {k: self.__deserialize(v, sub_kls)
 -                        for k, v in six.iteritems(data)}
-+        if isinstance(klass, str):
-+            if klass.startswith("list["):
-+                sub_kls = re.match(r"list\[(.*)\]", klass).group(1)
-+                return [self.__deserialize(sub_data, sub_kls) for sub_data in data]
-+
 +            if klass.startswith("dict("):
 +                sub_kls = re.match(r"dict\(([^,]*), (.*)\)", klass).group(2)
 +                return {
@@ -526,12 +505,9 @@ diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd
              else:
                  new_params.append((k, v))
          return new_params
-@@ -437,15 +530,16 @@
-             for k, v in six.iteritems(files):
-                 if not v:
+@@ -439,13 +532,14 @@
                      continue
--                file_names = v if type(v) is list else [v]
-+                file_names = v if isinstance(v, list) else [v]
+                 file_names = v if type(v) is list else [v]
                  for n in file_names:
 -                    with open(n, 'rb') as f:
 +                    with open(n, "rb") as f:

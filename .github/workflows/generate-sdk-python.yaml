@@ -23,8 +23,8 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
-        # with:
-        #   ref: ${{ inputs.base_branch }}
+        with:
+          ref: ${{ inputs.base_branch }}
 
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
@@ -42,19 +42,6 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: Restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
 
       - name: Restore cargo cache
         uses: actions/cache@v3

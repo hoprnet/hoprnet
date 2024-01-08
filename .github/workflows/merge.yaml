@@ -257,9 +257,9 @@ jobs:
 
   generate_sdk_python:
     name: SDK Python
-    # if: contains(github.event.pull_request.labels.*.name, 'release')
-    # needs:
-    #   - create_release
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    needs:
+      - create_release
     uses: ./.github/workflows/generate-sdk-python.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
