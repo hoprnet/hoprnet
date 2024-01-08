@@ -19,14 +19,19 @@
 
   outputs = { self, nixpkgs, flake-parts, rust-overlay, crane, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      perSystem = { config, self', inputs', system, ... }:
+      perSystem = { config, lib, self', inputs', system, ... }:
         let
           overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs {
             inherit system overlays;
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-          src = craneLib.cleanCargoSource ./.;
+          vendorFilter = path: _type: builtins.match "^vendor/cargo/" path != null;
+          vendorOrCargo = path: type: (vendorFilter path type) || (craneLib.filterCargoSources path type);
+          src = lib.cleanSourceWith {
+            src = craneLib.path ./.;
+            filter = vendorOrCargo;
+          };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           nativeBuildInputs = with pkgs; [
             rustToolchain
