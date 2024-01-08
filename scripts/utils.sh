@@ -333,9 +333,7 @@ get_authenticated_curl_cmd() {
 
   # add auth info if token was found previously
   if [ -n "${api_token}" ]; then
-    local api_token_encoded
-    api_token_encoded="$(encode_api_token "${api_token}")"
-    cmd+=" --header \"Authorization: Basic ${api_token_encoded}\""
+    cmd+=" --header \"X-Auth-Token: ${api_token}\""
   fi
 
   # return full command

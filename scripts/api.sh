@@ -48,7 +48,7 @@ api_call(){
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v3${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
 
-  local now=$(node -e "console.log(process.hrtime.bigint().toString());")
+  local now=$(date +%s | cut -b1-13)
 
   if [[ ${end_time_ns} -eq 0 ]]; then
     # need to calculate in nanoseconds
@@ -74,7 +74,7 @@ api_call(){
 
       sleep "${step_time}"
 
-      now=$(node -e "console.log(process.hrtime.bigint().toString());")
+      now=$(date +%s | cut -b1-13)
       (( ++attempt ))
     fi
   done

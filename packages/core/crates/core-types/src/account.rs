@@ -39,14 +39,12 @@ impl Display for AccountType {
 /// Represents a node announcement entry on the block chain.
 /// This contains node's public key and optional announcement information (multiaddress, block number).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
     entry_type: AccountType,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AccountEntry {
     /// Gets multiaddress as string if this peer ID has been announced.
     pub fn get_multiaddr_str(&self) -> Option<String> {
@@ -270,69 +268,5 @@ mod test {
 
         let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::account::AccountEntry;
-    use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::types::OffchainPublicKey;
-    use multiaddr::Multiaddr;
-    use std::str::FromStr;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::{primitives::Address, traits::BinarySerializable};
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl AccountEntry {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(
-            public_key: OffchainPublicKey,
-            chain_addr: Address,
-            multiaddr: Option<String>,
-            updated_at: Option<u32>,
-        ) -> JsResult<AccountEntry> {
-            if (multiaddr.is_some() && updated_at.is_some()) || (multiaddr.is_none() && updated_at.is_none()) {
-                Ok(Self {
-                    public_key,
-                    chain_addr,
-                    entry_type: match multiaddr {
-                        None => NotAnnounced,
-                        Some(multiaddr) => Announced {
-                            multiaddr: ok_or_jserr!(Multiaddr::from_str(multiaddr.as_str()))?,
-                            updated_block: updated_at.unwrap(),
-                        },
-                    },
-                })
-            } else {
-                Err("must either specify both: multiaddr and updated_at or none".into())
-            }
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<AccountEntry> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AccountEntry) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
     }
 }

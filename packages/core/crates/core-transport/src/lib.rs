@@ -14,6 +14,7 @@ pub enum TransportOutput {
 
 pub use {
     crate::{
+        adaptors::network::ExternalNetworkInteractions,
         multiaddrs::decapsulate_p2p_protocol,
         processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
@@ -22,22 +23,17 @@ pub use {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    core_network::network::{Health, PeerStatus},
+    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
-    timer::UniversalTimer,
+    timer::execute_on_tick,
 };
 
 use async_lock::RwLock;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_network::{
-    heartbeat::Heartbeat,
-    messaging::ControlMessage,
-    network::{Network, NetworkConfig, NetworkEvent},
-    ping::Ping,
-};
+use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_protocol::{
@@ -50,16 +46,13 @@ use core_types::{
     channels::{ChannelEntry, Ticket},
     protocol::TagBloomFilter,
 };
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::future::poll_fn;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
+    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
-use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{error, info};
+use log::{info, warn};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -81,18 +74,13 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
-use {async_std::task::sleep, utils_misc::time::native::current_timestamp};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use {gloo_timers::future::sleep, utils_misc::time::wasm::current_timestamp};
+use {async_std::task::sleep, platform::time::native::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,
     cfg: NetworkConfig,
 ) -> (
     Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    Sender<NetworkEvent>,
     Receiver<NetworkEvent>,
 ) {
     let (network_events_tx, network_events_rx) =
@@ -101,10 +89,10 @@ pub fn build_network(
     let network = Arc::new(RwLock::new(Network::new(
         peer_id,
         cfg,
-        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
+        adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
     )));
 
-    (network, network_events_tx, network_events_rx)
+    (network, network_events_rx)
 }
 
 pub fn build_ticket_aggregation<Db>(
@@ -112,7 +100,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -133,7 +121,7 @@ pub fn build_manual_ping(
 
     let ping_cfg = PingConfig {
         max_parallel_pings: constants::MAX_PARALLEL_PINGS,
-        timeout: cfg.heartbeat.timeout().as_millis() as u64,
+        timeout: cfg.heartbeat.timeout,
     };
 
     // manual ping explicitly called by the API
@@ -152,7 +140,7 @@ pub fn build_index_updater<Db>(
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     let (indexer_update_tx, indexer_update_rx) =
         futures::channel::mpsc::channel::<IndexerProcessed>(processes::indexer::INDEXER_UPDATE_QUEUE_SIZE);
@@ -168,7 +156,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprCoreEthereumDbActions + 'static,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
@@ -198,7 +186,7 @@ pub fn build_heartbeat(
 
     let ping_cfg = PingConfig {
         max_parallel_pings: constants::MAX_PARALLEL_PINGS,
-        timeout: proto_cfg.heartbeat.timeout().as_millis() as u64,
+        timeout: proto_cfg.heartbeat.timeout,
     };
 
     let hb_pinger = Ping::new(
@@ -229,18 +217,17 @@ impl ChannelEventEmitter {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub losing: u32,
+    pub losing: u64,
     pub win_proportion: f64,
-    pub unredeemed: u32,
+    pub unredeemed: u64,
     pub unredeemed_value: utils_types::primitives::Balance,
-    pub redeemed: u32,
+    pub redeemed: u64,
     pub redeemed_value: utils_types::primitives::Balance,
-    pub neglected: u32,
+    pub neglected: u64,
     pub neglected_value: utils_types::primitives::Balance,
-    pub rejected: u32,
+    pub rejected: u64,
     pub rejected_value: utils_types::primitives::Balance,
 }
 
@@ -250,12 +237,13 @@ pub struct PublicNodesResult {
     pub multiaddrs: Vec<Multiaddr>,
 }
 
-use core_network::network::PeerOrigin;
 use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
+use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
+use core_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use utils_types::primitives::{Balance, BalanceType};
@@ -269,7 +257,6 @@ pub struct HoprTransport {
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    network_change_notifier: Sender<NetworkEvent>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -285,7 +272,6 @@ impl HoprTransport {
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-        change_notifier: Sender<NetworkEvent>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
@@ -299,7 +285,6 @@ impl HoprTransport {
             db,
             ping: Arc::new(RwLock::new(ping)),
             network,
-            network_change_notifier: change_notifier,
             indexer,
             pkt_sender,
             ticket_aggregate_actions,
@@ -316,15 +301,17 @@ impl HoprTransport {
         self.indexer.clone()
     }
 
-    pub async fn ping(&self, peer: &PeerId) -> Option<std::time::Duration> {
-        if !(self.is_allowed_to_access_network(peer).await) {
-            return None;
+    pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
+        if !self.is_allowed_to_access_network(peer).await {
+            return Err(errors::HoprTransportError::Api(format!(
+                "ping to {peer} not allowed due to network registry"
+            )));
         }
 
         let mut pinger = self.ping.write().await;
 
         // TODO: add timeout on the p2p transport layer
-        let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
+        let timeout = sleep(std::time::Duration::from_secs(30)).fuse();
         let ping = (*pinger).ping(vec![*peer]).fuse();
 
         pin_mut!(timeout, ping);
@@ -336,15 +323,19 @@ impl HoprTransport {
         let start = current_timestamp();
 
         match select(timeout, ping).await {
-            Either::Left(_) => info!("Manual ping to peer '{}' timed out", peer),
+            Either::Left(_) => {
+                warn!("Manual ping to peer '{}' timed out", peer);
+                return Err(ProtocolError::Timeout.into());
+            }
             Either::Right(_) => info!("Manual ping succeeded"),
         };
 
-        self.network
+        Ok(self
+            .network
             .read()
             .await
             .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen - start))
+            .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
     }
 
     pub async fn send_message(
@@ -393,7 +384,7 @@ impl HoprTransport {
 
         match self.pkt_sender.clone().send_packet(app_data, path) {
             Ok(mut awaiter) => {
-                utils_log::debug!("Awaiting the HalfKeyChallenge");
+                log::debug!("Awaiting the HalfKeyChallenge");
                 Ok(awaiter
                     .consume_and_wait(std::time::Duration::from_millis(
                         crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,
@@ -407,7 +398,7 @@ impl HoprTransport {
         }
     }
 
-    pub async fn aggregate_tickets(&mut self, channel: &Hash) -> errors::Result<()> {
+    pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
         let entry = self
             .db
             .read()
@@ -419,15 +410,17 @@ impl HoprTransport {
                 if let Some(c) = c {
                     Ok(c)
                 } else {
-                    Err(errors::HoprTransportError::Api(format!(
-                        "aggregate tickets: no channel entry found for hash '{}'",
-                        &channel
-                    )))
+                    Err(core_protocol::errors::ProtocolError::ChannelNotFound.into())
                 }
             })?;
 
+        if entry.status != ChannelStatus::Open {
+            return Err(core_protocol::errors::ProtocolError::ChannelClosed.into());
+        }
+
         Ok(self
             .ticket_aggregate_actions
+            .clone()
             .aggregate_tickets(AggregationList::WholeChannel(entry))?
             .consume_and_wait(std::time::Duration::from_millis(60000))
             .await?)
@@ -515,18 +508,6 @@ impl HoprTransport {
         self.network.read().await.health()
     }
 
-    pub async fn network_unregister(&self, peer: &PeerId) {
-        let mut change_notifier = self.network_change_notifier.clone();
-
-        match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
-            Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(*peer)) {
-                Ok(_) => {}
-                Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
-            },
-            Err(e) => error!("The receiver for network updates was dropped: {}", e),
-        }
-    }
-
     pub async fn network_connected_peers(&self) -> Vec<PeerId> {
         self.network.read().await.get_all_peers()
     }
@@ -555,30 +536,32 @@ impl HoprTransport {
             } else {
                 0f64
             },
-            losing: losing as u32,
-            unredeemed: acked_ticket_amounts.len() as u32,
+            losing: losing as u64,
+            unredeemed: acked_ticket_amounts.len() as u64,
             unredeemed_value: total_value,
-            redeemed: db.get_redeemed_tickets_count().await? as u32,
+            redeemed: db.get_redeemed_tickets_count().await? as u64,
             redeemed_value: db.get_redeemed_tickets_value().await?,
-            neglected: db.get_neglected_tickets_count().await? as u32,
+            neglected: db.get_neglected_tickets_count().await? as u64,
             neglected_value: db.get_neglected_tickets_value().await?,
-            rejected: db.get_rejected_tickets_count().await? as u32,
+            rejected: db.get_rejected_tickets_count().await? as u64,
             rejected_value: db.get_rejected_tickets_value().await?,
         })
     }
 
-    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Vec<AcknowledgedTicket>> {
+    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         let db = self.db.read().await;
 
         let channel = db.get_channel(channel).await?;
 
         if let Some(channel) = channel {
             if channel.destination == self.me_onchain {
-                return Ok(db.get_acknowledged_tickets(Some(channel)).await?);
+                Ok(Some(db.get_acknowledged_tickets(Some(channel)).await?))
+            } else {
+                Ok(None)
             }
+        } else {
+            Ok(None)
         }
-
-        Ok(vec![])
     }
 
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {

@@ -1,0 +1,2976 @@
+openapi: 3.1.0
+info:
+  contact:
+    email: tech@hoprnet.org
+  description: This Rest API enables developers to interact with a hoprd node programatically.
+  license:
+    name: GPL-3.0
+    url: https://github.com/hoprnet/hoprnet/blob/master/LICENSE
+  title: HOPRd Rest API v3
+  version: 3.0.0
+externalDocs:
+  description: Find out more about HOPR and HOPRd.
+  url: http://docs.hoprnet.org
+servers:
+  - url: /api/v3
+security:
+  - keyScheme:
+      - write
+  - passwordScheme:
+      - write
+tags:
+  - name: Account
+  - name: Aliases
+  - name: Channels
+  - name: CheckHealthiness
+  - name: CheckReady
+  - name: CheckStarted
+  - name: Messages
+  - name: Node
+  - name: PeerInfo
+  - name: Peers
+  - name: Settings
+  - name: Tickets
+  - name: Tokens
+paths:
+  /tokens/:
+    post:
+      description: "Create a new authentication token based on the given information.\
+        \ The new token is returned as part of the response body and must be stored\
+        \ by the client. It cannot be read again in cleartext and is lost, if the\
+        \ client loses the token. An authentication has a lifetime. It can be unbound,\
+        \ meaning it will not expire. Or it has a limited lifetime after which it\
+        \ expires. The requested limited lifetime is requested by the client in seconds."
+      operationId: tokensCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/tokensCreate_request'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/tokensCreate_201_response'
+          description: Token succesfully created.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_TOKEN_LIFETIME | INVALID_TOKEN_CAPABILITIES
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Problem with inputs.
+        '403':
+          description: Missing capability to access endpoint
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Tokens
+  /token:
+    get:
+      description: Get the full token information for the token used in authentication.
+      operationId: tokensGetToken
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+          description: Token information.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+      tags:
+        - Tokens
+  /tickets/statistics:
+    get:
+      description: Get statistics regarding all your tickets. Node gets a ticket everytime
+        it relays data packet in channel.
+      operationId: ticketsGetStatistics
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ticketsGetStatistics_200_response'
+          description: Tickets statistics fetched successfully. Check schema for description
+            of every field in the statistics.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Tickets
+  /tickets/redeem:
+    post:
+      description: "Redeems all tickets from all the channels and exchanges them for\
+        \ Hopr tokens. Every ticket have a chance to be winning one, rewarding you\
+        \ with Hopr tokens."
+      operationId: ticketsRedeemTickets
+      responses:
+        '204':
+          description: Tickets redeemed succesfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Tickets
+  /tickets/:
+    get:
+      description: Get all tickets earned by relaying data packets by your node from
+        every channel.
+      operationId: ticketsGetTickets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Ticket'
+                type: array
+          description: Tickets fetched successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Tickets
+  /startedz/:
+    get:
+      description: Check whether the node is started
+      operationId: CheckNodeStarted
+      parameters: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: The node is started
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - CheckStarted
+  /settings/:
+    get:
+      description: Get all of the node's settings.
+      operationId: settingsGetSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: Settings fetched succesfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Settings
+  /readyz/:
+    get:
+      description: Check whether the node is ready
+      operationId: CheckNodeReady
+      parameters: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: The node is ready
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - CheckReady
+  /node/version:
+    get:
+      description: Get release version of the running node.
+      operationId: nodeGetVersion
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Node version.
+                example: 1.83.5
+                type: string
+          description: Returns the release version of the running node.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Node
+  /node/peers:
+    get:
+      description: |-
+        Lists information for `connected peers` and `announced peers`.
+        Connected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.
+        Optionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.
+      operationId: nodeGetPeers
+      parameters:
+        - description: "When quality is passed, the response will only include peers\
+            \ with higher or equal quality to the one specified."
+          explode: true
+          in: query
+          name: quality
+          required: false
+          schema:
+            example: 0.5
+            type: number
+          style: form
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nodeGetPeers_200_response'
+          description: Peers information fetched successfuly.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_QUALITY
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid input. One of the parameters passed is in an incorrect
+            format.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Node
+  /node/metrics:
+    get:
+      description: Retrieve Prometheus metrics from the running node.
+      operationId: nodeGetMetrics
+      responses:
+        '200':
+          content:
+            text/plain; version=0.0.4:
+              schema:
+                description: Prometheus metrics text format
+                example: basic_counter 30
+                type: string
+          description: Returns the encoded serialized metrics.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Node
+  /node/info:
+    get:
+      description: "Information about the HOPR Node, including any options it started\
+        \ with. See the schema of the response to get more information on each field."
+      operationId: nodeGetInfo
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/nodeGetInfo_200_response'
+          description: Node information fetched successfuly.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Node
+  /node/entryNodes:
+    get:
+      description: List all known entry nodes and their multiaddrs and their eligibility
+        state
+      operationId: nodeGetEntryNodes
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  $ref: '#/components/schemas/nodeGetEntryNodes_200_response_value'
+                type: object
+          description: Entry node information fetched successfuly.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Node
+  /messages/websocket:
+    get:
+      description: |-
+        This is a websocket endpoint which exposes a subset of message functions.
+        Incoming messages from other nodes are sent to the websocket client.
+        A client may also send message by sending the following data:
+          { cmd: "sendmsg", args: { peerId: "SOME_PEER_ID", path: [], hops: 1} }
+        The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+
+        The following messages may be sent by the server over the Websocket connection:
+
+          {
+            type: "message",
+            tag: 12,
+            body: "my example message"
+          }
+
+          {
+            type: "message-ack",
+            id: "some challenge id"
+          }
+
+          {
+            type: "message-ack-challenge",
+            id: "some challenge id"
+          }
+         Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/messages/websocket/?apiToken=myApiToken`
+      operationId: messagesWebsocket
+      responses:
+        '101':
+          description: Switching protocols
+        '206':
+          content:
+            application/text:
+              example: '104,101,108,108,111,32,119,111,114,108,100'
+              schema:
+                type: string
+          description: Incoming data
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: Not found
+      tags:
+        - Messages
+  /messages/size:
+    get:
+      description: Get size of filtered message inbox.
+      operationId: messagesGetSize
+      parameters:
+        - description: Tag used to filter target messages.
+          explode: true
+          in: query
+          name: tag
+          required: true
+          schema:
+            $ref: '#/components/schemas/MessageTag'
+          style: form
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/messagesGetSize_200_response'
+          description: Returns the message inbox size filtered by the given tag.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Messages
+  /messages/pop-all:
+    post:
+      description: Get list of messages currently present in the nodes message inbox.
+        The messages are removed from the inbox.
+      operationId: messagesPopAllMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/messagesPopAllMessage_request'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/messagesPopAllMessage_200_response'
+          description: Returns list of messages.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Messages
+  /messages/pop:
+    post:
+      description: Get oldest message currently present in the nodes message inbox.
+        The message is removed from the inbox.
+      operationId: messagesPopMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/messagesPopAllMessage_request'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceivedMessage'
+          description: Returns a message.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Messages
+  /messages/:
+    delete:
+      description: Delete messages from nodes message inbox. Does not return any data.
+      operationId: messagesDeleteMessages
+      parameters:
+        - description: Tag used to filter target messages.
+          explode: true
+          in: query
+          name: tag
+          required: true
+          schema:
+            $ref: '#/components/schemas/MessageTag'
+          style: form
+      responses:
+        '204':
+          description: Messages successfully deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+      tags:
+        - Messages
+    post:
+      description: "Send a message to another peer using a given path (list of node\
+        \ addresses that should relay our message through network). If no path is\
+        \ given, HOPR will attempt to find a path."
+      operationId: messagesSendMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/messagesSendMessage_request'
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                description: Challenge token used to poll for the acknowledgment of
+                  the sent message by the first hop.
+                example: e61bbdda74873540c7244fe69c39f54e5270bd46709c1dcb74c8e3afce7b9e616d
+                type: string
+          description: "The message was sent successfully. NOTE: This does not imply\
+            \ successful delivery."
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Messages
+  /healthyz/:
+    get:
+      description: Check whether the node is healthy
+      operationId: CheckNodeHealthy
+      parameters: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: The node is ready
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - CheckHealthiness
+  /channels/:
+    get:
+      description: "Lists all active channels between this node and other nodes on\
+        \ the Hopr network. By default response will contain all incomming and outgoing\
+        \ channels that are either open, waiting to be opened, or waiting to be closed.\
+        \ If you also want to receive past channels that were closed, you can pass\
+        \ `includingClosed` in the request url query."
+      operationId: channelsGetChannels
+      parameters:
+        - description: When includingClosed is passed the response will include closed
+            channels which are ommited by default.
+          explode: true
+          in: query
+          name: includingClosed
+          required: false
+          schema:
+            example: 'false'
+            type: string
+          style: form
+        - description: Get the full payment channel graph indexed by the node.
+          explode: true
+          in: query
+          name: fullTopology
+          required: false
+          schema:
+            example: 'false'
+            type: string
+          style: form
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/channelsGetChannels_200_response'
+          description: Channels fetched successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+    post:
+      description: "Opens a payment channel between this node and the counter party\
+        \ provided. This channel can be used to send messages between two nodes using\
+        \ other nodes on the network to relay the messages. Each message will deduce\
+        \ its cost from the funded amount to pay other nodes for relaying your messages.\
+        \ Opening a channel can take a little bit of time, because it requires some\
+        \ block confirmations on the blockchain."
+      operationId: channelsOpenChannel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/channelsOpenChannel_request'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/channelsOpenChannel_201_response'
+          description: Channel succesfully opened.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_AMOUNT | INVALID_ADDRESS
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Problem with inputs.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              example:
+                status: NOT_ENOUGH_BALANCE
+              schema:
+                $ref: '#/components/schemas/channelsOpenChannel_403_response'
+          description: Failed to open the channel because of insufficient HOPR balance
+            or allowance.
+        '409':
+          content:
+            application/json:
+              example:
+                status: CHANNEL_ALREADY_OPEN
+              schema:
+                $ref: '#/components/schemas/channelsOpenChannel_409_response'
+          description: Failed to open the channel because the channel between this
+            nodes already exists.
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /aliases/:
+    get:
+      description: Get all aliases you set previously and thier corresponding peer
+        IDs.
+      operationId: aliasesGetAliases
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/aliasesGetAliases_200_response'
+          description: Returns List of Aliases and corresponding peerIds.
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Aliases
+    post:
+      description: "Instead of using HOPR address, we can assign HOPR address to a\
+        \ specific name called alias. Give an address a more memorable alias and use\
+        \ it instead of Hopr address. Aliases are kept locally and are not saved or\
+        \ shared on the network."
+      operationId: aliasesSetAlias
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/aliasesSetAlias_request'
+      responses:
+        '201':
+          description: Alias set succesfully
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_PEERID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid peerId. The format or length of the peerId is incorrect.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Aliases
+  /account/withdraw:
+    post:
+      description: "Withdraw funds from this node to your ethereum wallet address.\
+        \ You can choose whitch currency you want to withdraw, NATIVE or HOPR."
+      operationId: accountWithdraw
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/accountWithdraw_request'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/accountWithdraw_200_response'
+          description: Withdraw successful. Receipt from this response can be used
+            to check details of the transaction on ethereum chain.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CURRENCY | INVALID_AMOUNT
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Incorrect data in request body. Make sure to provide valid
+            currency ('NATIVE' | 'HOPR') or amount.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: NOT_ENOUGH_BALANCE
+              schema:
+                $ref: '#/components/schemas/accountWithdraw_422_response'
+          description: Withdraw amount exeeds current balance or unknown error. You
+            can check current balance using /account/balance endpoint.
+      tags:
+        - Account
+  /account/balances:
+    get:
+      description: Get node's and associated Safe's HOPR and native balances as well
+        as the allowance for HOPR tokens to be drawn by HoprChannels from Safe. HOPR
+        tokens from the Safe balance is used to fund payment channels between this
+        node and other nodes on the network. NATIVE balance of the Node is used to
+        pay for the gas fees for the blockchain.
+      operationId: accountGetBalances
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/accountGetBalances_200_response'
+          description: Balances fetched successfuly.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Account
+  /account/addresses:
+    get:
+      description: Get node's HOPR and native addresses. HOPR address is also called
+        PeerId and can be used by other node owner to interact with this node.
+      operationId: accountGetAddresses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/accountGetAddresses_200_response'
+          description: Addresses fetched successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Account
+  /account/address:
+    get:
+      deprecated: true
+      description: Get node's HOPR and native addresses. HOPR address is also called
+        PeerId and can be used by other node owner to interact with this node.
+      operationId: accountGetAddress
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/accountGetAddresses_200_response'
+          description: Addresses fetched successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Account
+  /tokens/{id}:
+    delete:
+      description: Deletes a token. Can only be done before the lifetime expired.
+        After the lifetime expired the token is automatically deleted.
+      operationId: tokensDelete
+      parameters:
+        - description: ID of the token which shall be deleted.
+          explode: false
+          in: path
+          name: id
+          required: true
+          schema:
+            example: someTOKENid1234
+            type: string
+          style: simple
+      responses:
+        '204':
+          description: Token successfully deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+      tags:
+        - Tokens
+  /settings/{setting}:
+    put:
+      description: Change this node's setting value. Check Settings schema to learn
+        more about each setting and the type of value it expects.
+      operationId: settingsSetSetting
+      parameters:
+        - explode: false
+          in: path
+          name: setting
+          required: true
+          schema:
+            description: Name of the setting we want to change.
+            example: includeRecipient
+            format: settingKey
+            type: string
+          style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/settingsSetSetting_request'
+      responses:
+        '204':
+          description: Setting set succesfully
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_SETTING | INVALID_SETTING_VALUE
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid input. Either setting with that name doesn't exist
+            or the value is incorrect.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Settings
+  /peers/{peerid}/ping:
+    post:
+      description: Pings another node to check its availability.
+      operationId: peersPingPeer
+      parameters:
+        - description: Peer id that should be pinged
+          explode: false
+          in: path
+          name: peerid
+          required: true
+          schema:
+            format: peerid
+            type: string
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/peersPingPeer_200_response'
+          description: Ping successful.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_PEERID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid peerId.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: TIMEOUT
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: An error occured (see error details) or timeout - node with
+            specified PeerId didn't respond in time.
+      tags:
+        - Peers
+  /peers/{peerid}/:
+    get:
+      description: Get information about this peer.
+      operationId: peerInfoGetPeerInfo
+      parameters:
+        - explode: false
+          in: path
+          name: peerid
+          required: true
+          schema:
+            format: peerid
+            type: string
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/peerInfoGetPeerInfo_200_response'
+          description: Peer information fetched successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - PeerInfo
+  /channels/{channelid}/tickets/redeem:
+    post:
+      description: "Redeems your tickets for this channel. Redeeming will change your\
+        \ tickets into Hopr tokens if they are winning ones. You can check how much\
+        \ tickets given channel has by calling /channels/{channelid}/tickets endpoint.\
+        \ Do this before channel is closed as neglected tickets are no longer valid\
+        \ for redeeming."
+      operationId: channelsRedeemTickets
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            format: channelid
+            type: string
+          style: simple
+      responses:
+        '204':
+          description: Tickets redeemed successfully.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CHANNELID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid channel id.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          content:
+            application/json:
+              example:
+                status: TICKETS_NOT_FOUND
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Tickets were not found for that channel. That means that no
+            messages were sent inside this channel yet.
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /channels/{channelid}/tickets/aggregate:
+    post:
+      description: Takes all acknowledged and winning tickets (if any) from the given
+        channel and aggregates them into a single ticket. Requires cooperation of
+        the ticket issuer.
+      operationId: channelsAggregateTickets
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            format: channelid
+            type: string
+          style: simple
+      responses:
+        '204':
+          description: Tickets successfully aggregated
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CHANNELID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid channel id.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /channels/{channelid}/tickets:
+    get:
+      description: Get tickets earned by relaying data packets by your node for the
+        particular channel.
+      operationId: channelsGetTickets
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            format: channelid
+            type: string
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Ticket'
+                type: array
+          description: Tickets fetched successfully.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_PEERID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid peerId.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          content:
+            application/json:
+              example:
+                status: TICKETS_NOT_FOUND
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Tickets were not found for that channel. That means that no
+            messages were sent inside this channel yet.
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /channels/{channelid}/fund:
+    post:
+      description: Funds an existing channel with the given amount. The channel must
+        be in state OPEN
+      operationId: channelsFundChannel
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            format: channelid
+            type: string
+          style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/channelsFundChannel_request'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/channelsFundChannel_200_response'
+          description: Channel funded successfully.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CHANNELID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid channel id.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /channels/{channelid}/:
+    delete:
+      description: |-
+        Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
+          Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
+      operationId: channelsCloseChannel
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            format: channelid
+            type: string
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/channelsCloseChannel_200_response'
+          description: Channel closed succesfully.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CHANNELID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid channel id.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+    get:
+      description: Returns information about the channel.
+      operationId: channelsGetChannel
+      parameters:
+        - explode: false
+          in: path
+          name: channelid
+          required: true
+          schema:
+            $ref: '#/components/schemas/ChannelId'
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelTopology'
+          description: Channel fetched succesfully.
+        '400':
+          content:
+            application/json:
+              example:
+                status: INVALID_CHANNELID
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: Invalid channel id.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          description: The specified resource was not found
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Channels
+  /aliases/{alias}:
+    delete:
+      description: Unassign an alias from a PeerId. You can always assign back alias
+        to that PeerId using /aliases endpoint.
+      operationId: aliasesRemoveAlias
+      parameters:
+        - description: Alias that we want to remove.
+          explode: false
+          in: path
+          name: alias
+          required: true
+          schema:
+            example: Alice
+            type: string
+          style: simple
+      responses:
+        '204':
+          description: Alias removed succesfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Aliases
+    get:
+      description: Get the PeerId (Hopr address) that have this alias assigned to
+        it.
+      operationId: aliasesGetAlias
+      parameters:
+        - description: Alias that we previously assigned to some PeerId.
+          explode: false
+          in: path
+          name: alias
+          required: true
+          schema:
+            example: Alice
+            type: string
+          style: simple
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/aliasesGetAlias_200_response'
+          description: HOPR address was found for the provided alias.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authentication failed
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: authorization failed
+        '404':
+          content:
+            application/json:
+              example:
+                status: PEERID_NOT_FOUND
+              schema:
+                $ref: '#/components/schemas/RequestStatus'
+          description: This alias was not assigned to any PeerId before. You can get
+            the list of all PeerId's and thier corresponding aliases using /aliases
+            endpoint.
+        '422':
+          content:
+            application/json:
+              example:
+                status: UNKNOWN_FAILURE
+                error: Full error message.
+              schema:
+                $ref: '#/components/schemas/tokensCreate_422_response'
+          description: Unknown failure.
+      tags:
+        - Aliases
+components:
+  responses:
+    NotFound:
+      description: The specified resource was not found
+    Unauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+      description: authentication failed
+    Forbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+      description: authorization failed
+    UnknownFailure:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+      description: Unknown failure
+  schemas:
+    Error:
+      properties:
+        status:
+          type: string
+        error:
+          type: string
+      required:
+        - error
+        - status
+      type: object
+    RequestStatus:
+      example:
+        status: success
+      properties:
+        status:
+          description: Status declaring success/failure of the request.
+          type: string
+      type: object
+    Token:
+      example:
+        id: someTOKENid1223
+        description: this is an interesting token
+        capabilities:
+          - endpoint: tokensGetToken
+            limits:
+              - type: calls
+                conditions:
+                  max: 100
+      properties:
+        id:
+          description: Unique ID of the token
+          type: string
+        description:
+          description: Some description for the token
+          type: string
+        valid_until:
+          description: Seconds since epoch until the token is valid
+          type: integer
+        capabilities:
+          description: Array of capabilities associated with the token
+          items:
+            $ref: '#/components/schemas/TokenCapability'
+          minItems: 1
+          type: array
+      required:
+        - capabilities
+        - id
+      type: object
+    TokenCapabilityLimit:
+      example:
+        type: calls
+        conditions:
+          max: 100
+      properties:
+        type:
+          description: Limit type
+          type: string
+        conditions:
+          $ref: '#/components/schemas/TokenCapabilityLimit_conditions'
+      required:
+        - type
+      type: object
+    TokenCapability:
+      example:
+        endpoint: tokensGetToken
+        limits:
+          - type: calls
+            conditions:
+              max: 100
+      properties:
+        endpoint:
+          description: Short reference of the operation this capability is tied to.
+          enum:
+            - tokensCreate
+            - tokensGetToken
+            - ticketsGetStatistics
+            - ticketsRedeemTickets
+            - ticketsGetTickets
+            - settingsGetSettings
+            - nodeGetVersion
+            - nodeGetPeers
+            - nodeGetMetrics
+            - nodeGetInfo
+            - nodeGetEntryNodes
+            - messagesWebsocket
+            - messagesGetSize
+            - messagesPopAllMessage
+            - messagesPopMessage
+            - messagesSendMessage
+            - messagesDeleteMessages
+            - channelsOpenChannel
+            - channelsGetChannels
+            - aliasesSetAlias
+            - aliasesGetAliases
+            - accountWithdraw
+            - accountGetBalances
+            - accountGetAddresses
+            - accountGetAddress
+            - tokensDelete
+            - settingsSetSetting
+            - peersPingPeer
+            - peerInfoGetPeerInfo
+            - channelsRedeemTickets
+            - channelsGetTickets
+            - channelsGetChannel
+            - channelsCloseChannel
+            - aliasesGetAlias
+            - aliasesRemoveAlias
+            - nodeStreamWebsocket
+            - nodePing
+            - messagesSign
+            - messageSign
+            - channelsFundChannels
+          type: string
+        limits:
+          items:
+            $ref: '#/components/schemas/TokenCapabilityLimit'
+          minItems: 1
+          type: array
+      required:
+        - endpoint
+      type: object
+    Signature:
+      description: Signature from requested message.
+      example: 7.115342872866815E+167
+      type: string
+    MultiAddress:
+      description: "A multi address is a composable and future-proof network address,\
+        \ usually announced by Public HOPR nodes."
+      example: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+        ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+        ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+        ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+        ]"
+      type: string
+    Currency:
+      description: "Supported currencies, NATIVE used for the interacting with blockchain\
+        \ or HOPR used to fund channels."
+      enum:
+        - NATIVE
+        - HOPR
+      example: NATIVE
+      type: string
+    MessageTag:
+      description: The message tag which can be used to filter messages between apps.
+      example: 12
+      maximum: 65536
+      minimum: 0
+      type: integer
+    MessageBody:
+      example: This is a HOPR message.
+      type: string
+    ReceivedMessage:
+      example:
+        tag: 12
+        body: This is a HOPR message.
+        receivedAt: 1324284684614
+      properties:
+        tag:
+          description: The message tag which can be used to filter messages between
+            apps.
+          example: 12
+          maximum: 65536
+          minimum: 0
+          type: integer
+        body:
+          example: This is a HOPR message.
+          type: string
+        receivedAt:
+          description: Timestamp when the message was received in seconds since epoch.
+          example: 1324284684614
+          type: integer
+      required:
+        - body
+        - receivedAt
+        - tag
+      type: object
+    NativeAddress:
+      description: "Blockchain-native account address. Can be funded from external\
+        \ wallets (starts with **0x...**). It **can't be used** internally to send\
+        \ / receive messages, open / close payment channels."
+      example: 1.339446426793328E+48
+      format: ethereumaddress
+      type: string
+    HoprAddress:
+      description: "HOPR account address, also called a PeerId. Used to send / receive\
+        \ messages, open / close payment channels."
+      example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+      format: peerid
+      type: string
+    ChannelId:
+      description: The unique identifier of a unidirectional HOPR channel.
+      example: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+      format: string
+    ChannelStatus:
+      description: 'Status of the channel can be: Open, PendingToClose, or Closed.'
+      enum:
+        - Open
+        - PendingToClose
+        - Closed
+      example: Open
+      type: string
+    NativeBalance:
+      description: "Amount of NATIVE (ETH) balance in the smallest unit. Used only\
+        \ for gas fees on the blockchain the current release is running on. For example,\
+        \ when you will open or close the payment channel, it will use gas fees to\
+        \ execute this action."
+      example: '1000000000000000000'
+      type: string
+    HoprBalance:
+      description: Amount of HOPR tokens in the smallest unit. Used for funding payment
+        channels.
+      example: '10000000000000000000'
+      type: string
+    Channel:
+      example:
+        peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+        balance: '10000000000000000000'
+        id: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+        type: incoming
+        status: Open
+      properties:
+        type:
+          description: Channel can be either incomming or outgoing. Incomming means
+            that other node can send messages using this node as relay. Outgoing means
+            that this node can use other node to send message as realy.
+          enum:
+            - incoming
+            - outgoing
+          example: incoming
+          type: string
+        id:
+          description: The unique identifier of a unidirectional HOPR channel.
+          example: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+          format: string
+        peerId:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+        status:
+          $ref: '#/components/schemas/ChannelStatus'
+        balance:
+          description: Amount of HOPR tokens in the smallest unit. Used for funding
+            payment channels.
+          example: '10000000000000000000'
+          type: string
+      type: object
+    ChannelTopology:
+      example:
+        closureTime: closureTime
+        ticketIndex: ticketIndex
+        sourceAddress: 1.339446426793328E+48
+        destinationAddress: 1.339446426793328E+48
+        balance: '10000000000000000000'
+        sourcePeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+        destinationPeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+        channelEpoch: channelEpoch
+        channelId: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+        status: Open
+      properties:
+        channelId:
+          description: The unique identifier of a unidirectional HOPR channel.
+          example: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+          format: string
+        sourcePeerId:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+        destinationPeerId:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+        sourceAddress:
+          description: "Blockchain-native account address. Can be funded from external\
+            \ wallets (starts with **0x...**). It **can't be used** internally to\
+            \ send / receive messages, open / close payment channels."
+          example: 1.339446426793328E+48
+          format: ethereumaddress
+          type: string
+        destinationAddress:
+          description: "Blockchain-native account address. Can be funded from external\
+            \ wallets (starts with **0x...**). It **can't be used** internally to\
+            \ send / receive messages, open / close payment channels."
+          example: 1.339446426793328E+48
+          format: ethereumaddress
+          type: string
+        balance:
+          description: Amount of HOPR tokens in the smallest unit. Used for funding
+            payment channels.
+          example: '10000000000000000000'
+          type: string
+        status:
+          $ref: '#/components/schemas/ChannelStatus'
+        ticketIndex:
+          description: Each ticket is labeled by an ongoing serial number named ticket
+            index i and its current value is stored in the smart contract.
+          type: string
+        channelEpoch:
+          description: "Payment channels might run through multiple open and close\
+            \ sequences, this epoch tracks the sequence."
+          type: string
+        closureTime:
+          description: Time when the channel can be closed
+          type: string
+      type: object
+    Ticket:
+      example:
+        amount: amount
+        indexOffset: indexOffset
+        signature: 7.115342872866815E+167
+        winProb: winProb
+        index: index
+        channelEpoch: channelEpoch
+        channelId: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+      properties:
+        channelId:
+          description: The unique identifier of a unidirectional HOPR channel.
+          example: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+          format: string
+        amount:
+          description: The ticket's value in HOPR. Only relevant if ticket is a win.
+          type: string
+        index:
+          description: Each ticket is labeled by an ongoing serial number named ticket
+            index i and its current value is stored in the smart contract.
+          type: string
+        indexOffset:
+          description: Offset by which the on-chain stored ticket index gets increased
+            when redeeming the ticket. Used to aggregate tickets.
+          type: string
+        channelEpoch:
+          description: "Payment channels might run through multiple open and close\
+            \ sequences, this epoch tracks the sequence."
+          type: string
+        winProb:
+          description: "The ticket's winning probability, going from 0.0 to 1.0 where\
+            \ 0.0 ~= 0% winning probability and 1.0 equals 100% winning probability."
+          type: string
+        signature:
+          description: Signature from requested message.
+          example: 7.115342872866815E+167
+          type: string
+      type: object
+    Settings:
+      description: Various settings that affects how this node is interacting with
+        the network.
+      example:
+        includeRecipient: true
+        strategy: passive
+      properties:
+        includeRecipient:
+          description: Prepends your address to all messages so that receiver of the
+            message can know that you sent that message.
+          example: true
+          type: boolean
+        strategy:
+          description: "By default, hoprd runs in **passive** mode, this means that\
+            \ your node will not attempt to open or close any channels automatically.\
+            \ When you set your strategy to **promiscuous** mode, your node will attempt\
+            \ to open channels to a _randomly_ selected group of nodes which you have\
+            \ a healthy connection to. At the same time, your node will also attempt\
+            \ to close channels that are running low on balance or are unhealthy."
+          enum:
+            - passive
+            - promiscuous
+          example: passive
+          type: string
+      type: object
+    TransactionReceipt:
+      description: Receipt identifier for an Ethereum transaction.
+      example: 2.51409958563871E+76
+      type: string
+    tokensCreate_request:
+      example:
+        description: my test token
+        lifetime: 360
+        capabilities: []
+      properties:
+        capabilities:
+          description: Capabilities attached to the created token.
+          format: tokenCapabilities
+          items:
+            $ref: '#/components/schemas/TokenCapability'
+          minItems: 1
+          type: array
+        lifetime:
+          description: Lifetime of the token in seconds since creation. Defaults to
+            unlimited lifetime.
+          minimum: 1
+          type: integer
+        description:
+          description: Description associated with the token.
+          type: string
+      required:
+        - capabilities
+      type: object
+    tokensCreate_201_response:
+      example:
+        token: MYtoken1223
+      properties:
+        token:
+          description: The generated token which must be used when authenticating
+            for API calls.
+          example: MYtoken1223
+          type: string
+      type: object
+    tokensCreate_422_response:
+      properties:
+        status:
+          example: UNKNOWN_FAILURE
+          type: string
+        error:
+          example: Full error message.
+          type: string
+      type: object
+    ticketsGetStatistics_200_response:
+      example:
+        neglected: 5.637376656633329
+        losingTickets: 1.4658129805029452
+        unredeemed: 0.8008281904610115
+        redeemedValue: redeemedValue
+        redeemed: 6.027456183070403
+        rejected: 2.3021358869347655
+        neglectedValue: neglectedValue
+        unredeemedValue: unredeemedValue
+        rejectedValue: rejectedValue
+        winProportion: 5.962133916683182
+      properties:
+        unredeemed:
+          description: Number of tickets that wait to be redeemed as for Hopr tokens.
+          type: number
+        unredeemedValue:
+          description: Total value of all unredeemed tickets in Hopr tokens.
+          type: string
+        redeemed:
+          description: Number of tickets already redeemed on this node.
+          type: number
+        redeemedValue:
+          description: Total value of all redeemed tickets in Hopr tokens.
+          type: string
+        losingTickets:
+          description: Number of tickets that didn't win any Hopr tokens. To better
+            understand how tickets work read about probabilistic payments (https://docs.hoprnet.org/core/probabilistic-payments)
+          type: number
+        winProportion:
+          description: "Proportion of number of winning tickets vs loosing tickets,\
+            \ 1 means 100% of tickets won and 0 means that all tickets were losing\
+            \ ones."
+          type: number
+        neglected:
+          description: Number of tickets that were not redeemed in time before channel
+            was closed. Those cannot be redeemed anymore.
+          type: number
+        neglectedValue:
+          description: Total value of all neglected tickets in Hopr tokens.
+          type: string
+        rejected:
+          description: Number of tickets that were rejected by the network by not
+            passing validation. In other words tickets that look suspicious and are
+            not eligible for redeeming.
+          type: number
+        rejectedValue:
+          description: Total value of rejected tickets in Hopr tokens
+          type: string
+      type: object
+    nodeGetPeers_200_response_connected_inner_heartbeats:
+      example:
+        success: 8
+        sent: 10
+      properties:
+        sent:
+          description: Heartbeats sent to the node
+          example: 10
+          type: number
+        success:
+          description: Successful heartbeats sent to the node
+          example: 8
+          type: number
+      type: object
+    nodeGetPeers_200_response_connected_inner:
+      example:
+        peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+        heartbeats:
+          success: 8
+          sent: 10
+        lastSeen: 1646410980793
+        reportedVersion: 1.92.12
+        backoff: 0.8008281904610115
+        lastSeenLatency: 124
+        isNew: true
+        multiAddr: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+          ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+          ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+          ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+          ]"
+        peerAddress: 1.339446426793328E+48
+        quality: 0.8
+      properties:
+        peerId:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+        peerAddress:
+          description: "Blockchain-native account address. Can be funded from external\
+            \ wallets (starts with **0x...**). It **can't be used** internally to\
+            \ send / receive messages, open / close payment channels."
+          example: 1.339446426793328E+48
+          format: ethereumaddress
+          type: string
+        multiAddr:
+          description: "A multi address is a composable and future-proof network address,\
+            \ usually announced by Public HOPR nodes."
+          example: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ]"
+          type: string
+        heartbeats:
+          $ref: '#/components/schemas/nodeGetPeers_200_response_connected_inner_heartbeats'
+        lastSeen:
+          description: Timestamp on when the node was last seen (in milliseconds)
+          example: 1646410980793
+          type: number
+        lastSeenLatency:
+          description: Latency recorded the last time a node was measured when seen
+            (in milliseconds)
+          example: 124
+          type: number
+        quality:
+          description: A float between 0 (completely unreliable) and 1 (completely
+            reliable) estimating the quality of service of a peer's network connection
+          example: 0.8
+          type: number
+        backoff:
+          type: number
+        isNew:
+          description: True if the node is new (no heartbeats sent yet).
+          type: boolean
+        reportedVersion:
+          description: HOPR protocol version as determined from the successful ping
+            in the Major.Minor.Patch format or "unknown"
+          example: 1.92.12
+          type: string
+      type: object
+    nodeGetPeers_200_response:
+      example:
+        connected:
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            heartbeats:
+              success: 8
+              sent: 10
+            lastSeen: 1646410980793
+            reportedVersion: 1.92.12
+            backoff: 0.8008281904610115
+            lastSeenLatency: 124
+            isNew: true
+            multiAddr: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ]"
+            peerAddress: 1.339446426793328E+48
+            quality: 0.8
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            heartbeats:
+              success: 8
+              sent: 10
+            lastSeen: 1646410980793
+            reportedVersion: 1.92.12
+            backoff: 0.8008281904610115
+            lastSeenLatency: 124
+            isNew: true
+            multiAddr: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ]"
+            peerAddress: 1.339446426793328E+48
+            quality: 0.8
+        announced:
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            heartbeats:
+              success: 8
+              sent: 10
+            lastSeen: 1646410980793
+            reportedVersion: 1.92.12
+            backoff: 0.8008281904610115
+            lastSeenLatency: 124
+            isNew: true
+            multiAddr: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ]"
+            peerAddress: 1.339446426793328E+48
+            quality: 0.8
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            heartbeats:
+              success: 8
+              sent: 10
+            lastSeen: 1646410980793
+            reportedVersion: 1.92.12
+            backoff: 0.8008281904610115
+            lastSeenLatency: 124
+            isNew: true
+            multiAddr: "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+              ]"
+            peerAddress: 1.339446426793328E+48
+            quality: 0.8
+      properties:
+        connected:
+          items:
+            $ref: '#/components/schemas/nodeGetPeers_200_response_connected_inner'
+          type: array
+        announced:
+          items:
+            $ref: '#/components/schemas/nodeGetPeers_200_response_connected_inner'
+          type: array
+      type: object
+    nodeGetInfo_200_response:
+      example:
+        chain: anvil
+        hoprNetworkRegistryAddress: 0xBEE1F5d64b562715E749771408d06D57EE0892A7
+        listeningAddress:
+          - /ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+        network: anvil-localhost
+        nodeManagementModule: 0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D
+        announcedAddress:
+          - /ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+          - /p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+          - /ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+          - /ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+        hoprToken: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+        channelClosurePeriod: 1
+        hoprChannels: 0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63
+        hoprNodeSafeRegistryAddress: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
+        isEligible: true
+        connectivityStatus: GREEN
+        nodeSafe: 0x8D56Ef78c9dfF0d1446A28476653D979336032f9
+      properties:
+        network:
+          description: Name of the network the node is running on.
+          example: anvil-localhost
+          type: string
+        announcedAddress:
+          example:
+            - /ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+            - /p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+            - /ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+            - /ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+          items:
+            description: "description: Public IP address that the node announced on\
+              \ network when it was launched. Node anouncing means notifying all the\
+              \ other nodes on the network about its presence and readiness to be\
+              \ connected to via websocket."
+            type: string
+          type: array
+        listeningAddress:
+          example:
+            - /ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit
+          items:
+            description: Other nodes IP address that this node is listening to for
+              websocket events.
+            type: string
+          type: array
+        chain:
+          description: Name of the Hopr network this node connects to.
+          example: anvil
+          type: string
+        hoprToken:
+          description: Contract address of the Hopr token on the ethereum chain.
+          example: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+          type: string
+        hoprChannels:
+          description: Contract address of the HoprChannels smart contract on ethereum
+            chain. This smart contract is used to open payment channels between nodes
+            on blockchain.
+          example: 0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63
+          type: string
+        hoprNetworkRegistryAddress:
+          description: Contract address of the contract that allows to control the
+            number of nodes in the network
+          example: 0xBEE1F5d64b562715E749771408d06D57EE0892A7
+          type: string
+        hoprNodeSafeRegistryAddress:
+          description: Contract address of the contract that register node and safe
+            pairs
+          example: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
+          type: string
+        nodeManagementModule:
+          description: Contract address of the Safe module for managing the current
+            hopr node
+          example: 0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D
+          type: string
+        nodeSafe:
+          description: Contract address of the safe that holds asset for the current
+            node
+          example: 0x8D56Ef78c9dfF0d1446A28476653D979336032f9
+          type: string
+        connectivityStatus:
+          description: "Indicates how good is the connectivity of this node to the\
+            \ HOPR network: either RED, ORANGE, YELLOW or GREEN"
+          example: GREEN
+          type: string
+        isEligible:
+          description: Determines whether the staking account associated with this
+            node is eligible for accessing the HOPR network. Always true if network
+            registry is disabled.
+          example: true
+          type: boolean
+        channelClosurePeriod:
+          description: Time (in minutes) that this node needs in order to clean up
+            before closing the channel. When requesting to close the channel each
+            node needs some time to make sure that channel can be closed securely
+            and cleanly. After this channelClosurePeriod passes the second request
+            for closing channel will close the channel.
+          example: 1
+          type: number
+      type: object
+    nodeGetEntryNodes_200_response_value:
+      properties:
+        multiaddrs:
+          description: Known Multiaddrs of the node
+          items:
+            type: string
+          type: array
+        isEligible:
+          description: 'true if peer is allowed to access network, otherwise false'
+          type: boolean
+      type: object
+    messagesGetSize_200_response:
+      example:
+        size: 1011
+      properties:
+        size:
+          example: 1011
+          minimum: 0
+          type: integer
+      type: object
+    messagesPopAllMessage_request:
+      properties:
+        tag:
+          description: The message tag which can be used to filter messages between
+            apps.
+          example: 12
+          maximum: 65536
+          minimum: 0
+          type: integer
+      required:
+        - tag
+      type: object
+    messagesPopAllMessage_200_response:
+      example:
+        messages:
+          - tag: 12
+            body: This is a HOPR message.
+            receivedAt: 1324284684614
+          - tag: 12
+            body: This is a HOPR message.
+            receivedAt: 1324284684614
+      properties:
+        messages:
+          items:
+            $ref: '#/components/schemas/ReceivedMessage'
+          type: array
+      required:
+        - messages
+      type: object
+    messagesSendMessage_request:
+      properties:
+        tag:
+          description: The message tag which can be used to filter messages between
+            apps.
+          example: 12
+          maximum: 65536
+          minimum: 0
+          type: integer
+        body:
+          example: This is a HOPR message.
+          type: string
+        peerId:
+          description: 'The recipient HOPR peer id, to which the message is sent.'
+          example: 12Diu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF
+          format: peerid
+          type: string
+        path:
+          description: "The path is ordered list of peer ids through which the message\
+            \ should be sent. If no path is provided, a path which covers the nodes\
+            \ minimum required hops will be determined automatically."
+          items:
+            description: A valid HOPR peer id
+            example: 12Diu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMf
+            format: peerid
+            maxItems: 3
+            minItems: 0
+            type: string
+          type: array
+        hops:
+          description: Number of required intermediate nodes. This parameter is ignored
+            if path is set.
+          example: 3
+          maximum: 3
+          minimum: 1
+          type: integer
+      required:
+        - body
+        - peerId
+        - tag
+      type: object
+    channelsGetChannels_200_response:
+      example:
+        all:
+          - closureTime: closureTime
+            ticketIndex: ticketIndex
+            sourceAddress: 1.339446426793328E+48
+            destinationAddress: 1.339446426793328E+48
+            balance: '10000000000000000000'
+            sourcePeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            destinationPeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            channelEpoch: channelEpoch
+            channelId: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            status: Open
+          - closureTime: closureTime
+            ticketIndex: ticketIndex
+            sourceAddress: 1.339446426793328E+48
+            destinationAddress: 1.339446426793328E+48
+            balance: '10000000000000000000'
+            sourcePeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            destinationPeerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            channelEpoch: channelEpoch
+            channelId: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            status: Open
+        incoming:
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            balance: '10000000000000000000'
+            id: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            type: incoming
+            status: Open
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            balance: '10000000000000000000'
+            id: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            type: incoming
+            status: Open
+        outgoing:
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            balance: '10000000000000000000'
+            id: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            type: incoming
+            status: Open
+          - peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+            balance: '10000000000000000000'
+            id: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+            type: incoming
+            status: Open
+      properties:
+        incoming:
+          description: Incomming channels are the ones that were opened by a different
+            node and this node acts as relay.
+          items:
+            $ref: '#/components/schemas/Channel'
+          type: array
+        outgoing:
+          description: Outgoing channels are the ones that were opened by this node
+            and is using other node as relay.
+          items:
+            $ref: '#/components/schemas/Channel'
+          type: array
+        all:
+          description: All the channels indexed by the node in the current network.
+          items:
+            $ref: '#/components/schemas/ChannelTopology'
+          type: array
+      type: object
+    channelsOpenChannel_request:
+      example:
+        peerAddress: 0xf55df5f3ce0ccce707f76ef3e8459adff376ac99
+        amount: '1000000'
+      properties:
+        peerAddress:
+          description: Peer address that we want to transact with using this channel.
+          format: ethereumaddress
+          type: string
+        amount:
+          description: Amount of HOPR tokens to fund the channel. It will be used
+            to pay for sending messages through channel
+          format: amount
+          type: string
+      required:
+        - amount
+        - peerAddress
+      type: object
+    channelsOpenChannel_201_response:
+      example:
+        transactionReceipt: 2.51409958563871E+76
+        channelId: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+      properties:
+        channelId:
+          description: The unique identifier of a unidirectional HOPR channel.
+          example: 27406162736469732000000000000000000000000000000000000000000000000000000000000
+          format: string
+        transactionReceipt:
+          description: Receipt identifier for an Ethereum transaction.
+          example: 2.51409958563871E+76
+          type: string
+      type: object
+    channelsOpenChannel_403_response:
+      properties:
+        status:
+          description: Insufficient balance to open channel. Amount passed in request
+            body exeeds current balance.
+          example: NOT_ENOUGH_BALANCE
+          type: string
+      type: object
+    channelsOpenChannel_409_response:
+      properties:
+        status:
+          description: Channel already open. Cannot open more than one channel between
+            two nodes.
+          example: CHANNEL_ALREADY_OPEN
+          type: string
+      type: object
+    aliasesGetAliases_200_response:
+      example:
+        bob: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+        alice: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+      properties:
+        alice:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+        bob:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+      type: object
+    aliasesSetAlias_request:
+      example:
+        peerId: 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+        alias: Alice
+      properties:
+        peerId:
+          description: PeerId that we want to set alias to.
+          format: peerid
+          type: string
+        alias:
+          description: Alias that we want to attach to peerId.
+          type: string
+      required:
+        - alias
+        - peerId
+      type: object
+    accountWithdraw_request:
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          description: Amount to withdraw in the currency's smallest unit.
+          example: '1337'
+          format: amount
+          type: string
+        ethereumAddress:
+          description: "Blockchain-native account address. Can be funded from external\
+            \ wallets (starts with **0x...**). It **can't be used** internally to\
+            \ send / receive messages, open / close payment channels."
+          example: 1.339446426793328E+48
+          format: ethereumaddress
+          type: string
+      required:
+        - amount
+        - currency
+        - ethereumAddress
+      type: object
+    accountWithdraw_200_response:
+      example:
+        receipt: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+      properties:
+        receipt:
+          description: Withdraw txn hash that can be used to check details of the
+            transaction on ethereum chain.
+          example: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+          type: string
+      type: object
+    accountWithdraw_422_response:
+      properties:
+        status:
+          example: NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE
+          type: string
+        error:
+          example: NOT_ENOUGH_BALANCE
+          type: string
+      type: object
+    accountGetBalances_200_response:
+      example:
+        safeNative: '1000000000000000000'
+        native: '1000000000000000000'
+        safeHopr: '10000000000000000000'
+        hopr: '10000000000000000000'
+        safeHoprAllowance: '10000000000000000000'
+      properties:
+        native:
+          description: "Amount of NATIVE (ETH) balance in the smallest unit. Used\
+            \ only for gas fees on the blockchain the current release is running on.\
+            \ For example, when you will open or close the payment channel, it will\
+            \ use gas fees to execute this action."
+          example: '1000000000000000000'
+          type: string
+        hopr:
+          description: Amount of HOPR tokens in the smallest unit. Used for funding
+            payment channels.
+          example: '10000000000000000000'
+          type: string
+        safeNative:
+          description: "Amount of NATIVE (ETH) balance in the smallest unit. Used\
+            \ only for gas fees on the blockchain the current release is running on.\
+            \ For example, when you will open or close the payment channel, it will\
+            \ use gas fees to execute this action."
+          example: '1000000000000000000'
+          type: string
+        safeHopr:
+          description: Amount of HOPR tokens in the smallest unit. Used for funding
+            payment channels.
+          example: '10000000000000000000'
+          type: string
+        safeHoprAllowance:
+          description: Amount of HOPR tokens in the smallest unit. Used for funding
+            payment channels.
+          example: '10000000000000000000'
+          type: string
+      type: object
+    accountGetAddresses_200_response:
+      example:
+        native: 1.339446426793328E+48
+        hopr: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+      properties:
+        native:
+          description: "Blockchain-native account address. Can be funded from external\
+            \ wallets (starts with **0x...**). It **can't be used** internally to\
+            \ send / receive messages, open / close payment channels."
+          example: 1.339446426793328E+48
+          format: ethereumaddress
+          type: string
+        hopr:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+      type: object
+    settingsSetSetting_request:
+      example:
+        settingValue: true
+      properties:
+        settingValue: {}
+      required:
+        - settingValue
+      type: object
+    peersPingPeer_200_response:
+      example:
+        reportedVersion: 1.92.12
+        latency: 10
+      properties:
+        latency:
+          description: Number of milliseconds it took to get the response from the
+            pinged node.
+          example: 10
+          type: number
+        reportedVersion:
+          description: HOPR protocol version as determined from the successful ping
+            in the Major.Minor.Patch format or "unknown"
+          example: 1.92.12
+          type: string
+      type: object
+    peerInfoGetPeerInfo_200_response:
+      example:
+        announced:
+          - "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ]"
+          - "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ]"
+        observed:
+          - "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ]"
+          - "[\"/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ,\"/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit\"\
+            ]"
+      properties:
+        announced:
+          items:
+            $ref: '#/components/schemas/MultiAddress'
+          type: array
+        observed:
+          items:
+            $ref: '#/components/schemas/MultiAddress'
+          type: array
+      type: object
+    channelsFundChannel_request:
+      example:
+        amount: '1000000'
+      properties:
+        amount:
+          description: Amount of weiHOPR tokens to fund the channel. It will be used
+            to pay for sending messages through channel
+          format: amount
+          type: string
+      required:
+        - amount
+      type: object
+    channelsFundChannel_200_response:
+      example:
+        receipt: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+      properties:
+        receipt:
+          description: Receipt of the funding transaction
+          example: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+          type: string
+      required:
+        - receipt
+      type: object
+    channelsCloseChannel_200_response:
+      example:
+        receipt: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+        channelStatus: Closed
+      properties:
+        receipt:
+          description: Receipt of the closing transaction
+          example: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
+          type: string
+        channelStatus:
+          description: Current status of the channel
+          example: Closed
+          type: string
+      type: object
+    aliasesGetAlias_200_response:
+      example:
+        peerId: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+      properties:
+        peerId:
+          description: "HOPR account address, also called a PeerId. Used to send /\
+            \ receive messages, open / close payment channels."
+          example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+          format: peerid
+          type: string
+      type: object
+    TokenCapabilityLimit_conditions:
+      description: 'Limit conditions, if any'
+      properties:
+        max:
+          description: Upper ceiling. Applies to limit type calls.
+          type: integer
+      type: object
+  securitySchemes:
+    keyScheme:
+      description: A valid API token which had been configured at node startup or
+        through the token API.
+      in: header
+      name: x-auth-token
+      type: apiKey
+    passwordScheme:
+      description: A valid API token is used as the user which had been configured
+        at node startup. No password is required.
+      scheme: basic
+      type: http

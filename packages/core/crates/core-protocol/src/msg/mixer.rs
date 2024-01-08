@@ -1,8 +1,5 @@
 use std::time::Duration;
 
-use rand::Rng;
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct MixerConfig {
     min_delay: Duration,
@@ -21,24 +18,11 @@ impl Default for MixerConfig {
 }
 
 impl MixerConfig {
-    /// Get a random delay duration from the specified minimum and maximum delay available
-    /// inside the configuration.
-    pub fn random_delay(&self) -> Duration {
-        let mut rng = rand::thread_rng();
-        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
-
-        Duration::from_millis(random_delay)
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl MixerConfig {
     /// Create an instance of a new mixer configuration
     ///
     /// # Arguments
     /// * `min_delay` - the minimum delay invoked by the mixer represented in milliseconds
     /// * `min_delay` - the maximum delay invoked by the mixer represented in milliseconds
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn new(min_delay: u64, max_delay: u64) -> Self {
         if min_delay >= max_delay {
             panic!("The minimum delay must be smaller than the maximum delay")
@@ -50,6 +34,18 @@ impl MixerConfig {
             metric_delay_window: 10u64,
         }
     }
+
+    /// Get a random delay duration from the specified minimum and maximum delay available
+    /// inside the configuration.
+    pub fn random_delay(&self) -> Duration {
+        let random_delay = core_crypto::random::random_integer(
+            self.min_delay.as_millis() as u64,
+            Some(self.max_delay.as_millis() as u64),
+        )
+        .unwrap_or(self.max_delay.as_millis() as u64);
+
+        Duration::from_millis(random_delay)
+    }
 }
 
 #[cfg(test)]
@@ -57,6 +53,7 @@ mod tests {
     use super::*;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
+    use rand::Rng;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;
@@ -90,8 +87,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
-        let constant_delay = Duration::from_millis(10);
-        let tolerance = Duration::from_millis(1);
+        let constant_delay = Duration::from_millis(50);
+        let tolerance = Duration::from_millis(3);
 
         let expected = vec![1, 2, 3];
 

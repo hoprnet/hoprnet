@@ -3,12 +3,9 @@ use core_network::{
     PeerId,
 };
 use futures::channel::mpsc::Sender;
-use utils_log::error;
+use log::error;
 
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
+use platform::time::native::current_timestamp;
 
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
@@ -33,6 +30,6 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         }
     }
     fn create_timestamp(&self) -> u64 {
-        current_timestamp()
+        current_timestamp().as_millis() as u64
     }
 }

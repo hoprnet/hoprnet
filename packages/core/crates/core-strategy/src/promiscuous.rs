@@ -3,10 +3,10 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -104,7 +104,7 @@ where
 impl<Db, Net, A> PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
+    Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions,
 {
     pub fn new(
@@ -331,12 +331,12 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<Db, Net, A> SingularStrategy for PromiscuousStrategy<Db, Net, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
-    A: ChannelActions,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Net: NetworkExternalActions + Send + Sync,
+    A: ChannelActions + Send + Sync,
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
@@ -409,8 +409,8 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use lazy_static::lazy_static;
     use mockall::mock;
+    use platform::time::native::current_timestamp;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -423,7 +423,7 @@ mod tests {
 
     mock! {
         ChannelAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl ChannelActions for ChannelAct {
             async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
             async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<PendingAction>;
@@ -443,7 +443,7 @@ mod tests {
         }
         fn emit(&self, _: NetworkEvent) {}
         fn create_timestamp(&self) -> u64 {
-            current_timestamp()
+            current_timestamp().as_millis() as u64
         }
     }
 
@@ -479,7 +479,7 @@ mod tests {
             net.add(peer, PeerOrigin::Initialization);
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                net.update(peer, Ok(current_timestamp()));
+                net.update(peer, Ok(current_timestamp().as_millis() as u64));
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",

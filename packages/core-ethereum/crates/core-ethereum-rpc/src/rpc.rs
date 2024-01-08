@@ -11,7 +11,7 @@ use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryCl
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_log::debug;
+use log::debug;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -124,8 +124,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
         let ts = self
@@ -210,7 +209,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
-    use async_std::prelude::FutureExt;
+    use async_std::task::sleep;
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
@@ -264,7 +263,8 @@ pub mod tests {
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
-        pending.into_future().delay(timeout).await.expect(&format!(
+        sleep(timeout).await;
+        pending.into_future().await.expect(&format!(
             "timeout awaiting tx hash {tx_hash} after {} seconds",
             timeout.as_secs()
         ));

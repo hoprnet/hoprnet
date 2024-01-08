@@ -25,7 +25,7 @@ fi
 
 release_name="${1:-}"
 
-if [ "$(jq '.["'${release_name}'"]' "${mydir}/../packages/hoprd/releases.json")" = "null" ]; then
+if [ "$(jq '.["'${release_name}'"]' "${mydir}/../releases.json")" = "null" ]; then
   echo "Error: Parameter <release_name> contains unsupported value"
   exit 1
 fi
@@ -39,28 +39,6 @@ if [ -z "$(git status --porcelain)" ]; then
   git checkout -b "merge-back-release-${release_name}"
   git merge "release/${release_name}" > /tmp/merge.log || true
   cat /tmp/merge.log
-
-  # Resolve conflicts for package.json
-  packages=(core-ethereum core hoprd real utils)
-  for package in "${packages[@]}"; do
-    if [ `git diff packages/${package}/package.json | wc -l` -gt "0" ]; then
-      if [ `git diff packages/${package}/package.json  | grep @@ | wc -l` -eq "1" ]; then
-        git checkout --theirs packages/${package}/package.json
-        git add packages/${package}/package.json
-      else
-        echo "[ERROR] Review changes manually for ./packages/${package}/package.json"
-        exit 1
-      fi
-    fi
-  done
-
-  # Check if there are conflicts
-  conflicts="$(grep "CONFLICT" /tmp/merge.log | grep -v package.json | wc -l)"
-  if [ "${conflicts}" -gt "0" ]; then
-    echo "[ERROR] There are conflicts in source code files"
-    echo "[ERROR] You will need to continue manually on branch 'merge-back-release-${release_name}' or abort 'git merge --abort'"
-    exit 1
-  fi
 
   git commit -am "Merge branch 'master' into merge-back-release-${release_name}"
   git push --set-upstream origin "merge-back-release-${release_name}"

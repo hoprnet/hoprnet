@@ -19,12 +19,13 @@ use core_types::{
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use utils_log::{debug, error};
+use log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,
 };
 
+#[derive(Debug, Clone)]
 pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
@@ -524,8 +525,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     }
 }
 
-#[async_trait(? Send)]
-impl<U: HoprCoreEthereumDbActions> crate::traits::ChainLogHandler for ContractEventHandlers<U> {
+#[async_trait]
+impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler for ContractEventHandlers<U> {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
             self.addresses.channels,

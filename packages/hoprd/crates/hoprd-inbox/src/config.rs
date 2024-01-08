@@ -15,7 +15,6 @@ pub fn validate_is_power_of_two(value: u32) -> Result<(), ValidationError> {
 }
 
 /// Holds basic configuration parameters of the `MessageInbox`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Validate, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct MessageInboxConfiguration {
@@ -25,7 +24,7 @@ pub struct MessageInboxConfiguration {
     pub capacity: u32,
     /// Maximum age of a message held in the inbox until it is purged.
     #[serde_as(as = "DurationSeconds<u64>")]
-    max_age: Duration, // TODO: with the removal of wasm-bindgen this value can be public
+    pub max_age: Duration,
     /// List of tags that are excluded on `push`.
     pub excluded_tags: Vec<Tag>,
 }
@@ -39,15 +38,5 @@ impl Default for MessageInboxConfiguration {
             max_age: RAW_15_MINUTES,
             excluded_tags: vec![DEFAULT_APPLICATION_TAG],
         }
-    }
-}
-
-impl MessageInboxConfiguration {
-    pub fn max_age_sec(&self) -> u64 {
-        self.max_age.as_secs()
-    }
-
-    pub fn set_max_age_sec(&mut self, age: u64) {
-        self.max_age = Duration::from_secs(age)
     }
 }

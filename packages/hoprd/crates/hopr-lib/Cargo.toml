@@ -12,22 +12,17 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-lock = { workspace = true }
 async-std = { workspace = true }
 const_format = "0.2.32"
 futures = { workspace = true }
 lazy_static = { workspace = true }
+semver = "1.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
-
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { workspace = true, optional = true }
-gloo-timers = { workspace = true, optional = true }
-serde-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
 
 core-path = { workspace = true }
 core-transport = { workspace = true }
@@ -36,37 +31,21 @@ core-strategy = { workspace = true }        # TODO: better organize and cleanup,
 core-ethereum-actions = { workspace = true }
 core-ethereum-api = { workspace = true }
 core-ethereum-rpc = { workspace = true }
-core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-db = { workspace = true }
 core-ethereum-types = { workspace = true }
 core-ethereum-indexer = { workspace = true }
-real-base = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
-utils-log = { workspace = true }
+platform = { workspace = true }
+utils-db = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
-utils-misc = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
 serde_yaml = { version = "0.9" }
 
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
+default = ["prometheus"]
 wasm = [
-    "dep:js-sys",
-    "dep:gloo-timers",
-    "dep:serde-wasm-bindgen",
-    "dep:wasm-bindgen",
-    "dep:wasm-bindgen-futures",
     "core-path/wasm",
     "core-transport/wasm",
     "core-types/wasm",
@@ -76,12 +55,9 @@ wasm = [
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",
     "core-ethereum-rpc/wasm",
-    "real-base/wasm",
+    "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-log/wasm",
     "utils-metrics?/wasm",
-    "utils-misc/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics"]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+prometheus = ["dep:utils-metrics", "core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus", "core-ethereum-rpc/prometheus",  ]

@@ -1,0 +1,32 @@
+[package]
+name = "platform"
+version = "0.1.1"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Rust implementation of wrappers for different platforms, including WASM"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+wasm-bindgen = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
+
+[dependencies]
+bitflags = { version = "2.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+thiserror = { workspace = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = "0.12.0"
+wasm-opt = "0.112.0"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

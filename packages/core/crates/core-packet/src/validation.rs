@@ -5,7 +5,7 @@ use crate::errors::{
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use utils_log::{debug, info};
+use log::{debug, info};
 use utils_types::primitives::{Address, Balance};
 
 /// Performs validations of the given unacknowledged ticket and channel.
@@ -141,7 +141,7 @@ mod tests {
     mock! {
         pub Db { }
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;

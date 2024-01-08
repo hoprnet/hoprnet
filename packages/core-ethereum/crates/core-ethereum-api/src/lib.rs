@@ -19,21 +19,13 @@ use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
-use utils_log::{debug, error, info, warn};
-use utils_types::primitives::{Address, Balance, BalanceType};
+use log::{debug, error, info, warn};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};
 
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
 
-#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-pub type DefaultHttpPostRequestor = core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor;
-
-#[cfg(not(target_arch = "wasm32"))]
 pub type DefaultHttpPostRequestor = core_ethereum_rpc::client::native::SurfRequestor;
 
 pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;
@@ -101,7 +93,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
@@ -184,6 +176,10 @@ impl HoprChain {
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.db.read().await.get_channels().await?)
+    }
+
+    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
+        Ok(self.db.read().await.get_ticket_price().await?)
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {

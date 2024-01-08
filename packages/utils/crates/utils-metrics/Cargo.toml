@@ -12,25 +12,11 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { workspace = true, optional = true }
 prometheus = "0.13"
 regex = "1"
-wasm-bindgen = { workspace = true, optional = true }
 
-utils-misc = { workspace = true, default-features = false }
-
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
+platform = { workspace = true }
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "utils-misc/wasm" ]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
+default = []
+wasm = [ "platform/wasm-bindgen" ]

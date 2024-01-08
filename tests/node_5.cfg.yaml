@@ -13,9 +13,9 @@ hopr:
     finalize_channel_closure: false
     strategies: []
   heartbeat:
-    variance: 1000
-    interval: 2500
-    threshold: 2500
+    variance: 1
+    interval: 3
+    threshold: 3
   network_options:
     min_delay: 1
     max_delay: 300
@@ -43,6 +43,9 @@ hopr:
     announce: true
     network: anvil-localhost
     provider: null
+    protocols:
+      networks:
+      chains:
     check_unrealized_balance: true
   safe_module:
     safe_transaction_service_provider: 'https://safe-transaction.stage.hoprtech.net/'

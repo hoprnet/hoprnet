@@ -2,9 +2,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug, Serialize, Deserialize)]
-pub enum HoprdConfigError {
-    #[error("configuration file error: '{0}'")]
+pub enum HoprdError {
+    #[error("file error: '{0}'")]
     FileError(String),
+
+    #[error("configuration error: '{0}'")]
+    ConfigError(String),
 
     #[error("serialization failed: '{0}'")]
     SerializationError(String),
@@ -16,4 +19,4 @@ pub enum HoprdConfigError {
     DbError(#[from] utils_db::errors::DbError),
 }
 
-pub type Result<T> = std::result::Result<T, HoprdConfigError>;
+pub type Result<T> = std::result::Result<T, HoprdError>;

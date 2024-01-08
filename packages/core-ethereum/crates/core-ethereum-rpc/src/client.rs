@@ -15,12 +15,14 @@ use utils_metrics::metrics::MultiCounter;
 
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {
-     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
         "core_ethereum_counter_rpc_calls",
         "Number of successful RPC calls over HTTP",
-        &["eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
-          "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
-          "eth_getTransactionByHash", "eth_getLogs"]
+        &[
+            "eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
+            "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
+            "eth_getTransactionByHash", "eth_getLogs"
+        ]
     )
     .unwrap();
 }
@@ -190,7 +192,6 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub mod native {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
@@ -219,6 +220,7 @@ pub mod native {
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
+    /// `surf` works also for Browsers in WASM environments.
     #[derive(Clone, Debug)]
     pub struct SurfRequestor(surf::Client);
 
@@ -316,7 +318,7 @@ pub mod native {
             let data = resp
                 .text()
                 .await
-                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))?;
+                .map_err(|e| HttpRequestError::UnknownError(format!("body: {}", e.to_string())))?;
 
             //debug!("<- http post response with {}", data.len());
 

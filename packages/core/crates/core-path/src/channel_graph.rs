@@ -7,7 +7,7 @@ use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use utils_log::{debug, info};
+use log::{debug, info};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]

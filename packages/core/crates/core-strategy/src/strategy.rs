@@ -4,7 +4,7 @@ use crate::auto_redeeming::AutoRedeemingStrategy;
 use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
@@ -18,14 +18,10 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_log::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 use validator::Validate;
 
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
+use platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -38,13 +34,13 @@ lazy_static::lazy_static! {
     static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter =
         SimpleCounter::new("core_counter_strategy_count_closure_finalization", "Count of channels where closure finalizing was initiated automatically").unwrap();
 
-     static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
+    static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
         MultiGauge::new("core_multi_gauge_strategy_enabled_strategies", "List of enabled strategies", Strategy::VARIANTS).unwrap();
 }
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait SingularStrategy: Display {
     /// Strategy event raised at period intervals (typically each 1 minute).
     async fn on_tick(&self) -> Result<()> {
@@ -69,19 +65,19 @@ pub trait SingularStrategy: Display {
 
 /// Internal strategy which runs per tick and finalizes `PendingToClose` channels
 /// which have elapsed the grace period
-struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone> {
+struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
     db: Arc<RwLock<Db>>,
     chain_actions: CoreEthereumActions<Db>,
 }
 
-impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "channel_closure_finalizer")
     }
 }
 
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFinalizer<Db> {
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
         let to_close = self
             .db
@@ -91,7 +87,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp())
+                channel.status == ChannelStatus::PendingToClose
+                    && channel.closure_time_passed(current_timestamp().as_millis() as u64)
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
@@ -124,7 +121,6 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
@@ -146,28 +142,7 @@ pub struct MultiStrategyConfig {
 
     /// Configuration of individual sub-strategies.
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
-    pub(crate) strategies: Vec<Strategy>, // non-pub due to wasm
-}
-
-impl MultiStrategyConfig {
-    pub fn new(
-        on_fail_continue: bool,
-        allow_recursive: bool,
-        finalize_channel_closure: bool,
-        strategies: Vec<Strategy>,
-    ) -> Self {
-        // This constructor can be removed once `strategies` field is made `pub`
-        Self {
-            on_fail_continue,
-            allow_recursive,
-            finalize_channel_closure,
-            strategies,
-        }
-    }
-
-    pub fn get_strategies(&mut self) -> &mut Vec<Strategy> {
-        &mut self.strategies
-    }
+    pub strategies: Vec<Strategy>,
 }
 
 impl Default for MultiStrategyConfig {
@@ -186,7 +161,7 @@ impl Default for MultiStrategyConfig {
 /// which makes it possible (along with different `on_fail_continue` policies) to construct
 /// various logical strategy chains.
 pub struct MultiStrategy {
-    strategies: Vec<Box<dyn SingularStrategy>>,
+    strategies: Vec<Box<dyn SingularStrategy + Send + Sync>>,
     cfg: MultiStrategyConfig,
 }
 
@@ -201,10 +176,10 @@ impl MultiStrategy {
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Clone + 'static,
-        Net: NetworkExternalActions + 'static,
+        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+        Net: NetworkExternalActions + Send + Sync + 'static,
     {
-        let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
+        let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
         if cfg.finalize_channel_closure {
             strategies.push(Box::new(ChannelCloseFinalizer {
@@ -281,7 +256,7 @@ impl Display for MultiStrategy {
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {

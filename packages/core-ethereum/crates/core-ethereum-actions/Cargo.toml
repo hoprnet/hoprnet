@@ -15,19 +15,15 @@ crate-type = ["cdylib", "rlib"]
 async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-ethers = { version = "2", default-features = false }
+ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 hex = { workspace = true }
-js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
 primitive-types = "0.12.1"
 serde = { workspace = true, features = ["derive"] }
-serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"], optional = true }
 
 bindings = { workspace = true }
 core-crypto = { workspace = true }
@@ -36,9 +32,9 @@ core-ethereum-rpc = { workspace = true }
 core-ethereum-types = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
-utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-misc = { workspace = true }
-utils-log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+platform = { workspace = true }
+log = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -47,12 +43,8 @@ env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
-default = ["wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen",
-    "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+default = ["prometheus"]
+wasm = [ "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
+    "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics", "core-ethereum-rpc/prometheus" ]

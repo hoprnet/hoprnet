@@ -8,6 +8,15 @@ pub enum ProtocolError {
     #[error("tx queue is full, retry later")]
     Retry,
 
+    #[error("payment channel is closed")]
+    ChannelClosed,
+
+    #[error("payment channel was not found")]
+    ChannelNotFound,
+
+    #[error("timeout on protocol operation")]
+    Timeout,
+
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 
@@ -31,10 +40,3 @@ pub enum ProtocolError {
 }
 
 pub type Result<T> = core::result::Result<T, ProtocolError>;
-
-#[cfg(feature = "wasm")]
-impl From<ProtocolError> for wasm_bindgen::JsValue {
-    fn from(value: ProtocolError) -> Self {
-        value.to_string().into()
-    }
-}

@@ -10,7 +10,7 @@ use core_types::{
 };
 use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait]
 #[cfg_attr(test, mockall::automock)]
 pub trait HoprCoreEthereumDbActions {
     // core only part

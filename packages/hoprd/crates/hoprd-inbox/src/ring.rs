@@ -6,8 +6,10 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
+use platform::time::native::current_timestamp;
+
 /// Acts a simple wrapper of a message with added insertion timestamp.
-struct PayloadWrapper<M> {
+struct PayloadWrapper<M: std::marker::Send> {
     payload: M,
     ts: Duration,
 }
@@ -17,8 +19,8 @@ struct PayloadWrapper<M> {
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
@@ -27,18 +29,12 @@ where
 
 impl<T, M> RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     /// Creates new backend with default timestamping function from std::time.
-    /// This is incompatible with WASM runtimes.
-    #[cfg(not(feature = "wasm"))]
     pub fn new(capacity: usize) -> Self {
-        Self::new_with_capacity(capacity, || {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-        })
+        Self::new_with_capacity(capacity, current_timestamp)
     }
 
     /// Counts only the untagged entries.
@@ -69,11 +65,11 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
-    M: Clone,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");

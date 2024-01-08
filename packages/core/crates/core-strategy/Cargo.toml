@@ -12,9 +12,11 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-lock = { workspace = true }
 async-trait = { workspace = true }
 async-std = { workspace = true, features = ["unstable"]}
-getrandom = { workspace = true }
+futures = { workspace = true }
+getrandom = { workspace = true, optional = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
@@ -22,9 +24,6 @@ lazy_static = { workspace = true }
 strum = { version = "0.25", features = ["derive"] }
 thiserror = { workspace = true }
 validator = { workspace = true }
-futures = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = {workspace = true, optional = true}
 
 core-types = { workspace = true }
 core-crypto = { workspace = true }
@@ -33,8 +32,8 @@ core-protocol = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-actions = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
-utils-misc = { workspace = true }
+log = { workspace = true }
+platform = { workspace = true }
 utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true }
 
@@ -46,16 +45,8 @@ mockall = "0.11.4"
 hex-literal = "0.4.1"
 futures = "0.3.28"
 
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures" ]
-prometheus = [ "dep:utils-metrics" ]
+default = ["prometheus"]
+wasm = ["dep:getrandom" ]
+prometheus = [ "dep:utils-metrics", "core-network/prometheus", "core-protocol/prometheus", "core-ethereum-actions/prometheus" ]

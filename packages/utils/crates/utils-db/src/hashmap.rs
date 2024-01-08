@@ -57,7 +57,7 @@ where
 
 pub type BinaryHashMapStorage = InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>;
 
-#[async_trait(?Send)]
+#[async_trait]
 impl AsyncKVStorage for BinaryHashMapStorage {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;

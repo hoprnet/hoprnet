@@ -1,6 +1,6 @@
 # HOPR Metrics Collection
 
-The purpose of the `utils-metrics` Rust crate is create a thin Rust WASM-compatible wrapper
+The purpose of the `utils-metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
 over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 
 The reason for making this wrapper is to make it suitable for `wasm-bindgen` bindings to JS/TS. The

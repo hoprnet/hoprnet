@@ -12,26 +12,21 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-std = "1.12.0"
-console_error_panic_hook = { version = "0.1.7", optional = true }
+async-std = { workspace = true }
 hex = { workspace = true }
-js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 thiserror = "1.0"
 typenum = "1.16"
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
-gloo-timers = { workspace = true, optional = true}
 
-core-crypto = { workspace = true, default-features = false }
-core-ethereum-db = { workspace = true, default-features = false }
-core-path = { workspace = true, default-features = false}
-core-types = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-utils-metrics = { workspace = true, optional = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
-utils-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-path = { workspace = true }
+core-types = { workspace = true }
+platform = { workspace = true }
+utils-db = { workspace = true }
+log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+utils-types = { workspace = true }
 
 [dev-dependencies]
 async-std = {version = "1.12.0", features = ["unstable"]}
@@ -44,14 +39,7 @@ mockall = "0.11.4"
 parameterized = "1.0"
 serial_test = "2.0"
 
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
-wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-types/wasm" ]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
-prometheus = ["dep:utils-metrics"]
+default = ["prometheus"]
+wasm = [ "core-crypto/wasm", "core-ethereum-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-types/wasm" ]
+prometheus = [ "dep:utils-metrics", "core-path/prometheus" ]

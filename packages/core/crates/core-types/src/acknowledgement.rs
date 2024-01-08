@@ -14,7 +14,7 @@ use core_crypto::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::debug;
+use log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,
@@ -644,84 +644,5 @@ pub mod test {
             acked_ticket,
             AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
-    use crate::channels::wasm::Ticket;
-    use core_crypto::types::{Hash, Response};
-    use utils_types::primitives::Address;
-    use utils_types::traits::ToHex;
-    use wasm_bindgen::prelude::*;
-
-    #[derive(Clone)]
-    #[wasm_bindgen]
-    pub struct AcknowledgedTicket {
-        w: super::AcknowledgedTicket,
-    }
-
-    #[wasm_bindgen]
-    impl AcknowledgedTicket {
-        #[wasm_bindgen(getter)]
-        pub fn response(&self) -> Response {
-            self.w.response.clone()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn ticket(&self) -> Ticket {
-            self.w.ticket.clone().into()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn signer(&self) -> Address {
-            self.w.signer
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> AcknowledgedTicket {
-            Self { w: self.w.clone() }
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.w.to_string()
-        }
-
-        #[wasm_bindgen]
-        pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
-            if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
-                if let BeingRedeemed { .. } = self.w.status {
-                    if !tx_hash.eq(&Hash::default()) {
-                        self.w.status = BeingRedeemed { tx_hash }
-                    }
-                }
-            }
-        }
-    }
-
-    impl From<super::AcknowledgedTicket> for AcknowledgedTicket {
-        fn from(value: super::AcknowledgedTicket) -> Self {
-            Self { w: value }
-        }
-    }
-
-    impl From<&super::AcknowledgedTicket> for AcknowledgedTicket {
-        fn from(value: &super::AcknowledgedTicket) -> Self {
-            Self { w: value.clone() }
-        }
-    }
-
-    impl From<AcknowledgedTicket> for super::AcknowledgedTicket {
-        fn from(value: AcknowledgedTicket) -> Self {
-            value.w
-        }
-    }
-
-    impl From<&AcknowledgedTicket> for super::AcknowledgedTicket {
-        fn from(value: &AcknowledgedTicket) -> Self {
-            value.w.clone()
-        }
     }
 }
