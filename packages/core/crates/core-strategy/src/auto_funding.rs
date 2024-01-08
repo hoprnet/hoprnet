@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
 use core_types::channels::ChannelDirection::Outgoing;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 

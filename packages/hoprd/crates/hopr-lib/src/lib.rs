@@ -37,8 +37,8 @@ use core_types::{
     channels::{generate_channel_id, ChannelStatus, Ticket},
 };
 
-use utils_db::db::DB;
 use log::debug;
+use utils_db::db::DB;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
 use core_ethereum_api::HoprChain;
@@ -52,9 +52,9 @@ use core_transport::{
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
+use log::{error, info};
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::rusty::RustyLevelDbShim;
-use log::{error, info};
 use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;

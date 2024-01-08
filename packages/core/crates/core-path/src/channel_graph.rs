@@ -1,13 +1,13 @@
 use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use log::{debug, info};
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use log::{debug, info};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]

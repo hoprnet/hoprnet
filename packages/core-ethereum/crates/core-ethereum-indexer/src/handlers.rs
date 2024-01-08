@@ -17,9 +17,9 @@ use core_types::{
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,

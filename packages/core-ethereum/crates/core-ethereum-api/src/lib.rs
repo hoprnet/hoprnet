@@ -18,8 +18,8 @@ use core_ethereum_rpc::rpc::RpcOperations;
 use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
-use utils_db::rusty::RustyLevelDbShim;
 use log::{debug, error, info, warn};
+use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};

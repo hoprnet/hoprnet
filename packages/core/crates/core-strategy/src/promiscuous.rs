@@ -1,9 +1,9 @@
 use core_crypto::types::OffchainPublicKey;
 use core_types::channels::{ChannelDirection, ChannelStatus};
+use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;

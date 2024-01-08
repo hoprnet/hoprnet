@@ -9,13 +9,13 @@ use aes::{
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::random::random_bytes;
 use hex;
+use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 

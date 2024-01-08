@@ -12,9 +12,9 @@ use core_crypto::{
     keypairs::{ChainKeypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,

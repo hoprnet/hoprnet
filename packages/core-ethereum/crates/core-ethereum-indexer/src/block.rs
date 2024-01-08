@@ -1,8 +1,8 @@
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use futures::{pin_mut, StreamExt};
-use std::{collections::VecDeque, sync::Arc};
 use log::{debug, error, info};
+use std::{collections::VecDeque, sync::Arc};
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};

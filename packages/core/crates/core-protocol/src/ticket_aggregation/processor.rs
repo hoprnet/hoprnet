@@ -20,9 +20,9 @@ use futures::{
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
+use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use log::{debug, error, info, warn};
 use utils_types::{
     primitives::{Balance, BalanceType},
     traits::PeerIdLike,

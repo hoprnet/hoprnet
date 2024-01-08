@@ -51,8 +51,8 @@ use futures::{
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
-use std::sync::Arc;
 use log::{info, warn};
+use std::sync::Arc;
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]

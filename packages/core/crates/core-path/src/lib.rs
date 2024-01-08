@@ -9,9 +9,9 @@ use core_crypto::types::OffchainPublicKey;
 use core_ethereum_db::db::CoreEthereumDb;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::protocol::PeerAddressResolver;
+use log::error;
 use std::sync::Arc;
 use utils_db::rusty::RustyLevelDbShim;
-use log::error;
 use utils_types::primitives::Address;
 
 /// DB backed packet key to chain key resolver

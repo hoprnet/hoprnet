@@ -7,10 +7,10 @@ use core_ethereum_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
+use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, U256};
 
 use crate::action_queue::{ActionSender, PendingAction};

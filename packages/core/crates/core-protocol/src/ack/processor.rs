@@ -11,9 +11,9 @@ use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
+use log::{debug, error, warn};
 use std::pin::Pin;
 use std::sync::Arc;
-use log::{debug, error, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
 use async_std::task::spawn;

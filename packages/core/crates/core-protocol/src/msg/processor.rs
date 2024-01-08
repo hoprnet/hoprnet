@@ -805,10 +805,10 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,

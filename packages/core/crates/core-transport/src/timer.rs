@@ -1,8 +1,8 @@
 use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
-use std::time::Duration;
 use log::{debug, warn};
+use std::time::Duration;
 
 use async_std::task::sleep;
 use platform::time::native::current_timestamp;

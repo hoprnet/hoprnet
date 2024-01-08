@@ -6,8 +6,8 @@ use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
 use core_types::announcement::{AnnouncementData, KeyBinding};
-use multiaddr::Multiaddr;
 use log::info;
+use multiaddr::Multiaddr;
 use utils_types::primitives::{Address, Balance};
 
 /// Contains all on-chain calls specific to HOPR node itself.

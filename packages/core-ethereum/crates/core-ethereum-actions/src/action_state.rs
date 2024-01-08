@@ -3,13 +3,13 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
+use log::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use log::{debug, error};
 
 use crate::errors::{CoreEthereumActionsError, Result};
 

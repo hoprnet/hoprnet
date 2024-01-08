@@ -7,6 +7,7 @@ use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggreg
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::ChannelDirection::Incoming;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -15,7 +16,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 

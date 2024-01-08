@@ -1,14 +1,14 @@
 pub mod config;
 
 use std::error::Error;
-use std::{collections::HashMap, sync::Arc};
 use std::str::FromStr;
+use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
-use tide::http::headers::{AUTHORIZATION, HeaderName};
+use tide::http::headers::{HeaderName, AUTHORIZATION};
 use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
@@ -126,7 +126,7 @@ impl Modify for SecurityAddon {
         );
         components.add_security_scheme(
             "api_token",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token")))
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token"))),
         );
     }
 }
@@ -145,16 +145,15 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
             Auth::Token(expected_token) => {
                 let auth_headers = request
                     .iter()
-                    .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .filter_map(|(n, v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
                     .collect::<Vec<_>>();
 
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
-                !auth_headers.is_empty() && (
-                    auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token))) ||
-                    auth_headers.contains(&(&x_auth_header, &expected_token))
-                )
-            },
-            Auth::None => true
+                !auth_headers.is_empty()
+                    && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+            }
+            Auth::None => true,
         };
 
         if !is_authorized {
