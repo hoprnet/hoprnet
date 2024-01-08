@@ -143,7 +143,7 @@ class HoprdAPI:
         :return: channels: list
         """
 
-        status, response = self.__call_api(ChannelsApi, "list_channels", full_topology=False, including_closed=False)
+        status, response = self.__call_api(ChannelsApi, "list_channels", full_topology="false", including_closed="false")
         if status:
             if not hasattr(response, "incoming"):
                 log.warning("Response does not contain `incoming`")
@@ -216,7 +216,7 @@ class HoprdAPI:
         :return: channels: list
         """
         status, response = self.__call_api(
-            ChannelsApi, "list_channels", full_topology=True, including_closed=include_closed
+            ChannelsApi, "list_channels", full_topology="true", including_closed="true" if include_closed else "false"
         )
         return response if status else []
 

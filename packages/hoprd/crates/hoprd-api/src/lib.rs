@@ -923,8 +923,10 @@ mod channels {
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQuery {
         #[schema(required = false)]
+        #[serde(default)]
         pub including_closed: bool,
         #[schema(required = false)]
+        #[serde(default)]
         pub full_topology: bool,
     }
 
@@ -1233,6 +1235,7 @@ mod messages {
     #[into_params(parameter_in = Query)]
     pub(crate) struct TagQuery {
         #[schema(required = false)]
+        #[serde(default)]
         pub tag: Option<u16>,
     }
 
