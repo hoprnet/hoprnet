@@ -246,7 +246,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
         shell=False,
         capture_output=True,
         env=env_vars,
-        # timeout=2000,
+        timeout=300,
         check=True,
     )
 
