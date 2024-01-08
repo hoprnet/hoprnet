@@ -393,7 +393,7 @@ create_local_safes
 
 log "Setting up nodes"
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "127.0.0.1" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 # use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "127.0.0.1" "--announce"
@@ -442,8 +442,7 @@ wait_for_api_ready http://127.0.0.1:13307/
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-# TODO: change 127.0.0.1 to localhost
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "127.0.0.1" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 
 wait_for_api_ready http://127.0.0.1:13301/
 # }}}
