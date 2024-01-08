@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
