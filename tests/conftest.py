@@ -145,13 +145,13 @@ def swarm7(request):
 
     try:
         logging.debug("Creating a 7 node cluster from bash")
-        # res = subprocess.run(
-        #     f"./scripts/fixture_local_test_setup.sh --setup 2>&1 | tee {log_file_path}",
-        #     shell=True,
-        #     capture_output=True,
-        #     check=True,
-        # )
-        # res.check_returncode()
+        res = subprocess.run(
+            f"./scripts/fixture_local_test_setup.sh --setup 2>&1 | tee {log_file_path}",
+            shell=True,
+            capture_output=True,
+            check=True,
+        )
+        res.check_returncode()
         nodes = NODES.copy()
         for key in NODES.keys():
             port = NODES[key]["api_port"]
@@ -161,10 +161,10 @@ def swarm7(request):
         logging.error("Creating a 7 node cluster from bash - FAILED")
     finally:
         logging.debug("Tearing down the 7 node cluster from bash")
-        # subprocess.run(
-        #     f"./scripts/fixture_local_test_setup.sh --teardown 2>&1 | tee --append {log_file_path}",
-        #     shell=True,
-        #     capture_output=True,
-        #     check=False,
-        # )
+        subprocess.run(
+            f"./scripts/fixture_local_test_setup.sh --teardown 2>&1 | tee --append {log_file_path}",
+            shell=True,
+            capture_output=True,
+            check=False,
+        )
         pass
