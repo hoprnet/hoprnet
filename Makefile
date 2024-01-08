@@ -486,11 +486,15 @@ generate-python-sdk:
 
 	target/debug/hoprd-api-schema >| openapi.spec.json
 
+	jq --argjson specContent "$$(cat openapi.spec.json)" --arg version $$(./scripts/get-current-version.sh docker) '.spec += $$specContent | .options.additionalProperties.packageVersion=$$version' scripts/python-sdk-config.json > scripts/python-sdk-config_parsed.json
 	mkdir -p ./hoprd-sdk-python/
-	rm -rf ./hoprd-sdk-python/*
-	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
-		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
-		-c /local/scripts/python-sdk-config.json
+	rm -rf ./hoprd-sdk-python/{*,.swagger-codegen,.swagger-codegen-ignore,.travis.yml,.gitignore}
+	export http_response_code=$$(curl -s -w "%{http_code}" -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config_parsed.json --output hoprd-sdk-python.zip)
+	if [[ "$$http_response_code" != 200 ]]; then \
+		cat ./hoprd-sdk-python.zip;  \
+		exit 1; \
+	fi
+	unzip -o ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

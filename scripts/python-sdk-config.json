@@ -1,5 +1,4 @@
 {
-  "specURL": "https://raw.githubusercontent.com/hoprnet/hoprnet/master/packages/hoprd/rest-api-v3-spec.yaml",
   "lang": "python",
   "type": "CLIENT",
   "options": {
