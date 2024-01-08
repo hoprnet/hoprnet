@@ -87,8 +87,7 @@ jobs:
           yq -iP '.options.additionalProperties.packageVersion=env(current_version)' -o json scripts/python-sdk-config.json
 
       - name: Generate Docs
-        run: |
-          nix develop -c make build-docs-api
+        run: nix develop -c make build-docs-api
 
       - name: Generate SDK Python
         run: |
@@ -99,6 +98,9 @@ jobs:
           echo "Copy contents of auto generated code into repository"
           unzip -o ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
           echo "Fix auto generated code"
+          sleep 999999999999
+          # When the patch command fails, the patch file needs to be updated with the new changes by executing this kind of command
+          # diff --color -ruN -x .git hoprnet/hoprd-sdk-python/hoprd_sdk/api_client.py hoprd-sdk-python/hoprd_sdk/api_client.py > ./hoprnet/scripts/python-sdk.patch
           patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
       - name: Create Pull Request
