@@ -116,7 +116,7 @@ class HoprdAPI:
         :return: bool
         """
         body = FundRequest(amount=amount)
-        status, _ = self.__call_api(ChannelsApi, "fund_channel", channel_id, body=body)
+        status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
     async def close_channel(self, channel_id: str):

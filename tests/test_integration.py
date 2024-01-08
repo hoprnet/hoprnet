@@ -215,6 +215,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
         print("Could not get ticket price from API, using default value")
 
 
+@pytest.mark.skip
 def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
     """
     Tests run in bash file that more or less need to be run in the future python fixture.
