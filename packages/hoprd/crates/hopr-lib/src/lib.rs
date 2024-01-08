@@ -559,6 +559,13 @@ impl Hopr {
             cfg.db.initialize = true
         }
 
+        // create DB dir if it does not exist
+        if let Some(parent_dir_path) = std::path::Path::new(&db_path).parent() {
+            if !parent_dir_path.is_dir() {
+                std::fs::create_dir_all(&parent_dir_path).expect("Failed to create a DB directory")
+            }
+        }
+
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(utils_db::rusty::RustyLevelDbShim::new(&db_path, cfg.db.initialize)),
             me_onchain.public().to_address(),

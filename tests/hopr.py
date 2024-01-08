@@ -29,7 +29,6 @@ class HoprdAPI:
         self.configuration = Configuration()
         self.configuration.host = f"{url}"
         self.configuration.api_key["x-auth-token"] = token
-        self.configuration.api_key_prefix["x-auth-token"] = "Bearer"
 
     def __call_api(self, obj, method, *args, **kwargs):
         try:
