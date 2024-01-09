@@ -263,25 +263,34 @@ HOPR contains modules written in Rust, therefore a Rust toolchain is needed to s
 First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (at least version 1.60) with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
 
 ### Nix environment setup
+
 - install nix from official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html)
 - create `~/.config/nix/conf` file with the following content:
+
 ```
 experimental-features = nix-command flakes
 ```
+
 - append the following line to your schell rc file (depending on the shell you are using, it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Don't forget to modify the `<shell>` variable with your corresponding shell (`zsh`, `bash`, `csh`, etc.):
+
 ```bash
 eval "$(direnv hook <shell>)"
 ```
-- install `nix-direnv` package: 
+
+- install `nix-direnv` package:
+
 ```bash
 nix-env -i nix-direnv
 ```
+
 - from within the `hoprnet` folder, execute the following command.
+
 ```bash
 direnv allow .
 ```
 
 ### Local nodes
+
 ```sh
 # build deps and HOPRd code
 make -j deps && make -j build
