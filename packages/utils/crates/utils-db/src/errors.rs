@@ -1,5 +1,4 @@
 use crate::errors::DbError::GenericError;
-use sqlx::Error;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -34,7 +33,7 @@ impl From<DbError> for wasm_bindgen::JsValue {
 
 #[cfg(feature = "sqlite")]
 impl From<sqlx::Error> for DbError {
-    fn from(value: Error) -> Self {
+    fn from(value: sqlx::Error) -> Self {
         GenericError(value.to_string())
     }
 }
