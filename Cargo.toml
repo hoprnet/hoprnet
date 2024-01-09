@@ -84,6 +84,12 @@ utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
 
+[build]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
+
 [profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
 strip = true
 opt-level = 3
