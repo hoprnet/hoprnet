@@ -263,13 +263,7 @@ HOPR contains modules written in Rust, therefore a Rust toolchain is needed to s
 First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (at least version 1.60) with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
 
 ### Nix environment setup
-- install nix from official website at []()
-- create `~/env.nix` file with the following content:
-```nix
-with import <nixpkgs> {}; [
-    nix-direnv
-]
-```
+- install nix from official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html)
 - create `~/.config/nix/conf` file with the following content:
 ```
 experimental-features = nix-command flakes
