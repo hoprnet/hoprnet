@@ -7,7 +7,7 @@ description = "Generic database backend implementation"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
