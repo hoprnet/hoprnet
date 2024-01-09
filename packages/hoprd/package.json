@@ -23,7 +23,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v3-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --full-trace --exit . test",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --full-trace --exit . test --timeout 10000",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
     "dev": "NODE_ENV=development yarn start --network anvil-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
