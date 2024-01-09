@@ -1,7 +1,7 @@
 import logging
 
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi, NetworkApi
 from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, TagQuery, SendMessageReq
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
@@ -330,5 +330,5 @@ class HoprdAPI:
         Returns the ticket price in wei.
         :return: price: int
         """
-        _, response = self.__call_api(TicketsApi, "price")
+        _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None

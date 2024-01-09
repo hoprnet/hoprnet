@@ -66,7 +66,7 @@ pub struct InternalState {
         messages::pop_all,
         messages::peek,
         messages::peek_all,
-        tickets::price,
+        network::price,
         tickets::show_channel_tickets,
         tickets::show_all_tickets,
         tickets::show_ticket_statistics,
@@ -91,7 +91,8 @@ pub struct InternalState {
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             messages::InboxMessagesRes,
-            tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
+            tickets::NodeTicketStatistics, tickets::ChannelTicket,
+            network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersion
         )
@@ -295,7 +296,6 @@ pub async fn run_hopr_api(
             .post(tickets::aggregate_tickets_in_channel);
 
         api.at("/tickets").get(tickets::show_all_tickets);
-        api.at("/tickets/price").get(tickets::price);
         api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
         api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
 
@@ -307,6 +307,8 @@ pub async fn run_hopr_api(
         api.at("/messages/peek").post(messages::peek);
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
+
+        api.at("/network/price").get(network::price);
 
         api.at("/node/version").get(node::version);
         api.at("/node/info").get(node::info);
@@ -1567,14 +1569,8 @@ mod messages {
     }
 }
 
-mod tickets {
+mod network {
     use super::*;
-    use core_crypto::types::Hash;
-    use core_protocol::errors::ProtocolError;
-    use core_transport::errors::HoprTransportError;
-    use core_transport::TicketStatistics;
-    use core_types::channels::Ticket;
-    use utils_types::traits::ToHex;
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
@@ -1593,7 +1589,7 @@ mod tickets {
         security(
             ("api_token" = [])
         ),
-        tag = "Tickets"
+        tag = "Network"
     )]
     pub(super) async fn price(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -1612,6 +1608,15 @@ mod tickets {
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
+}
+mod tickets {
+    use super::*;
+    use core_crypto::types::Hash;
+    use core_protocol::errors::ProtocolError;
+    use core_transport::errors::HoprTransportError;
+    use core_transport::TicketStatistics;
+    use core_types::channels::Ticket;
+    use utils_types::traits::ToHex;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
