@@ -53,6 +53,12 @@ impl SqliteShim<'_> {
             ))
             .await?;
 
+        // Just log information on how many entries there are
+        let count: usize = sqlx::query_scalar(&const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
+            .fetch_one(&pool)
+            .await?;
+        log::debug!("initialized database with {count} existing entries");
+
         Ok(Self {
             pool,
             insert,
