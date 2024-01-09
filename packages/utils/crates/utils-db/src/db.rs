@@ -184,7 +184,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         }
     }
 
-    pub fn get_more<V: Serialize + DeserializeOwned>(
+    pub async fn get_more<V: Serialize + DeserializeOwned>(
         &self,
         prefix: Box<[u8]>,
         suffix_size: u32,
@@ -208,7 +208,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         Ok(output)
     }
 
-    pub fn get_more_range<V: DeserializeOwned>(
+    pub async fn get_more_range<V: DeserializeOwned>(
         &self,
         start: Box<[u8]>,
         end: Box<[u8]>,
@@ -238,8 +238,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         Ok(output)
     }
 
-    pub fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
-        self.backend.batch(batch.ops, wait_for_write)
+    pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
+        self.backend.batch(batch.ops, wait_for_write).await
     }
 
     pub async fn flush(&mut self) -> Result<()> {
