@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
+use sqlx::Error;
 use thiserror::Error;
+use crate::errors::DbError::GenericError;
 
-#[derive(Error, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Error, Debug, PartialEq)]
 pub enum DbError {
     #[error("failed to dump database into file: {0}")]
     DumpError(String),
@@ -28,5 +29,12 @@ pub type Result<T> = std::result::Result<T, DbError>;
 impl From<DbError> for wasm_bindgen::JsValue {
     fn from(value: DbError) -> Self {
         value.to_string().into()
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl From<sqlx::Error> for DbError {
+    fn from(value: Error) -> Self {
+        GenericError(value.to_string())
     }
 }

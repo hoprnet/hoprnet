@@ -1352,7 +1352,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use std::str::FromStr;
-    use utils_db::{db::serialize_to_bytes, rusty::RustyLevelDbShim};
+    use utils_db::{db::serialize_to_bytes, CurrentDbShim};
     use utils_types::{
         primitives::{Address, EthereumChallenge},
         traits::BinarySerializable,
@@ -1451,7 +1451,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1462,7 +1462,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1473,7 +1473,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1494,7 +1494,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1506,7 +1506,7 @@ mod tests {
     }
 
     async fn create_acknowledged_tickets(
-        db: &mut CoreEthereumDb<RustyLevelDbShim>,
+        db: &mut CoreEthereumDb<CurrentDbShim>,
         tickets_to_generate: u64,
         channel_epoch: u32,
         start_index: u64,
@@ -1584,7 +1584,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_mark_acknowledged_tickets_neglected() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1634,7 +1634,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1702,7 +1702,7 @@ mod tests {
     }
 
     async fn generate_ack_tickets(
-        db: &mut DB<RustyLevelDbShim>,
+        db: &mut DB<CurrentDbShim>,
         amount: u32,
     ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
@@ -1758,7 +1758,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_all_acknowledged_tickets() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1789,7 +1789,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_skip_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1825,7 +1825,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_after_last_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1864,7 +1864,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_prepare_when_last_being_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1894,7 +1894,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_have_0_unrealized_balance_non_existing_channels() {
         let db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -1906,7 +1906,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_contain_unrealized_balance_for_the_tickets_present() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -1942,7 +1942,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_channel_balance_for_newly_opened_channels() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -1970,7 +1970,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_unrealized_channel_balance_for_reopened_channels_to_channel_balance() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -2019,7 +2019,7 @@ mod tests {
     async fn test_db_should_move_the_outstanding_unrealized_value_to_unrealized_channel_balance_on_channel_update_with_the_same_channel_epoch_on_redeem(
     ) {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -2086,7 +2086,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_not_update_the_unrealized_balance_on_redeem() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2134,7 +2134,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_decrease_unrealized_balance_on_losing_ticket() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2180,7 +2180,7 @@ mod tests {
     async fn test_db_should_initialize_catch_when_explicitly_triggered() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         // generate_ack_tickets only creates tickets of the current epoch but with smaller ticket indexes
         let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
 
@@ -2216,7 +2216,7 @@ mod tests {
         let current_channel_ticket_index = 20u64;
         let current_channel_total_balance = Balance::new_from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
 
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
         let _tickets_from_previous_epoch = create_acknowledged_tickets(
             &mut db,
