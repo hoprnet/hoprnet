@@ -192,7 +192,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
         Ok(Box::new(RustyLevelDbIterator::new_range(i, &start, &end)))
     }
 
-    async fn batch(
+    fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,
         wait_for_write: bool,
