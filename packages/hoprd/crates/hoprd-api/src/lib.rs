@@ -1580,7 +1580,7 @@ mod network {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/price"),
+        path = const_format::formatcp!("{BASE_PATH}/network/price"),
         responses(
             (status = 200, description = "Current ticket price", body = TicketPriceResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),

@@ -79,7 +79,7 @@ hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
 platform = { path = "misc/platform" }
-utils-db = { path = "packages/utils/crates/utils-db" }
+utils-db = { path = "packages/utils/crates/utils-db", default-features = false, features = ['sqlite'] }
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
