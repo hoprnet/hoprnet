@@ -16,7 +16,7 @@ pub struct SqliteShim<'a> {
 }
 
 pub const SQL_TABLE_LABEL: &str = "1";
-pub const SQL_DB_FILE_NAME: &str = "hoprd_1.sqlite";
+pub const SQL_DB_FILE_NAME: &str = "hoprd.sqlite";
 
 impl SqliteShim<'_> {
     async fn new_from_pool(pool: SqlitePool) -> Result<Self, sqlx::Error> {
@@ -54,7 +54,7 @@ impl SqliteShim<'_> {
             .await?;
 
         // Just log information on how many entries there are
-        let count: usize = sqlx::query_scalar(&const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
+        let count: i64 = sqlx::query_scalar(&const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
             .fetch_one(&pool)
             .await?;
         log::debug!("initialized database with {count} existing entries");
