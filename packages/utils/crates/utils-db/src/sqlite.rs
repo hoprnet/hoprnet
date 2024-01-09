@@ -185,8 +185,9 @@ mod tests {
     use crate::sqlite::SqliteShim;
 
     #[async_std::test]
-    async fn test_sqlite() {
-        SqliteShim::new("/tmp/", true).await;
+    async fn test_sqlite_file() {
+        let _ = std::fs::remove_dir_all("/tmp/hopr_test_db");
+        SqliteShim::new("/tmp/hopr_test_db", true).await;
     }
 
     #[async_std::test]
