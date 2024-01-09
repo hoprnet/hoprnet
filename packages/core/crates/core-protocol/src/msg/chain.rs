@@ -153,7 +153,7 @@ impl ChainPacketComponents {
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self::Final {
-                        packet: Box::from(mp.to_bytes()),
+                        packet: mp.to_bytes(),
                         ticket,
                         packet_tag,
                         ack_key,
@@ -191,7 +191,7 @@ pub fn forward(
             next_ticket.challenge = next_challenge.to_ethereum_challenge();
             next_ticket.sign(chain_keypair, domain_separator);
             ChainPacketComponents::Forwarded {
-                packet: packet,
+                packet,
                 ticket: next_ticket,
                 ack_challenge,
                 packet_tag,

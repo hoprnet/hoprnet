@@ -80,7 +80,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
                 if let Some((current_channel_epoch, current_ticket_index)) =
-                    cached_channel.get(&ticket.channel_id).map(|c| c.clone())
+                    cached_channel.get(&ticket.channel_id).map(|c| *c)
                 {
                     // from the cached_channel
                     (current_channel_epoch, current_ticket_index)
@@ -110,7 +110,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 let unrealized_balance = self
                     .cached_unrealized_value
                     .get(&ticket.channel_id)
-                    .map(|b| b.clone())
+                    .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
                     .add(&ticket.amount);
 
@@ -371,7 +371,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let current_unrealized_value = self
             .cached_unrealized_value
             .get(&acked_ticket.ticket.channel_id)
-            .map(|v| v.clone())
+            .map(|v| *v)
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         self.cached_unrealized_value.insert(
@@ -661,7 +661,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     let updated_balance_difference = previous_channel_entry.balance.sub(&channel.balance);
 
                     self.cached_unrealized_value
-                        .get(&channel_id)
+                        .get(channel_id)
                         .map(|v| v.sub(&updated_balance_difference))
                         .unwrap_or(Balance::zero(BalanceType::HOPR))
                 } else {
@@ -846,7 +846,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0) + 1;
 
-        ops.put(key, &count);
+        ops.put(key, count);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
@@ -856,7 +856,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
-        ops.put(key, &new_redeemed_balance);
+        ops.put(key, new_redeemed_balance);
         self.db.batch(ops, true).await?;
 
         debug!("stopped marking {acked_ticket} as redeemed");

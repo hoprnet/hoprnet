@@ -122,7 +122,7 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - self.cfg.max_age).await;
 
-        return db.pop(tag).await;
+        db.pop(tag).await
     }
 
     /// Peek the oldest message with the given tag, or the oldest message regardless the tag
@@ -136,7 +136,7 @@ where
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - self.cfg.max_age).await;
 
-        return db.peek(tag).await;
+        db.peek(tag).await
     }
 
     /// Peeks all the messages with the given `tag` (ordered oldest to latest) or

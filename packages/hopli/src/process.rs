@@ -10,7 +10,7 @@ use crate::environment_config;
 use crate::utils::HelperErrors;
 
 pub fn build_path(network: &str, environment_type: &str) -> String {
-    let new_path = vec!["./", network, "/", &environment_type.to_string()].concat();
+    let new_path = ["./", network, "/", environment_type].concat();
     match Path::new(&new_path).to_str() {
         None => panic!("new path is not a valid UTF-8 sequence"),
         Some(s) => {

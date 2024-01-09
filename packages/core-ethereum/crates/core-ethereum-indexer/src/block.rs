@@ -135,11 +135,7 @@ where
         U: ChainLogHandler + 'static,
         V: HoprCoreEthereumDbActions + 'static,
     {
-        if let None = self.rpc {
-            return Err(CoreEthereumIndexerError::ProcessError(
-                "indexer is already started".into(),
-            ));
-        } else if let None = self.db_processor {
+        if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
                 "indexer is already started".into(),
             ));
@@ -201,7 +197,7 @@ where
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
 
-                if block_with_logs.logs.len() > 0 {
+                if ! block_with_logs.logs.is_empty() {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
                     let mut logs = block_with_logs.logs;
@@ -280,13 +276,13 @@ where
                 let snapshot = Snapshot::new(
                     U256::from(log.block_number),
                     U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                    U256::from(log.log_index),
+                    log.log_index,
                 );
 
                 let tx_hash = log.tx_hash;
 
                 match db_processor
-                    .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
+                    .on_event(log.address, log.block_number as u32, log.into(), snapshot)
                     .await
                 {
                     Ok(Some(event_type)) => {

@@ -488,10 +488,10 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Remove the PeerId from network status observed variables
     fn prune_from_network_status(&mut self, peer: &PeerId) {
-        self.good_quality_public.remove(&peer);
-        self.good_quality_non_public.remove(&peer);
-        self.good_quality_public.remove(&peer);
-        self.bad_quality_non_public.remove(&peer);
+        self.good_quality_public.remove(peer);
+        self.good_quality_non_public.remove(peer);
+        self.good_quality_public.remove(peer);
+        self.bad_quality_non_public.remove(peer);
     }
 
     pub fn get_peer_status(&self, peer: &PeerId) -> Option<PeerStatus> {

@@ -167,7 +167,7 @@ where
 
                     Ok(TransportPacket::Outgoing {
                         next_hop: next_hop.to_peerid(),
-                        ack_challenge: ack_challenge.clone(),
+                        ack_challenge: ack_challenge,
                         data: payload.into_boxed_slice(),
                     })
                 }
@@ -591,7 +591,7 @@ impl PacketInteraction {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let mixer_cfg = cfg.mixer.clone();
+        let mixer_cfg = cfg.mixer;
         let pkt_keypair = cfg.packet_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
 

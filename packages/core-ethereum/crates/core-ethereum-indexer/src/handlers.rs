@@ -144,7 +144,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     let new_balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
                     let diff = channel.balance.sub(&new_balance);
                     channel.balance = new_balance;
@@ -152,15 +152,15 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.clone(), diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     let new_balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
                     let diff = new_balance.sub(&channel.balance);
                     channel.balance = new_balance;
@@ -168,15 +168,15 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.clone(), diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
@@ -196,10 +196,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
                             .await?;
                     }
-                    Ok(Some(ChainEventType::ChannelClosed(channel.clone())))
+                    Ok(Some(ChainEventType::ChannelClosed(channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
                 let source: Address = channel_opened.source.into();
@@ -218,7 +218,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         // set all channel fields like we do on-chain on close
                         channel.status = ChannelStatus::Open;
                         channel.ticket_index = 0u64.into();
-                        channel.channel_epoch = channel.channel_epoch + U256::from(1u64);
+                        channel.channel_epoch += U256::from(1u64);
                         channel
                     })
                     .unwrap_or(ChannelEntry::new(
@@ -241,12 +241,13 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.cleanup_invalid_channel_tickets(&channel).await?;
                     }
                 }
-                return Ok(Some(ChainEventType::ChannelOpened(channel.clone())));
+
+                Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
@@ -293,22 +294,22 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     }
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
                 let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::PendingToClose;
                     channel.closure_time = closure_initiated.closure_time.into();
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel.clone())))
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
                 db.set_channels_domain_separator(&domain_separator_updated.domain_separator.into(), snapshot)
@@ -483,17 +484,17 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     async fn on_node_management_module_event(
         &self,
         _db: &mut U,
-        event: HoprNodeManagementModuleEvents,
+        _event: HoprNodeManagementModuleEvents,
         _snapshot: &Snapshot,
     ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
-        match event {
-            _ => {
-                // don't care at the moment
-            }
-        }
+        // match event {
+        //     _ => {
+        //         // don't care at the moment
+        //     }
+        // }
 
         Ok(None)
     }

@@ -82,7 +82,7 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
-            cfg: self.cfg.clone(),
+            cfg: self.cfg,
             contract_instances: self.contract_instances.clone(),
             node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
         }
