@@ -856,8 +856,7 @@ mod tests {
     }
 
     async fn create_dbs(amount: usize) -> Vec<CurrentDbShim> {
-        futures::future::join_all((0..amount)
-            .map(|_| CurrentDbShim::new_in_memory())).await
+        futures::future::join_all((0..amount).map(|_| CurrentDbShim::new_in_memory())).await
     }
 
     fn create_core_dbs(dbs: &Vec<CurrentDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {

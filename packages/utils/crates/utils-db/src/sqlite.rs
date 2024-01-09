@@ -1,10 +1,10 @@
-use std::fmt::Debug;
-use std::ops::DerefMut;
-use std::path::Path;
+use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use async_trait::async_trait;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteStatement};
 use sqlx::{Executor, SqlitePool, Statement};
-use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
+use std::fmt::Debug;
+use std::ops::DerefMut;
+use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct SqliteShim<'a> {
@@ -19,39 +19,52 @@ pub const SQL_TABLE_LABEL: &str = "1";
 pub const SQL_DB_FILE_NAME: &str = "hoprd_1.sqlite";
 
 impl SqliteShim<'_> {
-
     async fn new_from_pool(pool: SqlitePool) -> Result<Self, sqlx::Error> {
         // NOTE: the table name cannot be bound as a parameter, but since `label` is
         // a compile time constant, there should be no SQL possible injections here
         // TODO: use migrations for this
-        sqlx::query(&const_format::formatcp!("CREATE TABLE IF NOT EXISTS kv_{SQL_TABLE_LABEL} (key BLOB PRIMARY KEY, value BLOB)"))
-            .execute(&pool)
-            .await?;
+        sqlx::query(&const_format::formatcp!(
+            "CREATE TABLE IF NOT EXISTS kv_{SQL_TABLE_LABEL} (key BLOB PRIMARY KEY, value BLOB)"
+        ))
+        .execute(&pool)
+        .await?;
 
         let insert = pool
-            .prepare(&const_format::formatcp!("INSERT INTO kv_{SQL_TABLE_LABEL} VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value"))
+            .prepare(&const_format::formatcp!(
+                "INSERT INTO kv_{SQL_TABLE_LABEL} VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value"
+            ))
             .await?;
 
         let delete = pool
-            .prepare(&const_format::formatcp!("DELETE FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"))
+            .prepare(&const_format::formatcp!(
+                "DELETE FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"
+            ))
             .await?;
 
         let select = pool
-            .prepare(&const_format::formatcp!("SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"))
+            .prepare(&const_format::formatcp!(
+                "SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"
+            ))
             .await?;
 
         let iter = pool
-            .prepare(&const_format::formatcp!("SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key >= ? AND key <= ? ORDER BY key ASC"))
+            .prepare(&const_format::formatcp!(
+                "SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key >= ? AND key <= ? ORDER BY key ASC"
+            ))
             .await?;
 
-
-        Ok(Self { pool, insert, delete, select, iter })
+        Ok(Self {
+            pool,
+            insert,
+            delete,
+            select,
+            iter,
+        })
     }
 
     pub async fn new(directory: &str, create_if_missing: bool) -> Self {
         let dir = Path::new(directory);
-        std::fs::create_dir_all(dir)
-            .unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
+        std::fs::create_dir_all(dir).unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
 
         let pool = SqlitePool::connect_with(
             SqliteConnectOptions::default()
@@ -59,16 +72,20 @@ impl SqliteShim<'_> {
                 .create_if_missing(create_if_missing)
                 .journal_mode(SqliteJournalMode::Wal)
                 .auto_vacuum(SqliteAutoVacuum::Full)
-                .page_size(4096)
+                .page_size(4096),
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-       Self::new_from_pool(pool).await.unwrap_or_else(|e| panic!("cannot initialize db: {e}"))
+        Self::new_from_pool(pool)
+            .await
+            .unwrap_or_else(|e| panic!("cannot initialize db: {e}"))
     }
 
     pub async fn new_in_memory() -> Self {
-        Self::new_from_pool(SqlitePool::connect(":memory:").await.unwrap()).await.unwrap_or_else(|e| panic!("cannot initialize db: {e}"))
+        Self::new_from_pool(SqlitePool::connect(":memory:").await.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("cannot initialize db: {e}"))
     }
 }
 
@@ -102,33 +119,49 @@ impl AsyncKVStorage for SqliteShim<'_> {
         Ok(())
     }
 
-    async fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+    async fn iterate(
+        &self,
+        prefix: Self::Key,
+        suffix_size: u32,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
         let mut first_key: Vec<u8> = prefix.clone().into();
         first_key.extend((0..suffix_size).map(|_| 0u8));
 
         let mut last_key: Vec<u8> = prefix.into();
         last_key.extend((0..suffix_size).map(|_| 0xffu8));
 
-        self.iterate_range(first_key.into_boxed_slice(), last_key.into_boxed_slice()).await
+        self.iterate_range(first_key.into_boxed_slice(), last_key.into_boxed_slice())
+            .await
     }
 
-    async fn iterate_range(&self, start: Self::Key, end: Self::Key) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
-        let values: Vec<(Box<[u8]>,)> = self.iter.query_as()
-            .bind(start)
-            .bind(end)
-            .fetch_all(&self.pool)
-            .await?;
+    async fn iterate_range(
+        &self,
+        start: Self::Key,
+        end: Self::Key,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let values: Vec<(Box<[u8]>,)> = self.iter.query_as().bind(start).bind(end).fetch_all(&self.pool).await?;
 
         Ok(Box::new(values.into_iter().map(|v| Ok(v.0))))
     }
 
-    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>, _wait_for_write: bool) -> crate::errors::Result<()> {
+    async fn batch(
+        &mut self,
+        operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        _wait_for_write: bool,
+    ) -> crate::errors::Result<()> {
         let mut tx = self.pool.begin().await?;
 
         for op in operations {
             match op {
                 BatchOperation::del(del) => self.delete.query().bind(del.key).execute(tx.deref_mut()).await?,
-                BatchOperation::put(ins) => self.insert.query().bind(ins.key).bind(ins.value).execute(tx.deref_mut()).await?
+                BatchOperation::put(ins) => {
+                    self.insert
+                        .query()
+                        .bind(ins.key)
+                        .bind(ins.value)
+                        .execute(tx.deref_mut())
+                        .await?
+                }
             };
         }
 

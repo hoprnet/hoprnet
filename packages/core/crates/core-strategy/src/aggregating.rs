@@ -549,9 +549,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = futures::future::join_all((0..2)
-            .map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) }))
-            .await;
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
@@ -615,9 +614,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = futures::future::join_all((0..2)
-            .map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) }))
-            .await;
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -682,9 +680,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = futures::future::join_all((0..2)
-            .map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) }))
-            .await;
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -743,9 +740,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = futures::future::join_all((0..2)
-            .map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) }))
-            .await;
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (_, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 

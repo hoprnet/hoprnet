@@ -1701,10 +1701,7 @@ mod tests {
         assert_eq!(acked_tickets_range.len(), 1);
     }
 
-    async fn generate_ack_tickets(
-        db: &mut DB<CurrentDbShim>,
-        amount: u32,
-    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
+    async fn generate_ack_tickets(db: &mut DB<CurrentDbShim>, amount: u32) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
         let domain_separator = Hash::default();
 

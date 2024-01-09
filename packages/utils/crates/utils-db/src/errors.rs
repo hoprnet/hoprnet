@@ -1,6 +1,6 @@
+use crate::errors::DbError::GenericError;
 use sqlx::Error;
 use thiserror::Error;
-use crate::errors::DbError::GenericError;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum DbError {

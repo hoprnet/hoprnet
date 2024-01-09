@@ -836,9 +836,8 @@ mod tests {
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_dbs = futures::future::join_all((0..2)
-            .map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) }))
-            .await;
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         const NUM_TICKETS: u64 = 30;
 
