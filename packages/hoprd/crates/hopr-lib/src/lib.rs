@@ -54,7 +54,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
 use log::{error, info};
 use platform::file::native::{join, read_file, remove_dir_all, write};
-use utils_db::rusty::RustyLevelDbShim;
+use utils_db::CurrentDbShim;
 use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
@@ -284,7 +284,7 @@ pub fn build_components<FSaveTbf>(
     chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
@@ -566,8 +566,9 @@ impl Hopr {
             }
         }
 
+        let db_shim = async_std::task::block_on(utils_db::CurrentDbShim::new(&db_path, cfg.db.initialize));
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(utils_db::rusty::RustyLevelDbShim::new(&db_path, cfg.db.initialize)),
+            DB::new(db_shim),
             me_onchain.public().to_address(),
         )));
 

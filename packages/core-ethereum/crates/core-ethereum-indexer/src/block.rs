@@ -327,7 +327,7 @@ pub mod tests {
     use futures::{join, Stream};
     use mockall::mock;
     use multiaddr::Multiaddr;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::traits::PeerIdLike;
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
@@ -335,9 +335,9 @@ pub mod tests {
 
     use super::*;
 
-    fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>> {
+    async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             Address::random(),
         )))
     }
@@ -384,7 +384,7 @@ pub mod tests {
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -414,7 +414,7 @@ pub mod tests {
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -451,7 +451,7 @@ pub mod tests {
     async fn test_indexer_should_not_pass_blocks_unless_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -490,7 +490,7 @@ pub mod tests {
     async fn test_indexer_should_pass_blocks_that_are_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         let cfg = IndexerConfig::default();
 
@@ -547,7 +547,7 @@ pub mod tests {
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         let cfg = IndexerConfig::default();
 

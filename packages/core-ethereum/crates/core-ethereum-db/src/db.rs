@@ -178,8 +178,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
                 Box::new(move |v: &AcknowledgedTicket| maybe_signer.map(|s| v.signer.eq(&s)).unwrap_or(true)),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .map(|a| a.ticket)
             .collect::<Vec<Ticket>>();
@@ -197,8 +197,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                         Some(signer) => unack.signer.eq(&signer),
                     },
                 }),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter_map(|a| match a {
                 PendingAcknowledgement::WaitingAsSender => None,
@@ -255,8 +255,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     channel.get_id() == ack.ticket.channel_id
                         && channel.channel_epoch.as_u32() > ack.ticket.channel_epoch
                 }),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .map(|ack| (ack.ticket.amount, get_acknowledged_ticket_key(&ack)));
 
@@ -273,8 +273,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                             && channel2.channel_epoch.as_u32() > unack.ticket.channel_epoch
                     }
                 }),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter_map(|pa| match pa {
                 PendingAcknowledgement::WaitingAsSender => None,
@@ -301,7 +301,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
         batch_ops.put(count_key, count);
         batch_ops.put(value_key, balance);
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
@@ -315,7 +315,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         batch_ops.put(count_key, count + 1);
         batch_ops.put(value_key, balance.add(&ticket.amount));
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_pending_acknowledgement(
@@ -383,7 +383,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         batch_ops.del(unack_key);
         batch_ops.put(ack_key, acked_ticket);
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     // core and core-ethereum part
@@ -396,8 +396,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::new(move |ack: &AcknowledgedTicket| {
                     filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)
                 }),
-            )?;
-            //.await?;
+            )
+            .await?;
 
         tickets.sort();
 
@@ -414,8 +414,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::new(move |ack: &AcknowledgedTicket| {
                     filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true)
                 }),
-            )?;
-            //.await?;
+            )
+            .await?;
 
         Ok(tickets.len())
     }
@@ -510,7 +510,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             agg_tickets.push(ticket.clone());
         }
 
-        self.db.batch(batch_ops, true)?;//.await?;
+        self.db.batch(batch_ops, true).await?;
 
         debug!(
             "prepared {} tickets to aggregate in {channel_id} ({epoch}) range {index_start}-{index_end}",
@@ -532,8 +532,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 to_acknowledged_ticket_key(channel_id, epoch, index_start)?.into(),
                 to_acknowledged_ticket_key(channel_id, epoch, index_end)?.into(),
                 Box::new(|_| true),
-            )?;
-            //.await?;
+            )
+            .await?;
 
         tickets.sort();
 
@@ -564,7 +564,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
         batch.put(get_acknowledged_ticket_key(&aggregated_ticket)?, aggregated_ticket);
 
-        self.db.batch(batch, true)?;//.await?;
+        self.db.batch(batch, true).await?;
         Ok(())
     }
 
@@ -580,8 +580,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                         filter.map(|f| f.get_id() == unack.ticket.channel_id).unwrap_or(true)
                     }
                 }),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter_map(|a| match a {
                 PendingAcknowledgement::WaitingAsSender => None,
@@ -627,7 +627,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch, true)//.await
+        self.db.batch(batch, true).await
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
@@ -678,7 +678,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         batch_ops.put(channel_key, channel);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     // core-ethereum only part
@@ -711,7 +711,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             batch_ops.put(value_key, neglected_ticket_value);
         }
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_latest_block_number(&self) -> Result<Option<u32>> {
@@ -744,7 +744,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Hash::SIZE as u32,
                 Box::new(|_| true),
             )
-            //.await
+            .await
     }
 
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
@@ -754,8 +754,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::from(CHANNEL_PREFIX.as_bytes()),
                 Hash::SIZE as u32,
                 Box::new(|_| true),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter(|x| x.status == ChannelStatus::Open)
             .collect())
@@ -774,7 +774,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         batch_ops.put(address_key, account);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
@@ -784,7 +784,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Address::SIZE as u32,
                 Box::new(|_| true),
             )
-            //.await
+            .await
     }
 
     async fn get_public_node_accounts(&self) -> Result<Vec<AccountEntry>> {
@@ -794,7 +794,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Address::SIZE as u32,
                 Box::new(|x| x.contains_routing_info()),
             )
-            //.await
+            .await
     }
 
     async fn get_redeemed_tickets_value(&self) -> Result<Balance> {
@@ -857,7 +857,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         ops.put(key, &new_redeemed_balance);
-        self.db.batch(ops, true)?;//.await?;
+        self.db.batch(ops, true).await?;
 
         debug!("stopped marking {acked_ticket} as redeemed");
 
@@ -911,7 +911,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         self.cached_unrealized_value
             .insert(acked_ticket.ticket.channel_id, current_unrealized_value);
 
-        self.db.batch(ops, true)//.await
+        self.db.batch(ops, true).await
     }
 
     async fn get_rejected_tickets_value(&self) -> Result<Balance> {
@@ -942,8 +942,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::from(CHANNEL_PREFIX.as_bytes()),
                 Hash::SIZE as u32,
                 Box::new(|_| true),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter(move |x| x.source.eq(address))
             .collect())
@@ -956,8 +956,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::from(CHANNEL_PREFIX.as_bytes()),
                 Hash::SIZE as u32,
                 Box::new(|_| true),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter(move |x| x.source.eq(&self.me))
             .collect())
@@ -970,8 +970,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::from(CHANNEL_PREFIX.as_bytes()),
                 Hash::SIZE as u32,
                 Box::new(|_| true),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter(move |x| x.destination.eq(address))
             .collect())
@@ -984,8 +984,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 Box::from(CHANNEL_PREFIX.as_bytes()),
                 Hash::SIZE as u32,
                 Box::new(|_| true),
-            )?
-            //.await?
+            )
+            .await?
             .into_iter()
             .filter(move |x| x.destination.eq(&self.me))
             .collect())
@@ -1052,7 +1052,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_channels_domain_separator(&self) -> Result<Option<Hash>> {
@@ -1075,7 +1075,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_channels_ledger_domain_separator(&self) -> Result<Option<Hash>> {
@@ -1098,7 +1098,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -1117,7 +1117,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -1136,7 +1136,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     /// Get the staking safe address
@@ -1154,7 +1154,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(safe_address_key, safe_address);
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     /// Get the staking module address
@@ -1172,7 +1172,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(module_address_key, module_address);
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     /// Get the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
@@ -1196,7 +1196,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     /// Checks whether network registry is enabled. Default: true
@@ -1216,7 +1216,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             snapshot,
         );
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn is_allowed_to_access_network(&self, node: &Address) -> Result<bool> {
@@ -1245,7 +1245,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             batch_ops.del(key)
         }
 
-        self.db.batch(batch_ops, true)//.await
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_from_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>> {
@@ -1304,7 +1304,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             snapshot,
         );
-        self.db.batch(batch_ops, true)?;//.await?;
+        self.db.batch(batch_ops, true).await?;
 
         Ok(registered_nodes)
     }
@@ -1328,14 +1328,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 batch_ops.put(mfa_key, mfa_address);
                 batch_ops.put(snapshot_key, snapshot);
 
-                self.db.batch(batch_ops, true)//.await
+                self.db.batch(batch_ops, true).await
             }
             None => {
                 let mut batch_ops = utils_db::db::Batch::default();
                 batch_ops.del(mfa_key);
                 batch_ops.put(snapshot_key, snapshot);
 
-                self.db.batch(batch_ops, true)//.await
+                self.db.batch(batch_ops, true).await
             }
         }
     }
@@ -1352,7 +1352,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use std::str::FromStr;
-    use utils_db::{db::serialize_to_bytes, rusty::RustyLevelDbShim};
+    use utils_db::{db::serialize_to_bytes, CurrentDbShim};
     use utils_types::{
         primitives::{Address, EthereumChallenge},
         traits::BinarySerializable,
@@ -1451,7 +1451,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1462,7 +1462,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1473,7 +1473,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1494,7 +1494,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1506,7 +1506,7 @@ mod tests {
     }
 
     async fn create_acknowledged_tickets(
-        db: &mut CoreEthereumDb<RustyLevelDbShim>,
+        db: &mut CoreEthereumDb<CurrentDbShim>,
         tickets_to_generate: u64,
         channel_epoch: u32,
         start_index: u64,
@@ -1584,7 +1584,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_mark_acknowledged_tickets_neglected() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1634,7 +1634,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1701,10 +1701,7 @@ mod tests {
         assert_eq!(acked_tickets_range.len(), 1);
     }
 
-    async fn generate_ack_tickets(
-        db: &mut DB<RustyLevelDbShim>,
-        amount: u32,
-    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
+    async fn generate_ack_tickets(db: &mut DB<CurrentDbShim>, amount: u32) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
         let domain_separator = Hash::default();
 
@@ -1758,7 +1755,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_all_acknowledged_tickets() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1789,7 +1786,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_skip_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1825,7 +1822,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_after_last_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1864,7 +1861,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_prepare_when_last_being_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1894,7 +1891,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_have_0_unrealized_balance_non_existing_channels() {
         let db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -1906,7 +1903,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_contain_unrealized_balance_for_the_tickets_present() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -1942,7 +1939,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_channel_balance_for_newly_opened_channels() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -1970,7 +1967,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_unrealized_channel_balance_for_reopened_channels_to_channel_balance() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -2019,7 +2016,7 @@ mod tests {
     async fn test_db_should_move_the_outstanding_unrealized_value_to_unrealized_channel_balance_on_channel_update_with_the_same_channel_epoch_on_redeem(
     ) {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -2086,7 +2083,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_not_update_the_unrealized_balance_on_redeem() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2134,7 +2131,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_decrease_unrealized_balance_on_losing_ticket() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2180,7 +2177,7 @@ mod tests {
     async fn test_db_should_initialize_catch_when_explicitly_triggered() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         // generate_ack_tickets only creates tickets of the current epoch but with smaller ticket indexes
         let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
 
@@ -2216,7 +2213,7 @@ mod tests {
         let current_channel_ticket_index = 20u64;
         let current_channel_total_balance = Balance::new_from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
 
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
         let _tickets_from_previous_epoch = create_acknowledged_tickets(
             &mut db,

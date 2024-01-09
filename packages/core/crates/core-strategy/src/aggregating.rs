@@ -351,7 +351,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
-    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
@@ -444,7 +444,7 @@ mod tests {
     }
 
     async fn populate_db_with_ack_tickets(
-        db: &mut DB<RustyLevelDbShim>,
+        db: &mut DB<CurrentDbShim>,
         amount: usize,
     ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut acked_tickets = Vec::new();
@@ -472,7 +472,7 @@ mod tests {
         (acked_tickets, channel)
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
             let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
@@ -549,9 +549,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
@@ -615,9 +614,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -682,9 +680,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -743,9 +740,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (_, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 

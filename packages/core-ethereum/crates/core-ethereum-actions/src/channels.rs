@@ -180,7 +180,7 @@ mod tests {
         sync::Arc,
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -199,7 +199,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         db.write()
@@ -285,7 +285,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -351,7 +351,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(
@@ -389,7 +389,7 @@ mod tests {
         let bob = Address::random();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -438,7 +438,7 @@ mod tests {
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -474,7 +474,7 @@ mod tests {
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
 
@@ -521,7 +521,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         db.write()
@@ -608,7 +608,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -653,7 +653,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -701,7 +701,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -737,7 +737,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -781,7 +781,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -907,7 +907,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -978,7 +978,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -1030,7 +1030,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(
@@ -1061,7 +1061,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(

@@ -739,7 +739,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
@@ -798,7 +798,7 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
             let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
@@ -836,9 +836,8 @@ mod tests {
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         const NUM_TICKETS: u64 = 30;
 

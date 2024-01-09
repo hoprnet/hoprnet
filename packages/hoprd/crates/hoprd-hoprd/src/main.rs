@@ -40,6 +40,7 @@ fn setup_logger(level: log::LevelFilter) {
         .level(level)
         .level_for("libp2p_mplex", log::LevelFilter::Info)
         .level_for("multistream_select", log::LevelFilter::Info)
+        .level_for("sqlx::query", log::LevelFilter::Info)
         .chain(std::io::stdout())
         .apply()
     {

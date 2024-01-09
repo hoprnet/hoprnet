@@ -633,7 +633,7 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -654,9 +654,9 @@ pub mod tests {
         static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
     }
 
-    fn create_db() -> Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>> {
+    async fn create_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             Address::random(),
         )))
     }
@@ -682,7 +682,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_keybinding() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -721,7 +721,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_address_announcement() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -834,7 +834,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_revoke() {
-        let db = create_db();
+        let db = create_db().await;
         let handlers = init_handlers(db.clone());
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
@@ -886,7 +886,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_transfer_to() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -921,7 +921,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_transfer_from() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -961,7 +961,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_approval_correct() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1016,7 +1016,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1056,7 +1056,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered_by_manager() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1096,7 +1096,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1142,7 +1142,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered_by_manager() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1188,7 +1188,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_enabled() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1215,7 +1215,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_disabled() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1248,7 +1248,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_eligible() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1276,7 +1276,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_not_eligible() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1310,7 +1310,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_increased() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1369,7 +1369,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_domain_separator_updated() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1398,7 +1398,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_decreased() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1457,7 +1457,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closed() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1518,7 +1518,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_opened() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1561,7 +1561,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_reopened() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1623,7 +1623,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_ticket_redeemed() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1684,7 +1684,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closure_initiated() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1738,7 +1738,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_node_safe_registry_registered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1771,7 +1771,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_node_safe_registry_deregistered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1807,7 +1807,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn ticket_price_update() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 

@@ -808,7 +808,7 @@ mod tests {
     use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,
@@ -855,11 +855,11 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
-        (0..amount).map(|_| RustyLevelDbShim::new_in_memory()).collect()
+    async fn create_dbs(amount: usize) -> Vec<CurrentDbShim> {
+        futures::future::join_all((0..amount).map(|_| CurrentDbShim::new_in_memory())).await
     }
 
-    fn create_core_dbs(dbs: &Vec<RustyLevelDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<CurrentDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
@@ -871,7 +871,7 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    async fn create_minimal_topology(dbs: &Vec<RustyLevelDbShim>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<CurrentDbShim>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
@@ -944,7 +944,7 @@ mod tests {
 
         // let (done_tx, mut done_rx) = futures::channel::mpsc::unbounded();
 
-        let dbs = create_dbs(2);
+        let dbs = create_dbs(2).await;
 
         create_minimal_topology(&dbs)
             .await
@@ -1034,7 +1034,7 @@ mod tests {
 
         assert!(peer_count <= PEERS.len());
         assert!(peer_count >= 3);
-        let dbs = create_dbs(peer_count);
+        let dbs = create_dbs(peer_count).await;
 
         create_minimal_topology(&dbs)
             .await

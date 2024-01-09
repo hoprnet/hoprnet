@@ -58,21 +58,21 @@ impl Iterator for RustyLevelDbIterator {
 
 /// Adapter for Rusty Level DB database.
 #[derive(Clone)]
-pub struct RustyLevelDbShim {
+pub struct CurrentDbShim {
     db: Arc<Mutex<rusty_leveldb::DB>>,
 }
 
 /// Custom implementation going around the fact that rusty_leveldb
 /// does not provide the Debug implementation
-impl Debug for RustyLevelDbShim {
+impl Debug for CurrentDbShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RustyLevelDbShim")
+        f.debug_struct("CurrentDbShim")
             .field("db", &"rusty level DB".to_owned())
             .finish()
     }
 }
 
-impl RustyLevelDbShim {
+impl CurrentDbShim {
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
@@ -119,7 +119,7 @@ impl RustyLevelDbShim {
 }
 
 #[async_trait]
-impl AsyncKVStorage for RustyLevelDbShim {
+impl AsyncKVStorage for CurrentDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
 
@@ -192,7 +192,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
         Ok(Box::new(RustyLevelDbIterator::new_range(i, &start, &end)))
     }
 
-    fn batch(
+    async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,
         wait_for_write: bool,
