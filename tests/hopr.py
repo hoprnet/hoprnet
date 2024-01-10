@@ -1,8 +1,8 @@
 import logging
 
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi, NetworkApi
-from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, TagQuery, SendMessageReq
+from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NetworkApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, SendMessageReq, TagQuery
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
 

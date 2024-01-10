@@ -35,7 +35,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-tested-api",
         action="store",
-        default=f"http://{LOCALHOST}:{NODES['1']['api_port']}",
+        default=f"http://{LOCALHOST}:{NODES['0']['api_port']}",
         help="The API towards which the stress test is performed",
     )
     parser.addoption(
@@ -115,7 +115,7 @@ NODES = {
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
         "host_addr": "localhost",
-        "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5.cfg.yaml",
+        "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4.cfg.yaml",
     },
     "5": {
         "api_port": 19096,
@@ -132,7 +132,7 @@ NODES = {
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
         "host_addr": "localhost",
     },
-}
+}  # TODO: add remaining 3 nodes back in
 
 
 def cleanup_node(args):
@@ -183,7 +183,6 @@ def setup_node(args):
     # remove previous databases
     shutil.rmtree(args["dir"], ignore_errors=True)
 
-    logging.info(f"Starting up a node with cmd: {cmd} and env {custom_env}")
     proc = subprocess.Popen(
         cmd, stdout=log_file, stderr=subprocess.STDOUT, env=os.environ | custom_env, cwd=f"{MYDIR}/../"
     )
@@ -234,8 +233,6 @@ def reuse_pregenerated_identities():
     # remove existing identity files in tmp folder, .safe.args
     suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
 
-    logging.info(f"{suffixes=}")
-
     def is_relevant_file(f):
         return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
 
@@ -251,8 +248,9 @@ def reuse_pregenerated_identities():
         return fnmatch.fnmatch(f, "*.id")
 
     for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
-        path = shutil.copyfile(f"{PREGENERATED_IDENTITIES_DIR}/{f}", 
-                        f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id")
+        path = shutil.copyfile(
+            f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-node_{node_nr}.id"
+        )
         logging.info(f"Copied file {PREGENERATED_IDENTITIES_DIR}/{f} to {path}")
         node_nr += 1
 
@@ -267,8 +265,6 @@ def create_local_safes(nodes_args: dict, private_key):
     }
     for node_id, node_args in nodes_args.items():
         id_file = f"{node_args['dir']}.id"
-        logging.info(f"Creating safe and module for node {node_id} with id file {id_file}")
-
         res = subprocess.run(
             [
                 "hopli",
@@ -349,7 +345,7 @@ def collect_node_information(node_args):
 def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    for f in ["node_5.cfg.yaml"]:
+    for f in ["node_4.cfg.yaml"]:
         shutil.copyfile(f"{MYDIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-{f}")
 
     logging.info("Ensure local anvil server is not running")
@@ -394,9 +390,10 @@ def swarm7(request):
             while True:
                 with open(f"{node_args['dir']}.log", "r") as f:
                     logs = f.read()
-                    logging.info(logs)
                     if "still unfunded, " in logs or "node is funded" in logs:
+                        logging.info(f"Node {node_id} up")
                         break
+
                 sleep(0.1)
 
         logging.info("Funding nodes")

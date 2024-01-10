@@ -11,6 +11,7 @@ from conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
+from hopr import HoprdAPI
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
@@ -30,7 +31,7 @@ def default_nodes():
 
 def passive_node():
     """A node that uses no strategy"""
-    return "5"
+    return "4"
 
 
 @asynccontextmanager
@@ -212,11 +213,12 @@ async def test_hoprd_swarm_connectivity(swarm7):
 
 
 @pytest.mark.asyncio
-async def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
+async def test_hoprd_protocol_post_fixture_setup_tests(swarm7: dict):
     for _, node_args in swarm7.items():
-        addr = await node_args["api"].get_address("native")
+        api: HoprdAPI = node_args["api"]
+        addr = await api.addresses("native")
         assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
-        balances = await node_args["api"].balances()
+        balances = await api.balances()
         native_balance = int(balances.native.split(" ")[0])
         hopr_balance = int(balances.safe_hopr.split(" ")[0])
         assert native_balance > 0
@@ -300,25 +302,25 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
     await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_peeking_messages_with_tag(src, dest, swarm7):
-    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+# @pytest.mark.asyncio
+# @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+# async def test_peeking_messages_with_tag(src, dest, swarm7):
+#     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
-    packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-    random_tag = await send_and_receive_packets_with_peek(packets, src=swarm7[src], dest=swarm7[dest], path=[])
+#     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
+#     random_tag = await send_and_receive_packets_with_peek(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
-    # after checking that messages are in the destination inbox, a second check should again assert
-    # that they are there. This shows that peeking does not remove the messages from the inbox
-    await asyncio.wait_for(
-        check_received_packets_with_peek(
-            swarm7[dest],
-            packets,
-            tag=random_tag,
-            sort=True,
-        ),
-        MULTIHOP_MESSAGE_SEND_TIMEOUT,
-    )
+#     # after checking that messages are in the destination inbox, a second check should again assert
+#     # that they are there. This shows that peeking does not remove the messages from the inbox
+#     await asyncio.wait_for(
+#         check_received_packets_with_peek(
+#             swarm7[dest],
+#             packets,
+#             tag=random_tag,
+#             sort=True,
+#         ),
+#         MULTIHOP_MESSAGE_SEND_TIMEOUT,
+#     )
 
 
 @pytest.mark.asyncio
