@@ -149,12 +149,10 @@ test: smart-contract-test ## run unit tests for all packages, or a single packag
 	$(cargo) test
 
 .PHONY: smoke-test
-smoke-test: ## run smoke tests
-	echo "Only run parts of the tests which we know are working. "
-	source .venv/bin/activate && (python3 -m pytest tests/test_integration.py || (cat /tmp/hopr-smoke-test_integration.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_security.py || (cat /tmp/hopr-smoke-test_security.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_websocket_api.py || (cat /tmp/hopr-smoke-test_websocket_api.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_stress.py || (cat /tmp/hopr-smoke-test_stress.log && false))
+smoke-test: suite=integration
+smoke-test: ## run smoke test suite defained via parameter suite=
+	echo "Only run suite=$(suite)"
+	source .venv/bin/activate && python3 -m pytest tests/test_$(suite).py
 
 .PHONY: smoke-test-full
 smoke-test-full: ## run smoke tests
