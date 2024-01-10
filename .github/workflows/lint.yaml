@@ -79,6 +79,9 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
+      - name: Format generated code to pass the linter
+        run: nix develop -c cargo fmt -p bindings
+
       - name: Run linter
         run: nix develop -c make lint
 

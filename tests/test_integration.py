@@ -11,7 +11,6 @@ from conftest import (
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
 )
-from hopr import HoprdAPI
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
@@ -189,8 +188,8 @@ def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
 
-# NOTE: this test is first, ensuring that all tests following it have ensured connectivity
-@pytest.mark.asyncio
+# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
+# correct ticket price from api@pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
         others2 = set(others)
@@ -211,14 +210,21 @@ async def test_hoprd_swarm_connectivity(swarm7):
         ]
     )
 
+    ticket_price = await random.choice(list(swarm7.values()))["api"].ticket_price()
+    if ticket_price is not None:
+        global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
+        TICKET_PRICE_PER_HOP = ticket_price
+        AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
+    else:
+        print("Could not get ticket price from API, using default value")
+
 
 @pytest.mark.asyncio
-async def test_hoprd_protocol_post_fixture_setup_tests(swarm7: dict):
+async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7):
     for _, node_args in swarm7.items():
-        api: HoprdAPI = node_args["api"]
-        addr = await api.addresses("native")
+        addr = await node_args["api"].addresses("native")
         assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
-        balances = await api.balances()
+        balances = await node_args["api"].balances()
         native_balance = int(balances.native.split(" ")[0])
         hopr_balance = int(balances.safe_hopr.split(" ")[0])
         assert native_balance > 0
@@ -230,6 +236,7 @@ async def test_hoprd_protocol_post_fixture_setup_tests(swarm7: dict):
 async def test_hoprd_node_should_be_able_to_alias_other_peers(peer, swarm7):
     peer_id = swarm7[random.choice(default_nodes())]["peer_id"]
 
+    assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id) is True
     assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id)
     assert await swarm7[peer]["api"].aliases_get_alias("Alice") == peer_id
 

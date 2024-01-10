@@ -35,7 +35,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-tested-api",
         action="store",
-        default=f"http://{LOCALHOST}:{NODES['0']['api_port']}",
+        default=f"http://{LOCALHOST}:{NODES['1']['api_port']}",
         help="The API towards which the stress test is performed",
     )
     parser.addoption(
@@ -345,7 +345,7 @@ def collect_node_information(node_args):
 def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    for f in ["node_4.cfg.yaml"]:
+    for f in ["node_5.cfg.yaml"]:
         shutil.copyfile(f"{MYDIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-{f}")
 
     logging.info("Ensure local anvil server is not running")
