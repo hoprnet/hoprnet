@@ -2,7 +2,8 @@ use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
 use std::{
-    fs,collections::HashMap,
+    collections::HashMap,
+    fs,
     path::{Path, PathBuf},
 };
 

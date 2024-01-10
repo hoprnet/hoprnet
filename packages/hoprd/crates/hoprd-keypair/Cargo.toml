@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 aes = "0.8"
@@ -27,7 +27,7 @@ uuid = { version = "1.3.3", features = ["serde", "v4"] }
 core-crypto = { workspace = true, default-features = false }
 platform = { workspace = true }
 utils-types = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
+log = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -35,4 +35,4 @@ tempfile = "3"
 
 [features]
 default = []
-wasm = [ "core-crypto/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-log/wasm", "dep:getrandom" ]
+wasm = [ "core-crypto/wasm", "platform/wasm-bindgen", "utils-types/wasm", "dep:getrandom" ]

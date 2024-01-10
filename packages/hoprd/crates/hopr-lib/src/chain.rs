@@ -3,30 +3,28 @@ use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
-use semver::{VersionReq, Version};
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
-
-use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_path::channel_graph::ChannelGraph;
-use core_transport::{ChainKeypair, Keypair};
 use core_ethereum_actions::action_queue::ActionQueueConfig;
 use core_ethereum_actions::action_state::IndexerActionTracker;
 use core_ethereum_actions::payload::SafePayloadGenerator;
+use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use core_ethereum_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
 use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
-use utils_db::rusty::RustyLevelDbShim;
+use core_path::channel_graph::ChannelGraph;
+use core_transport::{ChainKeypair, Keypair};
+use utils_db::CurrentDbShim;
 use utils_types::primitives::Address;
 
 use crate::errors::HoprLibError;
-
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -61,7 +59,9 @@ impl FromStr for EnvironmentType {
             "staging" => Ok(Self::Staging),
             "development" => Ok(Self::Development),
             "local" => Ok(Self::Local),
-            _ => Err(HoprLibError::GeneralError("Failed to recognize environment type".into()))
+            _ => Err(HoprLibError::GeneralError(
+                "Failed to recognize environment type".into(),
+            )),
         }
     }
 }
@@ -196,7 +196,11 @@ fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<boo
 
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
-    pub fn new(id: &str, maybe_custom_provider: Option<&str>, protocol_config: &mut ProtocolsConfig) -> Result<Self, String> {
+    pub fn new(
+        id: &str,
+        maybe_custom_provider: Option<&str>,
+        protocol_config: &mut ProtocolsConfig,
+    ) -> Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
@@ -251,12 +255,12 @@ pub struct SmartContractConfig {
 impl From<&ChainNetworkConfig> for SmartContractConfig {
     fn from(network: &ChainNetworkConfig) -> Self {
         Self {
-            hopr_announcements_address: network.announcements.clone(),
-            hopr_token_address: network.token.clone(),
-            hopr_channels_address: network.channels.clone(),
-            hopr_network_registry_address: network.network_registry.clone(),
-            hopr_node_safe_registry_address: network.node_safe_registry.clone(),
-            hopr_ticket_price_oracle_address: network.ticket_price_oracle.clone(),
+            hopr_announcements_address: network.announcements,
+            hopr_token_address: network.token,
+            hopr_channels_address: network.channels,
+            hopr_network_registry_address: network.network_registry,
+            hopr_node_safe_registry_address: network.node_safe_registry,
+            hopr_ticket_price_oracle_address: network.ticket_price_oracle,
             indexer_start_block_number: network.channel_contract_deploy_block,
         }
     }
@@ -288,7 +292,7 @@ impl FromStr for ProtocolsConfig {
 impl std::cmp::PartialEq for ProtocolsConfig {
     fn eq(&self, other: &Self) -> bool {
         Vec::from_iter(self.networks.clone()) == Vec::from_iter(other.networks.clone())
-        && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
+            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
     }
 }
 
@@ -368,12 +372,12 @@ where
 
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {

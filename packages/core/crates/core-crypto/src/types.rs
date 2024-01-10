@@ -42,7 +42,7 @@ use crate::{
     primitives::{DigestLike, EthDigest},
     random::random_group_element,
 };
-use utils_log::warn;
+use log::warn;
 use utils_types::{
     errors::GeneralError::{self, ParseError},
     primitives::{Address, EthereumChallenge, U256},

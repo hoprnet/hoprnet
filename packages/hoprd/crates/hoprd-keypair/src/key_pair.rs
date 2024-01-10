@@ -9,13 +9,13 @@ use aes::{
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::random::random_bytes;
 use hex;
+use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use utils_log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
@@ -93,7 +93,7 @@ impl std::fmt::Display for HoprKeys {
                 self.packet_key.public().to_peerid_str(),
                 self.chain_key.public().to_hex(),
                 self.chain_key.public().0.to_address(),
-                self.id.to_string()
+                self.id
             )
             .as_str(),
         )
@@ -348,12 +348,10 @@ impl HoprKeys {
                     false,
                 ))
             }
-            _ => {
-                return Err(KeyPairError::InvalidEncryptedKeyLength {
-                    actual: pk.len(),
-                    expected: V2_PRIVKEYS_LENGTH,
-                });
-            }
+            _ => Err(KeyPairError::InvalidEncryptedKeyLength {
+                actual: pk.len(),
+                expected: V2_PRIVKEYS_LENGTH,
+            }),
         }
     }
 

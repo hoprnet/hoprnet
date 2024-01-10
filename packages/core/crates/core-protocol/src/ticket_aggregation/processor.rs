@@ -20,9 +20,9 @@ use futures::{
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
+use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use utils_log::{debug, error, info, warn};
 use utils_types::{
     primitives::{Balance, BalanceType},
     traits::PeerIdLike,
@@ -31,7 +31,7 @@ use utils_types::{
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use futures::stream::FuturesUnordered;
 
-use async_std::task::{sleep, spawn_local};
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -348,7 +348,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             first_acked_ticket.ticket.index.into(),
             (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
             1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch.into(),
+            channel_epoch,
             first_acked_ticket.ticket.challenge.clone(),
             &self.chain_key,
             &domain_separator,
@@ -604,16 +604,27 @@ impl<T, U> TicketAggregationActions<T, U> {
 }
 
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
-pub struct TicketAggregationInteraction<T, U> {
+pub struct TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     ack_event_queue: (
         Sender<TicketAggregationToProcess<T, U>>,
         Receiver<TicketAggregationProcessed<T, U>>,
     ),
 }
 
-impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
+impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+    ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
@@ -681,7 +692,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
             }
         });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });
@@ -698,7 +709,11 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
     }
 }
 
-impl<T, U> Stream for TicketAggregationInteraction<T, U> {
+impl<T, U> Stream for TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
@@ -724,7 +739,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
@@ -783,7 +798,7 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
             let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
@@ -821,9 +836,8 @@ mod tests {
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         const NUM_TICKETS: u64 = 30;
 

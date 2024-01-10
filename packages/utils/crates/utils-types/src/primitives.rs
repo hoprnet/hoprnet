@@ -1,4 +1,6 @@
 use ethnum::{u256, AsU256};
+use rand::rngs::OsRng;
+use rand::RngCore;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -6,8 +8,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 use std::str::FromStr;
-use rand::RngCore;
-use rand::rngs::OsRng;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -91,7 +91,7 @@ impl From<[u8; Address::SIZE]> for Address {
 
 impl From<primitive_types::H160> for Address {
     fn from(value: primitive_types::H160) -> Self {
-        Self (value.0)
+        Self(value.0)
     }
 }
 
@@ -143,7 +143,6 @@ pub struct Balance {
     value: U256,
     balance_type: BalanceType,
 }
-
 
 impl Balance {
     /// Creates new balance of the given type from the base 10 integer string

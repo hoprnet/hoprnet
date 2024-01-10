@@ -20,7 +20,7 @@ struct PayloadWrapper<M: std::marker::Send> {
 pub struct RingBufferInboxBackend<T, M>
 where
     T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
-    M: Clone + std::marker::Send + std::marker::Sync
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
@@ -82,7 +82,7 @@ where
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
         // Either use an existing ringbuffer or initialize a new one, if such tag does not exist yet.
-        match self.buffers.entry(tag.unwrap_or(T::default())) {
+        match self.buffers.entry(tag.unwrap_or_default()) {
             Entry::Occupied(mut e) => e.get_mut().push(PayloadWrapper {
                 payload,
                 ts: (self.ts)(),
@@ -108,7 +108,7 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf| 
+            .and_then(|buf|
                 buf
                 .dequeue()
                 .map(|w| (w.payload, w.ts)))
@@ -125,7 +125,7 @@ where
                             .map(|w| (w.payload, w.ts))
                             .collect::<Vec<_>>()
                     })
-                    .unwrap_or_else(Vec::<(M, Duration)>::new)
+                    .unwrap_or_default()
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
@@ -150,7 +150,7 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf| 
+            .and_then(|buf|
                 buf
                 .peek()
                 .map(|w| (w.payload.clone(), w.ts)))
@@ -169,7 +169,7 @@ where
                             .filter_map(|w| if w.ts >= timestamp { Some((w.payload.clone(), w.ts)) } else { None } )
                             .collect::<Vec<_>>()
                     })
-                    .unwrap_or_else(Vec::<(M, Duration)>::new)
+                    .unwrap_or_default()
             }
             None => {
                 // Peek across all the tags, need to sort again based on the timestamp
@@ -442,7 +442,7 @@ mod test {
     }
 
     #[async_std::test]
-    async fn test_peek_all_with_timestamp() { 
+    async fn test_peek_all_with_timestamp() {
         let mut rb = make_backend(8);
 
         rb.push(Some(2), 0).await;

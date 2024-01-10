@@ -10,16 +10,15 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
-# tokio = { version = "1.33", default-features = false }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
-env_logger = { workspace = true }
+fern = "0.6.2"
 futures = { workspace = true }
 hex = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 proc-macro-regex = "~1.1.0"
-rlp = "0.5.2"
 serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
@@ -39,10 +38,11 @@ hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 utils-validation = { workspace = true }
+humantime = "2.1.0"
 
 [dev-dependencies]
 tempfile = "3"
@@ -61,8 +61,15 @@ wasm = [
     "hoprd-keypair/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-log/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
 ]
-prometheus = [ "dep:utils-metrics", "hopr-lib/prometheus", "core-transport/prometheus", "core-strategy/prometheus", "core-network/prometheus", "core-ethereum-indexer/prometheus" ]
+prometheus = [
+    "dep:utils-metrics",
+    "dep:lazy_static",
+    "hopr-lib/prometheus",
+    "core-transport/prometheus",
+    "core-strategy/prometheus",
+    "core-network/prometheus",
+    "core-ethereum-indexer/prometheus"
+]

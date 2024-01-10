@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
-use utils_log::{debug, info};
+use log::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::{histogram_start_measure, metrics::SimpleHistogram};
@@ -121,17 +121,18 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
             match select(timeout, ping).await {
                 Either::Left(_) => info!("Heartbeat round interrupted by timeout"),
-                Either::Right(_) => info!("Heartbeat round finished for all peers"),
+                Either::Right(_) => {
+                    info!("Heartbeat round finished for all peers");
+
+                    let this_round_actual_duration = current_timestamp().saturating_sub(start);
+
+                    let time_to_wait_for_next_round =
+                        this_round_planned_duration.saturating_sub(this_round_actual_duration);
+
+                    debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}");
+                    sleep(time_to_wait_for_next_round).await
+                }
             };
-
-            let this_round_actual_duration = current_timestamp().saturating_sub(start);
-            if this_round_actual_duration < this_round_planned_duration {
-                let time_to_wait_for_next_round =
-                    this_round_planned_duration.saturating_sub(this_round_actual_duration);
-
-                debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}ms");
-                sleep(time_to_wait_for_next_round).await
-            }
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_TIME_TO_HEARTBEAT.record_measure(heartbeat_round_timer);

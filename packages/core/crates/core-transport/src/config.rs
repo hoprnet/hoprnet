@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -40,7 +41,7 @@ impl FromStr for HostConfig {
             Some(split) => split,
         };
 
-        let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
+        let port = str_port.parse().map_err(|e: ParseIntError| e.to_string())?;
 
         if validator::validate_ip_v4(ip_or_dns) {
             Ok(Self {

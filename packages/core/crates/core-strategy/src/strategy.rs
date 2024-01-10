@@ -15,10 +15,10 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
 use platform::time::native::current_timestamp;
@@ -177,7 +177,7 @@ impl MultiStrategy {
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
-        Net: NetworkExternalActions  + Send + Sync + 'static,
+        Net: NetworkExternalActions + Send + Sync + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 

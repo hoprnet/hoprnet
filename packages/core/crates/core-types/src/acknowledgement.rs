@@ -12,9 +12,9 @@ use core_crypto::{
     keypairs::{ChainKeypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,
@@ -134,7 +134,7 @@ pub struct AcknowledgedTicket {
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.ticket.partial_cmp(&other.ticket)
+        Some(self.cmp(other))
     }
 }
 

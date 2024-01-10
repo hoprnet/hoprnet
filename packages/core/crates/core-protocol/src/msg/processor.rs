@@ -24,14 +24,14 @@ use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, Unack
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
-use utils_log::{debug, error, warn};
+use log::{debug, error, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
-use async_std::task::{sleep, spawn_local};
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -167,7 +167,7 @@ where
 
                     Ok(TransportPacket::Outgoing {
                         next_hop: next_hop.to_peerid(),
-                        ack_challenge: ack_challenge.clone(),
+                        ack_challenge,
                         data: payload.into_boxed_slice(),
                     })
                 }
@@ -583,7 +583,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -591,7 +591,7 @@ impl PacketInteraction {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let mixer_cfg = cfg.mixer.clone();
+        let mixer_cfg = cfg.mixer;
         let pkt_keypair = cfg.packet_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
 
@@ -692,8 +692,6 @@ impl PacketInteraction {
             })
             // introduce random timeout to mix packets asynchrounously
             .then_concurrent(move |event| async move {
-                let mixer_cfg = mixer_cfg;
-
                 match event {
                     Ok(processed) => match processed {
                         MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => {
@@ -745,7 +743,7 @@ impl PacketInteraction {
                 }
             });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });
@@ -805,10 +803,10 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use utils_log::debug;
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,
@@ -855,11 +853,11 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
-        (0..amount).map(|_| RustyLevelDbShim::new_in_memory()).collect()
+    async fn create_dbs(amount: usize) -> Vec<CurrentDbShim> {
+        futures::future::join_all((0..amount).map(|_| CurrentDbShim::new_in_memory())).await
     }
 
-    fn create_core_dbs(dbs: &Vec<RustyLevelDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<CurrentDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
@@ -871,7 +869,7 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    async fn create_minimal_topology(dbs: &Vec<RustyLevelDbShim>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<CurrentDbShim>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
@@ -944,7 +942,7 @@ mod tests {
 
         // let (done_tx, mut done_rx) = futures::channel::mpsc::unbounded();
 
-        let dbs = create_dbs(2);
+        let dbs = create_dbs(2).await;
 
         create_minimal_topology(&dbs)
             .await
@@ -1034,7 +1032,7 @@ mod tests {
 
         assert!(peer_count <= PEERS.len());
         assert!(peer_count >= 3);
-        let dbs = create_dbs(peer_count);
+        let dbs = create_dbs(peer_count).await;
 
         create_minimal_topology(&dbs)
             .await

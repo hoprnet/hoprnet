@@ -3,12 +3,13 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
+use log::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use utils_log::{debug, error};
+use std::sync::Arc;
 
 use crate::errors::{CoreEthereumActionsError, Result};
 
@@ -70,13 +71,13 @@ type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sen
 
 #[derive(Debug)]
 pub struct IndexerActionTracker {
-    expectations: RwLock<ExpectationTable>,
+    expectations: Arc<RwLock<ExpectationTable>>,
 }
 
 impl Default for IndexerActionTracker {
     fn default() -> Self {
         Self {
-            expectations: RwLock::new(HashMap::new()),
+            expectations: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -169,7 +170,7 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             let hash = exp_clone
                 .match_and_resolve(&sample_event_clone)
                 .delay(Duration::from_millis(200))
@@ -205,7 +206,7 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             exp_clone
                 .unregister_expectation(sample_event_clone.tx_hash)
                 .delay(Duration::from_millis(200))
@@ -251,7 +252,7 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             for sample_event in sample_events_clone {
                 exp_clone
                     .match_and_resolve(&sample_event)
@@ -298,7 +299,7 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             for sample_event in sample_events_clone {
                 exp_clone
                     .match_and_resolve(&sample_event)

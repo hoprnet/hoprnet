@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -36,7 +36,7 @@ core-ethereum-types = { workspace = true }
 core-ethereum-indexer = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
@@ -57,7 +57,6 @@ wasm = [
     "core-ethereum-rpc/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-log/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
 ]

@@ -8,13 +8,13 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
+use log::{debug, error, info};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_log::{debug, error, info};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -80,7 +80,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
                 if let Some((current_channel_epoch, current_ticket_index)) =
-                    cached_channel.get(&ticket.channel_id).map(|c| c.clone())
+                    cached_channel.get(&ticket.channel_id).copied()
                 {
                     // from the cached_channel
                     (current_channel_epoch, current_ticket_index)
@@ -110,7 +110,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 let unrealized_balance = self
                     .cached_unrealized_value
                     .get(&ticket.channel_id)
-                    .map(|b| b.clone())
+                    .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
                     .add(&ticket.amount);
 
@@ -371,7 +371,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let current_unrealized_value = self
             .cached_unrealized_value
             .get(&acked_ticket.ticket.channel_id)
-            .map(|v| v.clone())
+            .copied()
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         self.cached_unrealized_value.insert(
@@ -631,7 +631,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel_to dest: {}", dest);
+        //log::debug!("DB: get_channel_to dest: {}", dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
@@ -649,7 +649,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         channel: &ChannelEntry,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        //utils_log::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
+        //log::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
@@ -661,7 +661,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     let updated_balance_difference = previous_channel_entry.balance.sub(&channel.balance);
 
                     self.cached_unrealized_value
-                        .get(&channel_id)
+                        .get(channel_id)
                         .map(|v| v.sub(&updated_balance_difference))
                         .unwrap_or(Balance::zero(BalanceType::HOPR))
                 } else {
@@ -720,7 +720,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
-        //utils_log::debug!("DB: update_latest_block_number to {}", number);
+        //log::debug!("DB: update_latest_block_number to {}", number);
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
         let _ = self.db.set(key, &number).await?;
         Ok(())
@@ -732,7 +732,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel {}", channel);
+        //log::debug!("DB: get_channel {}", channel);
         let key = utils_db::db::Key::new_with_prefix(channel, CHANNEL_PREFIX)?;
         self.db.get_or_none::<ChannelEntry>(key).await
     }
@@ -846,7 +846,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0) + 1;
 
-        ops.put(key, &count);
+        ops.put(key, count);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
@@ -856,7 +856,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
-        ops.put(key, &new_redeemed_balance);
+        ops.put(key, new_redeemed_balance);
         self.db.batch(ops, true).await?;
 
         debug!("stopped marking {acked_ticket} as redeemed");
@@ -930,7 +930,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //utils_log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
+        //log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(src, dest), CHANNEL_PREFIX)?;
         self.db.get_or_none(key).await
     }
@@ -992,7 +992,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_hopr_balance(&self) -> Result<Balance> {
-        //utils_log::debug!("DB: get_hopr_balance");
+        //log::debug!("DB: get_hopr_balance");
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         self.db
@@ -1014,7 +1014,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_ticket_price(&self) -> Result<Option<U256>> {
-        //utils_log::debug!("DB: get_ticket_price");
+        //log::debug!("DB: get_ticket_price");
         let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
 
         self.db.get_or_none::<U256>(key).await
@@ -1352,7 +1352,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use std::str::FromStr;
-    use utils_db::{db::serialize_to_bytes, rusty::RustyLevelDbShim};
+    use utils_db::{db::serialize_to_bytes, CurrentDbShim};
     use utils_types::{
         primitives::{Address, EthereumChallenge},
         traits::BinarySerializable,
@@ -1451,7 +1451,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1462,7 +1462,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1473,7 +1473,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1494,7 +1494,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1506,7 +1506,7 @@ mod tests {
     }
 
     async fn create_acknowledged_tickets(
-        db: &mut CoreEthereumDb<RustyLevelDbShim>,
+        db: &mut CoreEthereumDb<CurrentDbShim>,
         tickets_to_generate: u64,
         channel_epoch: u32,
         start_index: u64,
@@ -1584,7 +1584,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_mark_acknowledged_tickets_neglected() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1634,7 +1634,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1701,10 +1701,7 @@ mod tests {
         assert_eq!(acked_tickets_range.len(), 1);
     }
 
-    async fn generate_ack_tickets(
-        db: &mut DB<RustyLevelDbShim>,
-        amount: u32,
-    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
+    async fn generate_ack_tickets(db: &mut DB<CurrentDbShim>, amount: u32) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
         let domain_separator = Hash::default();
 
@@ -1758,7 +1755,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_all_acknowledged_tickets() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1789,7 +1786,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_skip_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1825,7 +1822,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_prepare_acknowledged_tickets_after_last_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1864,7 +1861,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_prepare_when_last_being_redeemed() {
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
 
         let amount_tickets = 29;
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
@@ -1894,7 +1891,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_have_0_unrealized_balance_non_existing_channels() {
         let db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -1906,7 +1903,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_contain_unrealized_balance_for_the_tickets_present() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -1942,7 +1939,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_channel_balance_for_newly_opened_channels() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -1970,7 +1967,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_reset_unrealized_channel_balance_for_reopened_channels_to_channel_balance() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let channel_epoch = 7u32;
@@ -2019,7 +2016,7 @@ mod tests {
     async fn test_db_should_move_the_outstanding_unrealized_value_to_unrealized_channel_balance_on_channel_update_with_the_same_channel_epoch_on_redeem(
     ) {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             BOB_KEYPAIR.public().to_address(),
         );
 
@@ -2086,7 +2083,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_not_update_the_unrealized_balance_on_redeem() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2134,7 +2131,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_decrease_unrealized_balance_on_losing_ticket() {
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
 
         let tickets_to_generate = 2u64;
@@ -2180,7 +2177,7 @@ mod tests {
     async fn test_db_should_initialize_catch_when_explicitly_triggered() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         // generate_ack_tickets only creates tickets of the current epoch but with smaller ticket indexes
         let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
 
@@ -2216,7 +2213,7 @@ mod tests {
         let current_channel_ticket_index = 20u64;
         let current_channel_total_balance = Balance::new_from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
 
-        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
         let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
         let _tickets_from_previous_epoch = create_acknowledged_tickets(
             &mut db,

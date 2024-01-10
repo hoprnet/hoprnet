@@ -17,6 +17,7 @@ ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 COPY Makefile Cargo.toml Cargo.lock ./
 COPY vendor vendor/
 COPY packages packages/
+COPY misc misc/
 
 RUN make build-solidity-types
 
@@ -35,7 +36,7 @@ LABEL name="hopli" \
     summary="Hopli cli tool" \
     description="Hopli is a commandline tool that interacts mainly with Foundry"
 
-ENV ETHERSCAN_API_KEY="random_giberish"
+ENV ETHERSCAN_API_KEY="random_gibberish"
 
 # build project sources
 WORKDIR /app/hoprnet

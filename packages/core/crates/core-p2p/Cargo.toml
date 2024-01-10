@@ -6,7 +6,7 @@ edition = "2021"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
 default = []
@@ -14,15 +14,13 @@ wasm = [
     "dep:getrandom",
     "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
     "core-network/wasm",
-    "utils-log/wasm",
 ]
 
 [dependencies]
 futures = { workspace = true }
 futures-lite = { workspace = true }
 getrandom = { workspace = true, optional = true}
-# a better separation of tcp + async-std for non wasm case could be designed
-libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
+libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp", "dns"] }
 libp2p-mplex = { workspace = true }
 libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
 serde = { workspace = true, features = ["derive"]}
@@ -33,7 +31,7 @@ void = "1"          # needed for Behavior implementations from libp2p
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-types = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

@@ -157,16 +157,15 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    HOPRD_HEARTBEAT_INTERVAL=2500 \
-    HOPRD_HEARTBEAT_THRESHOLD=2500 \
-    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_HEARTBEAT_INTERVAL=3 \
+    HOPRD_HEARTBEAT_THRESHOLD=3 \
+    HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     RUST_LOG="debug" \
     RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
-      --api-token "${api_token}" \
+      --disableApiAuthentication \
       --data="${dir}" \
       --host="${host}:${p2p_port}" \
       --identity="${id_file}" \
@@ -408,10 +407,9 @@ for node_id in ${!id_files[@]}; do
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
   log "\t\tAddress:\t${node_addrs[$node_id]}"
-  log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/swagger-ui/index.html"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
-  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 
   cat <<EOF >> "${env_file}"
 export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"

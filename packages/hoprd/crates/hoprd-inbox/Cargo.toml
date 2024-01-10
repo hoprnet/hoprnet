@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -21,7 +21,7 @@ validator = { workspace = true }
 
 core-types = { workspace = true }
 platform = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -30,5 +30,5 @@ tempfile = "3"
 
 [features]
 default = []
-wasm = [ "core-types/wasm", "utils-log/wasm" ]
+wasm = [ "core-types/wasm" ]
 

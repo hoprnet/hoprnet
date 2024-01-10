@@ -6,7 +6,7 @@ edition = "2021"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-std = { workspace = true }
@@ -25,7 +25,7 @@ validator = { workspace = true }
 
 core-crypto = { workspace = true }
 platform = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true}
 utils-types = { workspace = true }
 
@@ -41,6 +41,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "utils-metrics/wasm", "utils-log/wasm", "utils-types/wasm"]
+wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "utils-metrics/wasm", "utils-types/wasm"]
 compat-ping = []
 prometheus = ["dep:utils-metrics"]

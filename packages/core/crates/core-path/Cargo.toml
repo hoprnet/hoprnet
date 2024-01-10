@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -26,7 +26,7 @@ core-ethereum-db = { workspace = true }
 core-crypto = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-db = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
@@ -41,6 +41,6 @@ wasm-bindgen-test = "0.3.36"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+wasm = [ "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics" ]
 

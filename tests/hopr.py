@@ -1,8 +1,8 @@
 import logging
 
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasesApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi
-from hoprd_sdk.models import AliasesBody, ChannelidFundBody, ChannelsBody, MessagesBody, MessagesPopBody
+from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi, NetworkApi
+from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, TagQuery, SendMessageReq
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
 
@@ -27,8 +27,8 @@ class HoprdAPI:
 
     def __init__(self, url: str, token: str):
         self.configuration = Configuration()
-        self.configuration.host = f"{url}/api/v3"
-        self.configuration.api_key["x-auth-token"] = token
+        self.configuration.host = f"{url}"
+        self.configuration.api_key["X-Auth-Token"] = token
 
     def __call_api(self, obj, method, *args, **kwargs):
         try:
@@ -60,7 +60,7 @@ class HoprdAPI:
         Returns the aliases recognized by the node.
         :return: aliases: dict
         """
-        _, response = self.__call_api(AliasesApi, "aliases_get_aliases")
+        _, response = self.__call_api(AliasApi, "aliases")
         return response
 
     async def aliases_get_alias(self, alias: str):
@@ -68,7 +68,7 @@ class HoprdAPI:
         Returns the peer id recognized by the node.
         :return: peer_id: str
         """
-        status, response = self.__call_api(AliasesApi, "aliases_get_alias", alias)
+        status, response = self.__call_api(AliasApi, "get_alias", alias)
         return response.peer_id if status else None
 
     async def aliases_set_alias(self, alias: str, peer_id: str):
@@ -76,8 +76,8 @@ class HoprdAPI:
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasesBody(peer_id, alias)
-        status, response = self.__call_api(AliasesApi, "aliases_set_alias", body=body)
+        body = AliasPeerId(alias, peer_id)
+        status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
     async def aliases_remove_alias(self, alias: str):
@@ -85,20 +85,16 @@ class HoprdAPI:
         Returns the aliases recognized by the node.
         :return: bool
         """
-        status, _ = self.__call_api(AliasesApi, "aliases_remove_alias", alias)
+        status, _ = self.__call_api(AliasApi, "delete_alias", alias)
         return status
 
     async def balances(self):
         """
         Returns the balance of the node.
-        :param: type: str =  "all" | "hopr" | "native" | "safe_native" | "safe_hopr"
         :return: balances: dict | int
         """
-        status, response = self.__call_api(AccountApi, "account_get_balances")
-        if status:
-            return response
-        else:
-            return None
+        status, response = self.__call_api(AccountApi, "balances")
+        return response if status else None
 
     async def open_channel(self, peer_address: str, amount: str):
         """
@@ -107,9 +103,9 @@ class HoprdAPI:
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = ChannelsBody(peer_address, amount)
+        body = OpenChannelRequest(amount, peer_address)
 
-        status, response = self.__call_api(ChannelsApi, "channels_open_channel", body=body)
+        status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
 
     async def channels_fund_channel(self, channel_id: str, amount: str):
@@ -119,8 +115,8 @@ class HoprdAPI:
         :param: amount: str
         :return: bool
         """
-        body = ChannelidFundBody(amount=amount)
-        status, _ = self.__call_api(ChannelsApi, "channels_fund_channel", channel_id, body=body)
+        body = FundRequest(amount=amount)
+        status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
     async def close_channel(self, channel_id: str):
@@ -129,7 +125,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        status, _ = self.__call_api(ChannelsApi, "channels_close_channel", channel_id)
+        status, _ = self.__call_api(ChannelsApi, "close_channel", channel_id)
         return status
 
     async def channel_redeem_tickets(self, channel_id: str):
@@ -138,7 +134,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        status, _ = self.__call_api(ChannelsApi, "channels_redeem_tickets", channel_id)
+        status, _ = self.__call_api(ChannelsApi, "redeem_tickets_in_channel", channel_id)
         return status
 
     async def incoming_channels(self, only_id: bool = False):
@@ -148,7 +144,7 @@ class HoprdAPI:
         """
 
         status, response = self.__call_api(
-            ChannelsApi, "channels_get_channels", full_topology="false", including_closed="false"
+            ChannelsApi, "list_channels", full_topology="false", including_closed="false"
         )
         if status:
             if not hasattr(response, "incoming"):
@@ -171,7 +167,7 @@ class HoprdAPI:
         Returns all open outgoing channels.
         :return: channels: list
         """
-        status, response = self.__call_api(ChannelsApi, "channels_get_channels")
+        status, response = self.__call_api(ChannelsApi, "list_channels")
         if status:
             if not hasattr(response, "outgoing"):
                 log.warning("Response does not contain `outgoing`")
@@ -194,7 +190,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: channel: response
         """
-        _, response = self.__call_api(ChannelsApi, "channels_get_channel", channel_id)
+        _, response = self.__call_api(ChannelsApi, "show_channel", channel_id)
         return response
 
     async def channels_aggregate_tickets(self, channel_id: str):
@@ -203,7 +199,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        status, _ = self.__call_api(ChannelsApi, "channels_aggregate_tickets", channel_id)
+        status, _ = self.__call_api(ChannelsApi, "aggregate_tickets_in_channel", channel_id)
         return status
 
     async def channel_get_tickets(self, channel_id: str):
@@ -212,7 +208,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: tickets: response
         """
-        status, response = self.__call_api(ChannelsApi, "channels_get_tickets", channel_id)
+        status, response = self.__call_api(ChannelsApi, "show_channel_tickets", channel_id)
         return response if status else []
 
     async def all_channels(self, include_closed: bool):
@@ -222,7 +218,7 @@ class HoprdAPI:
         :return: channels: list
         """
         status, response = self.__call_api(
-            ChannelsApi, "channels_get_channels", full_topology="true", including_closed=include_closed
+            ChannelsApi, "list_channels", full_topology="true", including_closed="true" if include_closed else "false"
         )
         return response if status else []
 
@@ -232,7 +228,7 @@ class HoprdAPI:
         :param: peer_id: str
         :return: response: dict
         """
-        _, response = self.__call_api(PeersApi, "peers_ping_peer", peer_id)
+        _, response = self.__call_api(PeersApi, "ping_peer", peer_id)
         return response
 
     async def peers(self, params: list or str = "peer_id", status: str = "connected"):
@@ -243,7 +239,7 @@ class HoprdAPI:
         :param: quality: int = 0..1
         :return: peers: list
         """
-        is_ok, response = self.__call_api(NodeApi, "node_get_peers")
+        is_ok, response = self.__call_api(NodeApi, "peers")
         if is_ok:
             if not hasattr(response, status):
                 log.error(f"No `{status}` returned from the API")
@@ -272,24 +268,8 @@ class HoprdAPI:
         Returns the ticket statistics of the node.
         :return: statistics: dict
         """
-        _, response = self.__call_api(TicketsApi, "tickets_get_statistics")
+        _, response = self.__call_api(TicketsApi, "show_ticket_statistics")
         return response
-
-    async def get_address(self, address: str):
-        """
-        Returns the address of the node.
-        :param: address: str = "hopr" | "native"
-        :return: address: str | undefined
-        """
-        status, response = self.__call_api(AccountApi, "account_get_address", address)
-        if status:
-            if not hasattr(response, address):
-                log.error(f"No {address} returned from the API")
-                return None
-
-            return getattr(response, address)
-        else:
-            return None
 
     async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> bool:
         """
@@ -300,8 +280,8 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        body = MessagesBody(tag, message, destination, path=hops)
-        status, _ = self.__call_api(MessagesApi, "messages_send_message", body=body)
+        body = SendMessageReq(message, None, hops, destination, tag)
+        status, _ = self.__call_api(MessagesApi, "send_message", body=body)
         return status
 
     async def messages_pop(self, tag: int = MESSAGE_TAG) -> bool:
@@ -311,8 +291,8 @@ class HoprdAPI:
         :return: dict
         """
 
-        body = MessagesPopBody(tag=tag)
-        _, response = self.__call_api(MessagesApi, "messages_pop_message", body=body)
+        body = TagQuery(tag=tag)
+        _, response = self.__call_api(MessagesApi, "pop", body=body)
         return response
 
     async def messages_peek(self, tag: int = MESSAGE_TAG) -> dict:
@@ -322,8 +302,8 @@ class HoprdAPI:
         :return: dict
         """
 
-        body = MessagesPopBody(tag=tag)
-        _, response = self.__call_api(MessagesApi, "messages_peek_message", body=body)
+        body = TagQuery(tag=tag)
+        _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
     async def messages_peek_all(self, tag: int = MESSAGE_TAG) -> dict:
@@ -333,8 +313,8 @@ class HoprdAPI:
         :return: dict
         """
 
-        body = MessagesPopBody(tag=tag)
-        _, response = self.__call_api(MessagesApi, "messages_peek_all_message", body=body)
+        body = TagQuery(tag=tag)
+        _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 
     async def tickets_redeem(self):
@@ -342,7 +322,7 @@ class HoprdAPI:
         Redeems all tickets.
         :return: bool
         """
-        status, _ = self.__call_api(TicketsApi, "tickets_redeem_tickets")
+        status, _ = self.__call_api(TicketsApi, "redeem_all_tickets")
         return status
 
     async def ticket_price(self):
@@ -350,5 +330,5 @@ class HoprdAPI:
         Returns the ticket price in wei.
         :return: price: int
         """
-        _, response = self.__call_api(TicketsApi, "tickets_get_ticket_price")
+        _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None

@@ -8,10 +8,10 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_log::debug;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -82,7 +82,7 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
-            cfg: self.cfg.clone(),
+            cfg: self.cfg,
             contract_instances: self.contract_instances.clone(),
             node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
         }

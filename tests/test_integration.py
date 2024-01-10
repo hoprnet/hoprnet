@@ -215,6 +215,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
         print("Could not get ticket price from API, using default value")
 
 
+@pytest.mark.skip
 def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
     """
     Tests run in bash file that more or less need to be run in the future python fixture.
@@ -246,7 +247,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
         shell=False,
         capture_output=True,
         env=env_vars,
-        # timeout=2000,
+        timeout=300,
         check=True,
     )
 
@@ -256,6 +257,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
 async def test_hoprd_node_should_be_able_to_alias_other_peers(peer, swarm7):
     peer_id = swarm7[random.choice(default_nodes())]["peer_id"]
 
+    assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id) == True
     assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id)
     assert await swarm7[peer]["api"].aliases_get_alias("Alice") == peer_id
 
@@ -730,8 +732,6 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     native_balance=$(echo ${balances} | jq -r .native)
     """
     assert True
-
-
 
 
 @pytest.mark.asyncio

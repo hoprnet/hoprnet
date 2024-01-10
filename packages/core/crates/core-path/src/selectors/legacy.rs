@@ -18,13 +18,13 @@ struct WeightedChannelPath(Vec<Address>, U256);
 
 impl PartialOrd for WeightedChannelPath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.1.partial_cmp(&other.1)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for WeightedChannelPath {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        self.1.cmp(&other.1)
     }
 }
 

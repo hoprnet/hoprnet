@@ -100,9 +100,7 @@ impl MoveNodeToSafeModuleArgs {
         let checksumed_module_addr = Address::from_str(parsed_module_addr).unwrap().to_checksum();
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
 
         log!(target: "move_node_to_safe_module", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.

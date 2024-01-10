@@ -176,7 +176,7 @@ impl From<HoprdConfig> for HoprLibConfig {
 
 use platform::file::native::read_to_string;
 
-use utils_log::debug;
+use log::debug;
 
 use crate::errors::HoprdError;
 
@@ -184,8 +184,8 @@ impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
             debug!("fetching configuration from file {cfg_path}");
-            let yaml_configuration = read_to_string(cfg_path.as_str())
-                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
+            let yaml_configuration =
+                read_to_string(cfg_path.as_str()).map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
                 .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
@@ -223,8 +223,9 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
-                .map_err(crate::errors::HoprdError::ValidationError)?;
+            cfg.api.host =
+                HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
+                    .map_err(crate::errors::HoprdError::ValidationError)?;
         }
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -263,10 +264,7 @@ impl HoprdConfig {
         }
 
         if cli_args.auto_redeem_tickets {
-            cfg.hopr
-                .strategy
-                .strategies
-                .push(AutoRedeeming(Default::default()));
+            cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
         }
 
         // chain
@@ -276,13 +274,15 @@ impl HoprdConfig {
         }
 
         if let Some(protocol_config) = cli_args.protocol_config_path {
-            cfg.hopr.chain.protocols = ProtocolsConfig::from_str(&platform::file::native::read_to_string(&protocol_config)
-                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?)
-                .map_err(|e| crate::errors::HoprdError::ConfigError(e))?;
+            cfg.hopr.chain.protocols = ProtocolsConfig::from_str(
+                &platform::file::native::read_to_string(&protocol_config)
+                    .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
+            )
+            .map_err(crate::errors::HoprdError::ConfigError)?;
         }
 
         //   TODO: custom provider is redundant with the introduction of protocol-config.json
-        if let Some(x) = cli_args.provider {        
+        if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x)
         };
         cfg.hopr.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
@@ -306,18 +306,34 @@ impl HoprdConfig {
         // additional updates
         let home_symbol = '~';
         if cfg.hopr.db.data.starts_with(home_symbol) {
-            cfg.hopr.db.data = std::env::home_dir().map(|h| h.as_path().display().to_string()).expect("home dir for a user must be specified") + &cfg.hopr.db.data[1..];
+            cfg.hopr.db.data = std::env::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.hopr.db.data[1..];
         }
         if cfg.identity.file.starts_with(home_symbol) {
-            cfg.identity.file = std::env::home_dir().map(|h| h.as_path().display().to_string()).expect("home dir for a user must be specified") + &cfg.identity.file[1..];
+            cfg.identity.file = std::env::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.identity.file[1..];
         }
 
         if skip_validation {
             Ok(cfg)
         } else {
-            if ! cfg.hopr.chain.protocols.supported_networks().iter().any(|network| network == &cfg.hopr.chain.network) {
-                return Err(crate::errors::HoprdError::ValidationError(format!("The specified network '{}' is not listed as supported ({:?})",
-                    cfg.hopr.chain.network, cfg.hopr.chain.protocols.supported_networks())));
+            if !cfg
+                .hopr
+                .chain
+                .protocols
+                .supported_networks()
+                .iter()
+                .any(|network| network == &cfg.hopr.chain.network)
+            {
+                return Err(crate::errors::HoprdError::ValidationError(format!(
+                    "The specified network '{}' is not listed as supported ({:?})",
+                    cfg.hopr.chain.network,
+                    cfg.hopr.chain.protocols.supported_networks()
+                )));
             }
 
             match cfg.validate() {
@@ -333,9 +349,7 @@ impl HoprdConfig {
         // redacting sensitive information
         match &mut redacted_cfg.api.auth {
             Auth::None => {}
-            Auth::Token(_) => {
-                redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned())
-            }
+            Auth::Token(_) => redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned()),
         }
         if redacted_cfg.identity.private_key.is_some() {
             redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
@@ -346,8 +360,7 @@ impl HoprdConfig {
         }
         redacted_cfg.identity.password = "<REDACTED>".to_owned();
 
-        serde_json::to_string(&redacted_cfg)
-            .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
+        serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
 }
 
@@ -483,7 +496,8 @@ mod tests {
                 chain: hopr_lib::config::Chain {
                     announce: false,
                     network: "testing".to_string(),
-                    protocols: hopr_lib::ProtocolsConfig::from_str(r#"
+                    protocols: hopr_lib::ProtocolsConfig::from_str(
+                        r#"
                     {
                         "networks": {
                           "anvil-localhost": {
@@ -519,7 +533,9 @@ mod tests {
                           }
                         }
                       }
-                    "#).expect("protocol config should be valid"),
+                    "#,
+                    )
+                    .expect("protocol config should be valid"),
                     provider: None,
                     check_unrealized_balance: true,
                 },

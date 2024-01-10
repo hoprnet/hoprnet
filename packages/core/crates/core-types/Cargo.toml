@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -26,7 +26,7 @@ thiserror = "1.0"
 
 bindings =  { workspace = true }
 core-crypto = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 platform = { workspace = true }
 utils-types = { workspace = true }
 
@@ -36,4 +36,4 @@ bincode = "1.3.3"
 
 [features]
 default = []
-wasm = ["core-crypto/wasm", "platform/wasm-bindgen", "utils-log/wasm", "utils-types/wasm" ]
+wasm = ["core-crypto/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]

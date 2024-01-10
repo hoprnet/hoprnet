@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
@@ -26,7 +26,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 strum = { version = "0.25.0", features = ["derive"] }
-tide = "0.16.0"
+tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
 utoipa = { version = "4.1" }
 utoipa-swagger-ui = { version = "5.0.0" }
 validator = { workspace = true }
@@ -39,6 +39,6 @@ core-protocol = { workspace = true }
 core-transport = { workspace = true }
 core-types = { workspace = true }
 utils-types = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 
