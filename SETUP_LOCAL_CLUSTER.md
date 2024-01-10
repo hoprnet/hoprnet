@@ -25,9 +25,7 @@ unzip master.zip
 cd hoprnet-master
 ```
 
-2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), ie `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
-   to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^5]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
-
+1. **Install the dependencies of the project and build it**:
 ```
 make -j deps && make -j build
 ```

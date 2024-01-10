@@ -30,6 +30,7 @@
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
+  - [Nix environment setup](#nix-environment-setup)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
 - [Local cluster](#local-cluster)
@@ -91,8 +92,7 @@ Also all ports are mapped to your localhost, assuming you stick to the default p
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
-are doing and don't need further support. Otherwise you should use the `npm`
-or `docker` setup.
+are doing and don't need further support. Otherwise you should use the `docker` setup.
 
 You will need to clone and initialize the `hoprnet` repo first:
 
@@ -289,31 +289,6 @@ nix-env -i nix-direnv
 direnv allow .
 ```
 
-### Local nodes
-
-```sh
-# build deps and HOPRd code
-make -j deps && make -j build
-
-# starting network
-make run-anvil
-
-# update protocol-config
-scripts/update-protocol-config.sh -n anvil-localhost
-
-# running normal node alice (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:alice
-
-# running normal node bob (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:bob
-
-# fund all your nodes to get started
-make fund-local-all
-
-# start local HOPR admin in a container (and put into background)
-make run-hopr-admin &
-```
-
 ### Local node with safe staking service (local network)
 
 Running one node in test mode, with safe and module attached (in anvil-localhost network)
@@ -396,39 +371,11 @@ See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
 ## Test
 
 ### Unit testing
-
-We use [mocha][9] for our tests. You can run our test suite across all
-packages using the following command:
+Tests both the Rust and Solidity code.
 
 ```sh
 make test
 ```
-
-To run tests of a single package (e.g. hoprd) execute:
-
-```sh
-make test package=hoprd
-```
-
-To run tests of a single test suite (e.g. Identity) within a
-package (e.g. hoprd) execute:
-
-For instance, to run only the `Identity` test suite in `hoprd`, you need to
-run the following:
-
-```sh
-yarn --cwd packages/hoprd test --grep "Identity"
-```
-
-In a similar fashion, our contracts can be tested in isolation. For now, you
-need to pass the file to be tested, as [hardhat does not support --grep][12]
-
-```sh
-yarn test:contracts test/HoprChannels.spec.ts
-```
-
-In case a package you need to test is not included in our `package.json`,
-please feel free to update it as needed.
 
 #### Test-driven development
 

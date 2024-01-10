@@ -530,7 +530,7 @@ mod account {
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
     #[serde(rename_all = "camelCase")]
@@ -546,7 +546,7 @@ mod account {
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
         responses(
-            (status = 200, description = "The node's public addresses", body = AddressesAddress),
+            (status = 200, description = "The node's public addresses", body = AccountAddresses),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),

@@ -121,10 +121,6 @@ cargo-download: ## download vendored Cargo dependencies
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ ../crates/bindings/src
-# add [lib] as rlib is necessary to run integration tests
-# note: $(mydir) ends with '/'
-	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
-		echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build
 build: ## build all packages
@@ -138,6 +134,10 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs
 	echo "Deprecated"
+
+.PHONY: install
+install:
+	$(cargo) install --path packages/hopli
 
 .PHONY: clean
 clean: # Cleanup build directories
