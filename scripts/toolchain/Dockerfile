@@ -30,7 +30,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
-COPY Makefile rust-toolchain.toml Cargo.toml .cargo ./
+COPY .cargo .cargo
+COPY Makefile rust-toolchain.toml Cargo.toml ./
 
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
