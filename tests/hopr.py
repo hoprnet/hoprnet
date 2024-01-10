@@ -88,6 +88,22 @@ class HoprdAPI:
         status, _ = self.__call_api(AliasApi, "delete_alias", alias)
         return status
 
+    async def addresses(self, address_type: str):
+        """
+        Returns the address of the node.
+        :param: address: str = "hopr" | "native"
+        :return: address: str | undefined
+        """
+        status, response = self.__call_api(AccountApi, "addresses")
+        if status:
+            if not hasattr(response, address_type):
+                log.error(f"No {address_type} returned from the API")
+                return None
+
+            return getattr(response, address_type)
+        else:
+            return None
+
     async def balances(self):
         """
         Returns the balance of the node.
