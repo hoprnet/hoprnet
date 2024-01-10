@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 async-std = { workspace = true }
@@ -30,7 +30,7 @@ core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-rpc = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
+utils-db = { workspace = true }
 log = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true, default-features = false }

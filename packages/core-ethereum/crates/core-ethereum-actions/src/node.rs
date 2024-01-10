@@ -6,8 +6,8 @@ use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
 use core_types::announcement::{AnnouncementData, KeyBinding};
-use multiaddr::Multiaddr;
 use log::info;
+use multiaddr::Multiaddr;
 use utils_types::primitives::{Address, Balance};
 
 /// Contains all on-chain calls specific to HOPR node itself.
@@ -63,7 +63,7 @@ mod tests {
     use core_ethereum_types::actions::Action;
     use std::sync::Arc;
     use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
+    use utils_db::CurrentDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::BinarySerializable;
 
@@ -77,7 +77,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
 
@@ -125,7 +125,7 @@ mod tests {
         let bob = Address::random();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(

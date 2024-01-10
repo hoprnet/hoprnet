@@ -1,7 +1,7 @@
 import logging
 
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NodeApi, PeersApi, TicketsApi, NetworkApi
 from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, TagQuery, SendMessageReq
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
@@ -27,9 +27,8 @@ class HoprdAPI:
 
     def __init__(self, url: str, token: str):
         self.configuration = Configuration()
-        self.configuration.host = f"{url}/api/v3"
-        self.configuration.api_key["x-auth-token"] = token
-        self.configuration.api_key_prefix["x-auth-token"] = "Bearer"
+        self.configuration.host = f"{url}"
+        self.configuration.api_key["X-Auth-Token"] = token
 
     def __call_api(self, obj, method, *args, **kwargs):
         try:
@@ -89,6 +88,22 @@ class HoprdAPI:
         status, _ = self.__call_api(AliasApi, "delete_alias", alias)
         return status
 
+    async def addresses(self, address_type: str):
+        """
+        Returns the address of the node.
+        :param: address: str = "hopr" | "native"
+        :return: address: str | undefined
+        """
+        status, response = self.__call_api(AccountApi, "addresses")
+        if status:
+            if not hasattr(response, address_type):
+                log.error(f"No {address_type} returned from the API")
+                return None
+
+            return getattr(response, address_type)
+        else:
+            return None
+
     async def balances(self):
         """
         Returns the balance of the node.
@@ -117,7 +132,7 @@ class HoprdAPI:
         :return: bool
         """
         body = FundRequest(amount=amount)
-        status, _ = self.__call_api(ChannelsApi, "fund_channel", channel_id, body=body)
+        status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
     async def close_channel(self, channel_id: str):
@@ -144,7 +159,9 @@ class HoprdAPI:
         :return: channels: list
         """
 
-        status, response = self.__call_api(ChannelsApi, "list_channels", full_topology=False, including_closed=False)
+        status, response = self.__call_api(
+            ChannelsApi, "list_channels", full_topology="false", including_closed="false"
+        )
         if status:
             if not hasattr(response, "incoming"):
                 log.warning("Response does not contain `incoming`")
@@ -217,7 +234,7 @@ class HoprdAPI:
         :return: channels: list
         """
         status, response = self.__call_api(
-            ChannelsApi, "list_channels", full_topology=True, including_closed=include_closed
+            ChannelsApi, "list_channels", full_topology="true", including_closed="true" if include_closed else "false"
         )
         return response if status else []
 
@@ -329,5 +346,5 @@ class HoprdAPI:
         Returns the ticket price in wei.
         :return: price: int
         """
-        _, response = self.__call_api(TicketsApi, "price")
+        _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None

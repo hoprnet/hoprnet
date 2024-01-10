@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, TryStreamExt};
-use std::pin::Pin;
 use log::debug;
 use log::error;
+use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;

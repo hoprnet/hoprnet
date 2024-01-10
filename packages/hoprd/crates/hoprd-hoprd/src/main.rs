@@ -1,5 +1,5 @@
-use std::{future::poll_fn, pin::Pin, sync::Arc, time::SystemTime};
 use std::str::FromStr;
+use std::{future::poll_fn, pin::Pin, sync::Arc, time::SystemTime};
 
 use async_lock::RwLock;
 use chrono::{DateTime, Utc};
@@ -40,18 +40,21 @@ fn setup_logger(level: log::LevelFilter) {
         .level(level)
         .level_for("libp2p_mplex", log::LevelFilter::Info)
         .level_for("multistream_select", log::LevelFilter::Info)
+        .level_for("sqlx::query", log::LevelFilter::Info)
         .chain(std::io::stdout())
-        .apply() {
+        .apply()
+    {
         eprintln!("failed to setup logger: {e}")
     }
 }
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    setup_logger(std::env::var("RUST_LOG")
-        .map_err(|_| ())
-        .and_then(|level| log::LevelFilter::from_str(&level).map_err(|_| ()))
-        .unwrap_or(log::LevelFilter::Debug)
+    setup_logger(
+        std::env::var("RUST_LOG")
+            .map_err(|_| ())
+            .and_then(|level| log::LevelFilter::from_str(&level).map_err(|_| ()))
+            .unwrap_or(log::LevelFilter::Debug),
     );
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);

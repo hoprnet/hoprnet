@@ -18,8 +18,8 @@ use core_ethereum_rpc::rpc::RpcOperations;
 use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
-use utils_db::rusty::RustyLevelDbShim;
 use log::{debug, error, info, warn};
+use utils_db::CurrentDbShim;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};
@@ -96,13 +96,13 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 #[derive(Debug, Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
     indexer: Indexer<
         RpcOperations<JsonRpcClient>,
-        ContractEventHandlers<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>,
-        CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>,
+        ContractEventHandlers<CoreEthereumDb<utils_db::CurrentDbShim>>,
+        CoreEthereumDb<utils_db::CurrentDbShim>,
     >,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
@@ -110,12 +110,12 @@ pub struct HoprChain {
 impl HoprChain {
     pub fn new(
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
         contract_addresses: ContractAddresses,
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-        chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+        chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
@@ -186,11 +186,11 @@ impl HoprChain {
         Ok(self.db.read().await.get_staking_safe_allowance().await?)
     }
 
-    pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>> {
+    pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
         &self.chain_actions
     }
 
-    pub fn actions_mut_ref(&mut self) -> &mut CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>> {
+    pub fn actions_mut_ref(&mut self) -> &mut CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
         &mut self.chain_actions
     }
 
@@ -200,7 +200,7 @@ impl HoprChain {
     }
 
     // NOTE: needed early in the initialization to sync
-    pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> {
+    pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>> {
         self.db.clone()
     }
 

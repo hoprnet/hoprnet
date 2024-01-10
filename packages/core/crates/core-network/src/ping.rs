@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::pin::Pin;
 
 use async_trait::async_trait;
@@ -92,7 +93,7 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
         let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
 
         self.send_ping
-            .start_send((peer.clone(), ping_challenge.clone()))
+            .start_send((*peer, ping_challenge.clone()))
             .map(move |_| (current_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
     }
@@ -115,25 +116,22 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
 
         if peers.is_empty() {
             debug!("Received an empty peer list, not pinging any peers");
-            return ();
+            return;
         }
 
         if let Err(e) = poll_fn(|cx| Pin::new(&self.send_ping).poll_ready(cx)).await {
             error!("The ping receiver is not listening: {}", e);
-            return ();
+            return;
         }
 
         let mut active_pings: std::collections::HashMap<PeerId, PingStartedRecord> = std::collections::HashMap::new();
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
         for peer in peers.into_iter() {
-            if !active_pings.contains_key(&peer) {
-                match self.initiate_peer_ping(&peer) {
-                    Ok(v) => {
-                        active_pings.insert(peer.clone(), v);
-                    }
-                    Err(_) => {}
-                };
+            if let Entry::Vacant(e) = active_pings.entry(peer) {
+                if let Ok(v) = self.initiate_peer_ping(&peer) {
+                    e.insert(v);
+                }
             }
         }
 
@@ -185,10 +183,10 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
 
             if (current_timestamp() - start_all_peers) < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
-                    if !active_pings.contains_key(&peer) {
+                    if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
                             Ok(v) => {
-                                active_pings.insert(peer.clone(), v);
+                                e.insert(v);
                             }
                             Err(_) => continue,
                         };
@@ -196,7 +194,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 }
             }
 
-            if active_pings.len() == 0 && waiting.len() == 0 {
+            if active_pings.is_empty() && waiting.is_empty() {
                 break;
             }
         }

@@ -37,8 +37,8 @@ use core_types::{
     channels::{generate_channel_id, ChannelStatus, Ticket},
 };
 
-use utils_db::db::DB;
 use log::debug;
+use utils_db::db::DB;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
 use core_ethereum_api::HoprChain;
@@ -52,9 +52,9 @@ use core_transport::{
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
-use platform::file::native::{join, read_file, remove_dir_all, write};
-use utils_db::rusty::RustyLevelDbShim;
 use log::{error, info};
+use platform::file::native::{join, read_file, remove_dir_all, write};
+use utils_db::CurrentDbShim;
 use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
@@ -249,7 +249,7 @@ where
 
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
-                                        peer_id.clone(),
+                                        peer_id,
                                         allowed.clone().into()
                                     ))
                                     .await;
@@ -284,7 +284,7 @@ pub fn build_components<FSaveTbf>(
     chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
@@ -559,8 +559,16 @@ impl Hopr {
             cfg.db.initialize = true
         }
 
+        // create DB dir if it does not exist
+        if let Some(parent_dir_path) = std::path::Path::new(&db_path).parent() {
+            if !parent_dir_path.is_dir() {
+                std::fs::create_dir_all(parent_dir_path).expect("Failed to create a DB directory")
+            }
+        }
+
+        let db_shim = async_std::task::block_on(utils_db::CurrentDbShim::new(&db_path, cfg.db.initialize));
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(utils_db::rusty::RustyLevelDbShim::new(&db_path, cfg.db.initialize)),
+            DB::new(db_shim),
             me_onchain.public().to_address(),
         )));
 

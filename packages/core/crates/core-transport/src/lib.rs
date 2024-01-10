@@ -51,8 +51,8 @@ use futures::{
     FutureExt, SinkExt,
 };
 use libp2p::request_response::{RequestId, ResponseChannel};
-use std::sync::Arc;
 use log::{info, warn};
+use std::sync::Arc;
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -254,7 +254,7 @@ pub struct HoprTransport {
     me: PeerId,
     me_onchain: Address,
     cfg: config::TransportConfig,
-    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     indexer: processes::indexer::IndexerActions,
@@ -269,7 +269,7 @@ impl HoprTransport {
         identity: libp2p_identity::Keypair,
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
-        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         indexer: processes::indexer::IndexerActions,

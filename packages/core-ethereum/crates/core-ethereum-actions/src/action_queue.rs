@@ -16,13 +16,13 @@ use core_types::{
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 use crate::action_state::{ActionState, IndexerExpectation};

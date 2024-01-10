@@ -7,10 +7,10 @@ use core_ethereum_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
+use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, U256};
 
 use crate::action_queue::{ActionSender, PendingAction};
@@ -256,7 +256,7 @@ mod tests {
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
+    use utils_db::CurrentDbShim;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -304,7 +304,7 @@ mod tests {
     }
 
     async fn create_channel_with_ack_tickets(
-        rdb: RustyLevelDbShim,
+        rdb: CurrentDbShim,
         ticket_count: usize,
         counterparty: &ChainKeypair,
         channel_epoch: U256,
@@ -347,7 +347,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let rdb = RustyLevelDbShim::new_in_memory();
+        let rdb = CurrentDbShim::new_in_memory().await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
@@ -465,7 +465,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let rdb = RustyLevelDbShim::new_in_memory();
+        let rdb = CurrentDbShim::new_in_memory().await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
@@ -558,7 +558,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
-        let rdb = RustyLevelDbShim::new_in_memory();
+        let rdb = CurrentDbShim::new_in_memory().await;
 
         let (channel_from_bob, mut tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
@@ -643,7 +643,7 @@ mod tests {
 
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
-        let rdb = RustyLevelDbShim::new_in_memory();
+        let rdb = CurrentDbShim::new_in_memory().await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Make the first ticket from the previous epoch
@@ -725,7 +725,7 @@ mod tests {
 
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
-        let rdb = RustyLevelDbShim::new_in_memory();
+        let rdb = CurrentDbShim::new_in_memory().await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Make the first few tickets from the next epoch

@@ -27,8 +27,8 @@ use futures::{
 };
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
-use std::collections::{HashMap, HashSet};
 use log::{debug, error, info};
+use std::collections::{HashMap, HashSet};
 
 use crate::TransportOutput;
 

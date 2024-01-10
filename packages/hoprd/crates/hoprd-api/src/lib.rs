@@ -1,14 +1,14 @@
 pub mod config;
 
 use std::error::Error;
-use std::{collections::HashMap, sync::Arc};
 use std::str::FromStr;
+use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr};
-use tide::http::headers::{AUTHORIZATION, HeaderName};
+use tide::http::headers::{HeaderName, AUTHORIZATION};
 use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
@@ -66,7 +66,7 @@ pub struct InternalState {
         messages::pop_all,
         messages::peek,
         messages::peek_all,
-        tickets::price,
+        network::price,
         tickets::show_channel_tickets,
         tickets::show_all_tickets,
         tickets::show_ticket_statistics,
@@ -91,7 +91,8 @@ pub struct InternalState {
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
             messages::InboxMessagesRes,
-            tickets::NodeTicketStatistics, tickets::TicketPriceResponse, tickets::ChannelTicket,
+            tickets::NodeTicketStatistics, tickets::ChannelTicket,
+            network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersion
         )
@@ -126,7 +127,7 @@ impl Modify for SecurityAddon {
         );
         components.add_security_scheme(
             "api_token",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token")))
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token"))),
         );
     }
 }
@@ -145,16 +146,15 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
             Auth::Token(expected_token) => {
                 let auth_headers = request
                     .iter()
-                    .filter_map(|(n,v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .filter_map(|(n, v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
                     .collect::<Vec<_>>();
 
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
-                !auth_headers.is_empty() && (
-                    auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token))) ||
-                    auth_headers.contains(&(&x_auth_header, &expected_token))
-                )
-            },
-            Auth::None => true
+                !auth_headers.is_empty()
+                    && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+            }
+            Auth::None => true,
         };
 
         if !is_authorized {
@@ -250,7 +250,7 @@ pub async fn run_hopr_api(
     app.at("/readyz").get(checks::readyz);
     app.at("/healthyz").get(checks::healthyz);
 
-    app.at(&format!("{BASE_PATH}")).nest({
+    app.at(BASE_PATH).nest({
         let mut api = tide::with_state(InternalState {
             auth: Arc::new(cfg.auth.clone()),
             hopr: state.hopr.clone(),
@@ -296,7 +296,6 @@ pub async fn run_hopr_api(
             .post(tickets::aggregate_tickets_in_channel);
 
         api.at("/tickets").get(tickets::show_all_tickets);
-        api.at("/tickets/price").get(tickets::price);
         api.at("/tickets/statistics").get(tickets::show_ticket_statistics);
         api.at("/tickets/redeem").post(tickets::redeem_all_tickets);
 
@@ -308,6 +307,8 @@ pub async fn run_hopr_api(
         api.at("/messages/peek").post(messages::peek);
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
+
+        api.at("/network/price").get(network::price);
 
         api.at("/node/version").get(node::version);
         api.at("/node/info").get(node::info);
@@ -491,9 +492,7 @@ mod alias {
         let aliases = aliases.read().await;
         if let Some(peer_id) = aliases.get(&alias) {
             Ok(Response::builder(200)
-                .body(json!(PeerIdArg {
-                    peer_id: peer_id.clone()
-                }))
+                .body(json!(PeerIdArg { peer_id: *peer_id }))
                 .build())
         } else {
             Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
@@ -532,7 +531,7 @@ mod account {
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
     #[serde(rename_all = "camelCase")]
@@ -548,7 +547,7 @@ mod account {
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
         responses(
-            (status = 200, description = "The node's public addresses", body = AddressesAddress),
+            (status = 200, description = "The node's public addresses", body = AccountAddresses),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -923,8 +922,10 @@ mod channels {
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQuery {
         #[schema(required = false)]
+        #[serde(default)]
         pub including_closed: bool,
         #[schema(required = false)]
+        #[serde(default)]
         pub full_topology: bool,
     }
 
@@ -980,17 +981,13 @@ mod channels {
                     let channel_info = NodeChannels {
                         incoming: incoming
                             .into_iter()
-                            .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed)
-                                    .then(|| NodeChannel::from(c))
-                            })
+                            .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
+                            .map(NodeChannel::from)
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
-                            .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed)
-                                    .then(|| NodeChannel::from(c))
-                            })
+                            .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
+                            .map(NodeChannel::from)
                             .collect(),
                         all: vec![],
                     };
@@ -1233,6 +1230,7 @@ mod messages {
     #[into_params(parameter_in = Query)]
     pub(crate) struct TagQuery {
         #[schema(required = false)]
+        #[serde(default)]
         pub tag: Option<u16>,
     }
 
@@ -1565,14 +1563,8 @@ mod messages {
     }
 }
 
-mod tickets {
+mod network {
     use super::*;
-    use core_crypto::types::Hash;
-    use core_protocol::errors::ProtocolError;
-    use core_transport::errors::HoprTransportError;
-    use core_transport::TicketStatistics;
-    use core_types::channels::Ticket;
-    use utils_types::traits::ToHex;
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
@@ -1582,7 +1574,7 @@ mod tickets {
 
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets/price"),
+        path = const_format::formatcp!("{BASE_PATH}/network/price"),
         responses(
             (status = 200, description = "Current ticket price", body = TicketPriceResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1591,7 +1583,7 @@ mod tickets {
         security(
             ("api_token" = [])
         ),
-        tag = "Tickets"
+        tag = "Network"
     )]
     pub(super) async fn price(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
@@ -1610,6 +1602,15 @@ mod tickets {
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
+}
+mod tickets {
+    use super::*;
+    use core_crypto::types::Hash;
+    use core_protocol::errors::ProtocolError;
+    use core_transport::errors::HoprTransportError;
+    use core_transport::TicketStatistics;
+    use core_types::channels::Ticket;
+    use utils_types::traits::ToHex;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1964,7 +1965,7 @@ mod node {
         let query_params: NodePeersReqQuery = req.query()?;
 
         if let Some(quality) = query_params.quality {
-            if quality < 0.0f64 || quality > 1.0f64 {
+            if !(0.0f64..=1.0f64).contains(&quality) {
                 return Ok(Response::builder(400).body(ApiErrorStatus::InvalidQuality).build());
             }
         }
@@ -2003,7 +2004,7 @@ mod node {
             .map(|(address, peer_id, mas, info)| PeerInfo {
                 peer_id,
                 peer_address: address,
-                multiaddr: mas.first().map(|ma| ma.clone()),
+                multiaddr: mas.first().cloned(),
                 heartbeats: HeartbeatInfo {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
@@ -2016,7 +2017,7 @@ mod node {
                 reported_version: info
                     .metadata()
                     .get(&"protocol_version".to_owned())
-                    .map(|v| v.clone())
+                    .cloned()
                     .unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
@@ -2154,7 +2155,7 @@ mod node {
                     hopr_node_safe: safe_config.safe_address,
                     is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
                     connectivity_status: hopr.network_health().await,
-                    channel_closure_period: channel_closure_notice_period.as_secs() as u64,
+                    channel_closure_period: channel_closure_notice_period.as_secs(),
                 };
 
                 Ok(Response::builder(200).body(json!(body)).build())

@@ -117,7 +117,7 @@ impl HoprNetworkBehavior {
                     cfg
                 },
             ),
-            keep_alive: libp2p_swarm::keep_alive::Behaviour::default(),
+            keep_alive: libp2p_swarm::keep_alive::Behaviour,
         }
     }
 }

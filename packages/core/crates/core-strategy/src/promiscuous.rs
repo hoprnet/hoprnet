@@ -1,9 +1,9 @@
 use core_crypto::types::OffchainPublicKey;
 use core_types::channels::{ChannelDirection, ChannelStatus};
+use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;
@@ -410,7 +410,7 @@ mod tests {
     use lazy_static::lazy_static;
     use mockall::mock;
     use platform::time::native::current_timestamp;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::primitives::{Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -448,7 +448,7 @@ mod tests {
     }
 
     async fn mock_channel(
-        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
         dst: Address,
         balance: Balance,
     ) -> ChannelEntry {
@@ -489,7 +489,7 @@ mod tests {
         }
     }
 
-    async fn init_db(db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>, node_balance: Balance) {
+    async fn init_db(db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>, node_balance: Balance) {
         let mut d = db.write().await;
 
         d.set_hopr_balance(&node_balance).await.unwrap();
@@ -539,7 +539,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             PEERS[0].0,
         )));
 

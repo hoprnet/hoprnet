@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use core_ethereum_actions::redeem::TicketRedeemActions;
 use core_types::acknowledgement::AcknowledgedTicket;
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use log::info;
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;

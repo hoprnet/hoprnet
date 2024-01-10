@@ -21,7 +21,7 @@ use core_ethereum_types::chain_events::SignificantChainEvent;
 use core_ethereum_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use utils_db::rusty::RustyLevelDbShim;
+use utils_db::CurrentDbShim;
 use utils_types::primitives::Address;
 
 use crate::errors::HoprLibError;
@@ -255,12 +255,12 @@ pub struct SmartContractConfig {
 impl From<&ChainNetworkConfig> for SmartContractConfig {
     fn from(network: &ChainNetworkConfig) -> Self {
         Self {
-            hopr_announcements_address: network.announcements.clone(),
-            hopr_token_address: network.token.clone(),
-            hopr_channels_address: network.channels.clone(),
-            hopr_network_registry_address: network.network_registry.clone(),
-            hopr_node_safe_registry_address: network.node_safe_registry.clone(),
-            hopr_ticket_price_oracle_address: network.ticket_price_oracle.clone(),
+            hopr_announcements_address: network.announcements,
+            hopr_token_address: network.token,
+            hopr_channels_address: network.channels,
+            hopr_network_registry_address: network.network_registry,
+            hopr_node_safe_registry_address: network.node_safe_registry,
+            hopr_ticket_price_oracle_address: network.ticket_price_oracle,
             indexer_start_block_number: network.channel_contract_deploy_block,
         }
     }
@@ -372,12 +372,12 @@ where
 
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
     contract_addrs: ContractAddresses,
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {

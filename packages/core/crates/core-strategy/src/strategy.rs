@@ -15,10 +15,10 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use log::{debug, error, info, warn};
 use validator::Validate;
 
 use platform::time::native::current_timestamp;

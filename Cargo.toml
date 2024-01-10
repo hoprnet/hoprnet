@@ -1,5 +1,9 @@
 [workspace]
 
+exclude = [
+    "vendor/cargo/scale-info-2.10.0"
+]
+
 resolver = "2"
 
 members = [
@@ -45,10 +49,9 @@ futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
-libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519"] }
+libp2p-mplex = "0.40.0"
+libp2p = "0.52.4"
 log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
 rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
@@ -79,11 +82,17 @@ hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
 platform = { path = "misc/platform" }
-utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
+utils-db = { path = "packages/utils/crates/utils-db", default-features = false, features = ['sqlite'] }
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
 
+# [build]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
+
 [profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
 strip = true
 opt-level = 3

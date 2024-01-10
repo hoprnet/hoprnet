@@ -193,10 +193,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         let mut output = Vec::new();
 
         // let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
-        let mut data_iteration = self.backend.iterate(prefix, suffix_size)?;
+        let data_iteration = self.backend.iterate(prefix, suffix_size).await?;
 
         // fail fast for the first value that cannot be deserialized
-        while let Some(value) = data_iteration.next() {
+        for value in data_iteration {
             let value =
                 bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
 
@@ -223,10 +223,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
         let mut output = Vec::new();
 
         // let mut data_stream = Box::into_pin(self.backend.iterate_range(start, end)?);
-        let mut data_iteration = self.backend.iterate_range(start, end)?;
+        let data_iteration = self.backend.iterate_range(start, end).await?;
 
         // fail fast for the first value that cannot be deserialized
-        while let Some(value) = data_iteration.next() {
+        for value in data_iteration {
             let value =
                 bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
 

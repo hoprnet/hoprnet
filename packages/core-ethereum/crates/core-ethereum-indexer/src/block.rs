@@ -1,8 +1,8 @@
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use futures::{pin_mut, StreamExt};
-use std::{collections::VecDeque, sync::Arc};
 use log::{debug, error, info};
+use std::{collections::VecDeque, sync::Arc};
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
@@ -135,11 +135,7 @@ where
         U: ChainLogHandler + 'static,
         V: HoprCoreEthereumDbActions + 'static,
     {
-        if let None = self.rpc {
-            return Err(CoreEthereumIndexerError::ProcessError(
-                "indexer is already started".into(),
-            ));
-        } else if let None = self.db_processor {
+        if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
                 "indexer is already started".into(),
             ));
@@ -201,7 +197,7 @@ where
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
 
-                if block_with_logs.logs.len() > 0 {
+                if !block_with_logs.logs.is_empty() {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
                     let mut logs = block_with_logs.logs;
@@ -280,13 +276,13 @@ where
                 let snapshot = Snapshot::new(
                     U256::from(log.block_number),
                     U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                    U256::from(log.log_index),
+                    log.log_index,
                 );
 
                 let tx_hash = log.tx_hash;
 
                 match db_processor
-                    .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
+                    .on_event(log.address, log.block_number as u32, log.into(), snapshot)
                     .await
                 {
                     Ok(Some(event_type)) => {
@@ -327,7 +323,7 @@ pub mod tests {
     use futures::{join, Stream};
     use mockall::mock;
     use multiaddr::Multiaddr;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::traits::PeerIdLike;
     use utils_types::{primitives::Address, traits::BinarySerializable};
 
@@ -335,9 +331,9 @@ pub mod tests {
 
     use super::*;
 
-    fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>> {
+    async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             Address::random(),
         )))
     }
@@ -384,7 +380,7 @@ pub mod tests {
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -414,7 +410,7 @@ pub mod tests {
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -451,7 +447,7 @@ pub mod tests {
     async fn test_indexer_should_not_pass_blocks_unless_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         handlers.expect_contract_addresses().return_const(vec![]);
 
@@ -490,7 +486,7 @@ pub mod tests {
     async fn test_indexer_should_pass_blocks_that_are_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         let cfg = IndexerConfig::default();
 
@@ -547,7 +543,7 @@ pub mod tests {
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db();
+        let db = create_stub_db().await;
 
         let cfg = IndexerConfig::default();
 

@@ -46,7 +46,7 @@ pub mod native {
     {
         if let Some(parent_dir_path) = Path::new(path).parent() {
             if !parent_dir_path.is_dir() {
-                fs::create_dir_all(&parent_dir_path)
+                fs::create_dir_all(parent_dir_path)
                     .map_err(|e| PlatformError::GeneralError(format!("Failed to create dir '{}': {}", path, e)))?
             }
         }

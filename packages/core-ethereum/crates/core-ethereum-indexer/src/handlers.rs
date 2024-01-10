@@ -17,9 +17,9 @@ use core_types::{
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use log::{debug, error};
 use utils_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,
@@ -144,7 +144,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     let new_balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
                     let diff = channel.balance.sub(&new_balance);
                     channel.balance = new_balance;
@@ -152,15 +152,15 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.clone(), diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     let new_balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
                     let diff = new_balance.sub(&channel.balance);
                     channel.balance = new_balance;
@@ -168,15 +168,15 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.clone(), diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
@@ -196,10 +196,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
                             .await?;
                     }
-                    Ok(Some(ChainEventType::ChannelClosed(channel.clone())))
+                    Ok(Some(ChainEventType::ChannelClosed(channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
                 let source: Address = channel_opened.source.into();
@@ -218,7 +218,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         // set all channel fields like we do on-chain on close
                         channel.status = ChannelStatus::Open;
                         channel.ticket_index = 0u64.into();
-                        channel.channel_epoch = channel.channel_epoch + U256::from(1u64);
+                        channel.channel_epoch += U256::from(1u64);
                         channel
                     })
                     .unwrap_or(ChannelEntry::new(
@@ -241,12 +241,13 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.cleanup_invalid_channel_tickets(&channel).await?;
                     }
                 }
-                return Ok(Some(ChainEventType::ChannelOpened(channel.clone())));
+
+                Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
@@ -293,22 +294,22 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     }
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
                 let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
 
-                return if let Some(mut channel) = maybe_channel {
+                if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::PendingToClose;
                     channel.closure_time = closure_initiated.closure_time.into();
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel.clone())))
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                };
+                }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
                 db.set_channels_domain_separator(&domain_separator_updated.domain_separator.into(), snapshot)
@@ -483,17 +484,17 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     async fn on_node_management_module_event(
         &self,
         _db: &mut U,
-        event: HoprNodeManagementModuleEvents,
+        _event: HoprNodeManagementModuleEvents,
         _snapshot: &Snapshot,
     ) -> Result<Option<ChainEventType>>
     where
         U: HoprCoreEthereumDbActions,
     {
-        match event {
-            _ => {
-                // don't care at the moment
-            }
-        }
+        // match event {
+        //     _ => {
+        //         // don't care at the moment
+        //     }
+        // }
 
         Ok(None)
     }
@@ -633,7 +634,7 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -654,9 +655,9 @@ pub mod tests {
         static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
     }
 
-    fn create_db() -> Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>> {
+    async fn create_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             Address::random(),
         )))
     }
@@ -682,7 +683,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_keybinding() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -721,7 +722,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_address_announcement() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -834,7 +835,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_revoke() {
-        let db = create_db();
+        let db = create_db().await;
         let handlers = init_handlers(db.clone());
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
@@ -886,7 +887,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_transfer_to() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -921,7 +922,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_transfer_from() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -961,7 +962,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_approval_correct() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1016,7 +1017,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1056,7 +1057,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered_by_manager() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1096,7 +1097,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1142,7 +1143,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered_by_manager() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1188,7 +1189,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_enabled() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1215,7 +1216,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_disabled() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1248,7 +1249,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_eligible() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1276,7 +1277,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_not_eligible() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1310,7 +1311,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_increased() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1369,7 +1370,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_domain_separator_updated() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1398,7 +1399,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_decreased() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1457,7 +1458,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closed() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1518,7 +1519,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_opened() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1561,7 +1562,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_reopened() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1623,7 +1624,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_ticket_redeemed() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1684,7 +1685,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closure_initiated() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1738,7 +1739,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_node_safe_registry_registered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1771,7 +1772,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_node_safe_registry_deregistered() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
@@ -1807,7 +1808,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn ticket_price_update() {
-        let db = create_db();
+        let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
 
