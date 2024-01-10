@@ -24,18 +24,14 @@ use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, Unack
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
-use utils_log::{debug, error, warn};
+use log::{debug, error, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::{sleep, spawn_local};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -87,7 +83,7 @@ pub enum MsgProcessed {
 /// Implements protocol acknowledgement logic for msg packets
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -95,7 +91,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     fn clone(&self) -> Self {
         Self {
@@ -105,10 +101,10 @@ where
     }
 }
 
-#[async_trait::async_trait(? Send)]
+#[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     type Input = ApplicationData;
 
@@ -171,7 +167,7 @@ where
 
                     Ok(TransportPacket::Outgoing {
                         next_hop: next_hop.to_peerid(),
-                        ack_challenge: ack_challenge.clone(),
+                        ack_challenge,
                         data: payload.into_boxed_slice(),
                     })
                 }
@@ -364,7 +360,7 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
@@ -551,7 +547,6 @@ impl PacketActions {
 }
 
 /// Configuration parameters for the packet interaction.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
@@ -560,9 +555,7 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PacketInteractionConfig {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
@@ -590,7 +583,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -598,12 +591,11 @@ impl PacketInteraction {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let mixer_cfg = cfg.mixer.clone();
+        let mixer_cfg = cfg.mixer;
         let pkt_keypair = cfg.packet_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
 
         let mut processing_stream = to_process_rx
-            // transform raw data into packets
             .then_concurrent(move |event| {
                 let processor = processor.clone();
                 let pkt_keypair = pkt_keypair.clone();
@@ -700,8 +692,6 @@ impl PacketInteraction {
             })
             // introduce random timeout to mix packets asynchrounously
             .then_concurrent(move |event| async move {
-                let mixer_cfg = mixer_cfg;
-
                 match event {
                     Ok(processed) => match processed {
                         MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => {
@@ -753,7 +743,7 @@ impl PacketInteraction {
                 }
             });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });
@@ -786,7 +776,7 @@ mod tests {
         ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
         msg::mixer::MixerConfig,
     };
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use async_trait::async_trait;
     use core_crypto::types::OffchainPublicKey;
     use core_crypto::{
@@ -813,10 +803,10 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    use utils_log::debug;
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,
@@ -863,11 +853,11 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
-        (0..amount).map(|_| RustyLevelDbShim::new_in_memory()).collect()
+    async fn create_dbs(amount: usize) -> Vec<CurrentDbShim> {
+        futures::future::join_all((0..amount).map(|_| CurrentDbShim::new_in_memory())).await
     }
 
-    fn create_core_dbs(dbs: &Vec<RustyLevelDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<CurrentDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
@@ -879,7 +869,7 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    async fn create_minimal_topology(dbs: &Vec<RustyLevelDbShim>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<CurrentDbShim>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
@@ -952,7 +942,7 @@ mod tests {
 
         // let (done_tx, mut done_rx) = futures::channel::mpsc::unbounded();
 
-        let dbs = create_dbs(2);
+        let dbs = create_dbs(2).await;
 
         create_minimal_topology(&dbs)
             .await
@@ -1042,7 +1032,7 @@ mod tests {
 
         assert!(peer_count <= PEERS.len());
         assert!(peer_count >= 3);
-        let dbs = create_dbs(peer_count);
+        let dbs = create_dbs(peer_count).await;
 
         create_minimal_topology(&dbs)
             .await
@@ -1219,7 +1209,7 @@ mod tests {
 
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
                 self.0

@@ -88,18 +88,16 @@ impl ChainPacketComponents {
         ticket.sign(chain_keypair, domain_separator);
 
         Ok(Self::Outgoing {
-            packet: Box::from(
-                MetaPacket::<CurrentSphinxSuite>::new(
-                    shared_keys,
-                    msg,
-                    &public_keys_path,
-                    INTERMEDIATE_HOPS + 1,
-                    POR_SECRET_LENGTH,
-                    &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
-                    None,
-                )
-                .to_bytes(),
-            ),
+            packet: MetaPacket::<CurrentSphinxSuite>::new(
+                shared_keys,
+                msg,
+                &public_keys_path,
+                INTERMEDIATE_HOPS + 1,
+                POR_SECRET_LENGTH,
+                &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
+                None,
+            )
+            .to_bytes(),
             ticket,
             next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
             ack_challenge: por_values.ack_challenge,
@@ -131,7 +129,7 @@ impl ChainPacketComponents {
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self::Forwarded {
-                        packet: Box::from(packet.to_bytes()),
+                        packet: packet.to_bytes(),
                         ticket,
                         packet_tag,
                         ack_key,
@@ -153,7 +151,7 @@ impl ChainPacketComponents {
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self::Final {
-                        packet: Box::from(mp.to_bytes()),
+                        packet: mp.to_bytes(),
                         ticket,
                         packet_tag,
                         ack_key,
@@ -191,7 +189,7 @@ pub fn forward(
             next_ticket.challenge = next_challenge.to_ethereum_challenge();
             next_ticket.sign(chain_keypair, domain_separator);
             ChainPacketComponents::Forwarded {
-                packet: packet,
+                packet,
                 ticket: next_ticket,
                 ack_challenge,
                 packet_tag,
@@ -292,7 +290,7 @@ mod tests {
 
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
                 self.0

@@ -12,25 +12,12 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-fn validate_network(network: &String) -> Result<(), ValidationError> {
-    if crate::chain::ProtocolConfig::default()
-        .supported_networks()
-        .iter()
-        .any(|n| network == &n.id)
-    {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Unsupported network"))
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
     pub announce: bool,
-    #[validate(custom = "validate_network")]
     pub network: String,
     pub provider: Option<String>,
+    pub protocols: crate::chain::ProtocolsConfig,
     pub check_unrealized_balance: bool,
 }
 
@@ -40,12 +27,12 @@ impl Default for Chain {
             announce: false,
             network: "anvil-localhost".to_owned(),
             provider: None,
+            protocols: crate::chain::ProtocolsConfig::default(),
             check_unrealized_balance: true,
         }
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
@@ -67,9 +54,8 @@ impl Default for SafeModule {
     }
 }
 
-/// Does not work in the WASM environment
 #[allow(dead_code)]
-fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
+fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
         Ok(())
     } else {
@@ -77,7 +63,6 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
@@ -96,7 +81,6 @@ impl Default for Db {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
@@ -146,20 +130,6 @@ impl Default for HoprLibConfig {
             protocol: ProtocolConfig::default(),
             chain: Chain::default(),
             safe_module: SafeModule::default(),
-        }
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::HoprLibConfig;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl HoprLibConfig {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self::default()
         }
     }
 }

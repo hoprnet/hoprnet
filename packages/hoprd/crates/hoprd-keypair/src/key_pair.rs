@@ -9,22 +9,18 @@ use aes::{
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::random::random_bytes;
 use hex;
+use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use utils_log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::{metadata, read_to_string, write};
-
 use crate::errors::KeyPairError::KeyDerivationError;
-#[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::{metadata, read_to_string, write};
+use platform::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;
@@ -59,7 +55,6 @@ impl Aes128Ctr {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct IdentityOptions {
     pub initialize: bool,
     pub id_path: String,
@@ -68,27 +63,6 @@ pub struct IdentityOptions {
     pub private_key: Option<Box<[u8]>>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl IdentityOptions {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(
-        initialize: bool,
-        id_path: String,
-        password: String,
-        use_weak_crypto: Option<bool>,
-        private_key: Option<Box<[u8]>>,
-    ) -> Self {
-        Self {
-            initialize,
-            id_path,
-            password,
-            use_weak_crypto,
-            private_key,
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct HoprKeys {
     pub packet_key: OffchainKeypair,
     pub chain_key: ChainKeypair,
@@ -119,7 +93,7 @@ impl std::fmt::Display for HoprKeys {
                 self.packet_key.public().to_peerid_str(),
                 self.chain_key.public().to_hex(),
                 self.chain_key.public().0.to_address(),
-                self.id.to_string()
+                self.id
             )
             .as_str(),
         )
@@ -374,12 +348,10 @@ impl HoprKeys {
                     false,
                 ))
             }
-            _ => {
-                return Err(KeyPairError::InvalidEncryptedKeyLength {
-                    actual: pk.len(),
-                    expected: V2_PRIVKEYS_LENGTH,
-                });
-            }
+            _ => Err(KeyPairError::InvalidEncryptedKeyLength {
+                actual: pk.len(),
+                expected: V2_PRIVKEYS_LENGTH,
+            }),
         }
     }
 
@@ -462,33 +434,6 @@ impl Debug for HoprKeys {
                 &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.chain_key.public().to_hex()),
             )
             .finish()
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::IdentityOptions;
-    use crate::key_pair::HoprKeys;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl HoprKeys {
-        #[wasm_bindgen(constructor)]
-        pub fn _random() -> Self {
-            HoprKeys::random()
-        }
-
-        #[wasm_bindgen(js_name = "init")]
-        pub fn _init(identity_options: IdentityOptions) -> JsResult<HoprKeys> {
-            ok_or_jserr!(HoprKeys::init(identity_options))
-        }
-
-        #[wasm_bindgen(js_name = "id")]
-        pub fn _id(&self) -> String {
-            self.id.to_string()
-        }
     }
 }
 

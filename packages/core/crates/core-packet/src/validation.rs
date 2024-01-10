@@ -5,7 +5,7 @@ use crate::errors::{
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use utils_log::{debug, info};
+use log::{debug, info};
 use utils_types::primitives::{Address, Balance};
 
 /// Performs validations of the given unacknowledged ticket and channel.
@@ -126,7 +126,7 @@ mod tests {
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
+    use utils_db::CurrentDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -141,7 +141,7 @@ mod tests {
     mock! {
         pub Db { }
 
-        #[async_trait(? Send)]
+        #[async_trait]
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
@@ -492,7 +492,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_workflow() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
@@ -535,7 +535,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
@@ -555,7 +555,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_increase_ticket_index() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
@@ -583,7 +583,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             SENDER_PRIV_KEY.public().to_address(),
         );
 

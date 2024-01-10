@@ -1,4 +1,4 @@
-use async_std::sync::{Mutex, RwLock};
+use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use core_ethereum_actions::redeem::TicketRedeemActions;
@@ -7,6 +7,7 @@ use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggreg
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::ChannelDirection::Incoming;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -15,18 +16,13 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::{strategy::SingularStrategy, Strategy};
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -139,12 +135,12 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + 'static,
-    A: TicketRedeemActions + Clone + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
         debug!("starting aggregation in {channel}");
-        // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn_local
+        // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn
         let tickets_to_agg = self
             .db
             .write()
@@ -166,7 +162,7 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AGGREGATIONS.increment();
 
-                spawn_local(async move {
+                spawn(async move {
                     match awaiter.consume_and_wait(agg_timeout).await {
                         Ok(_) => {
                             // The TicketAggregationActions will raise the on_acknowledged_ticket event,
@@ -200,11 +196,13 @@ where
     }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + 'static,
-    A: TicketRedeemActions + Clone + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    A: TicketRedeemActions + Clone + Send + Sync + 'static,
+    T: Send + Sync,
+    U: Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
@@ -327,7 +325,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use async_trait::async_trait;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -353,7 +351,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
-    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
@@ -378,7 +376,7 @@ mod tests {
 
     mock! {
         TicketRedeemAct { }
-        #[async_trait(? Send)]
+        #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
             async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_with_counterparty(
@@ -446,7 +444,7 @@ mod tests {
     }
 
     async fn populate_db_with_ack_tickets(
-        db: &mut DB<RustyLevelDbShim>,
+        db: &mut DB<CurrentDbShim>,
         amount: usize,
     ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut acked_tickets = Vec::new();
@@ -474,7 +472,7 @@ mod tests {
         (acked_tickets, channel)
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
             let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
@@ -498,7 +496,7 @@ mod tests {
         dbs
     }
 
-    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + 'static>(
+    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
         db_alice: Arc<RwLock<Db>>,
         db_bob: Arc<RwLock<Db>>,
         key_alice: &ChainKeypair,
@@ -510,7 +508,7 @@ mod tests {
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
         let bob_aggregator = bob.writer();
 
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             let mut finalizer = None;
 
             match bob.next().await {
@@ -551,9 +549,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
@@ -617,9 +614,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -684,9 +680,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
@@ -745,9 +740,8 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         let (_, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 

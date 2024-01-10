@@ -9,23 +9,21 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 aes = "0.8.3"
 blake2 = { version = "0.10", features = ["reset"] }
 chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
-console_error_panic_hook = { version = "0.1.7", optional = true }
 curve25519-dalek = { version = "4.1.1", features = ["serde", "rand_core"] }
 digest = "0.10"
 ed25519-dalek = { version = "2.1.0", features = ["serde", "hazmat"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 generic-array = { version = "0.14.7", features = ["zeroize"] }
-getrandom = { workspace = true, features = ["js"] }
+getrandom = { workspace = true, optional = true }
 hex = { workspace = true }
 hkdf = "0.12"
-js-sys = { workspace = true, optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
 primitive-types = "0.12"
@@ -36,24 +34,16 @@ sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"
 thiserror = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
-utils-log = { workspace = true }
-utils-misc = { workspace = true }
+platform = { workspace = true }
+log = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"
 parameterized = "1.0"
 
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "getrandom/js", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
+default = []
+wasm = ["dep:getrandom", "platform/wasm-bindgen", "utils-types/wasm" ]

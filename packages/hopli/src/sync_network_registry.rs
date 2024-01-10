@@ -1,12 +1,14 @@
 use crate::{
-    process::{child_process_call_foundry_set_eligibility, child_process_call_foundry_sync_eligibility, set_process_path_env},
+    process::{
+        child_process_call_foundry_set_eligibility, child_process_call_foundry_sync_eligibility, set_process_path_env,
+    },
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use log::{log, error, Level};
-use std::{env, str::FromStr, iter};
-use utils_types::primitives::Address;
 use core_crypto::types::ToChecksum;
+use log::{error, log, Level};
+use std::{env, iter, str::FromStr};
+use utils_types::primitives::Address;
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum SyncNetworkRegistryType {
@@ -52,10 +54,7 @@ pub struct SyncNetworkRegistryArgs {
     #[clap(help = "Comma separated Ethereum addresses of safes", long, short)]
     safe_addresses: String,
 
-    #[clap(
-        help = "Desired eligibility in forced sync",
-        long,
-    )]
+    #[clap(help = "Desired eligibility in forced sync", long)]
     eligibility: Option<bool>,
 }
 
@@ -75,20 +74,25 @@ impl SyncNetworkRegistryArgs {
         }
 
         // 2. Read addresses of safes
-        let all_safes_addresses: Vec<String> = safe_addresses.split(',').map(|addr| Address::from_str(addr).unwrap().to_checksum()).collect();
-        
+        let all_safes_addresses: Vec<String> = safe_addresses
+            .split(',')
+            .map(|addr| Address::from_str(addr).unwrap().to_checksum())
+            .collect();
+
         log!(target: "sync_eligibility", Level::Info, "Safe addresses {:?}", all_safes_addresses);
-        
+
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
-        
+
         // Prepare payload and call function according to differnt types of sync
         match sync_type {
             SyncNetworkRegistryType::ForcedSync => {
                 if let Some(desired_eligibility) = eligibility {
-                    let all_eligibilities: Vec<String> = iter::repeat(desired_eligibility.to_string()).take(all_safes_addresses.len()).collect();
+                    let all_eligibilities: Vec<String> = iter::repeat(desired_eligibility.to_string())
+                        .take(all_safes_addresses.len())
+                        .collect();
                     log!(target: "sync_eligibility", Level::Info, "Eligibilities {:?}", all_eligibilities);
-                    
+
                     log!(target: "sync_eligibility::forced", Level::Debug, "Calling foundry...");
                     // iterate and collect execution result. If error occurs, the entire operation failes.
                     child_process_call_foundry_set_eligibility(
@@ -103,10 +107,7 @@ impl SyncNetworkRegistryArgs {
             }
             SyncNetworkRegistryType::NormalSync => {
                 log!(target: "sync_eligibility::normal", Level::Debug, "Calling foundry...");
-                child_process_call_foundry_sync_eligibility(
-                    &network,
-                    &format!("[{}]", &&all_safes_addresses.join(",")),
-                )
+                child_process_call_foundry_sync_eligibility(&network, &format!("[{}]", &&all_safes_addresses.join(",")))
             }
         }
     }

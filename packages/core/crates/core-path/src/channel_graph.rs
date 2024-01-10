@@ -1,13 +1,13 @@
 use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use log::{debug, info};
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use utils_log::{debug, info};
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -228,7 +228,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
+    use utils_db::CurrentDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
 
     lazy_static! {
@@ -417,7 +417,7 @@ mod tests {
     async fn test_channel_graph_sync() {
         let testing_snapshot = Snapshot::default();
         let mut last_addr = ADDRESSES[0];
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), last_addr);
 
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us

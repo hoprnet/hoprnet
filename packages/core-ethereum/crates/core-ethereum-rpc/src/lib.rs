@@ -27,10 +27,6 @@ pub mod indexer;
 /// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
 
-/// Node.js based HTTP client
-#[cfg(feature = "wasm")]
-pub mod nodejs;
-
 /// Helper types required by `client` module.
 mod helper;
 
@@ -131,8 +127,7 @@ impl From<LogFilter> for ethers::types::Filter {
 }
 
 /// Abstraction for HTTP client that perform HTTP POST with JSON data.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 #[cfg_attr(test, mockall::automock)]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
@@ -170,13 +165,15 @@ impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
     }
 }
 
+type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send + 'a>;
+
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,
-    resolver: Box<dyn Future<Output = Result<TransactionReceipt>> + 'a>,
+    resolver: Resolver<'a>,
 }
 
 impl PendingTransaction<'_> {
@@ -210,7 +207,7 @@ impl Display for PendingTransaction<'_> {
 
 impl<'a> IntoFuture for PendingTransaction<'a> {
     type Output = Result<TransactionReceipt>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + 'a>>;
+    type IntoFuture = Pin<Resolver<'a>>;
 
     fn into_future(self) -> Self::IntoFuture {
         Box::into_pin(self.resolver)
@@ -219,8 +216,7 @@ impl<'a> IntoFuture for PendingTransaction<'a> {
 
 /// Trait defining general set of operations an RPC provider
 /// must provide to the HOPR node.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 pub trait HoprRpcOperations {
     /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
@@ -273,8 +269,7 @@ impl BlockWithLogs {
 
 /// Trait with RPC provider functionality required by the Indexer.
 #[cfg_attr(test, mockall::automock)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
@@ -287,5 +282,5 @@ pub trait HoprIndexerRpcOperations {
         &'a self,
         start_block_number: u64,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }

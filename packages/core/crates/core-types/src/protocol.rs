@@ -5,9 +5,9 @@ use core_crypto::derivation::PacketTag;
 use core_crypto::random::random_bytes;
 use core_crypto::types::OffchainPublicKey;
 use ethers::utils::hex;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::warn;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
@@ -28,7 +28,7 @@ pub type Tag = u16;
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
 /// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait(? Send)] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
+#[async_trait] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
 pub trait PeerAddressResolver {
     /// Tries to resolve off-chain public key given the on-chain address
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
@@ -40,7 +40,6 @@ pub trait PeerAddressResolver {
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagBloomFilter {
     bloom: Bloom<PacketTag>,
@@ -101,7 +100,6 @@ impl Default for TagBloomFilter {
 }
 
 /// Represents the received decrypted packet carrying the application-layer data.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplicationData {
     pub application_tag: Option<Tag>,
@@ -231,32 +229,5 @@ mod tests {
             !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
             "bf 2 must not contain zero tag"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-mod wasm {
-    use crate::protocol::ApplicationData;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::traits::BinarySerializable;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl ApplicationData {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(tag: Option<u16>, data: &[u8]) -> JsResult<ApplicationData> {
-            ok_or_jserr!(Self::new(tag, data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
     }
 }

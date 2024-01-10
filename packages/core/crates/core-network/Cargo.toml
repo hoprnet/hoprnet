@@ -6,13 +6,14 @@ edition = "2021"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
-async-trait = "0.1"
+async-std = { workspace = true }
+async-trait = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
+getrandom = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
@@ -21,17 +22,12 @@ serde = { workspace = true }
 serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
-gloo-timers = { workspace = true, optional = true }
-console_error_panic_hook = { version = "0.1.7", optional = true }
-getrandom = { workspace = true }
-js-sys = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
 
-core-crypto = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
-utils-metrics = { workspace = true, default-features = false, optional = true}
-utils-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true }
+platform = { workspace = true }
+log = { workspace = true }
+utils-metrics = { workspace = true, optional = true}
+utils-types = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.11.3"
@@ -44,8 +40,7 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm", "compat-ping"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics/wasm", "utils-types/wasm"]
+default = ["prometheus", "compat-ping"]
+wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "utils-metrics/wasm", "utils-types/wasm"]
 compat-ping = []
-console_error_panic_hook = ["dep:console_error_panic_hook"]
 prometheus = ["dep:utils-metrics"]

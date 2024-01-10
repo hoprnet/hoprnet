@@ -3,7 +3,7 @@ use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_types::actions::Action;
 use core_types::channels::{ChannelDirection, ChannelStatus};
-use utils_log::{debug, error, info};
+use log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::action_queue::PendingAction;
@@ -17,14 +17,10 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
-#[async_trait(? Send)]
+#[async_trait]
 pub trait ChannelActions {
     /// Opens a channel to the given `destination` with the given `amount` staked.
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction>;
@@ -41,8 +37,8 @@ pub trait ChannelActions {
     ) -> Result<PendingAction>;
 }
 
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
@@ -132,15 +128,15 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                     ChannelStatus::PendingToClose => {
                         info!(
                             "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp())
+                            channel.remaining_closure_time(current_timestamp().as_millis() as u64)
                         );
-                        if channel.closure_time_passed(current_timestamp()) {
+                        if channel.closure_time_passed(current_timestamp().as_millis() as u64) {
                             info!("initiating finalization of channel closure of {channel} in {direction}");
                             self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                         } else {
                             Err(ClosureTimeHasNotElapsed(
                                 channel
-                                    .remaining_closure_time(current_timestamp())
+                                    .remaining_closure_time(current_timestamp().as_millis() as u64)
                                     .unwrap_or(u32::MAX as u64),
                             ))
                         }
@@ -184,7 +180,7 @@ mod tests {
         sync::Arc,
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -203,7 +199,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         db.write()
@@ -259,7 +255,7 @@ mod tests {
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
 
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
@@ -289,7 +285,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -355,7 +351,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(
@@ -393,7 +389,7 @@ mod tests {
         let bob = Address::random();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -442,7 +438,7 @@ mod tests {
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -478,7 +474,7 @@ mod tests {
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
 
@@ -525,7 +521,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         db.write()
@@ -579,7 +575,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
@@ -612,7 +608,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -657,7 +653,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -705,7 +701,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -741,7 +737,7 @@ mod tests {
         let channel_id = generate_channel_id(&self_addr, &bob);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             self_addr,
         )));
         let tx_queue = ActionQueue::new(
@@ -785,7 +781,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -849,7 +845,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
@@ -911,7 +907,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -953,7 +949,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
@@ -982,7 +978,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
 
@@ -1034,7 +1030,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(
@@ -1065,7 +1061,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
+            DB::new(CurrentDbShim::new_in_memory().await),
             *ALICE,
         )));
         let tx_queue = ActionQueue::new(

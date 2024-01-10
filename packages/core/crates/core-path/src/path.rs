@@ -148,7 +148,6 @@ impl Display for ChannelPath {
 /// In case of the direct path, this path contains only the destination.
 /// In case o multiple hops, it also must represent a valid `ChannelPath`, therefore
 /// open channels must exist (at the time of construction) except for the last hop.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPath {
     hops: Vec<PeerId>,
@@ -399,7 +398,7 @@ mod tests {
 
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-    #[async_trait(? Send)]
+    #[async_trait]
     impl PeerAddressResolver for TestResolver {
         async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
             self.0

@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -9,77 +10,13 @@ use core_strategy::{Strategy, Strategy::AutoRedeeming};
 use core_transport::config::HostConfig;
 use utils_types::primitives::Address;
 
-use hopr_lib::config::HoprLibConfig;
-
-pub const DEFAULT_API_HOST: &str = "127.0.0.1";
-pub const DEFAULT_API_PORT: u16 = 3001;
+use hopr_lib::{config::HoprLibConfig, ProtocolsConfig};
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
 
-pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
-
-fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
-    match &token {
-        Auth::None => Ok(()),
-        Auth::Token(token) => {
-            if token.len() >= MINIMAL_API_TOKEN_LENGTH {
-                // TODO: add more token limitations? alhpanumeric?
-                Ok(())
-            } else {
-                Err(ValidationError::new("The validation token is too short"))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Auth {
-    None,
-    Token(String),
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Api {
-    pub enable: bool,
-    /// Auth enum holding the API auth configuration
-    ///
-    /// The auth enum cannot be made public due to incompatibility with the wasm_bindgen.
-    #[validate(custom = "validate_api_auth")]
-    auth: Auth,
-    #[validate]
-    pub host: HostConfig,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Api {
-    pub fn is_auth_disabled(&self) -> bool {
-        self.auth == Auth::None
-    }
-
-    pub fn auth_token(&self) -> Option<String> {
-        match &self.auth {
-            Auth::None => None,
-            Auth::Token(token) => Some(token.clone()),
-        }
-    }
-}
-
-impl Default for Api {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            auth: Auth::Token("".to_owned()),
-            host: HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap(),
-        }
-    }
-}
-
-/// Does not work in the WASM environment
-#[allow(dead_code)]
 fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
         Ok(())
@@ -110,9 +47,9 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
     validate_private_key(s)
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
+    #[validate(custom = "validate_file_path")]
     pub file: String,
     #[validate(custom = "validate_password")]
     pub password: String,
@@ -132,17 +69,6 @@ impl std::fmt::Debug for Identity {
     }
 }
 
-/// Does not work in the WASM environment
-#[allow(dead_code)]
-fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
-    if std::path::Path::new(s).is_dir() {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Invalid directory path specified"))
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Testing {
     pub use_weak_crypto: bool,
@@ -223,7 +149,6 @@ pub struct Testing {
 ///   use_weak_crypto: false
 /// ```
 ///
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
@@ -249,24 +174,20 @@ impl From<HoprdConfig> for HoprLibConfig {
     }
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::read_to_string;
+use platform::file::native::read_to_string;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::read_to_string;
+use log::debug;
 
-use utils_log::debug;
-
-use crate::errors::HoprdConfigError;
+use crate::errors::HoprdError;
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
             debug!("fetching configuration from file {cfg_path}");
-            let yaml_configuration = read_to_string(cfg_path.as_str())
-                .map_err(|e| crate::errors::HoprdConfigError::FileError(e.to_string()))?;
+            let yaml_configuration =
+                read_to_string(cfg_path.as_str()).map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
-                .map_err(|e| crate::errors::HoprdConfigError::SerializationError(e.to_string()))?
+                .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
             debug!("loading default configuration");
             HoprdConfig::default()
@@ -302,8 +223,9 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host = HostConfig::from_str(format!("{}:{}", x.as_str(), DEFAULT_API_PORT).as_str())
-                .map_err(crate::errors::HoprdConfigError::ValidationError)?;
+            cfg.api.host =
+                HostConfig::from_str(format!("{}:{}", x.as_str(), hoprd_api::config::DEFAULT_API_PORT).as_str())
+                    .map_err(crate::errors::HoprdError::ValidationError)?;
         }
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -311,13 +233,13 @@ impl HoprdConfig {
 
         // heartbeat
         if let Some(x) = cli_args.heartbeat_interval {
-            cfg.hopr.heartbeat.interval = x
+            cfg.hopr.heartbeat.interval = std::time::Duration::from_secs(x)
         };
         if let Some(x) = cli_args.heartbeat_threshold {
-            cfg.hopr.heartbeat.threshold = x
+            cfg.hopr.heartbeat.threshold = std::time::Duration::from_secs(x)
         };
         if let Some(x) = cli_args.heartbeat_variance {
-            cfg.hopr.heartbeat.variance = x
+            cfg.hopr.heartbeat.variance = std::time::Duration::from_secs(x)
         };
 
         // network options
@@ -338,14 +260,11 @@ impl HoprdConfig {
 
         // strategy
         if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
-            cfg.hopr.strategy.get_strategies().push(x);
+            cfg.hopr.strategy.strategies.push(x);
         }
 
         if cli_args.auto_redeem_tickets {
-            cfg.hopr
-                .strategy
-                .get_strategies()
-                .push(AutoRedeeming(Default::default()));
+            cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
         }
 
         // chain
@@ -354,6 +273,15 @@ impl HoprdConfig {
             cfg.hopr.chain.network = network;
         }
 
+        if let Some(protocol_config) = cli_args.protocol_config_path {
+            cfg.hopr.chain.protocols = ProtocolsConfig::from_str(
+                &platform::file::native::read_to_string(&protocol_config)
+                    .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
+            )
+            .map_err(crate::errors::HoprdError::ConfigError)?;
+        }
+
+        //   TODO: custom provider is redundant with the introduction of protocol-config.json
         if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x)
         };
@@ -365,93 +293,74 @@ impl HoprdConfig {
         };
         if let Some(x) = cli_args.safe_address {
             cfg.hopr.safe_module.safe_address =
-                Address::from_str(&x).map_err(|e| HoprdConfigError::ValidationError(e.to_string()))?
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
         };
         if let Some(x) = cli_args.module_address {
             cfg.hopr.safe_module.module_address =
-                Address::from_str(&x).map_err(|e| HoprdConfigError::ValidationError(e.to_string()))?
+                Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
         };
 
         // test
         cfg.test.use_weak_crypto = cli_args.test_use_weak_crypto;
 
+        // additional updates
+        let home_symbol = '~';
+        if cfg.hopr.db.data.starts_with(home_symbol) {
+            cfg.hopr.db.data = std::env::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.hopr.db.data[1..];
+        }
+        if cfg.identity.file.starts_with(home_symbol) {
+            cfg.identity.file = std::env::home_dir()
+                .map(|h| h.as_path().display().to_string())
+                .expect("home dir for a user must be specified")
+                + &cfg.identity.file[1..];
+        }
+
         if skip_validation {
             Ok(cfg)
         } else {
+            if !cfg
+                .hopr
+                .chain
+                .protocols
+                .supported_networks()
+                .iter()
+                .any(|network| network == &cfg.hopr.chain.network)
+            {
+                return Err(crate::errors::HoprdError::ValidationError(format!(
+                    "The specified network '{}' is not listed as supported ({:?})",
+                    cfg.hopr.chain.network,
+                    cfg.hopr.chain.protocols.supported_networks()
+                )));
+            }
+
             match cfg.validate() {
                 Ok(_) => Ok(cfg),
-                Err(e) => Err(crate::errors::HoprdConfigError::ValidationError(e.to_string())),
+                Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
             }
         }
     }
-}
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::config::HoprdConfig;
-    use hopr_lib::config::HoprLibConfig;
-    use utils_misc::ok_or_jserr;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
+    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
+        let mut redacted_cfg = self.clone();
 
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(js_namespace = os)]
-        pub fn homedir() -> String;
-    }
-
-    #[wasm_bindgen]
-    impl HoprdConfig {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self::default()
+        // redacting sensitive information
+        match &mut redacted_cfg.api.auth {
+            Auth::None => {}
+            Auth::Token(_) => redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned()),
+        }
+        if redacted_cfg.identity.private_key.is_some() {
+            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
         }
 
-        #[wasm_bindgen]
-        pub fn as_redacted_string(&self) -> Result<String, JsValue> {
-            let mut redacted_cfg = self.clone();
-
-            // redacting sensitive information
-            match &mut redacted_cfg.api.auth {
-                crate::config::Auth::None => {}
-                crate::config::Auth::Token(_) => {
-                    redacted_cfg.api.auth = crate::config::Auth::Token("<REDACTED>".to_owned())
-                }
-            }
-            if redacted_cfg.identity.private_key.is_some() {
-                redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
-            }
-
-            if redacted_cfg.identity.private_key.is_some() {
-                redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
-            }
-            redacted_cfg.identity.password = "<REDACTED>".to_owned();
-
-            ok_or_jserr!(serde_json::to_string(&redacted_cfg))
+        if redacted_cfg.identity.private_key.is_some() {
+            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
         }
-    }
+        redacted_cfg.identity.password = "<REDACTED>".to_owned();
 
-    #[wasm_bindgen]
-    pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsError> {
-        let args: crate::cli::CliArgs =
-            serde_wasm_bindgen::from_value(cli_args).map_err(|e| JsError::new(e.to_string().as_str()))?;
-        let mut cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| JsError::new(e.to_string().as_str()))?;
-
-        // replace the ~ in the path for a home paths
-        let home_symbol = '~';
-        if cfg.hopr.db.data.starts_with(home_symbol) {
-            cfg.hopr.db.data = homedir() + &cfg.hopr.db.data[1..];
-        }
-        if cfg.identity.file.starts_with(home_symbol) {
-            cfg.identity.file = homedir() + &cfg.identity.file[1..];
-        }
-
-        Ok(cfg)
-    }
-
-    #[wasm_bindgen]
-    pub fn to_hoprlib_config(cfg: &HoprdConfig) -> HoprLibConfig {
-        cfg.clone().into()
+        serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
 }
 
@@ -500,6 +409,37 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
     announce: false
     network: testing
     provider: null
+    protocols:
+      networks:
+        anvil-localhost:
+          chain: anvil
+          environment_type: local
+          version_range: '*'
+          indexer_start_block_number: 5
+          tags: []
+          addresses:
+            network_registry: 0x3aa5ebb10dc797cac828524e59a333d0a371443c
+            network_registry_proxy: 0x68b1d87f95878fe05b998f19b66f4baba5de1aed
+            channels: 0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae
+            token: 0x9a676e781a523b5d0c0e43731313a708cb607508
+            module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
+            node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
+            ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
+            announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
+            node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
+          confirmations: 2
+      chains:
+        anvil:
+          description: Local Ethereum node, akin to Ganache, Hardhat chain
+          chain_id: 31337
+          live: false
+          default_provider: http://127.0.0.1:8545/
+          etherscan_api_url: null
+          max_fee_per_gas: 1 gwei
+          max_priority_fee_per_gas: 0.2 gwei
+          native_token_name: ETH
+          hopr_token_name: wxHOPR
+          tags: null
     check_unrealized_balance: true
   safe_module:
     safe_transaction_service_provider: https:://provider.com/
@@ -542,9 +482,9 @@ mod tests {
                 },
                 strategy: hopr_lib::config::StrategyConfig::default(),
                 heartbeat: hopr_lib::config::HeartbeatConfig {
-                    interval: 0,
-                    threshold: 0,
-                    variance: 0,
+                    interval: std::time::Duration::from_secs(0),
+                    threshold: std::time::Duration::from_secs(0),
+                    variance: std::time::Duration::from_secs(0),
                 },
                 network_options: {
                     let mut c = hopr_lib::config::NetworkConfig::default();
@@ -556,6 +496,46 @@ mod tests {
                 chain: hopr_lib::config::Chain {
                     announce: false,
                     network: "testing".to_string(),
+                    protocols: hopr_lib::ProtocolsConfig::from_str(
+                        r#"
+                    {
+                        "networks": {
+                          "anvil-localhost": {
+                            "chain": "anvil",
+                            "environment_type": "local",
+                            "version_range": "*",
+                            "indexer_start_block_number": 5,
+                            "addresses": {
+                              "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+                              "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+                              "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+                              "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+                              "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+                              "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+                              "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+                              "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+                            },
+                            "confirmations": 2,
+                            "tags": []
+                          }
+                        },
+                        "chains": {
+                          "anvil": {
+                            "description": "Local Ethereum node, akin to Ganache, Hardhat chain",
+                            "chain_id": 31337,
+                            "live": false,
+                            "max_fee_per_gas": "1 gwei",
+                            "max_priority_fee_per_gas": "0.2 gwei",
+                            "default_provider": "http://127.0.0.1:8545/",
+                            "native_token_name": "ETH",
+                            "hopr_token_name": "wxHOPR"
+                          }
+                        }
+                      }
+                    "#,
+                    )
+                    .expect("protocol config should be valid"),
                     provider: None,
                     check_unrealized_balance: true,
                 },

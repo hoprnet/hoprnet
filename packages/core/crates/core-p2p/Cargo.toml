@@ -6,48 +6,34 @@ edition = "2021"
 license = "GPL-3.0-only"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = []
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom",
-    "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
-    "core-network/wasm", "utils-log/wasm"
+    "dep:getrandom",
+    "libp2p/wasm-bindgen",
+    "core-network/wasm",
 ]
 
 [dependencies]
-# a better separation of tcp + async-std for non wasm case could be designed
-libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
-libp2p-mplex = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
+getrandom = { workspace = true, optional = true}
+libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp", "dns"] }
+libp2p-mplex = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 syn = "2.0.27"      # needed for `features=["macros"]` from `libp2p`
-void = "1"          # needed for Behavior implementations from libp2p
-
-# wasm
-libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
-getrandom = { version = "0.2.8", features = ["js"], optional = true }
-console_error_panic_hook = { version = "0.1.7", optional = true }
 thiserror = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
+void = "1"          # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-types = { workspace = true }
-utils-log = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 more-asserts = "0.3.1"
 env_logger = "0.10.0"
-wasm-bindgen-test = "0.3.36"
 
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']

@@ -1,18 +1,15 @@
+use std::collections::hash_map::Entry;
 use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
 use libp2p_identity::PeerId;
 
-use utils_log::{debug, error, info};
+use log::{debug, error, info};
 
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
+use platform::time::native::current_timestamp;
 
 use crate::messaging::ControlMessage;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
@@ -44,36 +41,24 @@ pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub timeout: u64, // `Duration` -> should be in millis,
+    pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl PingConfig {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(max_parallel_pings: usize, timeout: u64) -> Self {
-        Self {
-            max_parallel_pings,
-            timeout,
-        }
-    }
-}
-
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait] // not placing the `Send` trait limitations on the trait
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
 
 #[derive(Debug)]
-pub struct Ping<T: PingExternalAPI> {
+pub struct Ping<T: PingExternalAPI + std::marker::Send> {
     config: PingConfig,
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
@@ -82,7 +67,7 @@ pub struct Ping<T: PingExternalAPI> {
 
 type PingStartedRecord = (u64, ControlMessage);
 
-impl<T: PingExternalAPI> Ping<T> {
+impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
     pub fn new(
         config: PingConfig,
         send_ping: HeartbeatSendPingTx,
@@ -108,14 +93,14 @@ impl<T: PingExternalAPI> Ping<T> {
         let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
 
         self.send_ping
-            .start_send((peer.clone(), ping_challenge.clone()))
-            .map(move |_| (current_timestamp(), ping_challenge))
+            .start_send((*peer, ping_challenge.clone()))
+            .map(move |_| (current_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
     }
 }
 
-#[async_trait(? Send)]
-impl<T: PingExternalAPI> Pinging for Ping<T> {
+#[async_trait]
+impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     /// Performs multiple concurrent async pings to the specified peers.
     ///
     /// A sliding window mechanism is used to select at most a fixed number of concurrently processed
@@ -131,25 +116,22 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
 
         if peers.is_empty() {
             debug!("Received an empty peer list, not pinging any peers");
-            return ();
+            return;
         }
 
         if let Err(e) = poll_fn(|cx| Pin::new(&self.send_ping).poll_ready(cx)).await {
             error!("The ping receiver is not listening: {}", e);
-            return ();
+            return;
         }
 
         let mut active_pings: std::collections::HashMap<PeerId, PingStartedRecord> = std::collections::HashMap::new();
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
         for peer in peers.into_iter() {
-            if !active_pings.contains_key(&peer) {
-                match self.initiate_peer_ping(&peer) {
-                    Ok(v) => {
-                        active_pings.insert(peer.clone(), v);
-                    }
-                    Err(_) => {}
-                };
+            if let Entry::Vacant(e) = active_pings.entry(peer) {
+                if let Ok(v) = self.initiate_peer_ping(&peer) {
+                    e.insert(v);
+                }
             }
         }
 
@@ -169,7 +151,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
-                            Ok(std::time::Duration::from_millis(current_timestamp() - start))
+                            Ok(current_timestamp().saturating_sub(std::time::Duration::from_millis(start)))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())
@@ -199,13 +181,12 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            let remaining_time = current_timestamp() - start_all_peers;
-            if (remaining_time as u128) < self.config.timeout as u128 {
+            if (current_timestamp() - start_all_peers) < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
-                    if !active_pings.contains_key(&peer) {
+                    if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
                             Ok(v) => {
-                                active_pings.insert(peer.clone(), v);
+                                e.insert(v);
                             }
                             Err(_) => continue,
                         };
@@ -213,7 +194,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                 }
             }
 
-            if active_pings.len() == 0 && waiting.len() == 0 {
+            if active_pings.is_empty() && waiting.is_empty() {
                 break;
             }
         }
@@ -231,7 +212,7 @@ mod tests {
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            timeout: 150, //Duration::from_millis(150),
+            timeout: std::time::Duration::from_millis(150),
         }
     }
 
@@ -314,8 +295,10 @@ mod tests {
             futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let peer = PeerId::random();
-        let mut ping_config = simple_ping_config();
-        ping_config.timeout = 0;
+        let ping_config = PingConfig {
+            timeout: std::time::Duration::from_millis(0),
+            ..simple_ping_config()
+        };
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
@@ -334,7 +317,7 @@ mod tests {
             };
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
+        let mut pinger = Ping::new(ping_config, tx, rx, mock);
         futures::join!(pinger.ping(vec![peer.clone()]), timeout_single_use_channel);
     }
 
@@ -430,6 +413,6 @@ mod tests {
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
         let end = current_timestamp();
 
-        assert_ge!(end - start, ping_delay);
+        assert_ge!(end - start, std::time::Duration::from_millis(ping_delay));
     }
 }

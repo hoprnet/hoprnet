@@ -1,9 +1,8 @@
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;
 
-#[derive(Error, Debug, Serialize, Deserialize)]
+#[derive(Error, Debug)]
 pub enum PathError {
     #[error("path is not valid")]
     PathNotValid,
@@ -31,10 +30,3 @@ pub enum PathError {
 }
 
 pub type Result<T> = std::result::Result<T, PathError>;
-
-#[cfg(feature = "wasm")]
-impl From<PathError> for wasm_bindgen::JsValue {
-    fn from(value: PathError) -> Self {
-        value.to_string().into()
-    }
-}

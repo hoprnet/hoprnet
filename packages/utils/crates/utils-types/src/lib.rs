@@ -1,36 +1,92 @@
 extern crate core;
 
-pub mod chain;
 pub mod errors;
 pub mod primitives;
 pub mod sma;
 pub mod traits;
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
+// TODO: remove in 3.0
+#[deprecated(note = "RLP encoding will be removed in 3.0")]
+pub mod rlp {
+    use crate::errors::GeneralError;
+    use std::time::Duration;
 
-    use utils_log::logger::wasm::JsLogger;
-    use wasm_bindgen::prelude::*;
+    pub fn encode(data: &[u8], timestamp: Duration) -> Box<[u8]> {
+        let ts = timestamp.as_millis() as u64;
+        rlp::encode_list::<&[u8], &[u8]>(&[data, &ts.to_be_bytes()])
+            .to_vec()
+            .into_boxed_slice()
+    }
 
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    pub fn decode(data: &[u8]) -> crate::errors::Result<(Box<[u8]>, Duration)> {
+        let mut list = rlp::decode_list::<Vec<u8>>(data);
+        if list.len() != 2 {
+            return Err(GeneralError::ParseError);
+        }
 
-    static LOGGER: JsLogger = JsLogger {};
+        let enc_ts = list.remove(1);
+        let ts_len = enc_ts.len();
+        if ts_len > 8 {
+            return Err(GeneralError::ParseError);
+        }
 
-    #[allow(dead_code)]
-    #[wasm_bindgen]
-    pub fn utils_types_initialize_crate() {
-        let _ = JsLogger::install(&LOGGER, None);
+        let mut ts = [0u8; 8];
+        ts[8 - ts_len..].copy_from_slice(&enc_ts);
 
-        // When the `console_error_panic_hook` feature is enabled, we can call the
-        // `set_panic_hook` function at least once during initialization, and then
-        // we will get better error messages if our code ever panics.
-        //
-        // For more details see
-        // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
+        let ts = u64::from_be_bytes(ts);
+        Ok((list.remove(0).into_boxed_slice(), Duration::from_millis(ts)))
+    }
+}
+
+#[allow(deprecated)]
+#[cfg(test)]
+mod tests {
+    use hex_literal::hex;
+    use rand::rngs::OsRng;
+    use rand::RngCore;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn test_rlp() {
+        let mut b_1 = [0u8; 100];
+        let ts_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+        OsRng.fill_bytes(&mut b_1);
+
+        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
+
+        assert_eq!(&b_1, b_2.as_ref(), "data must be equal");
+        assert_eq!(
+            ts_1.as_millis(),
+            ts_2.as_millis(),
+            "timestamps must be equal up to milliseconds"
+        );
+    }
+
+    #[test]
+    fn test_rlp_fixed() {
+        let b_1 = b"hello";
+        let ts_1 = Duration::from_millis(1703086927316);
+
+        let data = hex!("cd8568656c6c6f86018c87e42dd4");
+        let (b_2, ts_2) = crate::rlp::decode(&data).expect("must decode");
+
+        assert_eq!(b_1, b_2.as_ref(), "data must be equal");
+        assert_eq!(ts_1, ts_2, "timestamps must be equal up to milliseconds");
+    }
+
+    #[test]
+    fn test_rlp_zero() {
+        let b_1 = [0u8; 0];
+        let ts_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+        let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
+
+        assert_eq!(&b_1, b_2.as_ref(), "data must be equal");
+        assert_eq!(
+            ts_1.as_millis(),
+            ts_2.as_millis(),
+            "timestamps must be equal up to milliseconds"
+        );
     }
 }

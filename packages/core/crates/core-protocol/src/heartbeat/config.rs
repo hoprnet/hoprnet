@@ -4,13 +4,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Copy, Clone, Validate, Serialize, Deserialize, Eq, PartialEq)]
 pub struct HeartbeatProtocolConfig {
     /// Maximum duration before the request times out
     #[serde_as(as = "DurationSeconds<u64>")]
-    timeout: Duration, // TODO: with the removal of wasm-bindgen this value can be public
+    pub timeout: Duration,
 }
 
 impl Default for HeartbeatProtocolConfig {
@@ -18,11 +17,5 @@ impl Default for HeartbeatProtocolConfig {
         Self {
             timeout: Duration::from_secs(15),
         }
-    }
-}
-
-impl HeartbeatProtocolConfig {
-    pub fn timeout(&self) -> Duration {
-        self.timeout
     }
 }

@@ -1,12 +1,10 @@
+use std::num::ParseIntError;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-#[cfg(not(feature = "wasm"))]
-use utils_validation::network::native::is_dns_address;
-#[cfg(feature = "wasm")]
-use utils_validation::network::wasm::is_dns_address;
+use utils_validation::network::{is_reachable_domain, looks_like_domain};
 
 pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
 pub use core_protocol::config::ProtocolConfig;
@@ -17,42 +15,12 @@ pub enum HostType {
     Domain(String),
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
     #[validate(custom = "validate_host_address")]
-    address: HostType,
+    pub address: HostType,
     #[validate(range(min = 1u16))]
     pub port: u16,
-}
-
-// necessary only while the object must be wasm-compatible
-impl HostConfig {
-    pub fn address(&self) -> &HostType {
-        &self.address
-    }
-}
-
-#[cfg(feature = "wasm")]
-#[wasm_bindgen::prelude::wasm_bindgen]
-impl HostConfig {
-    #[wasm_bindgen::prelude::wasm_bindgen]
-    pub fn is_ipv4(&self) -> bool {
-        matches!(self.address, HostType::IPv4(_))
-    }
-
-    #[wasm_bindgen::prelude::wasm_bindgen]
-    pub fn is_domain(&self) -> bool {
-        matches!(self.address, HostType::Domain(_))
-    }
-
-    #[wasm_bindgen::prelude::wasm_bindgen(js_name=address)]
-    pub fn _address(&self) -> String {
-        match &self.address {
-            HostType::IPv4(s) => s.clone(),
-            HostType::Domain(s) => s.clone(),
-        }
-    }
 }
 
 impl Default for HostConfig {
@@ -73,14 +41,14 @@ impl FromStr for HostConfig {
             Some(split) => split,
         };
 
-        let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
+        let port = str_port.parse().map_err(|e: ParseIntError| e.to_string())?;
 
         if validator::validate_ip_v4(ip_or_dns) {
             Ok(Self {
                 address: HostType::IPv4(ip_or_dns.to_owned()),
                 port,
             })
-        } else if is_dns_address(ip_or_dns) {
+        } else if looks_like_domain(ip_or_dns) {
             Ok(Self {
                 address: HostType::Domain(ip_or_dns.to_owned()),
                 port,
@@ -106,7 +74,7 @@ fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
 }
 
 fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
-    if is_dns_address(s) {
+    if looks_like_domain(s) || is_reachable_domain(s) {
         Ok(())
     } else {
         Err(ValidationError::new("Invalid DNS address provided"))
@@ -120,7 +88,6 @@ fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
@@ -158,15 +125,12 @@ mod tests {
     #[test]
     fn test_verify_valid_dns_addresses() {
         assert!(validate_dns_address("localhost").is_ok());
-        assert!(validate_dns_address("hoprnet.org").is_ok());
+        assert!(validate_dns_address("google.com").is_ok());
         assert!(validate_dns_address("hub.hoprnet.org").is_ok());
     }
 
     #[test]
     fn test_verify_invalid_dns_addresses() {
-        assert!(validate_dns_address("org").is_err());
-        assert!(validate_dns_address(".org").is_err());
         assert!(validate_dns_address("-hoprnet-.org").is_err());
-        assert!(validate_dns_address("unknown.sub.sub.hoprnet.org").is_err());
     }
 }

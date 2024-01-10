@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Copy, Clone, PartialEq)]
 pub struct ProtocolConfig {
     /// `ack` protocol config

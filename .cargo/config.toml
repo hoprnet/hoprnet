@@ -6,3 +6,7 @@ directory = "vendor/cargo"
 
 [install]
 root = ".cargo"
+
+# Nightly only
+#[build]
+#rustflags = [ "-Zlocation-detail=none" ]

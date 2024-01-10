@@ -3,16 +3,15 @@ use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, TryStreamExt};
+use log::debug;
+use log::error;
 use std::pin::Pin;
-use utils_log::debug;
-use utils_log::error;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
         Ok(self.provider.get_block_number().await?.as_u64())
@@ -22,7 +21,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         &'a self,
         start_block_number: u64,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
         if filter.is_empty() {
             return Err(FilterIsEmpty);
         }
@@ -101,7 +100,7 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_ethereum_types::{create_anvil, ContractAddresses, ContractInstances};
-    use utils_log::debug;
+    use log::debug;
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
@@ -198,7 +197,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
@@ -298,7 +297,7 @@ mod test {
         debug!("{:#?}", log_filter);
 
         // Spawn channel funding
-        async_std::task::spawn_local(async move {
+        async_std::task::spawn(async move {
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,

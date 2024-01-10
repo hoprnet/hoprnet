@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node ${mydir}/../packages/hoprd/lib/main.cjs"
+declare hoprd_command="target/debug/hoprd"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
@@ -157,17 +157,15 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*" \
-    NODE_ENV="${node_env}" \
-    HOPRD_HEARTBEAT_INTERVAL=2500 \
-    HOPRD_HEARTBEAT_THRESHOLD=2500 \
-    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_HEARTBEAT_INTERVAL=3 \
+    HOPRD_HEARTBEAT_THRESHOLD=3 \
+    HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    NODE_OPTIONS="--experimental-wasm-modules" \
+    RUST_LOG="debug" \
+    RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
-      --api-token "${api_token}" \
+      --disableApiAuthentication \
       --data="${dir}" \
       --host="${host}:${p2p_port}" \
       --identity="${id_file}" \
@@ -179,6 +177,7 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
+      --protocolConfig ${protocol_config} \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -282,7 +281,8 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 # }}}
 
-declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
+cp "${mydir}//protocol-config-anvil.json" /tmp/protocol-config-anvil.json
+declare protocol_config="/tmp/protocol-config-anvil.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
@@ -407,10 +407,9 @@ for node_id in ${!id_files[@]}; do
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
   log "\t\tAddress:\t${node_addrs[$node_id]}"
-  log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/swagger-ui/index.html"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
-  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 
   cat <<EOF >> "${env_file}"
 export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"

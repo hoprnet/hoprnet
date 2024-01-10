@@ -1,36 +1,26 @@
-use std::collections::HashMap;
-use std::ffi::OsString;
 use std::str::FromStr;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
-use clap::{ArgAction, Args, Command, FromArgMatches as _};
+use clap::{ArgAction, Parser};
 use core_strategy::Strategy;
 use core_transport::config::HostConfig;
 use hex;
-use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-#[cfg(not(feature = "wasm"))]
-use utils_validation::network::native::is_dns_address;
-#[cfg(feature = "wasm")]
-use {utils_validation::network::wasm::is_dns_address, wasm_bindgen::JsError};
+use utils_validation::network::looks_like_domain;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
-
-pub const DEFAULT_HOST: &str = "0.0.0.0";
-pub const DEFAULT_PORT: u16 = 9091;
-
-pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
-pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 fn parse_host(s: &str) -> Result<HostConfig, String> {
     let host = s.split_once(':').map_or(s, |(h, _)| h);
-    if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
-        return Err("Given string {s} is not a valid host, Example: {DEFAULT_HOST}:{DEFAULT_PORT}".into());
+    if !(validator::validate_ip_v4(host) || looks_like_domain(host)) {
+        return Err(format!(
+            "Given string {s} is not a valid host, should have a format: <ip>:<port> or <domain>(:<port>)"
+        ));
     }
 
     HostConfig::from_str(s)
@@ -80,17 +70,15 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 /// Takes all CLI arguments whose structure is known at compile-time.
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
-#[derive(Serialize, Deserialize, Args, Clone)]
-#[command(about = "HOPRd")]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Serialize, Deserialize, Clone, Parser)]
+#[command(author, version, about, long_about = None)]
 pub struct CliArgs {
     /// Network the node will operate in
     #[arg(
         long,
         env = "HOPRD_NETWORK",
         help = "ID of the network the node will attempt to connect to",
-        required = false,
-        value_parser = PossibleValuesParser::new(ProtocolConfig::default().supported_networks().iter().map(|e| e.id.clone()))
+        required = false
     )]
     pub network: Option<String>,
 
@@ -134,7 +122,7 @@ pub struct CliArgs {
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
-        default_value_t = crate::config::Api::default().enable
+        default_value_t = hoprd_api::config::Api::default().enable
     )]
     pub api: bool,
 
@@ -161,7 +149,7 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         hide = true,
-        default_value_t = crate::config::Api::default().is_auth_disabled()
+        default_value_t = hoprd_api::config::Api::default().auth == hoprd_api::config::Auth::None
     )]
     pub disable_api_authentication: bool,
 
@@ -226,15 +214,6 @@ pub struct CliArgs {
         value_name = "PROVIDER"
     )]
     pub provider: Option<String>,
-
-    #[arg(
-        long = "dryRun",
-        help = "List all the options used to run the HOPR node, but quit instead of starting",
-        env = "HOPRD_DRY_RUN",
-        default_value_t = false,
-        action = ArgAction::SetTrue
-    )]
-    pub dry_run: bool,
 
     #[arg(
         long,
@@ -371,8 +350,28 @@ pub struct CliArgs {
     )]
     pub module_address: Option<String>,
 
+    #[arg(
+        long = "protocolConfig",
+        value_name = "HOPRD_PROTOCOL_CONFIG_PATH",
+        help = "Path to the protocol-config.json file",
+        env = "HOPRD_PROTOCOL_CONFIG_PATH"
+    )]
+    pub protocol_config_path: Option<String>,
+
     // ==================================
     /// deprecated
+    #[deprecated]
+    #[arg(
+        long = "dryRun",
+        help = "DEPRECATED",
+        env = "HOPRD_DRY_RUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue
+    )]
+    pub dry_run: bool,
+
+    /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheck",
         help = "DEPRECATED",
@@ -382,36 +381,18 @@ pub struct CliArgs {
     pub health_check: bool,
 
     /// deprecated
+    #[deprecated]
     #[arg(long = "healthCheckHost", help = "DEPRECATED")]
     pub health_check_host: Option<String>,
 
     /// deprecated
+    #[deprecated]
     #[arg(
         long = "healthCheckPort",
         value_parser = clap::value_parser ! (u16),
         help = "DEPRECATED",
     )]
     pub health_check_port: Option<u16>,
-}
-
-#[cfg(feature = "wasm")]
-impl CliArgs {
-    /// Creates a new instance using custom cli_args and custom network variables
-    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, wasm_bindgen::JsError> {
-        let mut cmd = Command::new("hoprd")
-            .about("HOPRd")
-            .bin_name("index.cjs")
-            .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-            .version(hopr_lib::constants::APP_VERSION_COERCED);
-
-        cmd = Self::augment_args(cmd);
-
-        cmd.update_env_from(env_vars);
-
-        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(JsError::from)?;
-
-        Self::from_arg_matches(&derived_matches).map_err(wasm_bindgen::JsError::from)
-    }
 }
 
 #[cfg(test)]
@@ -474,40 +455,5 @@ mod tests {
             parsed,
             "Given string is not a private key. A private key must contain 128 hex chars."
         )
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use js_sys::JsString;
-    use std::collections::HashMap;
-    use std::ffi::OsString;
-    use std::str::FromStr;
-    use utils_misc::convert_from_jstrvec;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen]
-    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsError> {
-        convert_from_jstrvec!(cli_args, cli_str_args);
-
-        // wasm_bindgen receives Strings but to
-        // comply with Rust standard, turn them into OsStrings
-        let string_envs =
-            serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into()).map_err(JsError::from)?;
-
-        let mut env_map: HashMap<OsString, OsString> = HashMap::new();
-        for (ref k, ref v) in string_envs {
-            let key = OsString::from_str(k)
-                .map_err(|e| JsError::new(format!("Could not convert key {k} to OsString: {e}").as_str()))?;
-            let value = OsString::from_str(v)
-                .map_err(|e| JsError::new(format!("Could not convert value {v} to OsString: {e}").as_str()))?;
-
-            env_map.insert(key, value);
-        }
-
-        let args = super::CliArgs::new_from(cli_str_args, env_map)?;
-
-        serde_wasm_bindgen::to_value(&args).map_err(JsError::from)
     }
 }

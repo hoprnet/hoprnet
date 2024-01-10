@@ -30,42 +30,52 @@ rustdoc-args = [
     "docsrs",
 ]
 
-[dependencies]
-futures-rustls = "0.24.0"
-rcgen = "0.10.0"
-ring = "0.16.20"
-thiserror = "1.0.44"
-x509-parser = "0.15.1"
-yasna = "0.5.2"
-
 [dependencies.futures]
 version = "0.3.28"
 default-features = false
 
+[dependencies.futures-rustls]
+version = "0.24.0"
+
 [dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dependencies.libp2p-identity]
 version = "0.2.3"
+
+[dependencies.rcgen]
+version = "0.10.0"
+
+[dependencies.ring]
+version = "0.16.20"
 
 [dependencies.rustls]
 version = "0.21.6"
 features = ["dangerous_configuration"]
 default-features = false
 
+[dependencies.thiserror]
+version = "1.0.44"
+
 [dependencies.webpki]
 version = "0.101.4"
 features = ["std"]
 package = "rustls-webpki"
 
-[dev-dependencies]
-hex = "0.4.3"
-hex-literal = "0.4.1"
+[dependencies.x509-parser]
+version = "0.15.1"
+
+[dependencies.yasna]
+version = "0.5.2"
+
+[dev-dependencies.hex]
+version = "0.4.3"
+
+[dev-dependencies.hex-literal]
+version = "0.4.1"
 
 [dev-dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dev-dependencies.libp2p-identity]
 version = "0.2.3"
@@ -78,11 +88,9 @@ features = [
 
 [dev-dependencies.libp2p-swarm]
 version = "0.43.3"
-path = "../../swarm"
 
 [dev-dependencies.libp2p-yamux]
 version = "0.44.1"
-path = "../../muxers/yamux"
 
 [dev-dependencies.tokio]
 version = "1.32.0"

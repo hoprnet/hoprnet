@@ -17,16 +17,9 @@ let
     ## base
     envsubst
 
-    ## node, minimum recommended version is v18, see README for more details
-    nodejs-18_x # v18.16.1
-    (yarn.override { nodejs = nodejs-18_x; }) # v3.6.0 (as per local yarn cfg)
-
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
-    pkgs.wasm-pack # v0.12.1
-    pkgs.binaryen # v114 (includes wasm-opt)
-    wasm-bindgen-cli # v0.2.83
     pkg-config
 
     ## python is required by node module bcrypto and integration tests
@@ -57,6 +50,7 @@ let
 in
 with pkgs;
 mkShell {
+  nativeBuildInputs = [ openssl.dev pkg-config ];
   buildInputs = hoprdPkgs ++ devPkgs;
   shellHook = ''
     echo "Install cargo utils (dependency pruning...)"

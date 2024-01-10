@@ -1,6 +1,4 @@
 // Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
-//
-// Adds WASM compatibility (FS-access and RNG for `uuid` crate)
 
 use hex::{FromHex, ToHex};
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
@@ -87,7 +85,7 @@ where
 {
     use serde::de::Error;
     String::deserialize(deserializer)
-        .and_then(|string| Vec::from_hex(&string).map_err(|err| Error::custom(err.to_string())))
+        .and_then(|string| Vec::from_hex(string).map_err(|err| Error::custom(err.to_string())))
 }
 
 /// taken from `eth_keystore` library

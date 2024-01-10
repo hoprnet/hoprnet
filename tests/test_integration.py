@@ -1,9 +1,7 @@
 import asyncio
 import itertools
-import json
-import os
 import random
-import subprocess
+import re
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -184,8 +182,8 @@ def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
 
-# NOTE: this test is first, ensuring that all tests following it have ensured connectivity
-@pytest.mark.asyncio
+# NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
+# correct ticket price from api@pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
         others = set(others)
@@ -206,41 +204,25 @@ async def test_hoprd_swarm_connectivity(swarm7):
         ]
     )
 
+    ticket_price = await random.choice(list(swarm7.values()))["api"].ticket_price()
+    if ticket_price is not None:
+        global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
+        TICKET_PRICE_PER_HOP = ticket_price
+        AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
+    else:
+        print("Could not get ticket price from API, using default value")
 
-def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
-    """
-    Tests run in bash file that more or less need to be run in the future python fixture.
-    """
-    with open("/tmp/hopr-smoke-test-anvil.cfg") as f:
-        data = json.load(f)
 
-    anvil_private_key = data["private_keys"][0]
-
-    env_vars = os.environ.copy()
-    env_vars.update(
-        {
-            "HOPRD_API_TOKEN": f"{DEFAULT_API_TOKEN}",
-            "PRIVATE_KEY": f"{anvil_private_key}",
-        }
-    )
-
-    nodes_api_as_str = " ".join(list(map(lambda x: f"\"localhost:{x['api_port']}\"", swarm7.values())))
-
-    log_file_path = f"/tmp/hopr-smoke-{__name__}.log"
-    subprocess.run(
-        [
-            "bash",
-            "-o",
-            "pipefail",
-            "-c",
-            f"./tests/test_after_fixture_ready.sh {nodes_api_as_str} 2>&1 | tee --append {log_file_path}",
-        ],
-        shell=False,
-        capture_output=True,
-        env=env_vars,
-        # timeout=2000,
-        check=True,
-    )
+@pytest.mark.asyncio
+async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7):
+    for _, node_args in swarm7.items():
+        addr = await node_args["api"].addresses("native")
+        assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
+        balances = await node_args["api"].balances()
+        native_balance = int(balances.native.split(" ")[0])
+        hopr_balance = int(balances.safe_hopr.split(" ")[0])
+        assert native_balance > 0
+        assert hopr_balance > 0
 
 
 @pytest.mark.asyncio
@@ -248,6 +230,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
 async def test_hoprd_node_should_be_able_to_alias_other_peers(peer, swarm7):
     peer_id = swarm7[random.choice(default_nodes())]["peer_id"]
 
+    assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id) == True
     assert await swarm7[peer]["api"].aliases_set_alias("Alice", peer_id)
     assert await swarm7[peer]["api"].aliases_get_alias("Alice") == peer_id
 
@@ -722,3 +705,12 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
     native_balance=$(echo ${balances} | jq -r .native)
     """
     assert True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
+    price = await swarm7[peer]["api"].ticket_price()
+
+    assert isinstance(price, int)
+    assert price > 0

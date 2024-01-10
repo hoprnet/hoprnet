@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use futures_lite::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
@@ -34,10 +33,10 @@ where
     put(Put<K, V>),
 }
 
-pub type StorageValueIterator<T> = Box<dyn Stream<Item = crate::errors::Result<T>>>;
+pub type StorageValueIterator<T> = Box<dyn Iterator<Item = crate::errors::Result<T>>>;
 
 #[cfg_attr(test, mockall::automock(type Key = Box < [u8] >; type Value = Box < [u8] >;))]
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait]
 pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
@@ -60,11 +59,11 @@ pub trait AsyncKVStorage {
     /// Returns an iterator that yields all database entries whose key matches
     /// the given prefix and the length of the suffix. Does not match shorter
     /// or longer suffixes, even though they have the right suffix.
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
+    async fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
 
     /// Returns an iterator that yields all database entries whose is in the
     /// interval from `start` (inclusive) and `end` (inclusive).
-    fn iterate_range(&self, start: Self::Key, end: Self::Key) -> Result<StorageValueIterator<Self::Value>>;
+    async fn iterate_range(&self, start: Self::Key, end: Self::Key) -> Result<StorageValueIterator<Self::Value>>;
 
     /// Constructs batch query
     async fn batch(

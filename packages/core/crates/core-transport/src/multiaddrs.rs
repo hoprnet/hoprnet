@@ -7,10 +7,7 @@ pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
 pub(crate) fn is_dns(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
-        .map(|proto| match proto {
-            multiaddr::Protocol::Dns(_) => true,
-            _ => false,
-        })
+        .map(|proto| matches!(proto, multiaddr::Protocol::Dns(_)))
         .unwrap_or(false)
 }
 

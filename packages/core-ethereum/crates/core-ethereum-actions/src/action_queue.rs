@@ -1,5 +1,4 @@
 use async_lock::RwLock;
-use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -14,15 +13,16 @@ use core_types::{
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
+use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
-use futures::{pin_mut, FutureExt};
+use futures::{pin_mut, FutureExt, StreamExt};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 use crate::action_state::{ActionState, IndexerExpectation};
@@ -31,11 +31,7 @@ use crate::errors::CoreEthereumActionsError::{
 };
 use crate::errors::Result;
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -62,7 +58,7 @@ lazy_static::lazy_static! {
 /// Implements execution of transactions underlying each `Action`
 /// Each operation returns a transaction hash and may timeout.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
     async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
@@ -118,17 +114,17 @@ pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>>
 type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
-#[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {
     /// Delivers the future action into the `ActionQueue` for processing.
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
-        self.0
-            .send((action, completer.0))
+        let mut sender = self.0.clone();
+        poll_fn(|cx| Pin::new(&mut sender).poll_ready(cx))
             .await
+            .and_then(move |_| sender.start_send((action, completer.0)))
             .map(|_| {
                 completer
                     .1
@@ -326,9 +322,9 @@ where
 /// method of the `TransactionExecutor` to execute it and await its confirmation.
 pub struct ActionQueue<Db, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
-    S: ActionState,
-    TxExec: TransactionExecutor,
+    Db: HoprCoreEthereumDbActions + Send + Sync,
+    S: ActionState + Send + Sync,
+    TxExec: TransactionExecutor + Send + Sync,
 {
     queue_send: Sender<(Action, ActionFinisher)>,
     queue_recv: Receiver<(Action, ActionFinisher)>,
@@ -337,16 +333,16 @@ where
 
 impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + 'static,
-    TxExec: TransactionExecutor + 'static,
-    S: ActionState + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    S: ActionState + Send + Sync + 'static,
+    TxExec: TransactionExecutor + Send + Sync + 'static,
 {
     /// Number of pending transactions in the queue
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
     /// Creates a new instance with the given `TransactionExecutor` implementation.
     pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
-        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
+        let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {
             ctx: ExecutionContext {
                 db,
@@ -370,13 +366,13 @@ where
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
-    pub async fn action_loop(self) {
-        while let Ok((act, tx_finisher)) = self.queue_recv.recv().await {
+    pub async fn action_loop(mut self) {
+        while let Some((act, tx_finisher)) = self.queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
             let exec_context = self.ctx.clone();
-            spawn_local(async move {
+            spawn(async move {
                 let act_id = act.to_string();
                 debug!("start executing {act_id}");
 

@@ -5,7 +5,7 @@ use ethers::abi::RawLog;
 use utils_types::primitives::{Address, Snapshot};
 
 #[cfg_attr(test, mockall::automock)]
-#[async_trait(? Send)]
+#[async_trait]
 pub trait ChainLogHandler {
     fn contract_addresses(&self) -> Vec<Address>;
 

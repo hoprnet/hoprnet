@@ -8,10 +8,7 @@ use crate::{
 use clap::Parser;
 use core_crypto::keypairs::Keypair;
 use core_crypto::types::ToChecksum;
-use ethers::{
-    types::U256,
-    utils::parse_units,
-};
+use ethers::{types::U256, utils::parse_units};
 use log::{log, Level};
 use std::{env, str::FromStr};
 use utils_types::primitives::Address;
@@ -87,7 +84,10 @@ impl FaucetArgs {
 
         // validate and arrayfy provided list of addresses
         if let Some(addresses) = address {
-            let provided_addresses: Vec<String> = addresses.split(',').map(|addr| Address::from_str(addr).unwrap().to_checksum()).collect();
+            let provided_addresses: Vec<String> = addresses
+                .split(',')
+                .map(|addr| Address::from_str(addr).unwrap().to_checksum())
+                .collect();
             addresses_all.extend(provided_addresses);
         }
 
