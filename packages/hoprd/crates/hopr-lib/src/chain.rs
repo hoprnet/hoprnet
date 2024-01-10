@@ -187,6 +187,10 @@ pub struct ChainNetworkConfig {
     pub node_stake_v2_factory: Address,
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
+    /// milliseconds between polling the RPC for new transactions
+    pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
 }
 
 /// Check whether the version is allowed
