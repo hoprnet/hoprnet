@@ -82,42 +82,42 @@ PREGENERATED_IDENTITIES_DIR = f"{MYDIR}/identities"
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
-    "0": {
+    "1": {
         "api_port": 19091,
         "p2p_port": 13301,
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_0",
         "host_addr": "localhost",
     },
-    "1": {
+    "2": {
         "api_port": 19092,
         "p2p_port": 13302,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
         "host_addr": "127.0.0.1",
     },
-    "2": {
+    "3": {
         "api_port": 19093,
         "p2p_port": 13303,
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
         "host_addr": "localhost",
     },
-    "3": {
+    "4": {
         "api_port": 19094,
         "p2p_port": 13304,
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
         "host_addr": "127.0.0.1",
     },
-    "4": {
+    "5": {
         "api_port": 19095,
         "p2p_port": 13305,
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
         "host_addr": "localhost",
-        "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4.cfg.yaml",
+        "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5.cfg.yaml",
     },
-    "5": {
+    "6": {
         "api_port": 19096,
         "p2p_port": 13306,
         "api_token": DEFAULT_API_TOKEN,
@@ -125,7 +125,7 @@ NODES = {
         "host_addr": "127.0.0.1",
         "network": ANVIL_NETWORK2,
     },
-    "6": {
+    "7": {
         "api_port": 19097,
         "p2p_port": 13307,
         "api_token": DEFAULT_API_TOKEN,

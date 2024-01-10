@@ -31,7 +31,7 @@ def default_nodes():
 
 def passive_node():
     """A node that uses no strategy"""
-    return "4"
+    return "5"
 
 
 @asynccontextmanager

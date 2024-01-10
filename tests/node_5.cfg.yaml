@@ -4,7 +4,7 @@ hopr:
     address: !IPv4 127.0.0.1
     port: 19091
   db:
-    data: '/tmp/local_4'
+    data: '/tmp/local_5'
     initialize: true
     force_initialize: false
   strategy:
@@ -84,7 +84,7 @@ hopr:
     module_address: '0x0000000000000000000000000000000000000000'
 
 identity:
-  file: '/tmp/local_4.id'
+  file: '/tmp/local_5.id'
   password: ''
   private_key:
 inbox:
