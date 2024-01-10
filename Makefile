@@ -141,7 +141,7 @@ build-docs: ## build typedocs, Rest API docs
 
 .PHONY: install
 install:
-	$(cargo) install
+	$(cargo) install --path packages/hopli
 
 .PHONY: clean
 clean: # Cleanup build directories
