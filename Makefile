@@ -123,8 +123,8 @@ build-solidity-types: ## generate Solidity typings
 	$(MAKE) -C packages/ethereum/contracts/ ../crates/bindings/src
 # add [lib] as rlib is necessary to run integration tests
 # note: $(mydir) ends with '/'
-	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
-		echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
+	grep rlib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
+		echo -e "\n[lib] \ncrate-type = [\"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build
 build: ## build all packages
