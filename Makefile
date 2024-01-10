@@ -139,6 +139,10 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 build-docs: ## build typedocs, Rest API docs
 	echo "Deprecated"
 
+.PHONY: install
+install:
+	$(cargo) install --path packages/hopli
+
 .PHONY: clean
 clean: # Cleanup build directories
 	cargo clean

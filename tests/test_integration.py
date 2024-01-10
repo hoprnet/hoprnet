@@ -1,7 +1,7 @@
 import asyncio
 import itertools
-import re
 import random
+import re
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -210,7 +210,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
         ]
     )
 
-
+    
 @pytest.mark.asyncio
 async def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
     for _, node_args in swarm7.items():

@@ -51,19 +51,6 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -195,19 +182,6 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -221,7 +195,20 @@ jobs:
             .cargo/bin/
             .foundry/bin/
 
-      - name: Test with pytest
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
+      - name: Setup Hoprd Runtime
+        run: |
+          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+
+      - name: Build application
+        run: nix develop -c make -j build
+
+      - name: Install
+        run: nix develop -c make -j install
+
+- name: Test with pytest
         run: nix develop -c make smoke-test suite=${{ matrix.suite }}
         timeout-minutes: 30
 

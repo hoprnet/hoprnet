@@ -16,7 +16,7 @@
             },
             "version_range": {
               "type": "string",
-              "description": "The version range is a string which has one or more space-separated descriptors (same as npm dependancies, https://github.com/npm/node-semver)."
+              "description": "The version range in the Rust semver string format as specified in https://docs.rs/semver/latest/semver/)."
             },
             "indexer_start_block_number": {
               "type": "string",
