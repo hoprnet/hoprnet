@@ -264,7 +264,9 @@ pub mod tests {
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
         sleep(timeout).await;
-        pending.into_future().await.expect(&format!(
+        pending
+            .await
+            .expect(&format!(
             "timeout awaiting tx hash {tx_hash} after {} seconds",
             timeout.as_secs()
         ));

@@ -45,6 +45,11 @@ lazy_static::lazy_static! {
             "core_ethereum_gauge_indexer_block_number",
             "Current block number",
     ).unwrap();
+    static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
+        SimpleGauge::new(
+            "core_ethereum_gauge_indexer_sync_progress",
+            "Current sync progress of the indexer",
+    ).unwrap();
 }
 
 fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
@@ -219,14 +224,22 @@ where
 
                 if tx.is_some() {
                     let indexing_scope = chain_head - latest_block_in_db;
+                    let progress = 1_f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64));
                     info!(
                         "Sync progress {:.2}% @ block {}",
-                        (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64))) * 100f64,
+                         progress * 100_f64,
                         current_block
                     );
 
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
+
                     if current_block + finalization >= chain_head {
                         info!("Indexer sync successfully completed");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_INDEXER_SYNC_PROGRESS.set(1.00);
+
                         let _ = tx.take().expect("tx should be present").send(());
                     }
                 }

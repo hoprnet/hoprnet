@@ -1319,6 +1319,7 @@ dependencies = [
  "platform",
  "primitive-types",
  "serde",
+ "strum 0.25.0",
  "thiserror",
  "utils-db",
  "utils-metrics",
@@ -1457,6 +1458,7 @@ dependencies = [
  "multiaddr",
  "platform",
  "serde",
+ "strum 0.25.0",
  "utils-types",
 ]
 
@@ -3366,6 +3368,7 @@ dependencies = [
  "futures",
  "hopr-lib",
  "hoprd-inbox",
+ "lazy_static",
  "libp2p-identity",
  "log",
  "serde",
@@ -7645,6 +7648,7 @@ dependencies = [
  "sqlx",
  "tempfile",
  "thiserror",
+ "utils-metrics",
  "utils-types",
 ]
 

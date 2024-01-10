@@ -113,18 +113,16 @@ impl ChannelGraph {
                 match direction {
                     ChannelDirection::Outgoing => match channel.status {
                         ChannelStatus::Closed => {
-                            SimpleGauge::decrement(&METRIC_NUMBER_OF_OUTGOING_CHANNEL, 1.0);
-                            MultiGauge::set(
-                                &METRIC_CHANNEL_BALANCES,
-                                &[channel.source.to_hex().as_str(), "out"],
+                            METRIC_NUMBER_OF_OUTGOING_CHANNEL.decrement(1.0);
+                            METRIC_CHANNEL_BALANCES.set(
+                                &[channel.destination.to_hex().as_str(), "out"],
                                 0.0,
                             );
                         }
                         ChannelStatus::Open => {
-                            SimpleGauge::increment(&METRIC_NUMBER_OF_OUTGOING_CHANNEL, 1.0);
-                            MultiGauge::set(
-                                &METRIC_CHANNEL_BALANCES,
-                                &[channel.source.to_hex().as_str(), "out"],
+                            METRIC_NUMBER_OF_OUTGOING_CHANNEL.increment(1.0);
+                            METRIC_CHANNEL_BALANCES.set(
+                                &[channel.destination.to_hex().as_str(), "out"],
                                 channel
                                     .balance
                                     .amount_base_units()
@@ -136,13 +134,12 @@ impl ChannelGraph {
                     },
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
-                            SimpleGauge::decrement(&METRIC_NUMBER_OF_INCOMING_CHANNEL, 1.0);
-                            MultiGauge::set(&METRIC_CHANNEL_BALANCES, &[channel.source.to_hex().as_str(), "in"], 0.0);
+                            METRIC_NUMBER_OF_INCOMING_CHANNEL.decrement(1.0);
+                            METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], 0.0);
                         }
                         ChannelStatus::Open => {
-                            SimpleGauge::increment(&METRIC_NUMBER_OF_INCOMING_CHANNEL, 1.0);
-                            MultiGauge::set(
-                                &METRIC_CHANNEL_BALANCES,
+                            METRIC_NUMBER_OF_INCOMING_CHANNEL.increment(1.0);
+                            METRIC_CHANNEL_BALANCES.set(
                                 &[channel.source.to_hex().as_str(), "in"],
                                 channel
                                     .balance

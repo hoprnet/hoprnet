@@ -23,6 +23,7 @@ lazy_static = { workspace = true }
 multiaddr = "0.18"
 primitive-types = "0.12.1"
 serde = { workspace = true, features = ["derive"] }
+strum = { workspace = true }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
@@ -47,4 +48,4 @@ hex-literal = "0.4"
 default = ["prometheus"]
 wasm = [ "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
-prometheus = [ "dep:utils-metrics", "core-ethereum-rpc/prometheus" ]
+prometheus = [ "dep:utils-metrics", "core-ethereum-rpc/prometheus"]

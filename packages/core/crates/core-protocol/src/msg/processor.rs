@@ -47,6 +47,8 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
     static ref METRIC_PACKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+    static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_rejected_tickets", "Number of rejected tickets").unwrap();
     // mixer
     static ref METRIC_QUEUE_SIZE: SimpleGauge =
         SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
@@ -298,6 +300,10 @@ where
                 if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
                     self.db.write().await.mark_rejected(&ticket).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_REJECTED_TICKETS_COUNT.increment();
+
                     return Err(e);
                 }
 

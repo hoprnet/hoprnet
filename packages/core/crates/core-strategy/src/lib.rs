@@ -11,7 +11,6 @@ use crate::strategy::MultiStrategyConfig;
 use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
 
 pub mod strategy;
-
 pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
@@ -21,23 +20,13 @@ pub mod promiscuous;
 
 /// Enumerates all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
+#[strum(serialize_all = "snake_case")]
 pub enum Strategy {
-    #[strum(serialize = "promiscuous")]
     Promiscuous(PromiscuousStrategyConfig),
-
-    #[strum(serialize = "aggregating")]
     Aggregating(AggregatingStrategyConfig),
-
-    #[strum(serialize = "auto_redeeming")]
     AutoRedeeming(AutoRedeemingStrategyConfig),
-
-    #[strum(serialize = "auto_funding")]
     AutoFunding(AutoFundingStrategyConfig),
-
-    #[strum(serialize = "multi")]
     Multi(MultiStrategyConfig),
-
-    #[strum(serialize = "passive")]
     Passive,
 }
 
