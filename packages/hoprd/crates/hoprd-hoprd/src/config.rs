@@ -17,9 +17,6 @@ pub const DEFAULT_API_PORT: u16 = 3001;
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-pub const DEFAULT_HEALTH_CHECK_HOST: &str = "127.0.0.1";
-pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
-
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
@@ -77,24 +74,6 @@ impl Default for Api {
             enable: false,
             auth: Auth::Token("".to_owned()),
             host: HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap(),
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct HealthCheck {
-    pub enable: bool,
-    pub host: String,
-    pub port: u16,
-}
-
-impl Default for HealthCheck {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            host: DEFAULT_HEALTH_CHECK_HOST.to_string(),
-            port: DEFAULT_HEALTH_CHECK_PORT,
         }
     }
 }
@@ -220,10 +199,6 @@ pub struct Testing {
 ///   backoff_exponent: 1.5
 ///   backoff_min: 2.0
 ///   backoff_max: 300.0
-/// healthcheck:
-///   enable: false
-///   host: 127.0.0.1
-///   port: 0
 /// protocol:
 ///   ack:
 ///     timeout: 15

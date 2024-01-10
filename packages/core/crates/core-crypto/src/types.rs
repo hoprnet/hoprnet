@@ -25,6 +25,7 @@ use k256::{
 
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
+use sha2::Sha512;
 use std::fmt::Debug;
 use std::{
     fmt::{Display, Formatter},
@@ -1056,18 +1057,23 @@ pub struct OffchainSignature {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
-        let expanded_sk = ed25519_dalek::ExpandedSecretKey::from(
-            &ed25519_dalek::SecretKey::from_bytes(signing_keypair.secret().as_ref()).expect("invalid private key"),
+        // Expand the SK from the given keypair
+        let expanded_sk = ed25519_dalek::hazmat::ExpandedSecretKey::from(
+            &ed25519_dalek::SecretKey::try_from(signing_keypair.secret().as_ref()).expect("invalid private key"),
         );
 
-        let verifying = ed25519_dalek::PublicKey::from_bytes(signing_keypair.public().compressed.as_bytes()).unwrap();
+        // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on Ed25519
+        // See https://github.com/MystenLabs/ed25519-unsafe-libs for details
+        let verifying =
+            ed25519_dalek::VerifyingKey::from_bytes(signing_keypair.public().compressed.as_bytes()).unwrap();
+
         Self {
-            signature: expanded_sk.sign(msg, &verifying),
+            signature: ed25519_dalek::hazmat::raw_sign::<Sha512>(&expanded_sk, msg, &verifying),
         }
     }
 
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let pk = ed25519_dalek::PublicKey::from_bytes(public_key.compressed.as_bytes()).unwrap();
+        let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.compressed.as_bytes()).unwrap();
         pk.verify_strict(msg, &self.signature).is_ok()
     }
 }
@@ -1076,7 +1082,7 @@ impl BinarySerializable for OffchainSignature {
     const SIZE: usize = ed25519_dalek::Signature::BYTE_SIZE;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        ed25519_dalek::Signature::from_bytes(data)
+        ed25519_dalek::Signature::try_from(data)
             .map_err(|_| ParseError)
             .map(|signature| Self { signature })
     }
@@ -1301,12 +1307,9 @@ pub mod tests {
         let msg = b"test12345";
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
 
-        let key = ed25519_dalek::SecretKey::from_bytes(&PRIVATE_KEY).unwrap();
-        let pk: ed25519_dalek::PublicKey = (&key).into();
-        let kp = ed25519_dalek::Keypair {
-            secret: key,
-            public: pk.clone(),
-        };
+        let key = ed25519_dalek::SecretKey::try_from(PRIVATE_KEY).unwrap();
+        let kp = ed25519_dalek::SigningKey::from_bytes(&key);
+        let pk = ed25519_dalek::VerifyingKey::from(&kp);
 
         let sgn = kp.sign(msg);
         assert!(pk.verify_strict(msg, &sgn).is_ok(), "blomp");
@@ -1340,12 +1343,9 @@ pub mod tests {
         let msg = b"test12345";
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
 
-        let key = ed25519_dalek::SecretKey::from_bytes(&PRIVATE_KEY).unwrap();
-        let pk: ed25519_dalek::PublicKey = (&key).into();
-        let kp = ed25519_dalek::Keypair {
-            secret: key,
-            public: pk.clone(),
-        };
+        let key = ed25519_dalek::SecretKey::try_from(PRIVATE_KEY).unwrap();
+        let kp = ed25519_dalek::SigningKey::from_bytes(&key);
+        let pk = ed25519_dalek::VerifyingKey::from(&kp);
 
         let sgn = kp.sign(msg);
         assert!(pk.verify_strict(msg, &sgn).is_ok(), "blomp");

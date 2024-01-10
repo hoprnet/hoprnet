@@ -347,6 +347,7 @@ run-local: ## run HOPRd from local repo
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
+		--data /tmp/ \
 		$(args)
 
 .PHONY: run-local-with-safe
@@ -591,7 +592,7 @@ generate-python-sdk: build-docs-api			# not using the official swagger-codegen-c
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
 		-c /local/scripts/python-sdk-config.json
-	patch ./hoprd-sdk-python/ ./scripts/sdk-python.patch
+	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help
 help:

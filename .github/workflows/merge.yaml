@@ -100,13 +100,12 @@ jobs:
 
           # Tag images
           images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-          for image in ${images[@]}; 
-          do
+          for image in ${images[@]}; do
             echo "Tagging ${image}:${docker_release_latest_tag}"
             gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_release_latest_tag}
             if [ "${base_branch}" == "master" ]; then
               echo "Tagging ${image}:latest"
-              # gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:latest
+              gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:latest
             fi
           done
 
@@ -218,7 +217,7 @@ jobs:
           tag_name: v${{ steps.setup.outputs.current_version }}
 
       - name: Close Milestone
-        run: | 
+        run: |
           gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
@@ -238,7 +237,7 @@ jobs:
   new_release:
     name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs: 
+    needs:
       - create_release
     uses: ./.github/workflows/open-release.yaml
     with:
@@ -249,7 +248,7 @@ jobs:
   build_dappnode:
     name: Build dappNode
     if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs: 
+    needs:
       - create_release
     uses: ./.github/workflows/build-dappnode.yaml
     with:

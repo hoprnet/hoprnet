@@ -47,8 +47,6 @@ function cleanup {
   log "Remove logs"
   rm -f "${node_log_file}" "${anvil_rpc_log}"
 
-  wait
-
   exit $EXIT_CODE
 }
 trap cleanup SIGINT SIGTERM ERR EXIT
@@ -71,8 +69,8 @@ log "Start hoprd node"
 env DEBUG="hopr*" CI="true" HOPRD_API_PORT="${api_port}" \
   make -C "${mydir}/../" run-local-with-safe > "${node_log_file}" 2>&1 &
 
-log "Wait 15 seconds for node startup to complete"
-sleep 15
+log "Wait 60 seconds for node startup to complete"
+sleep 60
 
 log "Verify spec has been generated at ${spec_file_path}"
 test -f "${spec_file_path}" || {

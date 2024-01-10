@@ -176,32 +176,6 @@ pub struct CliArgs {
     pub api_token: Option<String>,
 
     #[arg(
-        long = "healthCheck",
-        env = "HOPRD_HEALTH_CHECK",
-        help = "Run a health check end point",
-        action = ArgAction::SetTrue,
-        default_value_t = crate::config::HealthCheck::default().enable
-    )]
-    pub health_check: bool,
-
-    #[arg(
-        long = "healthCheckHost",
-        value_name = "HOST",
-        help = "Updates the host for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_HOST"
-    )]
-    pub health_check_host: Option<String>,
-
-    #[arg(
-        long = "healthCheckPort",
-        value_name = "PORT",
-        value_parser = clap::value_parser ! (u16),
-        help = "Updates the port for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_PORT"
-    )]
-    pub health_check_port: Option<u16>,
-
-    #[arg(
         long,
         env = "HOPRD_PASSWORD",
         help = "A password to encrypt your keys",
@@ -396,6 +370,28 @@ pub struct CliArgs {
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
+
+    // ==================================
+    /// deprecated
+    #[arg(
+        long = "healthCheck",
+        help = "DEPRECATED",
+        action = ArgAction::SetTrue,
+        default_value_t = false
+    )]
+    pub health_check: bool,
+
+    /// deprecated
+    #[arg(long = "healthCheckHost", help = "DEPRECATED")]
+    pub health_check_host: Option<String>,
+
+    /// deprecated
+    #[arg(
+        long = "healthCheckPort",
+        value_parser = clap::value_parser ! (u16),
+        help = "DEPRECATED",
+    )]
+    pub health_check_port: Option<u16>,
 }
 
 #[cfg(feature = "wasm")]

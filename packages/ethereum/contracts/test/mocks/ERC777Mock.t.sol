@@ -17,13 +17,7 @@ contract ERC777MockTest is Test, ERC1820RegistryFixtureTest {
         address[] memory defaultOperators = new address[](1);
         defaultOperators[0] = msg.sender;
 
-        erc777Mock = new ERC777Mock(
-            address(1),
-            0,
-            "ERC777 Mock Token",
-            "ERC777Mock",
-            defaultOperators
-        );
+        erc777Mock = new ERC777Mock(address(1), 0, "ERC777 Mock Token", "ERC777Mock", defaultOperators);
     }
 
     function testFuzz_MintInternal(uint256 amount) public {
