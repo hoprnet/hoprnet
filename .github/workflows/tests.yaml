@@ -208,7 +208,7 @@ jobs:
       - name: Install
         run: nix develop -c make -j install
 
-- name: Test with pytest
+      - name: Test with pytest
         run: nix develop -c make smoke-test suite=${{ matrix.suite }}
         timeout-minutes: 30
 
