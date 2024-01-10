@@ -262,6 +262,7 @@ pub async fn run_hopr_api(
         api.with(TokenBasedAuthenticationMiddleware);
 
         api.at("/aliases").get(alias::aliases).post(alias::set_alias);
+
         api.at("/aliases/:alias")
             .get(alias::get_alias)
             .delete(alias::delete_alias);
