@@ -159,8 +159,7 @@ def setup_node(args):
         "NODE_OPTIONS": "--experimental-wasm-modules",
     }
     cmd = [
-        "node",
-        "packages/hoprd/lib/main.cjs",
+        "target/debug/hoprd",
         "--announce",
         "--api",
         "--disableTicketAutoRedeem",
