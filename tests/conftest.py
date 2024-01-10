@@ -1,12 +1,12 @@
+import fnmatch
+import http.client
+import json
 import logging
 import os
-from time import sleep
-import fnmatch
-import json
 import random
 import shutil
 import subprocess
-import http.client
+from time import sleep
 
 import pytest
 from hopr import HoprdAPI
@@ -82,54 +82,54 @@ PREGENERATED_IDENTITIES_DIR = f"{MYDIR}/identities"
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
-    "1": {
+    "0": {
         "api_port": 19091,
         "p2p_port": 13301,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_0",
         "host_addr": "localhost",
     },
-    "2": {
+    "1": {
         "api_port": 19092,
         "p2p_port": 13302,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
         "host_addr": "127.0.0.1",
     },
-    "3": {
+    "2": {
         "api_port": 19093,
         "p2p_port": 13303,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
         "host_addr": "localhost",
     },
-    "4": {
+    "3": {
         "api_port": 19094,
         "p2p_port": 13304,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
         "host_addr": "127.0.0.1",
     },
-    "5": {
+    "4": {
         "api_port": 19095,
         "p2p_port": 13305,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
         "host_addr": "localhost",
         "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5.cfg.yaml",
     },
-    "6": {
+    "5": {
         "api_port": 19096,
         "p2p_port": 13306,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
         "host_addr": "127.0.0.1",
         "network": ANVIL_NETWORK2,
     },
-    "7": {
+    "6": {
         "api_port": 19097,
         "p2p_port": 13307,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_7",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
         "host_addr": "localhost",
     },
 }
@@ -234,11 +234,14 @@ def reuse_pregenerated_identities():
     # remove existing identity files in tmp folder, .safe.args
     suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
 
+    logging.info(f"{suffixes=}")
+
     def is_relevant_file(f):
         return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
 
     for f in filter(is_relevant_file, os.listdir(FIXTURE_FILES_DIR)):
-        os.remove(f"{FIXTURE_FILES_DIR}/{f}")
+        os.remove(f"{FIXTURE_FILES_DIR}{f}")
+        logging.info(f"Removed file {FIXTURE_FILES_DIR}{f}")
 
     # we copy and rename the files according to the expected file name format and destination folder
     node_nr = 0
@@ -247,11 +250,14 @@ def reuse_pregenerated_identities():
     def is_relevant_file(f):
         return fnmatch.fnmatch(f, "*.id")
 
-    for f in filter(is_relevant_file, id_files):
-        shutil.copyfile(f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id")
+    for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
+        path = shutil.copyfile(f"{PREGENERATED_IDENTITIES_DIR}/{f}", 
+                        f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id")
+        logging.info(f"Copied file {PREGENERATED_IDENTITIES_DIR}/{f} to {path}")
+        node_nr += 1
 
 
-def create_local_safes(nodes_args, private_key):
+def create_local_safes(nodes_args: dict, private_key):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -261,6 +267,8 @@ def create_local_safes(nodes_args, private_key):
     }
     for node_id, node_args in nodes_args.items():
         id_file = f"{node_args['dir']}.id"
+        logging.info(f"Creating safe and module for node {node_id} with id file {id_file}")
+
         res = subprocess.run(
             [
                 "hopli",
@@ -342,7 +350,7 @@ def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
     for f in ["node_5.cfg.yaml"]:
-        shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
+        shutil.copyfile(f"{MYDIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-{f}")
 
     logging.info("Ensure local anvil server is not running")
     subprocess.run(["make", "kill-anvil"], cwd=f"{MYDIR}/../", check=True)
@@ -354,6 +362,8 @@ def swarm7(request):
         capture_output=True,
         cwd=f"{MYDIR}/../scripts",
     )
+
+    logging.info("Wait for anvil server to start up")
 
     # read auto-generated private key from anvil configuration
     with open(ANVIL_CFG_FILE, "r") as anvil_cfg_file:
@@ -378,11 +388,13 @@ def swarm7(request):
             nodes[node_id]["proc"] = proc
             nodes[node_id]["api"] = api
 
-        logging.info("Wait for all nodes to start up")
+        logging.info(f"Wait for {len(nodes)} nodes to start up")
+
         for node_id, node_args in nodes.items():
             while True:
                 with open(f"{node_args['dir']}.log", "r") as f:
                     logs = f.read()
+                    logging.info(logs)
                     if "still unfunded, " in logs or "node is funded" in logs:
                         break
                 sleep(0.1)
