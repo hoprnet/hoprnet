@@ -32,15 +32,17 @@ rustdoc-args = [
     "docsrs",
 ]
 
-[dependencies]
-quick-protobuf = "0.8"
-thiserror = "1.0"
-
 [dependencies.asynchronous-codec]
 version = "0.6"
 
 [dependencies.bytes]
 version = "1"
+
+[dependencies.quick-protobuf]
+version = "0.8"
+
+[dependencies.thiserror]
+version = "1.0"
 
 [dependencies.unsigned-varint]
 version = "0.7"
