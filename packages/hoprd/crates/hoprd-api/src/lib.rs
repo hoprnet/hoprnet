@@ -807,7 +807,6 @@ mod channels {
     use core_ethereum_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
-    use std::str::FromStr;
     use utils_types::traits::ToHex;
 
     #[serde_as]
@@ -1278,7 +1277,8 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
-        pub timestamp: u128,
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        pub timestamp: Duration,
     }
 
     #[serde_as]
@@ -1289,7 +1289,7 @@ mod messages {
         pub tag: u16,
         /// Timestamp to filter messages received after this timestamp
         #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
-        pub timestamp: Option<std::time::Duration>,
+        pub timestamp: Option<Duration>,
     }
 
     /// Send a message to another peer using a given path.
@@ -1336,15 +1336,11 @@ mod messages {
         }
 
         let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
         match hopr
-            .send_message(
-                msg_body,
-                args.peer_id,
-                args.path,
-                args.hops,
-                Some(args.tag),
-            )
+            .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
             .await
         {
             Ok(challenge) => Ok(Response::builder(202)
@@ -1554,8 +1550,8 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
-            content = TagQuery,
-            description = "Tag of message queue to peek from",
+            content = GetMessageReq,
+            description = "Tag of message queue and optionally a timestamp since from to peek from",
             content_type = "application/json"
         ),
         responses(

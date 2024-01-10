@@ -108,10 +108,7 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf|
-                buf
-                .dequeue()
-                .map(|w| (w.payload, w.ts)))
+            .and_then(|buf| buf.dequeue().map(|w| (w.payload, w.ts)))
     }
 
     async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
@@ -120,11 +117,7 @@ where
                 // Pop only all messages of a specific tag
                 self.buffers
                     .get_mut(&specific_tag)
-                    .map(|buf| {
-                        buf.drain()
-                            .map(|w| (w.payload, w.ts))
-                            .collect::<Vec<_>>()
-                    })
+                    .map(|buf| buf.drain().map(|w| (w.payload, w.ts)).collect::<Vec<_>>())
                     .unwrap_or_default()
             }
             None => {
@@ -150,10 +143,7 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf|
-                buf
-                .peek()
-                .map(|w| (w.payload.clone(), w.ts)))
+            .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
     }
 
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)> {
@@ -166,7 +156,13 @@ where
                     .get_mut(&specific_tag)
                     .map(|buf| {
                         buf.iter()
-                            .filter_map(|w| if w.ts >= timestamp { Some((w.payload.clone(), w.ts)) } else { None } )
+                            .filter_map(|w| {
+                                if w.ts >= timestamp {
+                                    Some((w.payload.clone(), w.ts))
+                                } else {
+                                    None
+                                }
+                            })
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default()
@@ -402,11 +398,19 @@ mod test {
 
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(None, None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+            rb.peek_all(None, None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
         );
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(None, None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+            rb.peek_all(None, None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
         );
         assert_eq!(3, rb.count(Some(1)).await);
 
@@ -456,14 +460,15 @@ mod test {
         // sleep for 10ms to ensure a break between timestamps
         async_std::task::sleep(Duration::from_millis(10)).await;
         let close_past = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
 
         rb.push(Some(1), 6).await;
         rb.push(Some(1), 7).await;
         rb.push(Some(2), 1).await;
 
         assert_eq!(
-            vec![6,7],
+            vec![6, 7],
             rb.peek_all(Some(1), Some(close_past))
                 .await
                 .into_iter()
@@ -479,7 +484,7 @@ mod test {
                 .collect::<Vec<_>>()
         );
         assert_eq!(
-            vec![0,1,2,3,4,5,6,7],
+            vec![0, 1, 2, 3, 4, 5, 6, 7],
             rb.peek_all(Some(1), None)
                 .await
                 .into_iter()
@@ -489,7 +494,6 @@ mod test {
 
         rb.pop_all(None).await;
     }
-
 
     #[async_std::test]
     async fn test_purge() {
