@@ -134,7 +134,7 @@ pub struct AcknowledgedTicket {
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.ticket.partial_cmp(&other.ticket)
+        Some(self.cmp(other))
     }
 }
 

@@ -250,7 +250,7 @@ pub async fn run_hopr_api(
     app.at("/readyz").get(checks::readyz);
     app.at("/healthyz").get(checks::healthyz);
 
-    app.at(&format!("{BASE_PATH}")).nest({
+    app.at(BASE_PATH).nest({
         let mut api = tide::with_state(InternalState {
             auth: Arc::new(cfg.auth.clone()),
             hopr: state.hopr.clone(),
@@ -492,9 +492,7 @@ mod alias {
         let aliases = aliases.read().await;
         if let Some(peer_id) = aliases.get(&alias) {
             Ok(Response::builder(200)
-                .body(json!(PeerIdArg {
-                    peer_id: peer_id.clone()
-                }))
+                .body(json!(PeerIdArg { peer_id: *peer_id }))
                 .build())
         } else {
             Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
@@ -983,17 +981,13 @@ mod channels {
                     let channel_info = NodeChannels {
                         incoming: incoming
                             .into_iter()
-                            .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed)
-                                    .then(|| NodeChannel::from(c))
-                            })
+                            .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
+                            .map(NodeChannel::from)
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
-                            .filter_map(|c| {
-                                (query.including_closed || c.status != ChannelStatus::Closed)
-                                    .then(|| NodeChannel::from(c))
-                            })
+                            .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
+                            .map(NodeChannel::from)
                             .collect(),
                         all: vec![],
                     };
@@ -1971,7 +1965,7 @@ mod node {
         let query_params: NodePeersReqQuery = req.query()?;
 
         if let Some(quality) = query_params.quality {
-            if quality < 0.0f64 || quality > 1.0f64 {
+            if !(0.0f64..=1.0f64).contains(&quality) {
                 return Ok(Response::builder(400).body(ApiErrorStatus::InvalidQuality).build());
             }
         }
@@ -2010,7 +2004,7 @@ mod node {
             .map(|(address, peer_id, mas, info)| PeerInfo {
                 peer_id,
                 peer_address: address,
-                multiaddr: mas.first().map(|ma| ma.clone()),
+                multiaddr: mas.first().cloned(),
                 heartbeats: HeartbeatInfo {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
@@ -2023,7 +2017,7 @@ mod node {
                 reported_version: info
                     .metadata()
                     .get(&"protocol_version".to_owned())
-                    .map(|v| v.clone())
+                    .cloned()
                     .unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
@@ -2161,7 +2155,7 @@ mod node {
                     hopr_node_safe: safe_config.safe_address,
                     is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
                     connectivity_status: hopr.network_health().await,
-                    channel_closure_period: channel_closure_notice_period.as_secs() as u64,
+                    channel_closure_period: channel_closure_notice_period.as_secs(),
                 };
 
                 Ok(Response::builder(200).body(json!(body)).build())

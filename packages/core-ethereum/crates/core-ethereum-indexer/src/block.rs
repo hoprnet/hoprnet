@@ -197,7 +197,7 @@ where
             while let Some(block_with_logs) = block_stream.next().await {
                 debug!("Processed block number: {}", block_with_logs.block_id);
 
-                if ! block_with_logs.logs.is_empty() {
+                if !block_with_logs.logs.is_empty() {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
                     let mut logs = block_with_logs.logs;

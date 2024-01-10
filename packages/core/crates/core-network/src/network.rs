@@ -265,7 +265,7 @@ impl<T: NetworkExternalActions> Network<T> {
         let mut excluded = HashSet::new();
         excluded.insert(my_peer_id);
 
-        let instance = Network {
+        Network {
             me: my_peer_id,
             cfg,
             events_to_emit: VecDeque::new(),
@@ -281,14 +281,12 @@ impl<T: NetworkExternalActions> Network<T> {
             network_actions_api,
             #[cfg(all(feature = "prometheus", not(test)))]
             started_at: Some(current_timestamp()),
-        };
-
-        instance
+        }
     }
 
     /// Set all registered multiaddresses for a specific peer
     pub fn store_peer_multiaddresses(&mut self, peer: &PeerId, addrs: Vec<Multiaddr>) {
-        self.known_multiaddresses.insert(peer.clone(), addrs);
+        self.known_multiaddresses.insert(*peer, addrs);
     }
 
     /// Get all registered multiaddresses for a specific peer
@@ -336,19 +334,14 @@ impl<T: NetworkExternalActions> Network<T> {
             };
 
             if !has_entry && !is_ignored {
-                let mut entry = PeerStatus::new(
-                    peer.clone(),
-                    origin,
-                    self.cfg.backoff_min,
-                    self.cfg.quality_avg_window_size,
-                );
-                entry.is_public = self.network_actions_api.is_public(&peer);
+                let mut entry = PeerStatus::new(*peer, origin, self.cfg.backoff_min, self.cfg.quality_avg_window_size);
+                entry.is_public = self.network_actions_api.is_public(peer);
                 if let Some(m) = metadata {
                     entry.metadata.extend(m);
                 }
                 self.refresh_network_status(&entry);
 
-                if let Some(x) = self.entries.insert(peer.clone(), entry) {
+                if let Some(x) = self.entries.insert(*peer, entry) {
                     warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
@@ -357,7 +350,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Remove PeerId from the network
     pub fn remove(&mut self, peer: &PeerId) {
-        self.prune_from_network_status(&peer);
+        self.prune_from_network_status(peer);
         self.entries.remove(peer);
     }
 
@@ -375,8 +368,8 @@ impl<T: NetworkExternalActions> Network<T> {
     ) -> Option<PeerStatus> {
         if let Some(existing) = self.entries.get(peer) {
             let mut entry = existing.clone();
-            entry.heartbeats_sent = entry.heartbeats_sent + 1;
-            entry.is_public = self.network_actions_api.is_public(&peer);
+            entry.heartbeats_sent += 1;
+            entry.is_public = self.network_actions_api.is_public(peer);
 
             // Upsert metadata if any
             if let Some(mm) = metadata {
@@ -393,7 +386,7 @@ impl<T: NetworkExternalActions> Network<T> {
             if let Ok(latency) = ping_result {
                 entry.last_seen = self.network_actions_api.create_timestamp();
                 entry.last_seen_latency = latency;
-                entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
+                entry.heartbeats_succeeded += 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
             } else {
@@ -401,8 +394,7 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.update_quality(0.0_f64.max(entry.quality - self.cfg.quality_step));
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
-                    self.network_actions_api
-                        .emit(NetworkEvent::CloseConnection(entry.id.clone()));
+                    self.network_actions_api.emit(NetworkEvent::CloseConnection(entry.id));
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(&entry.id);
                     return Some(entry);
@@ -413,7 +405,7 @@ impl<T: NetworkExternalActions> Network<T> {
             }
 
             self.refresh_network_status(&entry);
-            self.entries.insert(entry.id.clone(), entry.clone());
+            self.entries.insert(entry.id, entry.clone());
 
             Some(entry)
         } else {
@@ -428,16 +420,14 @@ impl<T: NetworkExternalActions> Network<T> {
 
         if entry.quality < self.cfg.quality_offline_threshold {
             if entry.is_public {
-                self.bad_quality_public.insert(entry.id.clone());
+                self.bad_quality_public.insert(entry.id);
             } else {
-                self.bad_quality_non_public.insert(entry.id.clone());
+                self.bad_quality_non_public.insert(entry.id);
             }
+        } else if entry.is_public {
+            self.good_quality_public.insert(entry.id);
         } else {
-            if entry.is_public {
-                self.good_quality_public.insert(entry.id.clone());
-            } else {
-                self.good_quality_non_public.insert(entry.id.clone());
-            }
+            self.good_quality_non_public.insert(entry.id);
         }
 
         let good_public = self.good_quality_public.len();
@@ -495,16 +485,13 @@ impl<T: NetworkExternalActions> Network<T> {
     }
 
     pub fn get_peer_status(&self, peer: &PeerId) -> Option<PeerStatus> {
-        return match self.entries.get(peer) {
-            Some(entry) => Some(entry.clone()),
-            None => None,
-        };
+        self.entries.get(peer).cloned()
     }
 
     pub fn get_all_peers(&self) -> Vec<PeerId> {
         self.entries
             .values()
-            .map(|peer_status| peer_status.id.clone())
+            .map(|peer_status| peer_status.id)
             .collect::<Vec<_>>()
     }
 
@@ -513,11 +500,7 @@ impl<T: NetworkExternalActions> Network<T> {
     where
         F: FnMut(&&PeerStatus) -> bool,
     {
-        self.entries
-            .values()
-            .filter(f)
-            .map(|x| x.id.clone())
-            .collect::<Vec<_>>()
+        self.entries.values().filter(f).map(|x| x.id).collect::<Vec<_>>()
     }
 
     pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)> {
@@ -569,7 +552,7 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn debug_output(&self) -> String {
         let mut output = "".to_string();
 
-        for (_, entry) in &self.entries {
+        for entry in self.entries.values() {
             output.push_str(format!("{}\n", entry).as_str());
         }
 

@@ -66,7 +66,7 @@ impl RegisterInNetworkRegistryArgs {
         // read all the identities from the directory
         let local_files = local_identity.get_files();
         // get peer ids and stringinfy them
-        if ! local_files.is_empty() {
+        if !local_files.is_empty() {
             // check if password is provided
             let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,

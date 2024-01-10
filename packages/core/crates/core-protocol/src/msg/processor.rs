@@ -167,7 +167,7 @@ where
 
                     Ok(TransportPacket::Outgoing {
                         next_hop: next_hop.to_peerid(),
-                        ack_challenge: ack_challenge,
+                        ack_challenge,
                         data: payload.into_boxed_slice(),
                     })
                 }
@@ -692,8 +692,6 @@ impl PacketInteraction {
             })
             // introduce random timeout to mix packets asynchrounously
             .then_concurrent(move |event| async move {
-                let mixer_cfg = mixer_cfg;
-
                 match event {
                     Ok(processed) => match processed {
                         MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => {

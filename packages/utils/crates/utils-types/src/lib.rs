@@ -33,7 +33,7 @@ pub mod rlp {
         let mut ts = [0u8; 8];
         ts[8 - ts_len..].copy_from_slice(&enc_ts);
 
-        let ts = u64::from_be_bytes(ts.try_into().map_err(|_| GeneralError::ParseError)?);
+        let ts = u64::from_be_bytes(ts);
         Ok((list.remove(0).into_boxed_slice(), Duration::from_millis(ts)))
     }
 }

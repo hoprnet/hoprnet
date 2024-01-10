@@ -249,7 +249,7 @@ where
 
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
-                                        peer_id.clone(),
+                                        peer_id,
                                         allowed.clone().into()
                                     ))
                                     .await;
@@ -562,7 +562,7 @@ impl Hopr {
         // create DB dir if it does not exist
         if let Some(parent_dir_path) = std::path::Path::new(&db_path).parent() {
             if !parent_dir_path.is_dir() {
-                std::fs::create_dir_all(&parent_dir_path).expect("Failed to create a DB directory")
+                std::fs::create_dir_all(parent_dir_path).expect("Failed to create a DB directory")
             }
         }
 

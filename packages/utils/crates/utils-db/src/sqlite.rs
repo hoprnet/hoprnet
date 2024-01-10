@@ -23,38 +23,38 @@ impl SqliteShim<'_> {
         // NOTE: the table name cannot be bound as a parameter, but since `label` is
         // a compile time constant, there should be no SQL possible injections here
         // TODO: use migrations for this
-        sqlx::query(&const_format::formatcp!(
+        sqlx::query(const_format::formatcp!(
             "CREATE TABLE IF NOT EXISTS kv_{SQL_TABLE_LABEL} (key BLOB PRIMARY KEY, value BLOB)"
         ))
         .execute(&pool)
         .await?;
 
         let insert = pool
-            .prepare(&const_format::formatcp!(
+            .prepare(const_format::formatcp!(
                 "INSERT INTO kv_{SQL_TABLE_LABEL} VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value"
             ))
             .await?;
 
         let delete = pool
-            .prepare(&const_format::formatcp!(
+            .prepare(const_format::formatcp!(
                 "DELETE FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"
             ))
             .await?;
 
         let select = pool
-            .prepare(&const_format::formatcp!(
+            .prepare(const_format::formatcp!(
                 "SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key = ?"
             ))
             .await?;
 
         let iter = pool
-            .prepare(&const_format::formatcp!(
+            .prepare(const_format::formatcp!(
                 "SELECT value FROM kv_{SQL_TABLE_LABEL} WHERE key >= ? AND key <= ? ORDER BY key ASC"
             ))
             .await?;
 
         // Just log information on how many entries there are
-        let count: i64 = sqlx::query_scalar(&const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
+        let count: i64 = sqlx::query_scalar(const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
             .fetch_one(&pool)
             .await?;
         log::debug!("initialized database with {count} existing entries");

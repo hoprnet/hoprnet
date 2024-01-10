@@ -278,7 +278,7 @@ impl HoprdConfig {
                 &platform::file::native::read_to_string(&protocol_config)
                     .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
             )
-            .map_err(|e| crate::errors::HoprdError::ConfigError(e))?;
+            .map_err(crate::errors::HoprdError::ConfigError)?;
         }
 
         //   TODO: custom provider is redundant with the introduction of protocol-config.json

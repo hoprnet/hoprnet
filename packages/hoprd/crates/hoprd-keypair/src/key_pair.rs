@@ -93,7 +93,7 @@ impl std::fmt::Display for HoprKeys {
                 self.packet_key.public().to_peerid_str(),
                 self.chain_key.public().to_hex(),
                 self.chain_key.public().0.to_address(),
-                self.id.to_string()
+                self.id
             )
             .as_str(),
         )
@@ -348,12 +348,10 @@ impl HoprKeys {
                     false,
                 ))
             }
-            _ => {
-                return Err(KeyPairError::InvalidEncryptedKeyLength {
-                    actual: pk.len(),
-                    expected: V2_PRIVKEYS_LENGTH,
-                });
-            }
+            _ => Err(KeyPairError::InvalidEncryptedKeyLength {
+                actual: pk.len(),
+                expected: V2_PRIVKEYS_LENGTH,
+            }),
         }
     }
 

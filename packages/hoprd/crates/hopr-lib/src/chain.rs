@@ -255,12 +255,12 @@ pub struct SmartContractConfig {
 impl From<&ChainNetworkConfig> for SmartContractConfig {
     fn from(network: &ChainNetworkConfig) -> Self {
         Self {
-            hopr_announcements_address: network.announcements.clone(),
-            hopr_token_address: network.token.clone(),
-            hopr_channels_address: network.channels.clone(),
-            hopr_network_registry_address: network.network_registry.clone(),
-            hopr_node_safe_registry_address: network.node_safe_registry.clone(),
-            hopr_ticket_price_oracle_address: network.ticket_price_oracle.clone(),
+            hopr_announcements_address: network.announcements,
+            hopr_token_address: network.token,
+            hopr_channels_address: network.channels,
+            hopr_network_registry_address: network.network_registry,
+            hopr_node_safe_registry_address: network.node_safe_registry,
+            hopr_ticket_price_oracle_address: network.ticket_price_oracle,
             indexer_start_block_number: network.channel_contract_deploy_block,
         }
     }

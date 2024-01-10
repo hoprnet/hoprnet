@@ -153,7 +153,7 @@ where
                 self.buffers
                     .get_mut(&specific_tag)
                     .map(|buf| buf.iter().map(|w| (w.payload.clone(), w.ts)).collect::<Vec<_>>())
-                    .unwrap_or_else(Vec::<(M, Duration)>::new)
+                    .unwrap_or_default()
             }
             None => {
                 // Peek across all the tags, need to sort again based on the timestamp
