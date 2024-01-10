@@ -43,48 +43,56 @@ rustdoc-args = [
 name = "split_send_size"
 harness = false
 
-[dependencies]
-asynchronous-codec = "0.6"
-bytes = "1"
-futures = "0.3.28"
-log = "0.4"
-nohash-hasher = "0.2"
-parking_lot = "0.12"
-rand = "0.8"
-smallvec = "1.11.0"
+[dependencies.asynchronous-codec]
+version = "0.6"
+
+[dependencies.bytes]
+version = "1"
+
+[dependencies.futures]
+version = "0.3.28"
 
 [dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.3"
+version = "0.2.0"
+
+[dependencies.log]
+version = "0.4"
+
+[dependencies.nohash-hasher]
+version = "0.2"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.smallvec]
+version = "1.6.1"
 
 [dependencies.unsigned-varint]
 version = "0.7"
 features = ["asynchronous_codec"]
 
-[dev-dependencies]
-criterion = "0.5"
-env_logger = "0.10"
-futures = "0.3"
-
 [dev-dependencies.async-std]
 version = "1.7.0"
 features = ["attributes"]
 
-[dev-dependencies.libp2p-muxer-test-harness]
-path = "../test-harness"
+[dev-dependencies.criterion]
+version = "0.5"
+
+[dev-dependencies.env_logger]
+version = "0.10"
+
+[dev-dependencies.futures]
+version = "0.3"
 
 [dev-dependencies.libp2p-plaintext]
 version = "0.40.0"
-path = "../../transports/plaintext"
 
 [dev-dependencies.libp2p-tcp]
 version = "0.40.0"
-path = "../../transports/tcp"
 features = ["async-io"]
-
-[dev-dependencies.quickcheck]
-path = "../../misc/quickcheck-ext"
-package = "quickcheck-ext"

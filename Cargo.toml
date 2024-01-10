@@ -1,5 +1,9 @@
 [workspace]
 
+exclude = [
+    "vendor/cargo/scale-info-2.10.0"
+]
+
 resolver = "2"
 
 members = [
@@ -45,10 +49,9 @@ futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
-libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519"] }
+libp2p-mplex = "0.40.0"
+libp2p = "0.52.4"
 log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
 rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
