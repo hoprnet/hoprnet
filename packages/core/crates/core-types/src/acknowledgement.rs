@@ -9,12 +9,12 @@ use crate::{
 use core_crypto::{
     derivation::derive_vrf_parameters,
     errors::CryptoError::{InvalidChallenge, InvalidVrfValues, SignatureVerification},
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    keypairs::{ChainKeypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,
@@ -97,26 +97,17 @@ pub enum AcknowledgedTicketStatus {
 impl AcknowledgedTicketStatus {
     /// Short-hand to check if the ticket is `BeingAggregated`
     pub fn is_being_redeemed(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::BeingRedeemed { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::BeingRedeemed { .. })
     }
 
     /// Short-hand to check if the ticket is `BeingRedeemed`
     pub fn is_being_aggregated(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::BeingAggregated { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::BeingAggregated { .. })
     }
 
     /// Short-hand to check if the ticket is `Untouched`
     pub fn is_untouched(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::Untouched { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::Untouched { .. })
     }
 }
 
@@ -143,7 +134,7 @@ pub struct AcknowledgedTicket {
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.ticket.partial_cmp(&other.ticket)
+        Some(self.cmp(other))
     }
 }
 
@@ -161,10 +152,10 @@ impl AcknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<AcknowledgedTicket> {
-        if signer.eq(&chain_keypair.public().to_address()) {
+        if signer.eq(&chain_keypair.into()) {
             return Err(LoopbackTicket);
         }
-        if generate_channel_id(&signer, &chain_keypair.public().to_address()).ne(&ticket.channel_id) {
+        if generate_channel_id(&signer, &chain_keypair.into()).ne(&ticket.channel_id) {
             return Err(InvalidTicketRecipient);
         }
 
@@ -215,10 +206,6 @@ impl AcknowledgedTicket {
         }
 
         Ok(())
-    }
-
-    pub fn status(&mut self, new_status: AcknowledgedTicketStatus) {
-        self.status = new_status;
     }
 
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
@@ -628,7 +615,7 @@ pub mod test {
             )
             .is_ok());
 
-        deserialized_ticket.status(super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 });
+        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 };
 
         assert_eq!(
             deserialized_ticket,
@@ -657,84 +644,5 @@ pub mod test {
             acked_ticket,
             AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
-    use crate::channels::wasm::Ticket;
-    use core_crypto::types::{Hash, Response};
-    use utils_types::primitives::Address;
-    use utils_types::traits::ToHex;
-    use wasm_bindgen::prelude::*;
-
-    #[derive(Clone)]
-    #[wasm_bindgen]
-    pub struct AcknowledgedTicket {
-        w: super::AcknowledgedTicket,
-    }
-
-    #[wasm_bindgen]
-    impl AcknowledgedTicket {
-        #[wasm_bindgen(getter)]
-        pub fn response(&self) -> Response {
-            self.w.response.clone()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn ticket(&self) -> Ticket {
-            self.w.ticket.clone().into()
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn signer(&self) -> Address {
-            self.w.signer
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> AcknowledgedTicket {
-            Self { w: self.w.clone() }
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.w.to_string()
-        }
-
-        #[wasm_bindgen]
-        pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
-            if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
-                if let BeingRedeemed { .. } = self.w.status {
-                    if !tx_hash.eq(&Hash::default()) {
-                        self.w.status = BeingRedeemed { tx_hash }
-                    }
-                }
-            }
-        }
-    }
-
-    impl From<super::AcknowledgedTicket> for AcknowledgedTicket {
-        fn from(value: super::AcknowledgedTicket) -> Self {
-            Self { w: value }
-        }
-    }
-
-    impl From<&super::AcknowledgedTicket> for AcknowledgedTicket {
-        fn from(value: &super::AcknowledgedTicket) -> Self {
-            Self { w: value.clone() }
-        }
-    }
-
-    impl From<AcknowledgedTicket> for super::AcknowledgedTicket {
-        fn from(value: AcknowledgedTicket) -> Self {
-            value.w
-        }
-    }
-
-    impl From<&AcknowledgedTicket> for super::AcknowledgedTicket {
-        fn from(value: &AcknowledgedTicket) -> Self {
-            value.w.clone()
-        }
     }
 }

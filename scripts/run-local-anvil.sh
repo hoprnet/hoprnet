@@ -39,6 +39,7 @@ declare cfg_file="${mydir}/../.anvil.cfg"
 declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 declare foreground="false"
 declare skip_deploy="false"
+declare prune_history=""
 
 while (( "$#" )); do
   case "$1" in
@@ -63,6 +64,10 @@ while (( "$#" )); do
       ;;
     -f)
       foreground="true"
+      shift
+      ;;
+    -p|--prune-history)
+      prune_history="--prune-history"
       shift
       ;;
     -*|--*=)
@@ -98,7 +103,7 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR
 
 # mine a block every 2 seconds
-declare flags="--host 0.0.0.0 --block-time 2 --config-out ${cfg_file}"
+declare flags="--host 0.0.0.0 --block-time 2 --config-out ${cfg_file} ${prune_history}"
 
 # prepare PATH if anvil is not present yet
 if ! command -v anvil ; then

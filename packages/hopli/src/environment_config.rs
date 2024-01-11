@@ -46,10 +46,10 @@ pub struct Addresses {
     /// in order to access the network, upgradeable
     pub network_registry_proxy: String,
     /// HoprChannels contract address, implementation of mixnet incentives
-    pub channels: String, 
+    pub channels: String,
     /// Hopr token contract address
     pub token: String,
-    /// contract address of Safe capability module implementation 
+    /// contract address of Safe capability module implementation
     pub module_implementation: String,
     /// address of contract that maps between Safe instances and node addresses
     pub node_safe_registry: String,

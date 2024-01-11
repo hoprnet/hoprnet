@@ -11,8 +11,8 @@ pub type TimestampFn = fn() -> Duration;
 
 /// Represents a generic backend trait for the message inbox.
 /// Messages `M` can be tagged or untagged via the type `T`
-#[async_trait(?Send)]
-pub trait InboxBackend<T: Copy + Default, M> {
+#[async_trait]
+pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::marker::Send> {
     /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
 
@@ -30,7 +30,12 @@ pub trait InboxBackend<T: Copy + Default, M> {
     /// Pops all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
-    // TODO: consider adding a stream version for `pop_all`
+    /// Peeks the oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
+    /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
+    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
+
+    /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
+    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
     /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
@@ -53,9 +58,8 @@ where
     B: InboxBackend<Tag, ApplicationData>,
 {
     /// Creates new instance given the configuration.
-    /// Uses `std::time::SystemTime` as timestamping function, therefore
-    /// this function cannot be used in WASM runtimes.
-    #[cfg(any(not(feature = "wasm"), test))]
+    ///
+    /// Uses `std::time::SystemTime` as timestamping function.
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || {
             std::time::SystemTime::now()
@@ -90,8 +94,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
 
         true
     }
@@ -104,8 +107,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.count(tag).await
     }
 
@@ -118,9 +120,35 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
+
         db.pop(tag).await
+    }
+
+    /// Peek the oldest message with the given tag, or the oldest message regardless the tag
+    /// if it is not given. Returns `None` if there's no message with such `tag` (if given) in the inbox
+    /// or if the whole inbox is empty (if no `tag` is given).
+    pub async fn peek(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
+        if self.is_excluded_tag(&tag) {
+            return None;
+        }
+
+        let mut db = self.backend.lock().await;
+        db.purge((self.time)() - self.cfg.max_age).await;
+
+        db.peek(tag).await
+    }
+
+    /// Peeks all the messages with the given `tag` (ordered oldest to latest) or
+    /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
+    pub async fn peek_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
+        if self.is_excluded_tag(&tag) {
+            return Vec::new();
+        }
+
+        let mut db = self.backend.lock().await;
+        db.purge((self.time)() - self.cfg.max_age).await;
+        db.peek_all(tag).await
     }
 
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
@@ -131,8 +159,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
-            .await;
+        db.purge((self.time)() - self.cfg.max_age).await;
         db.pop_all(tag).await
     }
 }
@@ -146,10 +173,11 @@ mod tests {
 
     #[async_std::test]
     async fn test_basic_flow() {
-        let mut cfg = MessageInboxConfiguration::default();
-        cfg.capacity = 4;
-        cfg.excluded_tags = vec![2];
-        cfg.set_max_age_sec(2);
+        let cfg = MessageInboxConfiguration {
+            capacity: 4,
+            max_age: std::time::Duration::from_secs(2),
+            excluded_tags: vec![2],
+        };
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);
 
@@ -197,84 +225,5 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(2500)).await;
 
         assert_eq!(0, mi.size(None).await);
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::inbox::MessageInboxConfiguration;
-    use crate::ring::RingBufferInboxBackend;
-    use core_types::protocol::ApplicationData;
-    use core_types::protocol::Tag;
-    use serde::{Deserialize, Serialize};
-    use std::time::Duration;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
-
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct MessageInboxEntry {
-        pub data: ApplicationData,
-        pub ts_seconds: u64,
-    }
-
-    impl From<(ApplicationData, Duration)> for MessageInboxEntry {
-        fn from(value: (ApplicationData, Duration)) -> Self {
-            Self {
-                data: value.0,
-                ts_seconds: value.1.as_secs(),
-            }
-        }
-    }
-
-    #[wasm_bindgen]
-    impl MessageInboxConfiguration {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self::default()
-        }
-    }
-
-    #[wasm_bindgen]
-    pub struct MessageInbox {
-        w: super::MessageInbox<RingBufferInboxBackend<Tag, ApplicationData>>,
-    }
-
-    #[wasm_bindgen]
-    impl MessageInbox {
-        #[wasm_bindgen(constructor)]
-        pub fn new(cfg: MessageInboxConfiguration) -> Self {
-            Self {
-                w: super::MessageInbox::new_with_time(cfg, || {
-                    Duration::from_millis(utils_misc::time::wasm::current_timestamp())
-                }),
-            }
-        }
-
-        pub async fn push(&self, payload: ApplicationData) -> bool {
-            self.w.push(payload).await
-        }
-
-        pub async fn pop(&self, tag: Option<u16>) -> Option<MessageInboxEntry> {
-            self.w.pop(tag).await.map(MessageInboxEntry::from)
-        }
-
-        pub async fn pop_all(&self, tag: Option<u16>) -> JsResult<JsValue> {
-            let all = self
-                .w
-                .pop_all(tag)
-                .await
-                .into_iter()
-                .map(MessageInboxEntry::from)
-                .collect::<Vec<MessageInboxEntry>>();
-
-            ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
-        }
-
-        pub async fn size(&self, tag: Option<u16>) -> u32 {
-            self.w.size(tag).await as u32
-        }
     }
 }

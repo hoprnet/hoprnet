@@ -2,24 +2,25 @@
 
 The purpose of this document is to streamline the releases of hoprd.
 
-- [Release Types](#types-of-release)
-  - [Internal release](#internal-release)
-  - [Public release](#public-release)
-  - [Deadline based releases](#deadline-based-releases)
-- [Testing phases](#testing-phases)
-  - [Pre-release testing](#pre-release-testing)
-  - [Release testing](#release-testing)
-  - [Promotion testing](#promotion-testing)
-  - [User acceptance testing](#user-acceptance-testing)
-- [Release promotion](#release-promotion)
-- [On a new chain](#on-a-new-chain)
-- [On a new release](#on-a-new-release)
-  - [Release Cycle](#release-cycle)
-  - [Close Release](#close-release)
-  - [Publish dappNode](#publish-dappnode)
-  - [Promote release](#promote-release)
-  - [Create Patch](#create-patch)
-  - [Merge Back](#merge-back)
+- [Release Processs](#release-processs)
+  - [Release Types](#release-types)
+    - [Internal release](#internal-release)
+    - [Public release](#public-release)
+    - [Deadline based releases](#deadline-based-releases)
+  - [Testing phases](#testing-phases)
+    - [Pre-release testing](#pre-release-testing)
+    - [Release testing](#release-testing)
+    - [Promotion testing](#promotion-testing)
+    - [User acceptance testing](#user-acceptance-testing)
+  - [Release promotion](#release-promotion)
+  - [On a new chain](#on-a-new-chain)
+  - [On a new release](#on-a-new-release)
+    - [Release Cycle](#release-cycle)
+    - [Close release](#close-release)
+    - [Publish DappNode](#publish-dappnode)
+      - [Prerequisites](#prerequisites)
+    - [Promote release](#promote-release)
+    - [Merge Back](#merge-back)
 
 ## Release Types
 
@@ -152,7 +153,7 @@ particular branch to deploy on every change.
 
 The process of closing a release consists of building, tagging and publishing the given release of the branch.
 
-1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all close. Do not start the next step until all the issues and PR are closed.
+1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all closed. Do not start the next step until all the issues and PR are closed.
 2. Execute the manual workflow named [Close Release](https://github.com/hoprnet/hoprnet/actions/workflows/close-release.yaml) selecting the branch where you want to close it.
 3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
@@ -183,6 +184,7 @@ There should be a correspondence between the dappNode version an the upstream ve
 8. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
 9. Click `Publish release` to publish the signed release (confirm transaction in MM).
 10. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
+11. Publish in Element channel `releases` the IPFS hash of the new dappNode package
 
 ### Promote release
 
@@ -196,6 +198,8 @@ The process of promoting the named release (bratislava, providence, etc) consist
 
 The process of merge back consists of bringing all the changes made in the release branch back to the master branch.
 
-1. Execute the manual workflow named [Merge Back](https://github.com/hoprnet/hoprnet/actions/workflows/merge-back.yaml)
-2. Review the new PR created by this workflow and approve it if the changes provided are correct.
-3. Remind that the release must be merged-back periodically to minimise conflicts whenever we want to merge a hotfix back to master.
+1. Execute the script `./scripts/merge-back.sh <release_name>`
+2. The workspace should be clean
+3. The release name is the name from which it will take the changes `release/<release_name>`
+4. If there are unresolvable conflicts the script will stop and you will need to continue manually
+5. The github cli should be installed to create the PR.

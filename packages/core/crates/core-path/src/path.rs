@@ -148,7 +148,6 @@ impl Display for ChannelPath {
 /// In case of the direct path, this path contains only the destination.
 /// In case o multiple hops, it also must represent a valid `ChannelPath`, therefore
 /// open channels must exist (at the time of construction) except for the last hop.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPath {
     hops: Vec<PeerId>,
@@ -399,7 +398,7 @@ mod tests {
 
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
-    #[async_trait(? Send)]
+    #[async_trait]
     impl PeerAddressResolver for TestResolver {
         async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
             self.0
@@ -700,51 +699,5 @@ mod tests {
             tp.hops(),
             "must contain all peer ids"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::channel_graph::wasm::ChannelGraph;
-    use crate::errors::{PathError::InvalidPeer, Result};
-    use crate::path::{Path, TransportPath};
-    use crate::DbPeerAddressResolver;
-    use core_ethereum_db::db::wasm::Database;
-    use js_sys::JsString;
-    use libp2p_identity::PeerId;
-    use std::str::FromStr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl TransportPath {
-        #[wasm_bindgen(js_name = "validated")]
-        pub async fn _validated(
-            path: Vec<JsString>,
-            db: &Database,
-            channel_graph: &ChannelGraph,
-        ) -> JsResult<TransportPath> {
-            let graph = channel_graph.as_ref_counted();
-            let cg = graph.read().await;
-            Ok(TransportPath::resolve(
-                path.into_iter()
-                    .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
-                    .collect::<Result<Vec<PeerId>>>()?,
-                &DbPeerAddressResolver(db.as_ref_counted()),
-                &cg,
-            )
-            .await
-            .map(|(p, _)| p)?)
-        }
-
-        #[wasm_bindgen(js_name = "length")]
-        pub fn _length(&self) -> u32 {
-            self.length() as u32
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.to_string()
-        }
     }
 }

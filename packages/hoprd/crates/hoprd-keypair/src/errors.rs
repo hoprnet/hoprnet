@@ -1,17 +1,13 @@
 use core_crypto::errors::CryptoError;
-use getrandom::Error as RandomError;
 use hex::FromHexError;
-use real_base::error::RealError;
+use platform::error::PlatformError;
 use serde_json::Error as JsonError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum KeyPairError {
-    #[error("could not retrieve random bytes: {0}")]
-    EntropyError(#[from] RandomError),
-
     #[error("file system error: {0}")]
-    FileSystemError(#[from] RealError),
+    FileSystemError(#[from] PlatformError),
 
     #[error("cryptography error: {0}")]
     CryptographyError(#[from] CryptoError),
@@ -45,10 +41,3 @@ pub enum KeyPairError {
 }
 
 pub type Result<T> = core::result::Result<T, KeyPairError>;
-
-#[cfg(feature = "wasm")]
-impl From<KeyPairError> for wasm_bindgen::JsValue {
-    fn from(value: KeyPairError) -> Self {
-        value.to_string().into()
-    }
-}

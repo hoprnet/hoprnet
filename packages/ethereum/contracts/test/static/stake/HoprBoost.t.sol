@@ -30,7 +30,7 @@ contract HoprBoostTest is Test {
         admin = vm.addr(100); // make address(100) admin
         newMinter = vm.addr(101); // make address(101) a minter
 
-        hoprBoost = new HoprBoost(admin, '');
+        hoprBoost = new HoprBoost(admin, "");
 
         // assign vm.addr(1) to vm.addr(5) to accounts
         accounts[0] = vm.addr(1);

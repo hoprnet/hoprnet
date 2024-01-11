@@ -27,27 +27,25 @@ categories = [
 license = "MIT"
 repository = "https://github.com/libp2p/rust-libp2p"
 
-[dependencies]
-void = "1"
-
 [dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.3"
+version = "0.2.0"
 features = ["peerid"]
 
 [dependencies.libp2p-swarm]
-version = "0.43.3"
-path = "../../swarm"
+version = "0.43.0"
+
+[dependencies.void]
+version = "1"
 
 [dev-dependencies.async-std]
 version = "1.12.0"
 features = ["attributes"]
 
 [dev-dependencies.libp2p-swarm-derive]
-path = "../../swarm-derive"
+version = "0.33.0"
 
 [dev-dependencies.libp2p-swarm-test]
-path = "../../swarm-test"
+version = "0.2.0"

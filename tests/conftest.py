@@ -5,7 +5,6 @@ import shutil
 import subprocess
 
 import pytest
-
 from hopr import HoprdAPI
 
 random_data = os.urandom(8)

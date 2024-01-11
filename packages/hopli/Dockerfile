@@ -17,6 +17,7 @@ ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 COPY Makefile Cargo.toml Cargo.lock ./
 COPY vendor vendor/
 COPY packages packages/
+COPY misc misc/
 
 RUN make build-solidity-types
 
@@ -35,7 +36,7 @@ LABEL name="hopli" \
     summary="Hopli cli tool" \
     description="Hopli is a commandline tool that interacts mainly with Foundry"
 
-ENV ETHERSCAN_API_KEY="random_giberish"
+ENV ETHERSCAN_API_KEY="random_gibberish"
 
 # build project sources
 WORKDIR /app/hoprnet
@@ -49,7 +50,7 @@ COPY --from=builder /app/hoprnet/packages/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
     apt install --no-install-recommends -y git curl ca-certificates make && \
     make install-foundry && \
-    echo "export PATH=${PATH}:/root/.foundry/bin/" >> /root/.bashrc && \
+    echo "export PATH=${PATH}:/app/hoprnet/.foundry/bin/" >> /root/.bashrc && \
     rm -rf /var/lib/apt/lists/* && \
     apt remove -y make && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \

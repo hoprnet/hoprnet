@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node ${mydir}/../packages/hoprd/lib/main.cjs"
+declare hoprd_command="target/debug/hoprd"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
@@ -85,7 +85,7 @@ while (( "$#" )); do
 done
 
 declare tmp_dir node_prefix password anvil_rpc_log env_file
-declare node_api_base_port node_p2p_base_port node_healthcheck_base_port
+declare node_api_base_port node_p2p_base_port
 declare api_endpoints cluster_size
 declare -a id_files
 
@@ -98,7 +98,6 @@ anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 env_file="${tmp_dir}/local-cluster.env"
 node_api_base_port=13301
 node_p2p_base_port=19091
-node_healthcheck_base_port=18081
 cluster_size=5
 
 function cleanup {
@@ -134,14 +133,13 @@ function setup_node() {
   local host=${2?"setup_node required host"}
   local additional_args=${3:-""}
 
-  local api_port p2p_port healthcheck_port dir log id_file safe_args
+  local api_port p2p_port dir log id_file safe_args
 
   dir="${tmp_dir}/${node_prefix}_${node_id}"
   log="${dir}.log"
   id_file="${dir}.id"
   api_port=$(( node_api_base_port + node_id ))
   p2p_port=$(( node_p2p_base_port + node_id ))
-  healthcheck_port=$(( node_healthcheck_base_port + node_id ))
   safe_args="$(<${dir}.safe.args)"
 
   api_endpoints+="${listen_host}:${api_port} "
@@ -159,17 +157,15 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*" \
-    NODE_ENV="${node_env}" \
-    HOPRD_HEARTBEAT_INTERVAL=2500 \
-    HOPRD_HEARTBEAT_THRESHOLD=2500 \
-    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_HEARTBEAT_INTERVAL=3 \
+    HOPRD_HEARTBEAT_THRESHOLD=3 \
+    HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    NODE_OPTIONS="--experimental-wasm-modules" \
+    RUST_LOG="debug" \
+    RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \
-      --api-token "${api_token}" \
+      --disableApiAuthentication \
       --data="${dir}" \
       --host="${host}:${p2p_port}" \
       --identity="${id_file}" \
@@ -181,9 +177,7 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --healthCheck \
-      --healthCheckHost "${host}" \
-      --healthCheckPort "${healthcheck_port}" \
+      --protocolConfig ${protocol_config} \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -230,6 +224,34 @@ function create_local_safes() {
   done
 }
 
+# read various identity files located at $id_path
+# create one safe and one module for all the identity files
+function create_local_safe_for_multi_nodes() {
+  log "Create safe"
+
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
+
+  # create one safe for all the nodes
+  # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `${node_prefix}_all_nodes.safe.log`
+  # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
+  env \
+    ETHERSCAN_API_KEY="" \
+    IDENTITY_PASSWORD="${password}" \
+    PRIVATE_KEY="${deployer_private_key}" \
+    DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
+    hopli create-safe-module \
+      --network anvil-localhost \
+      --identity-directory "${tmp_dir}" \
+      --identity-prefix "${node_prefix}" \
+      --contracts-root "./packages/ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
+
+  # store safe arguments in separate file for later use (as in `create_local_safes` function)
+  for id_file in ${id_files[@]}; do
+    grep -oE "\--safeAddress.*--moduleAddress.*" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
+  done
+  rm "${node_prefix}_all_nodes.safe.log"
+}
+
 # --- Log setup info {{{
 log "Node files and directories"
 log "\tanvil"
@@ -259,12 +281,13 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 # }}}
 
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+cp "${mydir}//protocol-config-anvil.json" /tmp/protocol-config-anvil.json
+declare protocol_config="/tmp/protocol-config-anvil.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
+make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log} -p"
 
 log "Wait for anvil local node to complete startup"
 wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:8545"
@@ -280,6 +303,8 @@ generate_local_identities
 
 # create safe and modules for all the ids, store them in args files
 create_local_safes
+# or running the following command to attach all the nodes to one safe
+# create_local_safe_for_multi_nodes
 
 #  --- Run nodes --- {{{
 for node_id in ${!id_files[@]}; do
@@ -343,6 +368,7 @@ fi
 # }}}
 
 # --- Get peer ids for reporting --- {{{
+log "Getting peer ids of running nodes"
 declare -a peers
 for endpoint in ${api_endpoints}; do
   declare peer
@@ -351,6 +377,7 @@ for endpoint in ${api_endpoints}; do
 done
 # }}}
 # --- Get node addresses for reporting --- {{{
+log "Getting node addresses of running nodes"
 declare -a node_addrs
 for endpoint in ${api_endpoints}; do
   declare node_addr
@@ -380,11 +407,9 @@ for node_id in ${!id_files[@]}; do
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
   log "\t\tAddress:\t${node_addrs[$node_id]}"
-  log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/swagger-ui/index.html"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
-  log "\t\tHealthcheck:\thttp://${listen_host}:$(( node_healthcheck_base_port + node_id ))/"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
-  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 
   cat <<EOF >> "${env_file}"
 export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"

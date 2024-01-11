@@ -5,6 +5,7 @@ use std::fmt::Debug;
 
 use core_protocol::{
     ack::config::AckProtocolConfig,
+    config::ProtocolConfig,
     constants::{
         HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE, HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
         HOPR_HEARTBEAT_CONNECTION_KEEPALIVE, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_CONNECTION_KEEPALIVE,
@@ -73,7 +74,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(hb_cfg.timeout());
+                    cfg.set_request_timeout(hb_cfg.timeout);
                     cfg
                 },
             ),
@@ -85,7 +86,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(msg_cfg.timeout());
+                    cfg.set_request_timeout(msg_cfg.timeout);
                     cfg
                 },
             ),
@@ -97,7 +98,7 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(ack_cfg.timeout());
+                    cfg.set_request_timeout(ack_cfg.timeout);
                     cfg
                 },
             ),
@@ -112,11 +113,11 @@ impl HoprNetworkBehavior {
                 {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout());
+                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout);
                     cfg
                 },
             ),
-            keep_alive: libp2p_swarm::keep_alive::Behaviour::default(),
+            keep_alive: libp2p_swarm::keep_alive::Behaviour,
         }
     }
 }
@@ -179,30 +180,7 @@ impl From<libp2p_request_response::Event<Acknowledgement, ()>> for HoprNetworkBe
     }
 }
 
-/// Build wasm variant of `Transport` for the Node environment
-#[cfg(all(feature = "wasm", not(test)))]
-pub fn build_basic_transport() -> libp2p_wasm_ext::ExtTransport {
-    libp2p_wasm_ext::ExtTransport::new(libp2p_wasm_ext::ffi::tcp_transport())
-}
-
-/// Build wasm variant of `Swarm`
-#[cfg(all(feature = "wasm", not(test)))]
-pub fn build_swarm<T: NetworkBehaviour>(
-    transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
-    behavior: T,
-    me: PeerId,
-) -> libp2p_swarm::Swarm<T> {
-    SwarmBuilder::with_wasm_executor(transport, behavior, me).build()
-}
-
-/// Build native `Transport`
-#[cfg(any(not(feature = "wasm"), test))]
-fn build_basic_transport() -> libp2p::tcp::Transport<libp2p::tcp::async_io::Tcp> {
-    libp2p::tcp::async_io::Transport::new(libp2p::tcp::Config::default().nodelay(true))
-}
-
 /// Build native `Swarm`
-#[cfg(any(not(feature = "wasm"), test))]
 fn build_swarm<T: NetworkBehaviour>(
     transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
     behavior: T,
@@ -214,62 +192,52 @@ fn build_swarm<T: NetworkBehaviour>(
 /// Build objects comprising the p2p network.
 ///
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
-pub fn build_p2p_network(
+pub async fn build_p2p_network(
     me: libp2p_identity::Keypair,
-    ack_proto_cfg: AckProtocolConfig,
-    heartbeat_proto_cfg: HeartbeatProtocolConfig,
-    msg_proto_cfg: MsgProtocolConfig,
-    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+    protocol_cfg: ProtocolConfig,
 ) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
-    let transport = build_basic_transport()
+    let mut mplex_config = libp2p_mplex::MplexConfig::new();
+
+    // libp2p default is 128
+    // we use more to accomodate many concurrent messages
+    // FIXME: make value configurable
+    mplex_config.set_max_num_streams(512);
+
+    // libp2p default is 32 Bytes
+    // we use the default for now
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_max_buffer_size(32);
+
+    // libp2p default is 8 KBytes
+    // we use the default for now, max allowed would be 1MB
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_split_send_size(8 * 1024);
+
+    // libp2p default is Block
+    // Alternative is ResetStream
+    // FIXME: benchmark and find appropriate values
+    mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
+
+    let tcp_transport = libp2p::tcp::async_io::Transport::new(libp2p::tcp::Config::default().nodelay(true));
+    let transport = libp2p::dns::DnsConfig::system(tcp_transport)
+        .await
+        .expect("p2p transport with system DNS should be obtainable");
+
+    let transport = transport
         .upgrade(upgrade::Version::V1)
         .authenticate(libp2p_noise::Config::new(&me).expect("signing libp2p-noise static keypair"))
-        .multiplex(libp2p_mplex::MplexConfig::default())
+        .multiplex(mplex_config)
         .timeout(std::time::Duration::from_secs(60))
         .boxed();
 
     let behavior = HoprNetworkBehavior::new(
-        msg_proto_cfg,
-        ack_proto_cfg,
-        heartbeat_proto_cfg,
-        ticket_aggregation_proto_cfg,
+        protocol_cfg.msg,
+        protocol_cfg.ack,
+        protocol_cfg.heartbeat,
+        protocol_cfg.ticket_aggregation,
     );
 
     build_swarm(transport, behavior, PeerId::from(me.public()))
 }
 
 pub type HoprSwarm = libp2p_swarm::Swarm<HoprNetworkBehavior>;
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_log::logger::wasm::JsLogger;
-    // use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-    static LOGGER: JsLogger = JsLogger {};
-
-    #[allow(dead_code)]
-    #[wasm_bindgen]
-    pub fn core_p2p_initialize_crate() {
-        let _ = JsLogger::install(&LOGGER, None);
-
-        // When the `console_error_panic_hook` feature is enabled, we can call the
-        // `set_panic_hook` function at least once during initialization, and then
-        // we will get better error messages if our code ever panics.
-        //
-        // For more details see
-        // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
-    }
-
-    // #[wasm_bindgen]
-    // pub fn core_p2p_gather_metrics() -> JsResult<String> {
-    //     utils_metrics::metrics::wasm::gather_all_metrics()
-    // }
-}

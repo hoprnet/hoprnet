@@ -5,6 +5,9 @@ use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
+    #[error("criteria to trigger the strategy were not satisfied")]
+    CriteriaNotSatisfied,
+
     #[error("non-specific strategy error: {0}")]
     Other(String),
 
@@ -19,10 +22,3 @@ pub enum StrategyError {
 }
 
 pub type Result<T> = std::result::Result<T, StrategyError>;
-
-#[cfg(feature = "wasm")]
-impl From<StrategyError> for wasm_bindgen::JsValue {
-    fn from(value: StrategyError) -> Self {
-        value.to_string().into()
-    }
-}

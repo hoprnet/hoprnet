@@ -3,16 +3,16 @@ use core_crypto::{
     keypairs::{Keypair, OffchainKeypair},
     types::{OffchainPublicKey, OffchainSignature},
 };
+use log::debug;
 use multiaddr::Multiaddr;
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use utils_log::debug;
 use utils_types::{
     errors::GeneralError::{self, InvalidInput, NonSpecificError},
     primitives::Address,
-    traits::{BinarySerializable, PeerIdLike, ToHex},
+    traits::{BinarySerializable, PeerIdLike},
 };
 
 /// Holds the signed binding of the chain key and the packet key.
@@ -20,14 +20,12 @@ use utils_types::{
 /// This is used to attest on-chain that node owns the corresponding packet key and links it with
 /// the chain key.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct KeyBinding {
     pub chain_key: Address,
     pub packet_key: OffchainPublicKey,
     pub signature: OffchainSignature,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl KeyBinding {
     fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
         let mut to_sign = Vec::with_capacity(70);
@@ -38,7 +36,6 @@ impl KeyBinding {
     }
 
     /// Create and sign new key binding of the given chain key and packet key.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(chain_key: Address, packet_key: &OffchainKeypair) -> Self {
         let to_sign = Self::prepare_for_signing(&chain_key, packet_key.public());
         Self {
@@ -71,11 +68,7 @@ impl KeyBinding {
 
 impl Display for KeyBinding {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KeyBinding")
-            .field("ChainKey", &self.chain_key.to_hex())
-            .field("PacketKey", &self.packet_key.to_hex())
-            .field("Signature", &self.signature.to_hex())
-            .finish()
+        write!(f, "keybinding {} <-> {}", self.chain_key, self.packet_key)
     }
 }
 
@@ -83,13 +76,11 @@ impl Display for KeyBinding {
 /// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
 /// optional `KeyBinding` (announcement can be done with key bindings or without)
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AnnouncementData {
     multiaddress: Multiaddr,
     pub key_binding: Option<KeyBinding>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AnnouncementData {
     pub fn to_multiaddress_str(&self) -> String {
         self.multiaddress.to_string()
@@ -140,14 +131,19 @@ impl AnnouncementData {
             Err(InvalidInput)
         }
     }
+
+    pub fn multiaddress(&self) -> &Multiaddr {
+        &self.multiaddress
+    }
 }
 
 impl Display for AnnouncementData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AnnouncementData")
-            .field("Multiaddress", &self.multiaddress)
-            .field("Keybinding", &self.key_binding)
-            .finish()
+        if let Some(binding) = &self.key_binding {
+            write!(f, "announcement of {} with {binding}", self.multiaddress)
+        } else {
+            write!(f, "announcement of {}", self.multiaddress)
+        }
     }
 }
 

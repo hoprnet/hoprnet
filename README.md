@@ -30,6 +30,7 @@
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
+  - [Nix environment setup](#nix-environment-setup)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
 - [Local cluster](#local-cluster)
@@ -91,8 +92,7 @@ Also all ports are mapped to your localhost, assuming you stick to the default p
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
-are doing and don't need further support. Otherwise you should use the `npm`
-or `docker` setup.
+are doing and don't need further support. Otherwise you should use the `docker` setup.
 
 You will need to clone and initialize the `hoprnet` repo first:
 
@@ -125,15 +125,15 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 
 ```sh
 $ hoprd --help
-Usage: hoprd [OPTIONS] --network <NETWORK>
+Usage: hoprd [OPTIONS]
 
 Options:
       --network <NETWORK>
-          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost2, anvil-localhost, rotsee, dufour, debug-staging]
-      --identity <identity>
-          The path to the identity file [env: HOPRD_IDENTITY=] [default: /Users/teebor/.hopr-identity]
-      --data <data>
-          manually specify the data directory to use [env: HOPRD_DATA=] [default: /Users/teebor/dev/hoprnet.org/hoprnet/packages/hoprd/hoprd-db]
+          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=] [possible values: debug-staging, anvil-localhost, dufour, rotsee, anvil-localhost2]
+      --identity <IDENTITY>
+          The path to the identity file [env: HOPRD_IDENTITY=]
+      --data <DATA>
+          Specifies the directory to hold all the data [env: HOPRD_DATA=]
       --host <HOST>
           Host to listen on for P2P connections [env: HOPRD_HOST=]
       --announce
@@ -146,12 +146,6 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
-      --healthCheck
-          Run a health check end point [env: HOPRD_HEALTH_CHECK=]
-      --healthCheckHost <HOST>
-          Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST=]
-      --healthCheckPort <PORT>
-          Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
       --defaultStrategy <DEFAULT_STRATEGY>
@@ -266,29 +260,33 @@ We attempt to provide instructions on how to migrate your tokens between release
 ## Develop
 
 HOPR contains modules written in Rust, therefore a Rust toolchain is needed to successfully build the artifacts.
-To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install) first.
+First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (at least version 1.60) with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
 
-```sh
-# build deps and HOPRd code
-make -j deps && make -j build
+### Nix environment setup
 
-# starting network
-make run-anvil
+- install nix from official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html)
+- create `~/.config/nix/conf` file with the following content:
 
-# update protocol-config
-scripts/update-protocol-config.sh -n anvil-localhost
+```
+experimental-features = nix-command flakes
+```
 
-# running normal node alice (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:alice
+- append the following line to your schell rc file (depending on the shell you are using, it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Don't forget to modify the `<shell>` variable with your corresponding shell (`zsh`, `bash`, `csh`, etc.):
 
-# running normal node bob (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:bob
+```bash
+eval "$(direnv hook <shell>)"
+```
 
-# fund all your nodes to get started
-make fund-local-all
+- install `nix-direnv` package:
 
-# start local HOPR admin in a container (and put into background)
-make run-hopr-admin &
+```bash
+nix-env -i nix-direnv
+```
+
+- from within the `hoprnet` folder, execute the following command.
+
+```bash
+direnv allow .
 ```
 
 ### Local node with safe staking service (local network)
@@ -304,13 +302,13 @@ Running one node in test mode, with safe and module attached (in anvil-localhost
 make -j deps && make -j build
 
 # starting network
-make run-anvil
+make run-anvil args="-p"
 
 # update protocol-config
 scripts/update-protocol-config.sh -n anvil-localhost
 
 # create identity files
-make create-local-identity
+make create-local-identity id_count=1
 
 # create a safe and a node management module instance,
 # and passing the created safe and module as argument to
@@ -318,7 +316,7 @@ make create-local-identity
 # It also register the created pairs in network registry, and
 # approve tokens for channels to move token.
 # fund safe with 2k token and 1 native token
-make run-local-with-safe
+make run-local-with-safe id_file_path=/tmp
 # or to restart a node and use the same id, safe and module
 # run:
 # make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
@@ -373,39 +371,11 @@ See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
 ## Test
 
 ### Unit testing
-
-We use [mocha][9] for our tests. You can run our test suite across all
-packages using the following command:
+Tests both the Rust and Solidity code.
 
 ```sh
 make test
 ```
-
-To run tests of a single package (e.g. hoprd) execute:
-
-```sh
-make test package=hoprd
-```
-
-To run tests of a single test suite (e.g. Identity) within a
-package (e.g. hoprd) execute:
-
-For instance, to run only the `Identity` test suite in `hoprd`, you need to
-run the following:
-
-```sh
-yarn --cwd packages/hoprd test --grep "Identity"
-```
-
-In a similar fashion, our contracts can be tested in isolation. For now, you
-need to pass the file to be tested, as [hardhat does not support --grep][12]
-
-```sh
-yarn test:contracts test/HoprChannels.spec.ts
-```
-
-In case a package you need to test is not included in our `package.json`,
-please feel free to update it as needed.
 
 #### Test-driven development
 

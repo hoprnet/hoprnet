@@ -20,31 +20,22 @@ use futures::{
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
+use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use utils_log::{debug, error, info, warn};
 use utils_types::{
-    primitives::{Balance, BalanceType, U256},
+    primitives::{Balance, BalanceType},
     traits::PeerIdLike,
 };
 
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use futures::stream::FuturesUnordered;
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+use utils_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -134,7 +125,7 @@ impl AggregationList {
     }
 
     async fn into_vec<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<Vec<AcknowledgedTicket>> {
-        Ok(match self {
+        let list = match self {
             AggregationList::WholeChannel(channel) => {
                 db.write()
                     .await
@@ -152,29 +143,44 @@ impl AggregationList {
                     .prepare_aggregatable_tickets(&channel_id, epoch, index_start, index_end)
                     .await?
             }
-            AggregationList::TicketList(list) => {
-                if list.is_empty() {
-                    debug!("got empty list of tickets to aggregate");
-                    return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
-                }
+            AggregationList::TicketList(list) => list,
+        };
 
-                let signer = list[0].signer;
-                let channel_id = list[0].ticket.channel_id;
+        if list.is_empty() {
+            debug!("got empty list of tickets to aggregate");
+            return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
+        }
 
-                if !list.iter().all(|tkt| {
-                    tkt.signer == signer && tkt.ticket.channel_id == channel_id && tkt.status.is_being_aggregated()
-                }) {
-                    error!(
-                        "some tickets to aggregate in the given list do not come from the same channel or are not marked as BeingAggregated"
-                    );
-                    return Err(ProtocolTicketAggregation(
-                        "invalid list of tickets to aggregate given".into(),
-                    ));
-                }
+        let signer = list[0].signer;
+        let channel_id = list[0].ticket.channel_id;
 
-                list
+        let channel_balance = db
+            .read()
+            .await
+            .get_channel(&channel_id)
+            .await?
+            .ok_or(ProtocolTicketAggregation(format!(
+                "channel {channel_id} does not exist"
+            )))?
+            .balance;
+
+        let mut total_amount = Balance::zero(BalanceType::HOPR);
+
+        for tkt in list.iter() {
+            if tkt.signer != signer || tkt.ticket.channel_id != channel_id || !tkt.status.is_being_aggregated() {
+                error!("{tkt} does not belong to the aggregation list");
+                return Err(ProtocolTicketAggregation(
+                    "invalid list of tickets to aggregate given".into(),
+                ));
             }
-        })
+
+            total_amount = total_amount.add(&tkt.ticket.amount);
+            if total_amount.gt(&channel_balance) {
+                return Err(ProtocolTicketAggregation(format!("aggregation list has total value of {total_amount} which is greater than balance {channel_balance} in channel {channel_id}")));
+            }
+        }
+
+        Ok(list)
     }
 }
 
@@ -256,31 +262,43 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             })?;
 
         let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
+        let channel_entry = self
+            .db
+            .read()
+            .await
+            .get_channel(&channel_id)
+            .await?
+            .ok_or(ProtocolTicketAggregation(format!(
+                "channel {channel_id} does not exist"
+            )))?;
+        let channel_balance = channel_entry.balance;
 
         acked_tickets.sort();
         acked_tickets.dedup();
 
-        let channel_epoch = acked_tickets[0].ticket.channel_epoch;
+        let channel_epoch = channel_entry.channel_epoch;
 
-        let mut final_value = U256::zero();
+        let mut final_value = Balance::zero(BalanceType::HOPR);
 
         for (i, acked_ticket) in acked_tickets.iter().enumerate() {
             if channel_id != acked_ticket.ticket.channel_id {
-                return Err(ProtocolTicketAggregation("Invalid channel".to_owned()));
+                return Err(ProtocolTicketAggregation(format!(
+                    "aggregated ticket has an invalid channel id {}",
+                    acked_ticket.ticket.channel_id
+                )));
             }
 
-            if acked_ticket.ticket.channel_epoch != channel_epoch {
+            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
                 return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
             }
 
-            if i + 1 < acked_tickets.len() {
-                if acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
+            if i + 1 < acked_tickets.len()
+                && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
                     > acked_tickets[i + 1].ticket.index
-                {
-                    return Err(ProtocolTicketAggregation(
-                        "Tickets with overlapping index intervals".to_owned(),
-                    ));
-                }
+            {
+                return Err(ProtocolTicketAggregation(
+                    "Tickets with overlapping index intervals".to_owned(),
+                ));
             }
 
             if acked_ticket
@@ -294,7 +312,10 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 return Err(ProtocolTicketAggregation("Not a winning ticket".to_owned()));
             }
 
-            final_value += acked_ticket.ticket.amount.amount();
+            final_value = final_value.add(&acked_ticket.ticket.amount);
+            if final_value.gt(&channel_balance) {
+                return Err(ProtocolTicketAggregation(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
+            }
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_AGGREGATED_TICKETS.increment();
@@ -311,13 +332,23 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_AGGREGATION_COUNT.increment();
 
+        info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).addn(1);
+        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
+        self.db
+            .write()
+            .await
+            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
+            .await?;
+
         Ticket::new(
             &destination,
-            &Balance::new(final_value, BalanceType::HOPR),
+            &final_value,
             first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index).into(),
-            1.0,
-            channel_epoch.into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
+            1.0, // Aggregated tickets have always 100% winning probability
+            channel_epoch,
             first_acked_ticket.ticket.challenge.clone(),
             &self.chain_key,
             &domain_separator,
@@ -346,7 +377,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             return Err(ProtocolTicketAggregation("Unexpected ticket".into()));
         }
 
-        let mut stored_value = Balance::new(U256::zero(), BalanceType::HOPR);
+        let mut stored_value = Balance::zero(BalanceType::HOPR);
 
         for stored_acked_ticket in stored_acked_tickets.iter() {
             stored_value = stored_value.add(&stored_acked_ticket.ticket.amount);
@@ -389,6 +420,10 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 ProtocolTicketAggregation("Missing domain separator".into())
             })?;
 
+        // calculate the new current ticket index
+        let current_ticket_index_from_aggregated_ticket =
+            U256::from(aggregated_ticket.index).addn(aggregated_ticket.index_offset);
+
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
             first_stored_ticket.response.clone(),
@@ -426,19 +461,21 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
+        info!("ensure the current ticket index is not smaller than the the aggregated ticket index + offset");
+        self.db
+            .write()
+            .await
+            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
+            .await?;
+
         Ok(acked_aggregated_ticket)
     }
 
-    pub async fn validate_tickets_to_aggregate(
+    async fn create_aggregation_request(
         &self,
         ticket_list: AggregationList,
     ) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
         let tickets_to_aggregate = ticket_list.into_vec(self.db.clone()).await?;
-
-        if tickets_to_aggregate.is_empty() {
-            debug!("got empty list of tickets to aggregate");
-            return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
-        }
 
         let signer = tickets_to_aggregate[0].signer;
 
@@ -567,16 +604,27 @@ impl<T, U> TicketAggregationActions<T, U> {
 }
 
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
-pub struct TicketAggregationInteraction<T, U> {
+pub struct TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     ack_event_queue: (
         Sender<TicketAggregationToProcess<T, U>>,
         Receiver<TicketAggregationProcessed<T, U>>,
     ),
 }
 
-impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
+impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+    ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
@@ -605,11 +653,11 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                             }
                         }
                     }
-                    TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket, request) => {
+                    TicketAggregationToProcess::ToReceive(destination, aggregated_ticket, request) => {
                         match aggregated_ticket {
                             Ok(ticket) => match processor.handle_aggregated_ticket(ticket.clone()).await {
                                 Ok(acked_ticket) => {
-                                    Some(TicketAggregationProcessed::Receive(_destination, acked_ticket, request))
+                                    Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                 }
                                 Err(e) => {
                                     debug!("Error while handling aggregated ticket {}", e);
@@ -623,7 +671,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                         }
                     }
                     TicketAggregationToProcess::ToSend(tickets_to_agg, finalizer) => {
-                        match processor.validate_tickets_to_aggregate(tickets_to_agg).await {
+                        match processor.create_aggregation_request(tickets_to_agg).await {
                             Ok((source, tickets)) => Some(TicketAggregationProcessed::Send(source, tickets, finalizer)),
                             Err(_) => None,
                         }
@@ -644,7 +692,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
             }
         });
 
-        spawn_local(async move {
+        spawn(async move {
             // poll the stream until it's done
             while processing_stream.next().await.is_some() {}
         });
@@ -661,7 +709,11 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
     }
 }
 
-impl<T, U> Stream for TicketAggregationInteraction<T, U> {
+impl<T, U> Stream for TicketAggregationInteraction<T, U>
+where
+    T: Send,
+    U: Send,
+{
     type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
@@ -671,7 +723,7 @@ impl<T, U> Stream for TicketAggregationInteraction<T, U> {
 
 #[cfg(test)]
 mod tests {
-    use async_std::sync::RwLock;
+    use async_lock::RwLock;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
@@ -687,7 +739,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, CurrentDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
@@ -746,7 +798,7 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
             let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
@@ -784,9 +836,8 @@ mod tests {
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
+        let mut inner_dbs =
+            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
 
         const NUM_TICKETS: u64 = 30;
 
@@ -823,14 +874,21 @@ mod tests {
         let channel_alice_bob = ChannelEntry::new(
             alice_addr,
             bob_addr,
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1u64.into(),
+            agg_balance.imul(10),
+            NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),
             0u64.into(),
         );
 
         dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
+            .await
+            .unwrap();
+
+        dbs[0]
             .write()
             .await
             .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
@@ -890,6 +948,10 @@ mod tests {
             },
             stored_acked_tickets[0].status,
             "first ticket must being redeemed"
+        );
+        assert!(
+            stored_acked_tickets[1].ticket.is_aggregated(),
+            "aggregated balance invalid"
         );
         assert_eq!(
             Untouched, stored_acked_tickets[1].status,

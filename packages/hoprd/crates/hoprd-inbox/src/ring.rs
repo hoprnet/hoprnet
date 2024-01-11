@@ -6,8 +6,10 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
+use platform::time::native::current_timestamp;
+
 /// Acts a simple wrapper of a message with added insertion timestamp.
-struct PayloadWrapper<M> {
+struct PayloadWrapper<M: std::marker::Send> {
     payload: M,
     ts: Duration,
 }
@@ -17,7 +19,8 @@ struct PayloadWrapper<M> {
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
@@ -26,29 +29,47 @@ where
 
 impl<T, M> RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     /// Creates new backend with default timestamping function from std::time.
-    /// This is incompatible with WASM runtimes.
-    #[cfg(not(feature = "wasm"))]
     pub fn new(capacity: usize) -> Self {
-        Self::new_with_capacity(capacity, || {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-        })
+        Self::new_with_capacity(capacity, current_timestamp)
     }
 
     /// Counts only the untagged entries.
     pub fn count_untagged(&self) -> usize {
         self.buffers.get(&T::default()).map(|buf| buf.len()).unwrap_or(0)
     }
+
+    fn tag_resolution(&mut self, tag: Option<T>) -> Option<T> {
+        let specific_tag = match tag {
+            // If no tag was given, we need to find a tag which has the oldest entry in it
+            None => self
+                .buffers
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    // Compare timestamps of the oldest entries in buckets
+                    // Empty buckets are moved away
+                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    ts_a.cmp(&ts_b)
+                })
+                .map(|(t, _)| *t)?,
+
+            // If a tag was given, just use it
+            Some(t) => t,
+        };
+
+        Some(specific_tag)
+    }
 }
 
-#[async_trait(? Send)]
+#[async_trait]
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
 where
-    T: Copy + Default + PartialEq + Eq + Hash,
+    T: Copy + Default + PartialEq + Eq + Hash + std::marker::Send + std::marker::Sync,
+    M: Clone + std::marker::Send + std::marker::Sync,
 {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
@@ -61,7 +82,7 @@ where
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
         // Either use an existing ringbuffer or initialize a new one, if such tag does not exist yet.
-        match self.buffers.entry(tag.unwrap_or(T::default())) {
+        match self.buffers.entry(tag.unwrap_or_default()) {
             Entry::Occupied(mut e) => e.get_mut().push(PayloadWrapper {
                 payload,
                 ts: (self.ts)(),
@@ -83,23 +104,7 @@ where
     }
 
     async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
-        let specific_tag = match tag {
-            // If no tag was given, we need to find a tag which has the oldest entry in it
-            None => self
-                .buffers
-                .iter()
-                .min_by(|(_, a), (_, b)| {
-                    // Compare timestamps of the oldest entries in buckets
-                    // Empty buckets are moved away
-                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
-                    ts_a.cmp(&ts_b)
-                })
-                .map(|(t, _)| *t)?,
-
-            // If a tag was given, just use it
-            Some(t) => t,
-        };
+        let specific_tag = self.tag_resolution(tag).unwrap();
 
         self.buffers
             .get_mut(&specific_tag)
@@ -113,7 +118,7 @@ where
                 self.buffers
                     .get_mut(&specific_tag)
                     .map(|buf| buf.drain().map(|w| (w.payload, w.ts)).collect::<Vec<_>>())
-                    .unwrap_or_else(Vec::<(M, Duration)>::new)
+                    .unwrap_or_default()
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
@@ -129,6 +134,41 @@ where
                 all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
                 all.into_iter().map(|w| (w.payload, w.ts)).collect()
+            }
+        }
+    }
+
+    async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
+        let specific_tag = self.tag_resolution(tag).unwrap();
+
+        self.buffers
+            .get_mut(&specific_tag)
+            .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
+    }
+
+    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
+        match tag {
+            Some(specific_tag) => {
+                // Peek only all messages of a specific tag
+                self.buffers
+                    .get_mut(&specific_tag)
+                    .map(|buf| buf.iter().map(|w| (w.payload.clone(), w.ts)).collect::<Vec<_>>())
+                    .unwrap_or_default()
+            }
+            None => {
+                // Peek across all the tags, need to sort again based on the timestamp
+                let mut all = self
+                    .buffers
+                    .iter()
+                    .flat_map(|(_, buf)| buf.into_iter())
+                    .collect::<Vec<_>>();
+
+                // NOTE: this approach is due to the requirement of considering
+                // messages with equal payload and timestamp to be distinct
+                // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
+                all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
+
+                all.into_iter().map(|w| (w.payload.clone(), w.ts)).collect()
             }
         }
     }
@@ -288,6 +328,99 @@ mod test {
 
         assert_eq!(0, rb.count(Some(2)).await);
         assert_eq!(0, rb.count(None).await);
+    }
+
+    #[async_std::test]
+    async fn test_peek_oldest() {
+        let mut rb = make_backend(2);
+
+        rb.push(Some(3), 10).await;
+
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 2).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        assert_eq!(5, rb.count(None).await);
+
+        assert_eq!(10, rb.peek(None).await.unwrap().0);
+
+        assert_eq!(5, rb.count(None).await);
+    }
+
+    #[async_std::test]
+    async fn test_peek_oldest_specific() {
+        let mut rb = make_backend(2);
+
+        rb.push(Some(3), 10).await;
+
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 2).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        assert_eq!(5, rb.count(None).await);
+        assert_eq!(1, rb.count(Some(3)).await);
+        assert_eq!(2, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+
+        assert_eq!(10, rb.peek(Some(3)).await.unwrap().0);
+        assert_eq!(1, rb.peek(Some(1)).await.unwrap().0);
+        assert_eq!(3, rb.peek(Some(2)).await.unwrap().0);
+
+        assert_eq!(5, rb.count(None).await);
+        assert_eq!(1, rb.count(Some(3)).await);
+        assert_eq!(2, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+    }
+
+    #[async_std::test]
+    async fn test_peek_all() {
+        let mut rb = make_backend(4);
+
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 2).await;
+        rb.push(Some(1), 1).await;
+
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
+        assert_eq!(3, rb.count(Some(1)).await);
+
+        rb.pop_all(None).await;
+    }
+
+    #[async_std::test]
+    async fn test_peek_all_specific() {
+        let mut rb = make_backend(4);
+
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 2).await;
+        rb.push(Some(1), 1).await;
+
+        rb.push(Some(2), 3).await;
+        rb.push(Some(2), 4).await;
+
+        rb.push(None, 5).await;
+
+        assert_eq!(
+            vec![0, 2, 1],
+            rb.peek_all(Some(1))
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(3, rb.count(Some(1)).await);
+        assert_eq!(2, rb.count(Some(2)).await);
+        assert_eq!(6, rb.count(None).await);
     }
 
     #[async_std::test]

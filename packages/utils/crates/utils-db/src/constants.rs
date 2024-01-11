@@ -7,7 +7,6 @@ pub const CHANNELS_LEDGER_DOMAIN_SEPARATOR_KEY: &str = "channels:ledgerDomainSep
 pub const COMMITMENT_PREFIX: &str = "commitment-";
 pub const CURRENT_COMMITMENT_PREFIX: &str = "commitment:current-";
 pub const TICKET_INDEX_PREFIX: &str = "ticketIndex-";
-pub const PENDING_TICKETS_COUNT: &str = "statistics:pending:value-";
 pub const REJECTED_TICKETS_COUNT: &str = "statistics:rejected:count";
 pub const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
 pub const REDEEMED_TICKETS_COUNT: &str = "statistics:redeemed:count";
@@ -30,6 +29,5 @@ pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addr
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
 /// some Multi-Factor Authorization module, e.g. Gnosis Safe
 pub const MFA_MODULE_PREFIX: &str = "mfaModule:enabled";
-pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
 pub const CHAIN_KEY_PREFIX: &str = "keys:chain-";
 pub const PACKET_KEY_PREFIX: &str = "keys:packet-";

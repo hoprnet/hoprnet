@@ -8,15 +8,22 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
-use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
+use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
-#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+#[async_trait]
+#[cfg_attr(test, mockall::automock)]
 pub trait HoprCoreEthereumDbActions {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
+    async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> Result<()>;
+    async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
+
+    async fn get_unrealized_balance(&self, channel: &Hash) -> Result<Balance>;
+
+    async fn get_channel_epoch(&self, channel: &Hash) -> Result<Option<U256>>;
 
     async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()>;
 
@@ -72,15 +79,6 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
-    /// Mark the ticket as pending.
-    async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()>;
-
-    /// Get pending balance to a counter party's address.
-    async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
-
-    /// Reset pending balance to a counter party's address.
-    async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> Result<()>;
-
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 
     async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>>;
@@ -110,7 +108,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> Result<()>;
 
     /// Get the value of the lastest block number.
-    async fn get_latest_block_number(&self) -> Result<u32>;
+    async fn get_latest_block_number(&self) -> Result<Option<u32>>;
 
     /// Set the latest block number to this value.
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()>;
@@ -151,14 +149,8 @@ pub trait HoprCoreEthereumDbActions {
     /// Get the total value of neglected tickets.
     async fn get_neglected_tickets_value(&self) -> Result<Balance>;
 
-    /// Get the total number of pending tickets.
-    async fn get_pending_tickets_count(&self) -> Result<usize>;
-
     /// Get the total number of losing tickets.
     async fn get_losing_tickets_count(&self) -> Result<usize>;
-
-    /// Resolve pending tickets.
-    async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> Result<()>;
 
     /// Mark the ticket as redeemed.
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
@@ -287,13 +279,4 @@ pub trait HoprCoreEthereumDbActions {
         maybe_mfa_address: Option<Address>,
         snapshot: &Snapshot,
     ) -> Result<()>;
-
-    /// Stores the REST API token.
-    async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
-
-    /// Retrieves the REST API token given its ID.
-    async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>>;
-
-    /// Deletes the REST API token given its ID.
-    async fn delete_authorization(&mut self, id: String) -> Result<()>;
 }

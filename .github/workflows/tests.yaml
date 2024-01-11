@@ -41,29 +41,16 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v23
+        uses: cachix/install-nix-action@v24
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/cachix-action@v13
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
 
       - name: restore cargo cache
         uses: actions/cache@v3
@@ -118,29 +105,16 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v23
+        uses: cachix/install-nix-action@v24
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/cachix-action@v13
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
 
       - name: restore cargo cache
         uses: actions/cache@v3
@@ -164,6 +138,9 @@ jobs:
 
       - name: Build application
         run: nix develop -c make -j build
+
+      - name: Install
+        run: nix develop -c make -j install
 
       - name: Test with pytest
         run: |

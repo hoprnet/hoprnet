@@ -1,7 +1,15 @@
-node_modules
-!hopr-admin/.next
-.dockerignore
-npm-debug.log
-Dockerfile
+.cargo
+# Needed for cargo vendoring
+!.cargo/config.toml
+.direnv
 .git
+.githooks
+.github
 .gitignore
+.pytest_cache
+.ruff_cache
+.venv
+.vscode
+.dockerignore
+target
+tests

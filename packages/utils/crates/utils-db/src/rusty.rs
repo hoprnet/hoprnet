@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use std::cmp::Ordering;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
-use futures_lite::stream::iter;
 use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
 
 struct RustyLevelDbIterator {
@@ -58,16 +58,39 @@ impl Iterator for RustyLevelDbIterator {
 
 /// Adapter for Rusty Level DB database.
 #[derive(Clone)]
-pub struct RustyLevelDbShim {
+pub struct CurrentDbShim {
     db: Arc<Mutex<rusty_leveldb::DB>>,
 }
 
-impl RustyLevelDbShim {
-    #[cfg(not(feature = "wasm"))]
+/// Custom implementation going around the fact that rusty_leveldb
+/// does not provide the Debug implementation
+impl Debug for CurrentDbShim {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CurrentDbShim")
+            .field("db", &"rusty level DB".to_owned())
+            .finish()
+    }
+}
+
+impl CurrentDbShim {
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
                 rusty_leveldb::DB::open("hoprd_db", rusty_leveldb::in_memory()).expect("failed to create DB"),
+            )),
+        }
+    }
+
+    pub fn new(path: &str, create_if_missing: bool) -> Self {
+        let opts = rusty_leveldb::Options {
+            create_if_missing,
+            error_if_exists: false,
+            ..rusty_leveldb::Options::default()
+        };
+
+        Self {
+            db: Arc::new(Mutex::new(
+                rusty_leveldb::DB::open(path, opts).expect("failed to create DB"),
             )),
         }
     }
@@ -83,11 +106,10 @@ impl RustyLevelDbShim {
 
     #[cfg(feature = "wasm")]
     pub fn new(path: &str, create_if_missing: bool) -> Self {
-        let opts = rusty_leveldb::Options {
-            create_if_missing,
-            error_if_exists: false,
-            ..wasm::NodeJsEnv::create_options()
-        };
+        let mut opts = wasm::NodeJsEnv::create_options();
+        opts.create_if_missing = create_if_missing;
+        opts.error_if_exists = false;
+
         Self {
             db: Arc::new(Mutex::new(
                 rusty_leveldb::DB::open(path, opts).expect("failed to create DB"),
@@ -96,8 +118,8 @@ impl RustyLevelDbShim {
     }
 }
 
-#[async_trait(?Send)]
-impl AsyncKVStorage for RustyLevelDbShim {
+#[async_trait]
+impl AsyncKVStorage for CurrentDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
 
@@ -153,11 +175,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
-        Ok(Box::new(iter(RustyLevelDbIterator::new(
-            i,
-            &prefix,
-            suffix_size as usize,
-        ))))
+        Ok(Box::new(RustyLevelDbIterator::new(i, &prefix, suffix_size as usize)))
     }
 
     fn iterate_range(
@@ -171,7 +189,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
-        Ok(Box::new(iter(RustyLevelDbIterator::new_range(i, &start, &end))))
+        Ok(Box::new(RustyLevelDbIterator::new_range(i, &start, &end)))
     }
 
     async fn batch(
@@ -205,29 +223,29 @@ impl AsyncKVStorage for RustyLevelDbShim {
 
 #[cfg(any(feature = "wasm", test))]
 fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u64) {
-    utils_log::debug!("test #1");
+    log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
     env.mkdir(&test_dir).expect("could not create dir");
 
-    utils_log::debug!("test #2");
+    log::debug!("test #2");
     let test_file = test_dir.join("test_file");
     assert!(
         !env.exists(&test_file).expect("could not check file existence 1"),
         "file should not exist before creation"
     );
 
-    utils_log::debug!("test #3");
+    log::debug!("test #3");
     let data = hex_literal::hex!("deadbeefcafebabe");
 
     {
-        utils_log::debug!("test #4");
+        log::debug!("test #4");
         let mut f = env.open_writable_file(&test_file).expect("could not open file 1");
         let len = f.write(&data).expect("could not write to a file");
         assert_eq!(data.len(), len, "writting invalid number of bytes");
     }
 
     {
-        utils_log::debug!("test #5");
+        log::debug!("test #5");
         assert!(
             env.exists(&test_file).expect("could not check file existence 3"),
             "file should exist"
@@ -240,20 +258,20 @@ fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u
     }
 
     {
-        utils_log::debug!("test #6");
+        log::debug!("test #6");
         let mut f = env.open_appendable_file(&test_file).expect("could not open file 3");
         let len = f.write(&data).expect("appendable write failed");
         assert_eq!(data.len(), len, "could not write all bytes to the file");
     }
 
     {
-        utils_log::debug!("test #7");
+        log::debug!("test #7");
         let len = env.size_of(&test_file).expect("could not get file size");
         assert_eq!(data.len() * 2, len, "file should have twice the length after appending");
     }
 
     {
-        utils_log::debug!("test #8");
+        log::debug!("test #8");
         let f = env.open_random_access_file(&test_file).expect("could not open file 4");
         let mut buf = [0; 8];
         let len = f.read_at(4, &mut buf).expect("could not read file at 1");
@@ -280,7 +298,7 @@ fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u
     }
 
     {
-        utils_log::debug!("test #9");
+        log::debug!("test #9");
         let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
         assert_eq!(children.len(), 1, "contains more children");
         assert!(
@@ -291,7 +309,7 @@ fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u
 
     let new_file = test_dir.join("new_file");
     {
-        utils_log::debug!("test #10");
+        log::debug!("test #10");
         env.rename(&test_file, &new_file).expect("rename must not fail");
         assert!(
             !env.exists(&test_file).expect("failed to check existence after rename"),
@@ -304,7 +322,7 @@ fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u
     }
 
     {
-        utils_log::debug!("test #11");
+        log::debug!("test #11");
         env.delete(&new_file).expect("could not delete file");
         assert!(
             !env.exists(&new_file).expect("failed to check existence after deletion"),
@@ -313,7 +331,7 @@ fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u
     }
 
     {
-        utils_log::debug!("test #12");
+        log::debug!("test #12");
         let _ = env.rmdir(&test_dir); // cannot be tested with MemEnv
     }
 }
@@ -327,7 +345,6 @@ mod tests {
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
         use crate::traits::{AsyncKVStorage, BatchOperation};
-        use futures_lite::StreamExt;
 
         let key_1 = "1";
         let value_1 = "abc";
@@ -428,13 +445,11 @@ mod tests {
         let expected = vec![value_1.as_bytes().into(), value_3.as_bytes().into()];
 
         let mut received = Vec::new();
-        let mut data_stream = Box::into_pin(
-            kv_storage
-                .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
-                .unwrap(),
-        );
+        let mut data_stream = kv_storage
+            .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
+            .unwrap();
 
-        while let Some(value) = data_stream.next().await {
+        while let Some(value) = data_stream.next() {
             let v = value.unwrap();
 
             if v.as_ref() != value_2.as_bytes() {
@@ -451,7 +466,7 @@ mod tests {
         test_env(
             Box::new(MemEnv::new()),
             Path::new("/"),
-            utils_misc::time::native::current_timestamp(),
+            platform::time::native::current_timestamp().as_millis() as u64,
         )
     }
 }
@@ -545,7 +560,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            utils_misc::time::wasm::current_timestamp() * 1000
+            platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -616,7 +631,7 @@ pub mod wasm {
         }
 
         let deserialized_error: FsErr = err_res.unwrap();
-        utils_log::debug!("io error: {:?}", deserialized_error);
+        log::debug!("io error: {:?}", deserialized_error);
 
         if deserialized_error.code.is_some() {
             let code = deserialized_error.code.unwrap();
@@ -858,7 +873,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            utils_misc::time::wasm::current_timestamp() * 1000
+            platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -871,7 +886,7 @@ pub mod wasm {
         test_env(
             Box::new(NodeJsEnv::new()),
             Path::new(base_dir),
-            utils_misc::time::wasm::current_timestamp(),
+            platform::time::wasm::current_timestamp(),
         );
     }
 }

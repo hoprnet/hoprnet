@@ -40,11 +40,11 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v23
+        uses: cachix/install-nix-action@v24
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/cachix-action@v13
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -78,6 +78,9 @@ jobs:
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
+
+      - name: Format generated code to pass the linter
+        run: nix develop -c cargo fmt -p bindings
 
       - name: Run linter
         run: nix develop -c make lint

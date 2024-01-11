@@ -18,9 +18,7 @@ pub struct PasswordArgs {
 
 impl Default for PasswordArgs {
     fn default() -> Self {
-        PasswordArgs {
-            password_path: None,
-        }
+        PasswordArgs { password_path: None }
     }
 }
 

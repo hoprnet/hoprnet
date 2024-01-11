@@ -10,7 +10,7 @@ use crate::environment_config;
 use crate::utils::HelperErrors;
 
 pub fn build_path(network: &str, environment_type: &str) -> String {
-    let new_path = vec!["./", network, "/", &environment_type.to_string()].concat();
+    let new_path = ["./", network, "/", environment_type].concat();
     match Path::new(&new_path).to_str() {
         None => panic!("new path is not a valid UTF-8 sequence"),
         Some(s) => {
@@ -142,6 +142,36 @@ pub fn child_process_call_foundry_migrate_safe_module(
     child_process_call_foundry(network, &self_register_args)
 }
 
+/// Launch a child process to call foundry move-nodes-to-safe-module command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `node_address` - Addresses of HOPR nodes to be included in the module
+/// * `safe_address` - New safe address
+/// * `module_address` - New module address
+pub fn child_process_call_foundry_move_node_to_safe_module(
+    network: &str,
+    ethereum_address: &String,
+    safe_address: &str,
+    module_address: &str,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let move_node_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "moveNodesToSafeModule(address[],address,address)",
+        ethereum_address,
+        safe_address,
+        module_address,
+    ];
+
+    child_process_call_foundry(network, &move_node_args)
+}
+
 /// Launch a child process to call foundry express-setup-safe-module command
 ///
 /// # Arguments
@@ -162,9 +192,9 @@ pub fn child_process_call_foundry_express_setup_safe_module(
         "--broadcast",
         "--sig",
         "expressSetupSafeModule(address[],uint256,uint256)",
-        &ethereum_address,
-        &hopr_amount,
-        &native_amount,
+        ethereum_address,
+        hopr_amount,
+        native_amount,
     ];
 
     child_process_call_foundry(network, &express_setup_safe_args)
@@ -179,7 +209,7 @@ pub fn child_process_call_foundry_express_setup_safe_module(
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let peer_id_string = ["[", peer_ids, "]"].concat();
     let self_register_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
@@ -198,8 +228,12 @@ pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String
 ///
 /// * `network` - Name of the network that nodes run in
 /// * `staking_address` - Addresses of staking accounts
-/// * `eligibilities` - Array of eligibility 
-pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address: &String, eligibilities: &String) -> Result<(), HelperErrors> {
+/// * `eligibilities` - Array of eligibility
+pub fn child_process_call_foundry_set_eligibility(
+    network: &str,
+    staking_address: &String,
+    eligibilities: &String,
+) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let set_eligibility_args = vec![
         "script",
@@ -207,8 +241,8 @@ pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address
         "--broadcast",
         "--sig",
         "forceSyncEligibility(address[],bool[])",
-        &staking_address,
-        &eligibilities,
+        staking_address,
+        eligibilities,
     ];
 
     child_process_call_foundry(network, &set_eligibility_args)
@@ -220,7 +254,10 @@ pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address
 ///
 /// * `network` - Name of the network that nodes run in
 /// * `staking_address` - Addresses of staking accounts
-pub fn child_process_call_foundry_sync_eligibility(network: &str, staking_address: &String) -> Result<(), HelperErrors> {
+pub fn child_process_call_foundry_sync_eligibility(
+    network: &str,
+    staking_address: &String,
+) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let sync_eligibility_args = vec![
         "script",
@@ -228,7 +265,7 @@ pub fn child_process_call_foundry_sync_eligibility(network: &str, staking_addres
         "--broadcast",
         "--sig",
         "syncEligibility(address[])",
-        &staking_address,
+        staking_address,
     ];
 
     child_process_call_foundry(network, &sync_eligibility_args)

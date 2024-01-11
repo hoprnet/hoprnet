@@ -29,3 +29,10 @@ impl From<DbError> for wasm_bindgen::JsValue {
         value.to_string().into()
     }
 }
+
+#[cfg(feature = "sqlite")]
+impl From<sqlx::Error> for DbError {
+    fn from(value: sqlx::Error) -> Self {
+        crate::errors::DbError::GenericError(value.to_string())
+    }
+}

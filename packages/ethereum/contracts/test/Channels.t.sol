@@ -90,7 +90,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     function setUp() public virtual override {
         super.setUp();
 
-        hoprToken = new ERC777('HOPR', 'HOPR', new address[](0));
+        hoprToken = new ERC777("HOPR", "HOPR", new address[](0));
 
         hoprNodeSafeRegistry = new HoprNodeSafeRegistry();
         hoprChannels = new MyHoprChannels(address(hoprToken), closureNoticePeriod, hoprNodeSafeRegistry);

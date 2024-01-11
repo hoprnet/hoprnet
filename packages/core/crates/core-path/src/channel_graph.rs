@@ -1,14 +1,38 @@
 use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use log::{debug, info};
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use utils_log::{debug, info};
 use utils_types::primitives::Address;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use {
+    core_types::channels::ChannelDirection,
+    utils_metrics::metrics::{MultiGauge, SimpleGauge},
+    utils_types::traits::ToHex,
+};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_NUMBER_OF_OUTGOING_CHANNEL: SimpleGauge = SimpleGauge::new(
+        "core_gauge_num_outgoing_channels",
+        "Number of outgoing channels"
+    ).unwrap();
+    static ref METRIC_NUMBER_OF_INCOMING_CHANNEL: SimpleGauge = SimpleGauge::new(
+        "core_gauge_num_incoming_channels",
+        "Number of incoming channels"
+    ).unwrap();
+    static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
+        "core_mgauge_channel_balances",
+        "Balances on channels with counterparties",
+        &["counterparty", "direction"]
+    ).unwrap();
+}
 
 /// Structure that adds additional data to a `ChannelEntry`, which
 /// can be used to compute edge weights and traverse the `ChannelGraph`.
@@ -83,6 +107,56 @@ impl ChannelGraph {
     /// Returns a set of changes if the channel was already present in the graphs or
     /// None if the channel was not previously present in the channel graph.
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            if let Some(direction) = channel.direction(&self.me) {
+                match direction {
+                    ChannelDirection::Outgoing => match channel.status {
+                        ChannelStatus::Closed => {
+                            SimpleGauge::decrement(&METRIC_NUMBER_OF_OUTGOING_CHANNEL, 1.0);
+                            MultiGauge::set(
+                                &METRIC_CHANNEL_BALANCES,
+                                &[channel.source.to_hex().as_str(), "out"],
+                                0.0,
+                            );
+                        }
+                        ChannelStatus::Open => {
+                            SimpleGauge::increment(&METRIC_NUMBER_OF_OUTGOING_CHANNEL, 1.0);
+                            MultiGauge::set(
+                                &METRIC_CHANNEL_BALANCES,
+                                &[channel.source.to_hex().as_str(), "out"],
+                                channel
+                                    .balance
+                                    .amount_base_units()
+                                    .parse::<f64>()
+                                    .expect("Formatted balance must be convertible to float"),
+                            );
+                        }
+                        ChannelStatus::PendingToClose => {}
+                    },
+                    ChannelDirection::Incoming => match channel.status {
+                        ChannelStatus::Closed => {
+                            SimpleGauge::decrement(&METRIC_NUMBER_OF_INCOMING_CHANNEL, 1.0);
+                            MultiGauge::set(&METRIC_CHANNEL_BALANCES, &[channel.source.to_hex().as_str(), "in"], 0.0);
+                        }
+                        ChannelStatus::Open => {
+                            SimpleGauge::increment(&METRIC_NUMBER_OF_INCOMING_CHANNEL, 1.0);
+                            MultiGauge::set(
+                                &METRIC_CHANNEL_BALANCES,
+                                &[channel.source.to_hex().as_str(), "in"],
+                                channel
+                                    .balance
+                                    .amount_base_units()
+                                    .parse::<f64>()
+                                    .expect("Formatted balance must be convertible to float"),
+                            );
+                        }
+                        ChannelStatus::PendingToClose => {}
+                    },
+                }
+            }
+        }
+
         // Remove the edge since we don't allow Closed channels
         if channel.status == ChannelStatus::Closed {
             let ret = self
@@ -91,6 +165,7 @@ impl ChannelGraph {
                 .map(|old_value| ChannelChange::diff_channels(&old_value.channel, &channel));
 
             info!("removed {channel}");
+
             return ret;
         }
 
@@ -153,7 +228,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
+    use utils_db::CurrentDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
 
     lazy_static! {
@@ -342,7 +417,7 @@ mod tests {
     async fn test_channel_graph_sync() {
         let testing_snapshot = Snapshot::default();
         let mut last_addr = ADDRESSES[0];
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), last_addr);
 
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us
@@ -377,28 +452,5 @@ mod tests {
                 .all(|c| cg.contains_channel(&c)),
             "must contain all non-closed channels"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use async_std::sync::RwLock;
-    use std::sync::Arc;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    #[derive(Clone)]
-    pub struct ChannelGraph {
-        w: Arc<RwLock<super::ChannelGraph>>,
-    }
-
-    impl ChannelGraph {
-        pub fn new(w: Arc<RwLock<super::ChannelGraph>>) -> Self {
-            Self { w }
-        }
-
-        pub fn as_ref_counted(&self) -> Arc<RwLock<super::ChannelGraph>> {
-            self.w.clone()
-        }
     }
 }

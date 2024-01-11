@@ -11,19 +11,16 @@ use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
+use log::{debug, error, warn};
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_log::{debug, error, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
@@ -151,9 +148,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    return Err(AcknowledgementValidation(format!(
-                        "acknowledgement received for channel that does not exist or has a newer epoch"
-                    )));
+                    return Err(AcknowledgementValidation(
+                        "acknowledgement received for channel that does not exist or has a newer epoch".into(),
+                    ));
                 }
 
                 let domain_separator = self
@@ -247,7 +244,10 @@ pub struct AcknowledgementInteraction {
 
 impl AcknowledgementInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+    ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
 
@@ -299,12 +299,8 @@ impl AcknowledgementInteraction {
             }
         });
 
-        spawn_local(async move {
-            processing_stream
-                .map(|x| Ok(x))
-                .forward(futures::sink::drain())
-                .await
-                .unwrap();
+        spawn(async move {
+            processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 
         Self {

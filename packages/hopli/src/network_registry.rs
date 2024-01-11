@@ -17,7 +17,7 @@ pub struct RegisterInNetworkRegistryArgs {
     network: String,
 
     #[clap(
-        help = "Comma sperated node peer ids",
+        help = "Comma separated node peer ids",
         long,
         short,
         default_value = None
@@ -52,7 +52,7 @@ impl RegisterInNetworkRegistryArgs {
         } = self;
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if let Err(_) = env::var("PRIVATE_KEY") {
+        if env::var("PRIVATE_KEY").is_err() {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
@@ -66,7 +66,7 @@ impl RegisterInNetworkRegistryArgs {
         // read all the identities from the directory
         let local_files = local_identity.get_files();
         // get peer ids and stringinfy them
-        if local_files.len() > 0 {
+        if !local_files.is_empty() {
             // check if password is provided
             let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,

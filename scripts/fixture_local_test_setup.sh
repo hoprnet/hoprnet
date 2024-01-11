@@ -15,6 +15,8 @@ declare HOPR_LOG_ID="smoke-fixture-setup"
 source "${mydir}/testnet.sh"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
+source "${mydir}/api.sh"
 
 PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
@@ -288,14 +290,14 @@ function setup_node() {
   # Using a mix of CLI parameters and env variables to ensure
   # both work.
   env \
-    DEBUG="hopr*" \
+    RUST_LOG="debug" \
+    RUST_BACKTRACE=1 \
     NODE_ENV=development \
-    HOPRD_HEARTBEAT_INTERVAL=2500 \
-    HOPRD_HEARTBEAT_THRESHOLD=2500 \
-    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_HEARTBEAT_INTERVAL=3 \
+    HOPRD_HEARTBEAT_THRESHOLD=3 \
+    HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    NODE_OPTIONS="--experimental-wasm-modules" \
-    node packages/hoprd/lib/main.cjs \
+    target/debug/hoprd \
       --data="${dir}" \
       --host="${host_addr}:${node_port}" \
       --identity="${id}" \
@@ -307,6 +309,7 @@ function setup_node() {
       --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
+      --protocolConfig ${protocol_config} \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -352,7 +355,8 @@ for p in "${all_ports[@]}"; do
 done
 # }}}
 
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+cp "${mydir}/../scripts/protocol-config-anvil.json" /tmp/protocol-config.json
+declare protocol_config=/tmp/protocol-config.json
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
@@ -384,13 +388,15 @@ reuse_pregenerated_identities
 # create safe and modules for all the ids, store them in args files
 create_local_safes
 
+
+log "Setting up nodes"
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 # use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "localhost" "--announce"
-setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" " --announce"
-setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" " --announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" "--announce"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" "--announce"
 # should not be able to talk to the rest
 setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "127.0.0.1" "--announce --network anvil-localhost2"
 # node n7 will be the only one NOT registered
@@ -421,27 +427,22 @@ env \
   --hopr-amount "0.0"
 # }}}
 
-log "Waiting for port binding"
-
-#  --- Wait for ports to be bound --- {{{
-wait_for_regex "${node1_log}" "STARTED NODE"
-wait_for_regex "${node2_log}" "STARTED NODE"
-wait_for_regex "${node3_log}" "STARTED NODE"
-wait_for_regex "${node4_log}" "STARTED NODE"
-wait_for_regex "${node5_log}" "STARTED NODE"
-wait_for_regex "${node6_log}" "STARTED NODE"
-wait_for_port 19096 "127.0.0.1" "${node6_log}"
-wait_for_regex "${node7_log}" "STARTED NODE"
-# }}}
-
-log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
-sleep 30
+api_token=$default_api_token
+log "Waiting for nodes to become ready"
+wait_for_api_ready http://127.0.0.1:13301/
+wait_for_api_ready http://127.0.0.1:13302/
+wait_for_api_ready http://127.0.0.1:13303/
+wait_for_api_ready http://127.0.0.1:13304/
+wait_for_api_ready http://127.0.0.1:13305/
+wait_for_api_ready http://127.0.0.1:13306/
+wait_for_api_ready http://127.0.0.1:13307/
 
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
-wait_for_regex "${node1_log}" "STARTED NODE"
+
+wait_for_api_ready http://127.0.0.1:13301/
 # }}}
 
 #  --- Ensure data directories are used --- {{{

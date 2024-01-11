@@ -29,12 +29,14 @@ pub enum TransportPacket {
     },
 }
 
-#[async_trait::async_trait(? Send)]
+#[async_trait::async_trait]
 pub trait PacketConstructing {
     type Input;
 
+    #[allow(clippy::wrong_self_convention)]
     async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket>;
 
+    #[warn(clippy::wrong_self_convention)]
     async fn from_incoming(
         &self,
         data: Box<[u8]>,

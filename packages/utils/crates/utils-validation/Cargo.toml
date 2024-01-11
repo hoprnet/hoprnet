@@ -8,22 +8,5 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 proc-macro-regex = "~1.1.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
-[features]
-default = ["wasm"]
-wasm = []

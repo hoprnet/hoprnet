@@ -45,21 +45,27 @@ api_call(){
     response_type="-d"
   fi
 
-  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v3${api_endpoint} ${response_type}"
+  if [[ $api_endpoint == *readyz ]] || [[ $api_endpoint == *healthyz ]] || [[ $api_endpoint == *startedz ]]
+  then
+    api_endpoint=$api_endpoint
+  else
+    api_endpoint=api/v3$api_endpoint
+  fi
+  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
 
-  local now=$(node -e "console.log(process.hrtime.bigint().toString());")
+  local now=$(date +%s | cut -b1-13)
 
   if [[ ${end_time_ns} -eq 0 ]]; then
     # need to calculate in nanoseconds
-    end_time_ns=$((now+wait_time*1000000000))
+    end_time_ns=$((now+wait_time*1000000))
   fi
 
   local done=false
   local attempt=0
 
   while [[ "${done}" == false ]]; do
-    result=$(${cmd} "${request_body}")
+    result=$(${cmd} "${request_body}" || true)
 
     # if an assertion was given and has not been fulfilled, we fail
     if [[ -z "${assertion}" ]] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
@@ -74,12 +80,18 @@ api_call(){
 
       sleep "${step_time}"
 
-      now=$(node -e "console.log(process.hrtime.bigint().toString());")
+      now=$(date +%s | cut -b1-13)
       (( ++attempt ))
     fi
   done
 
   echo "${result}"
+}
+
+wait_for_api_ready() {
+  local node_api=${1}
+
+  api_call "${node_api}" "readyz" "GET" "{}" "200" 10 5 0 true
 }
 
 # $1 = node api endpoint
