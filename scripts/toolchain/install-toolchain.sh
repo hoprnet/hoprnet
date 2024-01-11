@@ -34,6 +34,7 @@ function usage() {
   msg
   msg "Use --runtime-only to install only those utilities that are necessary at runtime"
   msg "Use --with-yarn to install yarn"
+  msg "Use --with-wasm-utilities to install wasm-pack and wasm-opt"
   msg
 }
 
@@ -44,9 +45,10 @@ export PATH=${PATH}:${CARGO_BIN_DIR}
 declare usr_local="/usr/local"
 declare usr_local_bin="${usr_local}/bin"
 
-declare runtime_only with_yarn
+declare runtime_only with_yarn with_wasm_utilities
 runtime_only="false"
 with_yarn="false"
+with_wasm_utilities="false"
 
 while (( "$#" )); do
   case "$1" in
@@ -61,6 +63,10 @@ while (( "$#" )); do
       ;;
     --with-yarn)
       with_yarn="true"
+      shift
+      ;;
+    --with-wasm-utilities)
+      with_wasm_utilities="true"
       shift
       ;;
     -*|--*=)
@@ -278,6 +284,10 @@ else
         install_yarn
         # Installation *with* yarn, so let's remove no longer necessary cache
         yarn cache clean --all
+    fi
+    if ${with_wasm_utilities}; then
+        install_wasm_opt
+        install_wasm_pack
     fi
 fi
 
