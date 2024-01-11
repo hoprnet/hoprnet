@@ -74,8 +74,9 @@ ANVIL_LOG_FILE = f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-anvil.log"
 ANVIL_NETWORK1 = "anvil-localhost"
 ANVIL_NETWORK2 = "anvil-localhost2"
 
-PROTOCOL_CONFIG_FILE = f"{MYDIR}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
-DEPLOYMENTS_SUMMARY_FILE = f"{MYDIR}/../packages/ethereum/contracts/contracts-addresses.json"
+PROTOCOL_CONFIG_FILE = f"{MYDIR}/../scripts/protocol-config-anvil.json"
+TEST_PROTOCOL_CONFIG_FILE = f"/tmp/{NODE_NAME_PREFIX}-protocol-config.json"
+DEPLOYMENTS_SUMMARY_FILE = f"{MYDIR}/../ethereum/contracts/contracts-addresses.json"
 
 PREGENERATED_IDENTITIES_DIR = f"{MYDIR}/identities"
 
@@ -172,6 +173,7 @@ def setup_node(args: dict):
         f"--network={network}",
         f"--password={PASSWORD}",
         f"--safeAddress={args['safe_address']}",
+        f"--protocolConfig={TEST_PROTOCOL_CONFIG_FILE}",
         api_token_param,
     ]
     if "cfg_file" in args:
@@ -271,7 +273,7 @@ def create_local_safes(nodes_args: dict, private_key):
                 "--identity-from-path",
                 id_file,
                 "--contracts-root",
-                "./packages/ethereum/contracts",
+                "./ethereum/contracts",
                 "--hopr-amount",
                 "20000.0",
             ],
@@ -312,7 +314,7 @@ def funding_nodes(private_key):
             "--identity-directory",
             FIXTURE_FILES_DIR,
             "--contracts-root",
-            "./packages/ethereum/contracts",
+            "./ethereum/contracts",
             "--hopr-amount",
             "0.0",
         ],
@@ -364,8 +366,10 @@ def swarm7(request):
         private_key = data["private_keys"][0]
 
     logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-    mirror_contract_data(PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK1)
-    mirror_contract_data(PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK2)
+    
+    shutil.copyfile(PROTOCOL_CONFIG_FILE, TEST_PROTOCOL_CONFIG_FILE)
+    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK1)
+    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK2)
 
     logging.info("Reuse pre-generated identities")
     reuse_pregenerated_identities()
