@@ -61,7 +61,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          file: packages/ethereum/Dockerfile.anvil
+          file: ethereum/Dockerfile.anvil
           cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ steps.update.outputs.DOCKER_TAG }}-cache
           cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ steps.update.outputs.DOCKER_TAG }}-cache,mode=max
           tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ steps.update.outputs.DOCKER_TAG }}

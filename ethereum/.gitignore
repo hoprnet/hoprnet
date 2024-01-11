@@ -1,5 +1,6 @@
 contracts/cache/
 contracts/out/
+contracts/build-info
 
 # Ignore Environment Variables!
 .env
@@ -23,8 +24,5 @@ target/
 contracts/lcov.info
 contracts/report
 
-# Ignore WASM bindings
-/lib
-
 # Ignore generated bindings source files
-crates/bindings/src
+bindings/src

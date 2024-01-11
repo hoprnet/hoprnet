@@ -23,7 +23,7 @@ members = [
     "chain/chain-indexer",
     "chain/chain-types",
     "chain/chain-rpc",
-    "packages/ethereum/crates/bindings",
+    "ethereum/bindings",
     "packages/hopli",
     "packages/hoprd/crates/hopr-lib",
     "packages/hoprd/crates/hoprd-api",
@@ -61,7 +61,7 @@ serde_with = { version = "3.3" }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
 
-bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
+bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/chain-actions", default-features = false }
 chain-api = { path = "chain/chain-api", default-features = false }
 chain-db = { path = "chain/chain-db", default-features = false }

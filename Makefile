@@ -6,9 +6,9 @@ mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
 
 # Gets all solidity files which can be modified
-SOLIDITY_SRC_FILES := $(shell find ./packages/ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
-SOLIDITY_TEST_FILES := $(shell find ./packages/ethereum/contracts/test -type f -name "*.sol")
-SOLIDITY_SCRIPT_FILES := $(shell find ./packages/ethereum/contracts/script -type f -name "*.sol")
+SOLIDITY_SRC_FILES := $(shell find ./ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
+SOLIDITY_TEST_FILES := $(shell find ./ethereum/contracts/test -type f -name "*.sol")
+SOLIDITY_SCRIPT_FILES := $(shell find ./ethereum/contracts/script -type f -name "*.sol")
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
 
 # Set local foundry directory (for binaries) and versions
@@ -119,7 +119,7 @@ cargo-download: ## download vendored Cargo dependencies
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
-	$(MAKE) -C packages/ethereum/contracts/ ../crates/bindings/src
+	$(MAKE) -C ethereum/contracts/ ../bindings/src
 
 .PHONY: build
 build: ## build all packages
@@ -141,7 +141,7 @@ install:
 .PHONY: clean
 clean: # Cleanup build directories
 	cargo clean
-	find packages/ethereum/crates/bindings/src -delete
+	find ethereum/bindings/src -delete
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
@@ -159,7 +159,7 @@ smoke-test-full: ## run smoke tests
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
-	$(MAKE) -C packages/ethereum/contracts/ sc-test
+	$(MAKE) -C ethereum/contracts/ sc-test
 
 .PHONY: lint
 lint: lint-rust lint-python lint-sol
@@ -168,7 +168,7 @@ lint: ## run linter for TS, Rust, Python, Solidity
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
+		forge fmt --root ./ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
 	# npx solhint $${f} || exit 1; \
@@ -188,7 +188,7 @@ fmt: ## run code formatter for TS, Rust, Python, Solidity
 .PHONY: fmt-sol
 fmt-sol: ## run code formatter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f} --root ./packages/ethereum/contracts; \
+		forge fmt $${f} --root ./ethereum/contracts; \
 	done
 
 .PHONY: fmt-rust
@@ -271,7 +271,7 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
@@ -283,7 +283,7 @@ create-safe-module-all: ## create a safe and a module and add all the nodes from
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: create-safe-module
 create-safe-module: id_password=local
@@ -296,7 +296,7 @@ create-safe-module: ## create a safe and a module, and add a node to the module
 		--network anvil-localhost \
 		--identity-from-path "${id_path}" \
 		--hopr-amount ${hopr_amount} --native-amount ${native_amount} \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: deploy-safe-module
 deploy-safe-module: id_password=local
@@ -310,7 +310,7 @@ endif
 		hopli create-safe-module \
 		--network "${network}" \
 		--identity-from-path "${id_path}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -329,7 +329,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-funds network=$(network) environment-type=$(environment_type) recipient=$(recipient)
+	make -C ethereum/contracts request-funds network=$(network) environment-type=$(environment_type) recipient=$(recipient)
 
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-and-network-are-set
@@ -343,7 +343,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-nrnft network=$(network) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
+	make -C ethereum/contracts request-nrnft network=$(network) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
 
 .PHONY: stake-funds
 stake-funds: ensure-environment-and-network-are-set
@@ -351,7 +351,7 @@ stake-funds: ## stake funds (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-funds network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts stake-funds network=$(network) environment-type=$(environment_type)
 
 .PHONY: stake-nrnft
 stake-nrnft: ensure-environment-and-network-are-set
@@ -359,22 +359,22 @@ stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
+	make -C ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
 
 enable-network-registry: ensure-environment-and-network-are-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	make -C packages/ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
 
 disable-network-registry: ensure-environment-and-network-are-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	make -C packages/ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
 
 sync-eligibility: ensure-environment-and-network-are-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(staking_addresses),)
 	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts sync-eligibility \
+	make -C ethereum/contracts sync-eligibility \
 		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(staking_addresses)"
 
@@ -386,7 +386,7 @@ endif
 ifeq ($(node_addresses),)
 	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts register-nodes \
+	make -C ethereum/contracts register-nodes \
 		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(staking_addresses)" node_addresses="$(node_addresses)"
 
@@ -395,7 +395,7 @@ deregister-nodes: ## owner de-register given nodes in network registry contract
 ifeq ($(node_addresses),)
 	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts deregister-nodes \
+	make -C ethereum/contracts deregister-nodes \
 		network=$(network) environment-type=$(environment_type) \
 		node_addresses="$(node_addresses)"
 
@@ -447,12 +447,12 @@ ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
-environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
+environment_type != jq '.networks."$(network)".environment_type // empty' ethereum/contracts/contracts-addresses.json
 endif
 
 ensure-environment-is-set:
 ifeq ($(environment_type),)
-	echo "could not read environment info from packages/ethereum/contracts/contracts-addresses.json" >&2 && exit 1
+	echo "could not read environment info from ethereum/contracts/contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev

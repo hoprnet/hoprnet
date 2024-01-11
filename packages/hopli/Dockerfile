@@ -42,7 +42,7 @@ ENV ETHERSCAN_API_KEY="random_gibberish"
 WORKDIR /app/hoprnet
 VOLUME /app/hoprnet/node
 
-COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY ethereum/contracts ethereum/contracts
 COPY Makefile .
 COPY vendor/solidity vendor/solidity
 

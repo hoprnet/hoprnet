@@ -216,7 +216,7 @@ function create_local_safes() {
       hopli create-safe-module \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
-        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log"
+        --contracts-root "./ethereum/contracts" > "${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
     grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
@@ -243,7 +243,7 @@ function create_local_safe_for_multi_nodes() {
       --network anvil-localhost \
       --identity-directory "${tmp_dir}" \
       --identity-prefix "${node_prefix}" \
-      --contracts-root "./packages/ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
+      --contracts-root "./ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
 
   # store safe arguments in separate file for later use (as in `create_local_safes` function)
   for id_file in ${id_files[@]}; do
@@ -283,7 +283,7 @@ ensure_port_is_free 19095
 
 cp "${mydir}//protocol-config-anvil.json" /tmp/protocol-config-anvil.json
 declare protocol_config="/tmp/protocol-config-anvil.json"
-declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"

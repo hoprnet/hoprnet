@@ -28,7 +28,7 @@ for i in $(seq 0 $((${input_len}-1))); do
 	echo "Module: ${module_addr}"
 	echo "Node: ${node_addr}"
 
-	env PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C packages/ethereum/contracts \
+	env PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C ethereum/contracts \
 		configure-safe-module network=rotsee environment-type=staging \
 		node_address="${node_addr}" \
 		safe_address="${safe_addr}" \
