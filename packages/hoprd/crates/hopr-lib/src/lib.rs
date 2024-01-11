@@ -372,6 +372,7 @@ where
         cfg.safe_module.safe_address,
         chain_config.channel_contract_deploy_block as u64,
         tx_indexer_events,
+        chain_config.confirmations as u64,
         chain_actions.clone(),
         rpc_operations.clone(),
         channel_graph.clone(),

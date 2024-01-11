@@ -1,9 +1,3 @@
-# Exclude node.js stuff
-/node_modules
-
-# Typescript builds
-/lib
-
 # Exclude any built npm packages
 /*.tgz
 
