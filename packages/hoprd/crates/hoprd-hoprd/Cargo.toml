@@ -29,9 +29,9 @@ validator = { workspace = true }
 core-transport = { workspace = true }
 core-network = { workspace = true }
 core-strategy = { workspace = true }
-core-ethereum-db = { workspace = true }
-core-ethereum-indexer = { workspace = true }
-core-ethereum-types = { workspace = true }
+chain-db = { workspace = true }
+chain-indexer = { workspace = true }
+chain-types = { workspace = true }
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
@@ -53,9 +53,9 @@ wasm = [
     "core-transport/wasm",
     "core-network/wasm",
     "core-strategy/wasm",
-    "core-ethereum-db/wasm",
-    "core-ethereum-indexer/wasm",
-    "core-ethereum-types/wasm",
+    "chain-db/wasm",
+    "chain-indexer/wasm",
+    "chain-types/wasm",
     "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",
@@ -71,5 +71,5 @@ prometheus = [
     "core-transport/prometheus",
     "core-strategy/prometheus",
     "core-network/prometheus",
-    "core-ethereum-indexer/prometheus"
+    "chain-indexer/prometheus"
 ]

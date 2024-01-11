@@ -12,13 +12,13 @@ crate-type = ["rlib"]
 [features]
 default = ["prometheus"]
 wasm = [
-    "core-ethereum-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
+    "chain-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
     "core-protocol/wasm", "core-types/wasm",
     "utils-db/wasm", "platform/wasm-bindgen", "utils-metrics?/wasm", "utils-types/wasm",
 ]
 prometheus = [
     "dep:lazy_static", "dep:utils-metrics",
-    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "core-ethereum-rpc/prometheus"
+    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "chain-rpc/prometheus"
 ]
 
 [dependencies]
@@ -36,9 +36,9 @@ lazy_static = { workspace = true, optional = true }
 
 core-network = { workspace = true }
 core-crypto = { workspace = true }
-core-ethereum-db = { workspace = true }
-core-ethereum-rpc = { workspace = true }
-core-ethereum-types = { workspace = true }
+chain-db = { workspace = true }
+chain-rpc = { workspace = true }
+chain-types = { workspace = true }
 core-path = { workspace = true }
 core-p2p = { workspace = true }
 core-packet = { workspace = true }

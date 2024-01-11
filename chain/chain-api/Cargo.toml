@@ -1,0 +1,44 @@
+[package]
+name = "chain-api"
+version = "0.2.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implements the main HOPR chain interface"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["prometheus"]
+wasm = [
+    "chain-db/wasm", "chain-actions/wasm", "chain-rpc/wasm", "chain-indexer/wasm",
+    "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-metrics?/wasm", "utils-types/wasm"
+]
+prometheus = ["dep:utils-metrics", "chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
+
+[dependencies]
+async-std = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+ethers = { workspace = true, default-features = false }
+futures = { workspace = true }
+primitive-types = "0.12"
+hex = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+core-crypto = { workspace = true }
+chain-actions = { workspace = true }
+chain-db = { workspace = true }
+chain-indexer = { workspace = true }
+chain-rpc = { workspace = true }
+chain-types = { workspace = true }
+core-path = { workspace = true }
+core-types = { workspace = true }
+utils-db = { workspace = true }
+log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+utils-types = { workspace = true }
+

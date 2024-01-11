@@ -1,5 +1,5 @@
 use crate::errors::Result;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
 use log::{debug, info};
 use petgraph::algo::has_path_connecting;
@@ -222,8 +222,8 @@ impl ChannelGraph {
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use chain_db::db::CoreEthereumDb;
+    use chain_db::traits::HoprCoreEthereumDbActions;
     use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
     use std::str::FromStr;

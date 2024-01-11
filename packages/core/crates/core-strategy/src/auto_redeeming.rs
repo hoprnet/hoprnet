@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core_ethereum_actions::redeem::TicketRedeemActions;
+use chain_actions::redeem::TicketRedeemActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -87,10 +87,10 @@ mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
-    use core_ethereum_actions::action_queue::{ActionConfirmation, PendingAction};
-    use core_ethereum_actions::redeem::TicketRedeemActions;
-    use core_ethereum_types::actions::Action;
-    use core_ethereum_types::chain_events::ChainEventType;
+    use chain_actions::action_queue::{ActionConfirmation, PendingAction};
+    use chain_actions::redeem::TicketRedeemActions;
+    use chain_types::actions::Action;
+    use chain_types::chain_events::ChainEventType;
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::{future::ok, FutureExt};
@@ -136,18 +136,18 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> core_ethereum_actions::errors::Result<Vec<PendingAction>>;
+            async fn redeem_all_tickets(&self, only_aggregated: bool) -> chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
+            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
                 only_aggregated: bool,
-            ) -> core_ethereum_actions::errors::Result<Vec<PendingAction >>;
-            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> core_ethereum_actions::errors::Result<PendingAction>;
+            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
+            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> chain_actions::errors::Result<PendingAction>;
         }
     }
 

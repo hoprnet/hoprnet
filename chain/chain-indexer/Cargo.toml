@@ -1,0 +1,46 @@
+[package]
+name = "chain-indexer"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Core-Ethereum-specific interaction with the backend database"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+async-std = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+ethers = { workspace = true, default-features = false, features = ["abigen"] }
+futures = { workspace = true }
+hex = { workspace = true }
+lazy_static = { workspace = true }
+multiaddr = "0.18"
+primitive-types = "0.12.1"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = { workspace = true }
+
+bindings = { workspace = true, default-features = false }
+core-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true, default-features = false }
+chain-db = { workspace = true, default-features = false }
+chain-rpc = { workspace = true, default-features = false }
+chain-types = { workspace = true, default-features = false }
+utils-db = { workspace = true }
+log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+utils-types = { workspace = true, default-features = false }
+
+[dev-dependencies]
+env_logger = "0.10"
+hex-literal = "0.4"
+mockall = "0.11"
+
+[features]
+default = ["prometheus"]
+wasm = [ "chain-db/wasm", "chain-rpc/wasm", "chain-types/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-metrics?/wasm", "utils-types/wasm" ]
+prometheus = ["dep:utils-metrics", "chain-rpc/prometheus" ]

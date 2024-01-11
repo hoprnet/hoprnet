@@ -3,7 +3,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
 use core_packet::errors::Result;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};

@@ -19,15 +19,15 @@ use futures::{
     pin_mut, Future, FutureExt, Stream, StreamExt,
 };
 
-use core_ethereum_actions::{
+use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
     errors::CoreEthereumActionsError,
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use core_ethereum_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
-use core_ethereum_types::chain_events::ChainEventType;
+use chain_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
+use chain_types::chain_events::ChainEventType;
 use core_transport::TicketStatistics;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use core_types::protocol::TagBloomFilter;
@@ -41,9 +41,9 @@ use log::debug;
 use utils_db::db::DB;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
-use core_ethereum_api::HoprChain;
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_ethereum_types::ContractAddresses;
+use chain_api::HoprChain;
+use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p_identity::PeerId;
@@ -158,7 +158,7 @@ pub fn to_chain_events_refresh_process<Db, S>(
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
-    Db: core_ethereum_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
     S: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
     Box::pin(async move {
@@ -255,13 +255,13 @@ where
                                     .await;
 
                                 match allowed {
-                                    core_ethereum_types::chain_events::NetworkRegistryStatus::Allowed => {
+                                    chain_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         let mut net = network.write().await;
                                         if ! net.has(&peer_id) {
                                             net.add_with_metadata(&peer_id, PeerOrigin::NetworkRegistry, None);
                                         }
                                     },
-                                    core_ethereum_types::chain_events::NetworkRegistryStatus::Denied => {
+                                    chain_types::chain_events::NetworkRegistryStatus::Denied => {
                                         network.write().await.remove(&peer_id);
                                     },
                                 };

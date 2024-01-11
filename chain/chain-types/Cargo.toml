@@ -1,0 +1,40 @@
+[package]
+name = "chain-types"
+version = "0.8.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Core-Ethereum-specific interaction with the backend database"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
+ethers = { workspace = true }
+hex-literal = "0.4.1"
+serde = "1.0"
+
+bindings = { workspace = true }
+core-crypto = { workspace = true }
+core-types = { workspace = true }
+platform = { workspace = true }
+log = { workspace = true }
+utils-types = { workspace = true }
+
+[dev-dependencies]
+async-std = "1.12.0"
+env_logger = "0.10"
+mockall = "0.11.4"
+hex-literal = "0.4"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+hex = { workspace = true }
+
+
+[features]
+default = []
+wasm = [ "core-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]

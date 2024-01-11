@@ -28,12 +28,12 @@ core-path = { workspace = true }
 core-transport = { workspace = true }
 core-types = { workspace = true }
 core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
-core-ethereum-actions = { workspace = true }
-core-ethereum-api = { workspace = true }
-core-ethereum-rpc = { workspace = true }
-core-ethereum-db = { workspace = true }
-core-ethereum-types = { workspace = true }
-core-ethereum-indexer = { workspace = true }
+chain-actions = { workspace = true }
+chain-api = { workspace = true }
+chain-rpc = { workspace = true }
+chain-db = { workspace = true }
+chain-types = { workspace = true }
+chain-indexer = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
@@ -50,14 +50,14 @@ wasm = [
     "core-transport/wasm",
     "core-types/wasm",
     "core-strategy/wasm",
-    "core-ethereum-actions/wasm",
-    "core-ethereum-api/wasm",
-    "core-ethereum-db/wasm",
-    "core-ethereum-indexer/wasm",
-    "core-ethereum-rpc/wasm",
+    "chain-actions/wasm",
+    "chain-api/wasm",
+    "chain-db/wasm",
+    "chain-indexer/wasm",
+    "chain-rpc/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["dep:utils-metrics", "core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus", "core-ethereum-rpc/prometheus",  ]
+prometheus = ["dep:utils-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]

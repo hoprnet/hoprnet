@@ -805,7 +805,7 @@ mod peers {
 mod channels {
     use super::*;
     use core_crypto::types::Hash;
-    use core_ethereum_actions::errors::CoreEthereumActionsError;
+    use chain_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
     use utils_types::traits::ToHex;

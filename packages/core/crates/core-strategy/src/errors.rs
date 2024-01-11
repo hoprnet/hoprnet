@@ -1,4 +1,4 @@
-use core_ethereum_actions::errors::CoreEthereumActionsError;
+use chain_actions::errors::CoreEthereumActionsError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;

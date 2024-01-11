@@ -32,7 +32,7 @@ pub use {
 };
 
 use async_lock::RwLock;
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};

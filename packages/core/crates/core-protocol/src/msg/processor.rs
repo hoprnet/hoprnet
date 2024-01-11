@@ -12,7 +12,7 @@ use core_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{
     self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
     PathPositionMismatch, Retry, TagReplay, TransportError,
@@ -786,7 +786,7 @@ mod tests {
         shared_keys::SharedSecret,
         types::{HalfKeyChallenge, Hash},
     };
-    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};

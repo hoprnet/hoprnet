@@ -4,7 +4,7 @@ use crate::errors::{
 };
 use async_lock::RwLock;
 use core_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, ChannelEntry, Ticket},
@@ -728,7 +728,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
     use core_types::{
         acknowledgement::AcknowledgedTicket,

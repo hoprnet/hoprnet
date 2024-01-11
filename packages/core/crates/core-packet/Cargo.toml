@@ -19,7 +19,7 @@ thiserror = "1.0"
 typenum = "1.16"
 
 core-crypto = { workspace = true }
-core-ethereum-db = { workspace = true }
+chain-db = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
@@ -32,7 +32,7 @@ utils-types = { workspace = true }
 async-std = {version = "1.12.0", features = ["unstable"]}
 async-process = "1.7.0"
 async-trait = "0.1.73"
-core-ethereum-types = { workspace = true, default-features = false }
+chain-types = { workspace = true, default-features = false }
 env_logger = "0.10.0"
 hex-literal = "0.4.1"
 mockall = "0.11.4"
@@ -41,5 +41,5 @@ serial_test = "2.0"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-crypto/wasm", "core-ethereum-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-types/wasm" ]
+wasm = [ "core-crypto/wasm", "chain-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "utils-metrics?/wasm", "chain-types/wasm" ]
 prometheus = [ "dep:utils-metrics", "core-path/prometheus" ]

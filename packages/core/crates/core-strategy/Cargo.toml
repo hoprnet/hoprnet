@@ -29,8 +29,8 @@ core-types = { workspace = true }
 core-crypto = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
-core-ethereum-db = { workspace = true }
-core-ethereum-actions = { workspace = true }
+chain-db = { workspace = true }
+chain-actions = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 platform = { workspace = true }
@@ -39,7 +39,7 @@ utils-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
-core-ethereum-types = { workspace = true }
+chain-types = { workspace = true }
 env_logger = "0.10.0"
 mockall = "0.11.4"
 hex-literal = "0.4.1"
@@ -49,4 +49,4 @@ futures = "0.3.28"
 [features]
 default = ["prometheus"]
 wasm = ["dep:getrandom" ]
-prometheus = [ "dep:utils-metrics", "core-network/prometheus", "core-protocol/prometheus", "core-ethereum-actions/prometheus" ]
+prometheus = [ "dep:utils-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

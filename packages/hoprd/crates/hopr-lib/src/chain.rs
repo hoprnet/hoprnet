@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
-use core_ethereum_actions::action_queue::ActionQueueConfig;
-use core_ethereum_actions::action_state::IndexerActionTracker;
-use core_ethereum_actions::payload::SafePayloadGenerator;
-use core_ethereum_actions::{action_queue::ActionQueue, CoreEthereumActions};
-use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use core_ethereum_api::{DefaultHttpPostRequestor, JsonRpcClient};
-use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
-use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use core_ethereum_types::chain_events::SignificantChainEvent;
-use core_ethereum_types::{ContractAddresses, TypedTransaction};
+use chain_actions::action_queue::ActionQueueConfig;
+use chain_actions::action_state::IndexerActionTracker;
+use chain_actions::payload::SafePayloadGenerator;
+use chain_actions::{action_queue::ActionQueue, CoreEthereumActions};
+use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use chain_types::chain_events::SignificantChainEvent;
+use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use utils_db::CurrentDbShim;
@@ -395,14 +395,14 @@ pub fn build_chain_api(
     chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> core_ethereum_api::HoprChain {
-    let indexer_cfg = core_ethereum_indexer::block::IndexerConfig {
+) -> chain_api::HoprChain {
+    let indexer_cfg = chain_indexer::block::IndexerConfig {
         start_block_number: indexer_start_block,
         finalization: confirmations,
         ..Default::default()
     };
 
-    core_ethereum_api::HoprChain::new(
+    chain_api::HoprChain::new(
         me_onchain,
         db,
         contract_addrs,

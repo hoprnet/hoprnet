@@ -22,7 +22,7 @@ petgraph = {version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-core-ethereum-db = { workspace = true }
+chain-db = { workspace = true }
 core-crypto = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
@@ -41,6 +41,6 @@ wasm-bindgen-test = "0.3.36"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+wasm = [ "chain-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = ["dep:utils-metrics" ]
 

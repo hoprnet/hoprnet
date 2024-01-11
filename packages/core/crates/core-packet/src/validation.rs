@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use core_crypto::types::Hash;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use log::{debug, info};
 use utils_types::primitives::{Address, Balance};
@@ -114,8 +114,8 @@ mod tests {
         keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash},
     };
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use chain_db::db::CoreEthereumDb;
+    use chain_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
     use core_types::channels::{f64_to_win_prob, ChannelStatus};
     use core_types::{
@@ -143,111 +143,111 @@ mod tests {
 
         #[async_trait]
         impl HoprCoreEthereumDbActions for Db {
-            async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
-            async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
-            async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> core_ethereum_db::errors::Result<()>;
-            async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
-            async fn get_unrealized_balance(&self, signer: &Hash) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_channel_epoch(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
-            async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
+            async fn get_current_ticket_index(&self, channel_id: &Hash) -> chain_db::errors::Result<Option<U256>>;
+            async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> chain_db::errors::Result<()>;
+            async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> chain_db::errors::Result<()>;
+            async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> chain_db::errors::Result<()>;
+            async fn get_tickets(&self, signer: Option<Address>) -> chain_db::errors::Result<Vec<Ticket>>;
+            async fn get_unrealized_balance(&self, signer: &Hash) -> chain_db::errors::Result<Balance>;
+            async fn get_channel_epoch(&self, channel: &Hash) -> chain_db::errors::Result<Option<U256>>;
+            async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> chain_db::errors::Result<()>;
+            async fn mark_rejected(&mut self, ticket: &Ticket) -> chain_db::errors::Result<()>;
             async fn get_pending_acknowledgement(
                 &self,
                 half_key_challenge: &HalfKeyChallenge,
-            ) -> core_ethereum_db::errors::Result<Option<PendingAcknowledgement>>;
+            ) -> chain_db::errors::Result<Option<PendingAcknowledgement>>;
             async fn store_pending_acknowledgment(
                 &mut self,
                 half_key_challenge: HalfKeyChallenge,
                 pending_acknowledgment: PendingAcknowledgement,
-            ) -> core_ethereum_db::errors::Result<()>;
+            ) -> chain_db::errors::Result<()>;
             async fn replace_unack_with_ack(
                 &mut self,
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
-            ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            ) -> chain_db::errors::Result<()>;
+            async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<usize>;
+            async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(
                 &self,
                 channel_id: &Hash,
                 epoch: u32,
                 index_start: u64,
                 index_end: u64,
-            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
-            async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            ) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> chain_db::errors::Result<()>;
             async fn prepare_aggregatable_tickets(
                 &mut self,
                 channel_id: &Hash,
                 epoch: u32,
                 index_start: u64,
                 index_end: u64,
-            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
-            async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
-            async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            ) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> chain_db::errors::Result<()>;
+            async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<Vec<UnacknowledgedTicket>>;
+            async fn get_channel_to(&self, dest: &Address) -> chain_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_from(&self, src: &Address) -> chain_db::errors::Result<Option<ChannelEntry>>;
             async fn update_channel_and_snapshot(
                 &mut self,
                 channel_id: &Hash,
                 channel: &ChannelEntry,
                 snapshot: &Snapshot,
-            ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
-            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<Option<u32>>;
-            async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
-            async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
-            async fn get_channel(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_channels_open(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_account(&self, address: &Address) -> core_ethereum_db::errors::Result<Option<AccountEntry>>;
-            async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
-            async fn get_redeemed_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_redeemed_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_neglected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channels_from(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_outgoing_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_channels_to(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_incoming_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
-            async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
-            async fn get_ticket_price(&self) -> core_ethereum_db::errors::Result<Option<U256>>;
-            async fn set_ticket_price(&mut self, ticket_price: &U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_node_safe_registry_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_channels_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_channels_ledger_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_safe_allowance(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
-            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            ) -> chain_db::errors::Result<()>;
+            async fn get_packet_key(&self, chain_key: &Address) -> chain_db::errors::Result<Option<OffchainPublicKey>>;
+            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> chain_db::errors::Result<Option<Address>>;
+            async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> chain_db::errors::Result<()>;
+            async fn get_latest_block_number(&self) -> chain_db::errors::Result<Option<u32>>;
+            async fn update_latest_block_number(&mut self, number: u32) -> chain_db::errors::Result<()>;
+            async fn get_latest_confirmed_snapshot(&self) -> chain_db::errors::Result<Option<Snapshot>>;
+            async fn get_channel(&self, channel: &Hash) -> chain_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channels(&self) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_channels_open(&self) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_account(&self, address: &Address) -> chain_db::errors::Result<Option<AccountEntry>>;
+            async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn get_accounts(&self) -> chain_db::errors::Result<Vec<AccountEntry>>;
+            async fn get_redeemed_tickets_value(&self) -> chain_db::errors::Result<Balance>;
+            async fn get_redeemed_tickets_count(&self) -> chain_db::errors::Result<usize>;
+            async fn get_neglected_tickets_count(&self) -> chain_db::errors::Result<usize>;
+            async fn get_neglected_tickets_value(&self) -> chain_db::errors::Result<Balance>;
+            async fn get_losing_tickets_count(&self) -> chain_db::errors::Result<usize>;
+            async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> chain_db::errors::Result<()>;
+            async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> chain_db::errors::Result<()>;
+            async fn get_rejected_tickets_value(&self) -> chain_db::errors::Result<Balance>;
+            async fn get_rejected_tickets_count(&self) -> chain_db::errors::Result<usize>;
+            async fn get_channel_x(&self, src: &Address, dest: &Address) -> chain_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channels_from(&self, address: &Address) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_outgoing_channels(&self) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_channels_to(&self, address: &Address) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_incoming_channels(&self) -> chain_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_public_node_accounts(&self) -> chain_db::errors::Result<Vec<AccountEntry>>;
+            async fn get_hopr_balance(&self) -> chain_db::errors::Result<Balance>;
+            async fn set_hopr_balance(&mut self, balance: &Balance) -> chain_db::errors::Result<()>;
+            async fn get_ticket_price(&self) -> chain_db::errors::Result<Option<U256>>;
+            async fn set_ticket_price(&mut self, ticket_price: &U256) -> chain_db::errors::Result<()>;
+            async fn get_node_safe_registry_domain_separator(&self) -> chain_db::errors::Result<Option<Hash>>;
+            async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn get_channels_domain_separator(&self) -> chain_db::errors::Result<Option<Hash>>;
+            async fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn get_channels_ledger_domain_separator(&self) -> chain_db::errors::Result<Option<Hash>>;
+            async fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn get_staking_safe_address(&self) -> chain_db::errors::Result<Option<Address>>;
+            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> chain_db::errors::Result<()>;
+            async fn get_staking_module_address(&self) -> chain_db::errors::Result<Option<Address>>;
+            async fn set_staking_module_address(&mut self, module_address: &Address) -> chain_db::errors::Result<()>;
+            async fn get_staking_safe_allowance(&self) -> chain_db::errors::Result<Balance>;
+            async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn is_network_registry_enabled(&self) -> chain_db::errors::Result<bool>;
+            async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn is_eligible(&self, account: &Address) -> chain_db::errors::Result<bool>;
+            async fn is_mfa_protected(&self) -> chain_db::errors::Result<Option<Address>>;
+            async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn is_allowed_to_access_network(&self, node: &Address) -> chain_db::errors::Result<bool>;
+            async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> chain_db::errors::Result<()>;
+            async fn get_from_network_registry(&self, stake_account: &Address) -> chain_db::errors::Result<Vec<Address>>;
+            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> chain_db::errors::Result<Vec<Address>>;
         }
     }
 
