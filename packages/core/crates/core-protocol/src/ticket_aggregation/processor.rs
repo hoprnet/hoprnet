@@ -895,6 +895,13 @@ mod tests {
             .await
             .unwrap();
 
+        dbs[0]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
+            .await
+            .unwrap();
+
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 

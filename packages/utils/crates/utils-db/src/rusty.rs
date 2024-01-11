@@ -693,7 +693,10 @@ pub mod wasm {
                 .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
             if written >= 0 {
-                Ok(written as usize)
+                // we flush after every successful write to ensure consistency
+                fsync_sync(self.0)
+                    .map(|_| written as usize)
+                    .map_err(|_| io::Error::from(io::ErrorKind::Other))
             } else {
                 Err(io::ErrorKind::Other.into())
             }

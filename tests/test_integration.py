@@ -79,6 +79,17 @@ async def get_channel_seen_from_dst(src, dest, include_closed=False):
     return channels[0] if len(channels) > 0 else None
 
 
+async def get_channel_seen_from_dst(src, dest, include_closed=False):
+    open_channels = await dest["api"].all_channels(include_closed=include_closed)
+    channels = [
+        oc
+        for oc in open_channels.all
+        if oc.source_address == src["address"] and oc.destination_address == dest["address"]
+    ]
+
+    return channels[0] if len(channels) > 0 else None
+
+
 async def check_channel_status(src, dest, status):
     assert status in ["Open", "PendingToClose", "Closed"]
     include_closed = status == "Closed"
@@ -149,6 +160,24 @@ async def check_rejected_tickets(src, count):
 async def check_unredeemed_tickets_value(src, value):
     while balance_str_to_int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+async def check_all_tickets_redeemed(src, channel_id=None):
+    if channel_id is not None:
+        while len(await src["api"].channel_get_tickets(channel_id)) > 0:
+            await asyncio.sleep(CHECK_RETRY_INTERVAL)
+    else:
+        while (await src["api"].get_tickets_statistics()).unredeemed > 0:
+            await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+async def send_and_receive_packets(packets, src, dest, path, timeout=MULTIHOP_MESSAGE_SEND_TIMEOUT):
+    random_tag = random.randint(10, 65530)
+
+    for packet in packets:
+        assert await src["api"].send_message(dest["peer_id"], packet, path, random_tag)
+
+    await asyncio.wait_for(check_received_packets(dest, packets, tag=random_tag, sort=True), timeout)
 
 
 async def check_all_tickets_redeemed(src, channel_id=None):
