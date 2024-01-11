@@ -82,7 +82,6 @@ impl SqliteShim<'_> {
                 .optimize_on_close(true, None)
                 .page_size(4096)
                 .pragma("cache_size", "-30000"), // 32M
-
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
