@@ -95,7 +95,7 @@ hopr:
           native_token_name: ETH
           hopr_token_name: wxHOPR
           block_time: 2000
-          tags:git
+          tags: []
     check_unrealized_balance: true
   safe_module:
     safe_transaction_service_provider: 'https://safe-transaction.stage.hoprtech.net/'
