@@ -58,7 +58,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         }
     }
 
-    pub async fn init_cache(&mut self) -> Result<()> {
+    pub async fn init_cache1(&mut self) -> Result<()> {
         // let channels = self.get_channels().await?;
         // info!("Cleaning up invalid tickets from {} tracked channels...", channels.len());
         // for channel in channels.iter() {
@@ -80,7 +80,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
                 if let Some((current_channel_epoch, current_ticket_index)) =
-                    cached_channel.get(&ticket.channel_id).map(|c| c.clone())
+                    cached_channel.get(&ticket.channel_id).cloned()
                 {
                     // from the cached_channel
                     (current_channel_epoch, current_ticket_index)
@@ -111,71 +111,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     .cached_unrealized_value
                     .get(&ticket.channel_id)
                     .map(|b| b.clone())
-                    .unwrap_or(Balance::zero(BalanceType::HOPR))
-                    .add(&ticket.amount);
-
-                self.cached_unrealized_value
-                    .insert(ticket.channel_id, unrealized_balance);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-    pub async fn init_cache(&mut self) -> Result<()> {
-        // let channels = self.get_channels().await?;
-        // info!("Cleaning up invalid tickets from {} tracked channels...", channels.len());
-        // for channel in channels.iter() {
-        //     self.cleanup_invalid_channel_tickets(channel).await?
-        // }
-
-        let mut cached_channel: HashMap<Hash, (u32, u64)> = HashMap::new(); // channel_id: (channel_epoch, ticket_index)
-        debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
-
-        // FIXME: Currently a node does not have a way of reconciling unacknowledged
-        // tickets with the sender. Therefore, the use of unack tickets could make a
-        // channel inoperable. Re-enable the use of unacknowledged tickets in this
-        // calculation once a reconciliation mechanism has been implemented
-        let tickets = self.get_acknowledged_tickets(None).await?;
-        info!("Calculating unrealized balance for {} tickets...", tickets.len());
-
-        for ack_ticket in tickets.into_iter() {
-            let ticket = ack_ticket.ticket;
-            // get the corresponding channel info from the cached_channel, or from the db
-            let (channel_epoch, ticket_index) = {
-                if let Some((current_channel_epoch, current_ticket_index)) =
-                    cached_channel.get(&ticket.channel_id).copied()
-                {
-                    // from the cached_channel
-                    (current_channel_epoch, current_ticket_index)
-                } else {
-                    // read from db
-                    let (channel_epoch, ticket_index) = {
-                        if let Some(channel_entry) = self.get_channel(&ticket.channel_id).await? {
-                            // update the cached value
-                            (
-                                channel_entry.channel_epoch.as_u32(),
-                                channel_entry.ticket_index.as_u64(),
-                            )
-                        } else {
-                            (0u32, 0u64)
-                        }
-                    };
-                    // update the cached value
-                    cached_channel.insert(ticket.channel_id, (channel_epoch, ticket_index));
-                    (channel_epoch, ticket_index)
-                }
-            };
-
-            if ticket.channel_epoch == channel_epoch && ticket.index >= ticket_index {
-                // only calculate unrealized balance if ticket is issued of the current channel_epoch and index larger than or equal to the ticket_index in the channel
-                // do nothing to tickets that is issued to channel_epoch larger than the current channel_epoch
-                // TODO: for other tickets (of previous channel epoch; or of the current channel epoch but index smaller than ticket_index in the channel), remove it from the db
-                let unrealized_balance = self
-                    .cached_unrealized_value
-                    .get(&ticket.channel_id)
-                    .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
                     .add(&ticket.amount);
 
@@ -232,34 +167,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             // Ignoring evicted value
             // flush the db after setter
             self.db.flush().await?;
-        }
-        Ok(())
-    }
-
-    // combine the two function above to increase the current ticket index of a channel
-    async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> Result<()> {
-        let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let current_index = self
-            .db
-            .get_or_none::<U256>(prefixed_key.clone())
-            .await?
-            .unwrap_or(U256::zero());
-        let _evicted = self.db.set(prefixed_key, &current_index.addn(1_u32)).await?;
-        // Ignoring evicted value
-        Ok(())
-    }
-
-    // ensure the current ticket index is not smaller than the given value. If it's samller, set to the given value
-    async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
-        let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let current_index = self
-            .db
-            .get_or_none::<U256>(prefixed_key.clone())
-            .await?
-            .unwrap_or(U256::zero());
-        // compare the current_index with index, if current_index is smaller than index, set to index
-        if current_index < index {
-            let _evicted = self.db.set(prefixed_key, &index).await?;
         }
         Ok(())
     }
