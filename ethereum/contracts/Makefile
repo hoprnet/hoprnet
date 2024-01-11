@@ -4,7 +4,7 @@ SOLIDITY_DEP_FILES := $(shell find ./../../vendor/solidity -type f -name "*.sol"
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_DEP_FILES)
 
 # Use local foundry directory (for binaries)
-FOUNDRY_DIR ?= ${CURDIR}/../../../.foundry
+FOUNDRY_DIR ?= ${CURDIR}/../../.foundry
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 
@@ -31,8 +31,8 @@ sc-audit-coverage:
 forked-local-anvil:
 	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
 
-../bindings/src: ${SOLIDITY_FILES}
-../bindings/src: ## Only create types for Hopr* contracts
+generate-bindings: ${SOLIDITY_FILES}
+generate-bindings: ## Only create types for Hopr* contracts
 	$(forge-bind) --bindings-path ../bindings --crate-name bindings \
 		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
 

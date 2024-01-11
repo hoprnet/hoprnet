@@ -119,7 +119,7 @@ cargo-download: ## download vendored Cargo dependencies
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
-	$(MAKE) -C ethereum/contracts/ ../bindings/src
+	$(MAKE) -C ethereum/contracts/ generate-bindings
 
 .PHONY: build
 build: ## build all packages
@@ -137,8 +137,8 @@ build-docs: ## build typedocs, Rest API docs
 .PHONY: install
 install:
 	$(cargo) install --path hopli
-	$(cargo) install --path hoprd/hoprd-api
-	$(cargo) install --path hoprd/hoprd-hoprd
+	$(cargo) install --path hoprd/rest-api
+	$(cargo) install --path hoprd/hoprd
 
 .PHONY: clean
 clean: # Cleanup build directories
