@@ -1,9 +1,3 @@
-use hopr_crypto::{
-    derivation::{derive_ack_key_share, PacketTag},
-    keypairs::{ChainKeypair, OffchainKeypair},
-    shared_keys::SphinxSuite,
-    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
-};
 use core_packet::{
     errors::{PacketError::PacketDecodingError, Result},
     packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
@@ -12,6 +6,12 @@ use core_packet::{
 use core_path::path::{Path, TransportPath};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
+use hopr_crypto::{
+    derivation::{derive_ack_key_share, PacketTag},
+    keypairs::{ChainKeypair, OffchainKeypair},
+    shared_keys::SphinxSuite,
+    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
+};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
@@ -225,15 +225,15 @@ impl ChainPacketComponents {
 mod tests {
     use super::ChainPacketComponents;
     use async_trait::async_trait;
+    use core_path::channel_graph::ChannelGraph;
+    use core_path::path::TransportPath;
+    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use core_types::protocol::PeerAddressResolver;
     use hopr_crypto::types::OffchainPublicKey;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, PublicKey},
     };
-    use core_path::channel_graph::ChannelGraph;
-    use core_path::path::TransportPath;
-    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use core_types::protocol::PeerAddressResolver;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
     use utils_types::primitives::Address;

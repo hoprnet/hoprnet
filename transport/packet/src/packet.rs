@@ -1,4 +1,5 @@
 use crate::errors::PacketError::PacketDecodingError;
+use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use hopr_crypto::{
     derivation::{derive_packet_tag, PacketTag},
     keypairs::Keypair,
@@ -7,7 +8,6 @@ use hopr_crypto::{
     routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
-use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use typenum::Unsigned;
 use utils_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
 
@@ -243,12 +243,12 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
 mod tests {
     use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
+    use core_types::protocol::INTERMEDIATE_HOPS;
     use hopr_crypto::{
         ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         shared_keys::SphinxSuite,
     };
-    use core_types::protocol::INTERMEDIATE_HOPS;
     use parameterized::parameterized;
 
     #[test]

@@ -1,12 +1,12 @@
 use crate::CoreEthereumActions;
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
+use hopr_crypto::types::Hash;
 use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
@@ -241,9 +241,6 @@ mod tests {
     use crate::redeem::TicketRedeemActions;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
@@ -253,6 +250,9 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;

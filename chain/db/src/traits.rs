@@ -1,13 +1,13 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use hopr_crypto::types::OffchainPublicKey;
-use hopr_crypto::types::{HalfKeyChallenge, Hash};
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
+use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::{HalfKeyChallenge, Hash};
 use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 #[async_trait]

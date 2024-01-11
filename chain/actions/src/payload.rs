@@ -14,7 +14,6 @@ use bindings::{
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
-use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
 use chain_types::ContractAddresses;
 use chain_types::{create_eip1559_transaction, TypedTransaction};
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
@@ -23,6 +22,7 @@ use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
+use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -561,10 +561,6 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
 #[cfg(test)]
 pub mod tests {
     use bindings::{hopr_channels::HoprChannels, hopr_token::HoprToken};
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::native::SurfRequestor;
     use chain_types::{create_anvil, ContractInstances};
@@ -578,6 +574,10 @@ pub mod tests {
         types::{Bytes, Eip1559TransactionRequest, H160, U256},
     };
     use hex_literal::hex;
+    use hopr_crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{Hash, Response},
+    };
     use multiaddr::Multiaddr;
     use std::{str::FromStr, sync::Arc};
     use utils_types::primitives::Address;

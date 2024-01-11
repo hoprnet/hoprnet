@@ -25,8 +25,8 @@ use platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    strum::VariantNames,
     metrics::metrics::{MultiGauge, SimpleCounter},
+    strum::VariantNames,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]

@@ -98,8 +98,8 @@ mod test {
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use log::debug;
     use utils_types::primitives::Address;
 

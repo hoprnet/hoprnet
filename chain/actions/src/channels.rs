@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use core_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_crypto::types::Hash;
 use log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
@@ -166,13 +166,13 @@ mod tests {
     use crate::errors::CoreEthereumActionsError;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
-    use hopr_crypto::{random::random_bytes, types::Hash};
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_crypto::{random::random_bytes, types::Hash};
     use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{

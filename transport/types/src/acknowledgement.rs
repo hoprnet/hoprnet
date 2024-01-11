@@ -434,11 +434,11 @@ pub mod test {
         channels::Ticket,
     };
     use bincode::{deserialize, serialize};
+    use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
     };
-    use hex_literal::hex;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
         traits::BinarySerializable,

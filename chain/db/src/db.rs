@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_types::channels::ChannelDirection;
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
+use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use log::{debug, error, info};
 use utils_db::errors::DbError;
 use utils_db::{
@@ -1343,12 +1343,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core_types::channels::ChannelEntry;
+    use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Response},
     };
-    use core_types::channels::ChannelEntry;
-    use hex_literal::hex;
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};

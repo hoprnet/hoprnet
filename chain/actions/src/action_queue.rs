@@ -1,6 +1,5 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
@@ -16,6 +15,7 @@ use core_types::{
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
+use hopr_crypto::types::Hash;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

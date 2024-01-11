@@ -327,10 +327,6 @@ mod tests {
     use crate::strategy::SingularStrategy;
     use async_lock::RwLock;
     use async_trait::async_trait;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
     use chain_actions::action_queue::PendingAction;
     use chain_actions::redeem::TicketRedeemActions;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -346,6 +342,10 @@ mod tests {
     use futures::channel::oneshot::Receiver;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
+    use hopr_crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{Hash, Response},
+    };
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::pin::pin;

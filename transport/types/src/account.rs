@@ -199,8 +199,8 @@ mod test {
         AccountEntry,
         AccountType::{Announced, NotAnnounced},
     };
-    use hopr_crypto::types::OffchainPublicKey;
     use hex_literal::hex;
+    use hopr_crypto::types::OffchainPublicKey;
     use multiaddr::Multiaddr;
     use utils_types::{primitives::Address, traits::BinarySerializable};
 

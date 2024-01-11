@@ -7,7 +7,6 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents,
 };
-use hopr_crypto::types::OffchainSignature;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
@@ -17,6 +16,7 @@ use core_types::{
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use hopr_crypto::types::OffchainSignature;
 use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
@@ -618,10 +618,6 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use hopr_crypto::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::Hash,
-    };
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::ContractAddresses;
     use core_types::{
@@ -635,6 +631,10 @@ pub mod tests {
         types::U256 as EthU256,
     };
     use hex_literal::hex;
+    use hopr_crypto::{
+        keypairs::{Keypair, OffchainKeypair},
+        types::Hash,
+    };
     use multiaddr::Multiaddr;
     use primitive_types::H256;
     use utils_db::{db::DB, CurrentDbShim};

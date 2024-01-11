@@ -16,8 +16,8 @@ use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    platform::time::native::current_timestamp,
     metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
+    platform::time::native::current_timestamp,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]

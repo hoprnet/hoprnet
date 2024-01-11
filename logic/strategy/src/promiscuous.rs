@@ -1,5 +1,5 @@
-use hopr_crypto::types::OffchainPublicKey;
 use core_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_crypto::types::OffchainPublicKey;
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
@@ -394,9 +394,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;
@@ -407,6 +404,9 @@ mod tests {
     };
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
+    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::Hash;
     use lazy_static::lazy_static;
     use mockall::mock;
     use platform::time::native::current_timestamp;

@@ -1,10 +1,10 @@
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 use async_trait::async_trait;
 use bloomfilter::Bloom;
+use ethers::utils::hex;
 use hopr_crypto::derivation::PacketTag;
 use hopr_crypto::random::random_bytes;
 use hopr_crypto::types::OffchainPublicKey;
-use ethers::utils::hex;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

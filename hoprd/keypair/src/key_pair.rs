@@ -6,9 +6,9 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
+use hex;
 use hopr_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_crypto::random::random_bytes;
-use hex;
 use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};

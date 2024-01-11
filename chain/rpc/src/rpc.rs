@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
 use chain_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -8,6 +7,7 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
+use hopr_crypto::keypairs::{ChainKeypair, Keypair};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -211,10 +211,10 @@ pub mod tests {
     use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
     use async_std::task::sleep;
     use bindings::hopr_token::HoprToken;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use primitive_types::H160;
     use std::future::IntoFuture;
     use std::time::Duration;

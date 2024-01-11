@@ -1,6 +1,6 @@
-use hopr_crypto::types::Hash;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
+use hopr_crypto::types::Hash;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use utils_types::primitives::{Address, Balance};

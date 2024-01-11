@@ -1,6 +1,6 @@
 use async_lock::RwLock;
-use hopr_crypto::types::Hash;
 use futures::{pin_mut, StreamExt};
+use hopr_crypto::types::Hash;
 use log::{debug, error, info};
 use std::{collections::VecDeque, sync::Arc};
 
@@ -312,7 +312,6 @@ pub mod tests {
 
     use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use chain_db::db::CoreEthereumDb;
     use chain_rpc::BlockWithLogs;
     use chain_types::chain_events::ChainEventType;
@@ -321,6 +320,7 @@ pub mod tests {
         contract::EthEvent,
     };
     use futures::{join, Stream};
+    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};

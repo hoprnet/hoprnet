@@ -1,13 +1,13 @@
 use crate::errors::{CoreTypesError, Result};
 use bindings::hopr_channels::RedeemTicketCall;
+use enum_iterator::{all, Sequence};
+use ethers::contract::EthCall;
+use hex_literal::hex;
 use hopr_crypto::{
     errors::CryptoError::SignatureVerification,
     keypairs::{ChainKeypair, Keypair},
     types::{Hash, PublicKey, Signature},
 };
-use enum_iterator::{all, Sequence};
-use ethers::contract::EthCall;
-use hex_literal::hex;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -836,11 +836,11 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
 #[cfg(test)]
 pub mod tests {
     use crate::channels::{f64_to_win_prob, ChannelEntry, ChannelStatus, Ticket};
+    use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
     };
-    use hex_literal::hex;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
         traits::BinarySerializable,

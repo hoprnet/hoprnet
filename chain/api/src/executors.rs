@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use hopr_crypto::types::Hash;
 use chain_actions::action_queue::TransactionExecutor;
 use chain_actions::payload::PayloadGenerator;
 use chain_rpc::errors::RpcError;
@@ -9,6 +8,7 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
+use hopr_crypto::types::Hash;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -58,10 +58,7 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
         Self { rpc, cfg }
     }
 
-    async fn post_tx_with_timeout(
-        &self,
-        tx: TypedTransaction,
-    ) -> chain_rpc::errors::Result<PendingTransaction> {
+    async fn post_tx_with_timeout(&self, tx: TypedTransaction) -> chain_rpc::errors::Result<PendingTransaction> {
         let submit_tx = self.rpc.send_transaction(tx).fuse();
         let timeout = sleep(self.cfg.max_tx_submission_wait).fuse();
         pin_mut!(submit_tx, timeout);
@@ -79,10 +76,7 @@ impl<Rpc: HoprRpcOperations + Send + Sync> EthereumClient<TypedTransaction> for 
         self.post_tx_with_timeout(tx).await.map(|t| t.tx_hash())
     }
 
-    async fn post_transaction_and_await_confirmation(
-        &self,
-        tx: TypedTransaction,
-    ) -> chain_rpc::errors::Result<Hash> {
+    async fn post_transaction_and_await_confirmation(&self, tx: TypedTransaction) -> chain_rpc::errors::Result<Hash> {
         // Polling for completion has internal retry amount set to max 3
         // so it does not need an additional timeout set.
         Ok(self.post_tx_with_timeout(tx).await?.await?.tx_hash)
@@ -130,11 +124,7 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn fund_channel(
-        &self,
-        destination: Address,
-        balance: Balance,
-    ) -> chain_actions::errors::Result<Hash> {
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.fund_channel(destination, balance)?;
         Ok(self.client.post_transaction(payload).await?)
     }

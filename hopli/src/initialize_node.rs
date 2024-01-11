@@ -6,11 +6,11 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use hopr_crypto::keypairs::Keypair;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
+use hopr_crypto::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
 

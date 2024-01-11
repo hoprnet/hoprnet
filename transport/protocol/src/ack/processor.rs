@@ -1,8 +1,6 @@
 use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
-use hopr_crypto::keypairs::ChainKeypair;
-use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
 use core_packet::errors::Result;
@@ -10,6 +8,8 @@ use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAc
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
+use hopr_crypto::keypairs::ChainKeypair;
+use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
 use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use std::pin::Pin;

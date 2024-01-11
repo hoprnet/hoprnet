@@ -1,20 +1,20 @@
 //! HOPRdaemon application providing a higher level interface for creating a HOPRd with or without
 //! a dedicated REST API.
-//! 
+//!
 //! When the Rest API is enabled, the node serves a Swagger UI to inspect and test
 //! the Rest API v3 at: http://localhost:3001/swagger-ui/index.html
-//! 
+//!
 //! NOTE: Hostname and port can be different, since they depend on the settings `--apiHost` and `--apiPort`.
-//! 
+//!
 //! ## Usage
 //! See `hoprd --help` for full list.
 
 //! ```shell
 //! $ hoprd --help
 //! Contains the main entry point of HOPR daemon applicatio
-//! 
+//!
 //! Usage: hoprd [OPTIONS]
-//! 
+//!
 //! Options:
 //!       --network <NETWORK>
 //!           ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=]
@@ -85,7 +85,6 @@
 //!   -V, --version
 //!           Print version
 //! ```
-
 
 pub mod cli;
 pub mod config;

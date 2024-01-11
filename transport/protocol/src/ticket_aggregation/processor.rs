@@ -3,7 +3,6 @@ use crate::errors::{
     Result,
 };
 use async_lock::RwLock;
-use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
@@ -18,6 +17,7 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
+use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
@@ -724,10 +724,6 @@ where
 #[cfg(test)]
 mod tests {
     use async_lock::RwLock;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
     use core_types::{
@@ -736,6 +732,10 @@ mod tests {
     };
     use futures_lite::StreamExt;
     use hex_literal::hex;
+    use hopr_crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{Hash, Response},
+    };
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;

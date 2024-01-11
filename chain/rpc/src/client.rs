@@ -339,8 +339,8 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
         ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
     >,
 > {
-    use hopr_crypto::keypairs::Keypair;
     use ethers::signers::Signer;
+    use hopr_crypto::keypairs::Keypair;
 
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
@@ -355,10 +355,10 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use std::time::Duration;
     use utils_types::primitives::Address;
 

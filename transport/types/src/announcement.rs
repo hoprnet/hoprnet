@@ -150,8 +150,8 @@ impl Display for AnnouncementData {
 #[cfg(test)]
 mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use hex_literal::hex;
+    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use multiaddr::Multiaddr;
     use utils_types::{
         primitives::Address,

@@ -113,8 +113,6 @@ mod tests {
     use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_actions::channels::ChannelActions;
     use chain_types::actions::Action;
@@ -123,6 +121,8 @@ mod tests {
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::Hash;
     use mockall::mock;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::BinarySerializable;
