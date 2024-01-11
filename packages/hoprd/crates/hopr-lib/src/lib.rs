@@ -72,7 +72,7 @@ use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_SEND_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
-        "hopr_counter_failed_send_messages",
+        "hopr_failed_send_message_count",
         "Number of sent messages failures"
     ).unwrap();
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
@@ -80,9 +80,14 @@ lazy_static::lazy_static! {
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
     static ref METRIC_HOPR_LIB_VERSION: MultiGauge = MultiGauge::new(
-        "hopr_gauge_lib_version",
+        "hopr_lib_version",
         "Executed version of hopr-lib",
         &["version"]
+    ).unwrap();
+    static ref METRIC_HOPR_NODE_INFO: MultiGauge = MultiGauge::new(
+        "hopr_node_addresses",
+        "Node on-chain and off-chain addresses",
+        &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
 }
 
@@ -839,6 +844,17 @@ impl Hopr {
         info!("# STARTED NODE");
         info!("ID {}", self.transport_api.me());
         info!("Protocol version {}", constants::APP_VERSION);
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_HOPR_NODE_INFO.set(
+            &[
+                &self.me.public().to_peerid().to_string(),
+                &self.me_onchain().to_string(),
+                &self.safe_module_cfg.safe_address.to_string(),
+                &self.safe_module_cfg.module_address.to_string(),
+            ],
+            1.0,
+        );
 
         Ok(futures::future::pending())
     }

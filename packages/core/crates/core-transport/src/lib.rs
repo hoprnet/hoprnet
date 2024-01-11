@@ -61,7 +61,7 @@ use {core_path::path::Path, utils_metrics::metrics::SimpleHistogram};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PATH_LENGTH: SimpleHistogram = SimpleHistogram::new(
-        "hopr_histogram_path_length",
+        "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();

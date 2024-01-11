@@ -21,7 +21,7 @@ use utils_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 lazy_static::lazy_static! {
     static ref METRIC_TIME_TO_HEARTBEAT: SimpleHistogram =
         SimpleHistogram::new(
-            "hopr_histogram_heartbeat_time_sec",
+            "hopr_heartbeat_round_time_sec",
             "Measures total time in seconds it takes to probe all other nodes",
             vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();

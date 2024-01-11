@@ -41,19 +41,25 @@ lazy_static::lazy_static! {
     // packet processing
     static ref METRIC_PACKET_COUNT: MultiCounter =
         MultiCounter::new(
-        "hopr_counter_packets",
+        "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
+    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter =
+        MultiCounter::new(
+        "hopr_packets_per_peer_count",
+        "Number of processed packets to/from distinct peers",
+        &["peer", "direction"]
+    ).unwrap();
     static ref METRIC_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_counter_created_tickets", "Number of created tickets").unwrap();
+        SimpleCounter::new("hopr_created_tickets_count", "Number of created tickets").unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_counter_rejected_tickets", "Number of rejected tickets").unwrap();
+        SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
     // mixer
     static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("hopr_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "hopr_gauge_mixer_average_packet_delay",
+        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
+    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+        "hopr_mixer_average_packet_delay",
         "Average mixer packet delay averaged over a packet window"
     )
     .unwrap();
@@ -658,7 +664,10 @@ impl PacketInteraction {
                             data,
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PACKET_COUNT.increment(&["sent"]);
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
+                                METRIC_PACKET_COUNT.increment(&["sent"]);
+                            }
 
                             if let Some(finalizer) = finalizer {
                                 finalizer.finalize(ack_challenge);
@@ -674,7 +683,10 @@ impl PacketInteraction {
                         } => match ApplicationData::from_bytes(plain_text.as_ref()) {
                             Ok(app_data) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_PACKET_COUNT.increment(&["received"]);
+                                {
+                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                                    METRIC_PACKET_COUNT.increment(&["received"]);
+                                }
 
                                 Ok(MsgProcessed::Receive(previous_hop, app_data, ack))
                             }
@@ -689,7 +701,11 @@ impl PacketInteraction {
                             ..
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
 
                             Ok(MsgProcessed::Forward(next_hop, data, previous_hop, ack))
                         }
@@ -714,9 +730,9 @@ impl PacketInteraction {
                                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
                                 let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
-                                METRIC_AVERAGE_DELAY.set(
+                                METRIC_MIXER_AVERAGE_DELAY.set(
                                     (weight * random_delay.as_millis() as f64)
-                                        + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()),
+                                        + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
                                 );
                             }
 

@@ -20,7 +20,7 @@ const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_MESSAGE_LATENCY: SimpleHistogram = SimpleHistogram::new(
-        "hopr_histogram_message_latency_sec",
+        "hopr_message_latency_sec",
         "Histogram of measured received message latencies in seconds",
         vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0]
     ).unwrap();

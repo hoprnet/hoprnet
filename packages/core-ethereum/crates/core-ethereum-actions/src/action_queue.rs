@@ -39,7 +39,7 @@ use utils_metrics::metrics::MultiCounter;
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_ACTIONS: MultiCounter = MultiCounter::new(
-        "hopr_counter_chain_actions",
+        "hopr_chain_actions_count",
         "Number of different chain actions and their results",
         &["action", "result"]
     )

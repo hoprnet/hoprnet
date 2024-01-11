@@ -16,7 +16,7 @@ use utils_metrics::metrics::SimpleCounter;
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_REDEEMS: SimpleCounter =
-        SimpleCounter::new("hopr_counter_strategy_auto_redeem_redeems", "Count of initiated automatic redemptions").unwrap();
+        SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`

@@ -18,7 +18,7 @@ use utils_metrics::metrics::SimpleGauge;
 lazy_static::lazy_static! {
     static ref METRIC_RPC_CHAIN_HEAD: SimpleGauge =
         SimpleGauge::new(
-            "hopr_gauge_chain_head",
+            "hopr_chain_head_block_number",
             "Current block number of chain head",
     ).unwrap();
 }

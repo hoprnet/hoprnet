@@ -32,11 +32,11 @@ use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_OPENS: SimpleCounter =
-        SimpleCounter::new("hopr_counter_strategy_promiscuous_opened_channels", "Count of open channel decisions").unwrap();
+        SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
     static ref METRIC_COUNT_CLOSURES: SimpleCounter =
-        SimpleCounter::new("hopr_counter_strategy_promiscuous_closed_channels", "Count of close channel decisions").unwrap();
+        SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
     static ref METRIC_MAX_AUTO_CHANNELS: SimpleGauge =
-        SimpleGauge::new("hopr_gauge_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
+        SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
 /// Config of promiscuous strategy.
