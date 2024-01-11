@@ -176,6 +176,12 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
+                debug!(
+                    "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
+                    channel_closed.channel_id,
+                    maybe_channel.is_some()
+                );
+
                 if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
@@ -210,7 +216,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let maybe_channel = db.get_channel(&channel_id).await?;
                 let is_reopen = maybe_channel.is_some();
                 debug!(
-                    "on_open_channel_event - source: {source} - destination: {destination} - channel_id: {channel_id}, channel known: {is_reopen}"
+                    "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}, channel known: {is_reopen}"
                 );
 
                 let channel = maybe_channel

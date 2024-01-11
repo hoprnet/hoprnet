@@ -85,6 +85,8 @@ pub struct ChainOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
+    /// expected block time on the chain in milliseconds
+    pub block_time: u64,
     pub tags: Option<Vec<String>>,
 }
 
@@ -107,6 +109,10 @@ pub struct Network {
     pub addresses: Addresses,
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
+    /// milliseconds between polling the RPC for new transactions
+    pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
 }
 
 #[serde_as]
@@ -181,6 +187,10 @@ pub struct ChainNetworkConfig {
     pub node_stake_v2_factory: Address,
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
+    /// milliseconds between polling the RPC for new transactions
+    pub tx_polling_interval: u64,
+    /// number of blocks to fetch logs for when indexing
+    pub logs_page_size: u64,
 }
 
 /// Check whether the version is allowed
@@ -231,6 +241,8 @@ impl ChainNetworkConfig {
                 node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
+                tx_polling_interval: network.tx_polling_interval,
+                logs_page_size: network.logs_page_size,
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
@@ -344,7 +356,10 @@ where
         contract_addrs,
         module_address,
         max_http_retries: 10,
-        expected_block_time: Duration::from_secs(7),
+        expected_block_time: Duration::from_millis(chain_config.chain.block_time),
+        tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
+        tx_confirmations: chain_config.confirmations as usize,
+        logs_page_size: chain_config.logs_page_size,
         ..RpcOperationsConfig::default()
     };
     let rpc_client_cfg = RpcEthereumClientConfig::default();
@@ -377,12 +392,14 @@ pub fn build_chain_api(
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
+    confirmations: u64,
     chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
     let indexer_cfg = core_ethereum_indexer::block::IndexerConfig {
         start_block_number: indexer_start_block,
+        finalization: confirmations,
         ..Default::default()
     };
 

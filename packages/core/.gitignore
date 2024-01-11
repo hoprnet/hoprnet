@@ -1,9 +1,3 @@
-# Exclude node stuff
-/node_modules
-
-# Exclude built files
-/lib
-
 # Exclude vim swap files
 *.swp
 
