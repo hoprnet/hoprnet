@@ -1,3 +1,6 @@
+.cargo
+# Needed for cargo vendoring
+!.cargo/config.toml
 .direnv
 .git
 .githooks
