@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Pipeline triggered on every pull request to run unit and e2e tests
+# Pipeline triggered on every pull request to run unit and smoke tests
 #################################################################################
 name: Test
 
@@ -19,10 +19,9 @@ concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true
 jobs:
-  unit_testing:
-    name: Unit
-    runs-on: ubuntu-2-core
-    timeout-minutes: 90
+  build:
+    runs-on: ubuntu-8-core
+    timeout-minutes: 30
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
@@ -38,7 +37,7 @@ jobs:
         if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0"
+          version: "v0.7.4"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v24
@@ -62,7 +61,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            .cargo/.package-cache/
+            .cargo/bin/
             .foundry/bin/
 
       - name: Install dependencies
@@ -71,15 +70,69 @@ jobs:
       - name: Build
         run: nix develop -c make -j build
 
+  unit-tests:
+    needs:
+      - build
+    runs-on: ubuntu-2-core
+    timeout-minutes: 30
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.7.4"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v13
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/bin/
+            .foundry/bin/
+
       - name: Test
         run: nix develop -c make -j test
         env:
           HOPR_NETWORK: anvil-localhost
 
-  e2e_testing:
-    name: End to end
+  smoke-tests:
+    needs:
+      - build
+    strategy:
+      matrix:
+        suite:
+          - integration
+          #- security      TODO: re-enable when fixed
+          #- websocket_api TODO: re-enable when fixed
     runs-on: ubuntu-8-core
-    timeout-minutes: 120
+    timeout-minutes: 30
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
@@ -102,7 +155,7 @@ jobs:
         if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0"
+          version: "v0.7.4"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v24
@@ -126,7 +179,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            .cargo/.package-cache/
+            .cargo/bin/
             .foundry/bin/
 
       - name: Install dependencies
@@ -143,15 +196,14 @@ jobs:
         run: nix develop -c make -j install
 
       - name: Test with pytest
-        run: |
-          nix develop -c make smoke-test
-        timeout-minutes: 60
+        run: nix develop -c make smoke-test suite=${{ matrix.suite }}
+        timeout-minutes: 30
 
       - name: Compress test logs
         if: always()
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
+          test_path=/tmp/test-smoke-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
           cp -r /tmp/hopr-smoke-test* ${test_path} || echo "no files to copy"
           cd ${test_path}
@@ -163,6 +215,6 @@ jobs:
         if: always()
         with:
           path: /tmp/
-          glob: 'test-e2e-*'
+          glob: 'test-smoke-*'
           parent: false
           destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}

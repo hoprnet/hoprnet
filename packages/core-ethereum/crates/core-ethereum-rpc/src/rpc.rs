@@ -57,7 +57,7 @@ impl Default for RpcOperationsConfig {
             contract_addrs: Default::default(),
             module_address: Default::default(),
             max_http_retries: 5,
-            logs_page_size: 50,
+            logs_page_size: 2500,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
             tx_confirmations: 8,

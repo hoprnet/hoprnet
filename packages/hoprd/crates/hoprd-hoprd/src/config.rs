@@ -428,6 +428,8 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
             announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
+          tx_polling_interval: 1000
+          logs_page_size: 200
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
@@ -439,7 +441,8 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
           max_priority_fee_per_gas: 0.2 gwei
           native_token_name: ETH
           hopr_token_name: wxHOPR
-          tags: null
+          block_time: 5000
+          tags: []
     check_unrealized_balance: true
   safe_module:
     safe_transaction_service_provider: https:://provider.com/
@@ -517,7 +520,9 @@ mod tests {
                               "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
                             },
                             "confirmations": 2,
-                            "tags": []
+                            "tags": [],
+                            "tx_polling_interval": 1000,
+                            "logs_page_size": 200
                           }
                         },
                         "chains": {
@@ -529,7 +534,10 @@ mod tests {
                             "max_priority_fee_per_gas": "0.2 gwei",
                             "default_provider": "http://127.0.0.1:8545/",
                             "native_token_name": "ETH",
-                            "hopr_token_name": "wxHOPR"
+                            "hopr_token_name": "wxHOPR",
+                            "block_time": 5000,
+                            "tags": [],
+                            "etherscan_api_url": null
                           }
                         }
                       }
@@ -565,6 +573,7 @@ mod tests {
         let cfg = example_cfg();
 
         let yaml = serde_yaml::to_string(&cfg)?;
+
         assert_eq!(yaml, EXAMPLE_YAML);
 
         Ok(())
