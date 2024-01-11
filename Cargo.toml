@@ -25,7 +25,7 @@ members = [
     "chain/chain-rpc",
     "ethereum/bindings",
     "hopli",
-    "packages/hoprd/crates/hopr-lib",
+    "hopr",
     "packages/hoprd/crates/hoprd-api",
     "packages/hoprd/crates/hoprd-hoprd",
     "packages/hoprd/crates/hoprd-inbox",
@@ -77,7 +77,7 @@ core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
 core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
 core-transport = { path = "packages/core/crates/core-transport", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }
-hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
+hopr-lib = { path = "hopr", default-features = false }
 hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false }
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
