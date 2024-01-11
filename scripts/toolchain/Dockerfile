@@ -36,6 +36,8 @@ RUN ls -a
 COPY .cargo .cargo
 COPY Makefile rust-toolchain.toml Cargo.toml ./
 
+RUN ls -a
+
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 # Make sure that Rust toolchain utilities can be found
