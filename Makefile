@@ -69,7 +69,6 @@ endif
 .PHONY: deps
 deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
-		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
 # install foundry (cast + forge + anvil)
