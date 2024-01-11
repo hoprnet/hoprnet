@@ -174,10 +174,10 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 
 Notes on Test cases:
 
-- `testFail_ExceedMaxMint` in `packages/ethereum/contracts/test/HoprDistributor.t.sol` should have been `testRevert_ExceedMaxMint`. However, foundry has trouble catching uint128 overflow.
+- `testFail_ExceedMaxMint` in `ethereum/contracts/test/HoprDistributor.t.sol` should have been `testRevert_ExceedMaxMint`. However, foundry has trouble catching uint128 overflow.
 - After the update of Permittable token, it's possible to wrap tokens with "transfer" (Regarding `test_CanAlsoWrapWithTransfer` case in `HoprWrapper.t.sol`)
 
-5. Temporarily skipped deployment scripts for
+1. Temporarily skipped deployment scripts for
 
 - HoprDistributor
 - HoprWrapper

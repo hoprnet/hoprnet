@@ -15,9 +15,16 @@ ENV OPENSSL_STATIC=1
 ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
 COPY Makefile Cargo.toml Cargo.lock ./
-COPY vendor vendor/
-COPY packages packages/
+COPY chain chain/
+COPY crypto crypto/
+COPY ethereum ethereum/
+COPY hopli hopli/
+COPY hopr hopr/
+COPY hoprd hoprd/
+COPY logic logic/
 COPY misc misc/
+COPY transport transport/
+COPY vendor vendor/
 
 RUN make build-solidity-types
 

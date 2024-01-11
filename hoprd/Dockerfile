@@ -7,14 +7,22 @@ FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE} as build
 WORKDIR /app/hoprnet
 
 COPY .cargo/config.toml .cargo/
-COPY vendor vendor/
-COPY packages packages/
-COPY misc misc/
 COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY chain chain/
+COPY crypto crypto/
+COPY ethereum ethereum/
+COPY hopli hopli/
+COPY hopr hopr/
+COPY hoprd hoprd/
+COPY logic logic/
+COPY misc misc/
+COPY transport transport/
+COPY vendor vendor/
 
 RUN make build-solidity-types \
     && cargo build --release \
-    && cargo install --root ./artifacts --path hoprd/crates/hoprd-hoprd/
+    && cargo install --root ./artifacts --path hoprd/hoprd/ \
+    && cargo install --root ./artifacts --path hoprd/rest-api/
 
 # Debian 11.7
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore

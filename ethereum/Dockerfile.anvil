@@ -8,7 +8,7 @@ WORKDIR /app/hoprnet
 
 LABEL description="Launches an anvil node running a local network with the HOPR contracts deployed and available."
 
-COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY ethereum/contracts ethereum/contracts
 COPY scripts/ scripts
 COPY Makefile .
 COPY vendor/solidity vendor/solidity
@@ -27,7 +27,7 @@ RUN apt-get update \
 RUN make -f Makefile run-anvil \
  && sleep 2 \
  && make -f Makefile kill-anvil \
- && rm -rf packages/ethereum/contracts/broadcast/ \
+ && rm -rf ethereum/contracts/broadcast/ \
  && rm -f /tmp/*.log \
  && rm -f .anvil.state.json
 
