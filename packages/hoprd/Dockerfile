@@ -6,8 +6,7 @@ FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet
 
-RUN mv /app/hoprnet-toolchain/.cargo . && \
-    mv /app/hoprnet-toolchain/.yarn .
+RUN mv /app/hoprnet-toolchain/.cargo .
 
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
