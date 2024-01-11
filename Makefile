@@ -137,7 +137,6 @@ build-docs: ## build typedocs, Rest API docs
 .PHONY: install
 install:
 	$(cargo) install --path hopli
-	$(cargo) install --path hoprd/rest-api
 	$(cargo) install --path hoprd/hoprd
 
 .PHONY: clean
