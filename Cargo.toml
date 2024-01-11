@@ -21,19 +21,19 @@ members = [
     "hoprd/hoprd",
     "hoprd/inbox",
     "hoprd/keypair",
-    "logic/core-path",
-    "logic/core-strategy",
+    "logic/path",
+    "logic/strategy",
     "misc/metrics",
     "misc/platform",
     "misc/utils-db",
     "misc/utils-types",
     "misc/utils-validation",
-    "transport/core-network",
-    "transport/core-packet",
-    "transport/core-protocol",
-    "transport/core-p2p",
-    "transport/core-transport",
-    "transport/core-types",
+    "transport/network",
+    "transport/packet",
+    "transport/protocol",
+    "transport/p2p",
+    "transport/api",
+    "transport/types",
 ]
 
 [workspace.dependencies]
@@ -69,14 +69,14 @@ chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-crypto = { path = "crypto", default-features = false }
-core-network = { path = "transport/core-network", default-features = false }
-core-packet = { path = "transport/core-packet", default-features = false }
-core-path = { path = "logic/core-path", default-features = false }
-core-protocol = { path = "transport/core-protocol", default-features = false }
-core-p2p = { path = "transport/core-p2p", default-features = false }
-core-strategy = { path = "logic/core-strategy", default-features = false }
-core-transport = { path = "transport/core-transport", default-features = false }
-core-types = { path = "transport/core-types", default-features = false }
+core-network = { path = "transport/network", default-features = false }
+core-packet = { path = "transport/packet", default-features = false }
+core-path = { path = "logic/path", default-features = false }
+core-protocol = { path = "transport/protocol", default-features = false }
+core-p2p = { path = "transport/p2p", default-features = false }
+core-strategy = { path = "logic/strategy", default-features = false }
+core-transport = { path = "transport/api", default-features = false }
+core-types = { path = "transport/types", default-features = false }
 hopr-lib = { path = "hopr", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
