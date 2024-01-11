@@ -30,7 +30,7 @@ use utils_metrics::metrics::SimpleCounter;
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AGGREGATIONS: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_aggregating_aggregations", "Count of initiated automatic aggregations").unwrap();
+        SimpleCounter::new("hopr_counter_strategy_aggregating_aggregations", "Count of initiated automatic aggregations").unwrap();
 }
 
 /// Configuration object for the `AggregatingStrategy`

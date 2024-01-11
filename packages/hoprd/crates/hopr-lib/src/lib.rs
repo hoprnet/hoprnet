@@ -72,16 +72,16 @@ use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_SEND_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
-        "core_counter_failed_send_messages",
+        "hopr_counter_failed_send_messages",
         "Number of sent messages failures"
     ).unwrap();
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
-        "hoprd_gauge_startup_unix_time_seconds",
-        "The unix timestamp at which the process was started"
+        "hopr_up",
+        "The unix timestamp in seconds at which the process was started"
     ).unwrap();
     static ref METRIC_HOPR_LIB_VERSION: MultiGauge = MultiGauge::new(
-        "hoprd_mgauge_version",
-        "Executed version of HOPRd",
+        "hopr_gauge_lib_version",
+        "Executed version of hopr-lib",
         &["version"]
     ).unwrap();
 }

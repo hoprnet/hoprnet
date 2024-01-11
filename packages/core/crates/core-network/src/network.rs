@@ -23,15 +23,15 @@ use {
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_NETWORK_HEALTH: SimpleGauge =
-        SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").unwrap();
+        SimpleGauge::new("hopr_gauge_network_health", "Connectivity health indicator").unwrap();
     static ref METRIC_PEERS_BY_QUALITY: MultiGauge =
-        MultiGauge::new("core_mgauge_peers_by_quality", "Number different peer types by quality",
+        MultiGauge::new("hopr_gauge_peers_by_quality", "Number different peer types by quality",
             &["type", "quality"],
         ).unwrap();
     static ref METRIC_PEER_COUNT: SimpleGauge =
-        SimpleGauge::new("core_gauge_num_peers", "Number of all peers").unwrap();
+        SimpleGauge::new("hopr_gauge_num_peers", "Number of all peers").unwrap();
     static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleHistogram = SimpleHistogram::new(
-        "hoprd_histogram_time_to_green_seconds",
+        "hopr_histogram_time_to_green_seconds",
         "Time it takes for a node to transition to the GREEN network state",
         vec![30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0]
     ).unwrap();

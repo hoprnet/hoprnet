@@ -19,7 +19,7 @@ use utils_metrics::metrics::SimpleCounter;
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_FUNDINGS: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_auto_funding_fundings", "Count of initiated automatic fundings").unwrap();
+        SimpleCounter::new("hopr_counter_strategy_auto_funding_fundings", "Count of initiated automatic fundings").unwrap();
 }
 
 /// Configuration for `AutoFundingStrategy`

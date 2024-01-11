@@ -40,12 +40,12 @@ use utils_types::primitives::U256;
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_AGGREGATED_TICKETS: SimpleCounter = SimpleCounter::new(
-        "core_counter_aggregated_tickets",
+        "hopr_counter_aggregated_tickets",
         "Number of aggregated tickets"
     )
     .unwrap();
     static ref METRIC_AGGREGATION_COUNT: SimpleCounter = SimpleCounter::new(
-        "core_counter_aggregations",
+        "hopr_counter_aggregations",
         "Number of performed ticket aggregations"
     )
     .unwrap();

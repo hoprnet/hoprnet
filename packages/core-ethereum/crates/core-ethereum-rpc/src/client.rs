@@ -17,15 +17,15 @@ use utils_metrics::metrics::{MultiCounter, MultiHistogram};
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
-        "core_ethereum_counter_rpc_calls",
-        "Number of RPC calls over HTTP and their result",
+        "hopr_counter_rpc_calls",
+        "Number of Ethereum RPC calls over HTTP and their result",
         &["call", "result"]
     )
     .unwrap();
     static ref METRIC_COUNT_RPC_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
-        "core_ethereum_histogram_rpc_calls",
-        "Timing of RPC calls over HTTP",
-        Vec::new(),
+        "hopr_histogram_rpc_calls_timing_sec",
+        "Timing of RPC calls over HTTP in seconds",
+        vec![0.1, 0.5, 1, 2, 5, 7, 10],
         &["call"]
     )
     .unwrap();

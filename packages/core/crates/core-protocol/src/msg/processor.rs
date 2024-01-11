@@ -41,19 +41,19 @@ lazy_static::lazy_static! {
     // packet processing
     static ref METRIC_PACKET_COUNT: MultiCounter =
         MultiCounter::new(
-        "core_counter_packets",
+        "hopr_counter_packets",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
     static ref METRIC_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
+        SimpleCounter::new("hopr_counter_created_tickets", "Number of created tickets").unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_rejected_tickets", "Number of rejected tickets").unwrap();
+        SimpleCounter::new("hopr_counter_rejected_tickets", "Number of rejected tickets").unwrap();
     // mixer
     static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
+        SimpleGauge::new("hopr_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
     static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "core_gauge_mixer_average_packet_delay",
+        "hopr_gauge_mixer_average_packet_delay",
         "Average mixer packet delay averaged over a packet window"
     )
     .unwrap();

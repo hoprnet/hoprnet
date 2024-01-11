@@ -16,13 +16,13 @@ use {core_types::channels::ChannelDirection, utils_metrics::metrics::MultiGauge,
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_NUMBER_OF_CHANNELS: MultiGauge = MultiGauge::new(
-        "core_gauge_num_channels",
+        "hopr_gauge_channels_count",
         "Number of channels per direction",
         &["direction"]
     ).unwrap();
     static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
-        "core_mgauge_channel_balances",
-        "Balances on channels with counterparties",
+        "hopr_gauge_channel_balances",
+        "Balances on channels per counterparty",
         &["counterparty", "direction"]
     ).unwrap();
 }

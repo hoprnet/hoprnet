@@ -18,12 +18,12 @@ use utils_metrics::metrics::{MultiCounter, SimpleHistogram};
 lazy_static::lazy_static! {
     static ref METRIC_TIME_TO_PING: SimpleHistogram =
         SimpleHistogram::new(
-            "core_histogram_ping_time_seconds",
+            "hopr_histogram_ping_time_sec",
             "Measures total time it takes to ping a single node (seconds)",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
     static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
-            "core_counter_heartbeat_successful_pings",
+            "hopr_counter_heartbeat_successful_pings",
             "Total number of pings",
             &["success"]
         ).unwrap();

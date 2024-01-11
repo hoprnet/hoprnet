@@ -24,17 +24,17 @@ use utils_metrics::metrics::{MultiCounter, SimpleCounter};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
-        "core_counter_received_acks",
+        "hopr_counter_received_acks",
         "Number of received acknowledgements",
         &["valid"]
     )
     .unwrap();
     static ref METRIC_SENT_ACKS: SimpleCounter =
-        SimpleCounter::new("core_counter_sent_acks", "Number of sent message acknowledgements").unwrap();
+        SimpleCounter::new("hopr_counter_sent_acks", "Number of sent message acknowledgements").unwrap();
     static ref METRIC_WINNING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_winning_tickets", "Number of winning tickets").unwrap();
+        SimpleCounter::new("hopr_counter_winning_tickets", "Number of winning tickets").unwrap();
     static ref METRIC_LOSING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_losing_tickets", "Number of losing tickets").unwrap();
+        SimpleCounter::new("hopr_counter_losing_tickets", "Number of losing tickets").unwrap();
 }
 
 // Default sizes of the acknowledgement queues

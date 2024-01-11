@@ -20,12 +20,12 @@ use async_std::task::spawn;
 lazy_static::lazy_static! {
     static ref METRIC_INDEXER_CURRENT_BLOCK: SimpleGauge =
         SimpleGauge::new(
-            "core_ethereum_gauge_indexer_block_number",
+            "hopr_gauge_indexer_block_number",
             "Current block number",
     ).unwrap();
     static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
         SimpleGauge::new(
-            "core_ethereum_gauge_indexer_sync_progress",
+            "hopr_gauge_indexer_sync_progress",
             "Current sync progress of the indexer",
     ).unwrap();
 }

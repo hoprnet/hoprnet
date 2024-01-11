@@ -30,14 +30,14 @@ use utils_metrics::metrics::{MultiCounter, MultiHistogram};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
-        "hoprd_api_http_calls",
+        "hopr_counter_api_http_calls",
         "Number of different REST API calls and their statuses",
         &["endpoint", "method", "status"]
     )
     .unwrap();
     static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
-        "hoprd_api_http_calls_timing",
-        "Timing of different REST API calls",
+        "hopr_counter_api_http_calls_timing_sec",
+        "Timing of different REST API calls in seconds",
         Vec::new(),
         &["endpoint", "method"]
     )
