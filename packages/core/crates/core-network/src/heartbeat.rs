@@ -15,7 +15,7 @@ use validator::Validate;
 use log::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::{histogram_start_measure, metrics::SimpleHistogram};
+use metrics::{histogram_start_measure, metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

@@ -12,7 +12,7 @@ use platform::time::native::current_timestamp;
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
+use metrics::metrics::{SimpleCounter, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

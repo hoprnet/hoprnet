@@ -1026,6 +1026,7 @@ dependencies = [
  "hex-literal",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "multiaddr",
  "platform",
@@ -1033,7 +1034,6 @@ dependencies = [
  "serde",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
 ]
 
@@ -1056,11 +1056,11 @@ dependencies = [
  "futures",
  "hex",
  "log",
+ "metrics",
  "primitive-types",
  "serde",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
 ]
 
@@ -1105,13 +1105,13 @@ dependencies = [
  "hex-literal",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "multiaddr",
  "primitive-types",
  "serde",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
 ]
 
@@ -1137,6 +1137,7 @@ dependencies = [
  "hex-literal",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "pin-project",
  "primitive-types",
@@ -1146,7 +1147,6 @@ dependencies = [
  "surf",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1489,6 +1489,7 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "log",
+ "metrics",
  "mockall",
  "more-asserts",
  "multiaddr",
@@ -1497,7 +1498,6 @@ dependencies = [
  "serde",
  "serde_with",
  "thiserror",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1541,6 +1541,7 @@ dependencies = [
  "hex-literal",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "parameterized",
  "platform",
@@ -1548,7 +1549,6 @@ dependencies = [
  "thiserror",
  "typenum",
  "utils-db",
- "utils-metrics",
  "utils-types",
 ]
 
@@ -1567,6 +1567,7 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "log",
+ "metrics",
  "mockall",
  "petgraph",
  "platform",
@@ -1574,7 +1575,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "wasm-bindgen-test",
 ]
@@ -1600,6 +1600,7 @@ dependencies = [
  "libp2p",
  "libp2p-identity",
  "log",
+ "metrics",
  "more-asserts",
  "parameterized",
  "rand 0.8.5",
@@ -1609,7 +1610,6 @@ dependencies = [
  "serial_test",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1634,6 +1634,7 @@ dependencies = [
  "hex-literal",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "platform",
  "rand 0.8.5",
@@ -1642,7 +1643,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1669,12 +1669,12 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "log",
+ "metrics",
  "multiaddr",
  "platform",
  "serde",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "utils-validation",
  "validator",
@@ -3298,6 +3298,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
+ "metrics",
  "platform",
  "semver 1.0.21",
  "serde",
@@ -3306,7 +3307,6 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -3336,6 +3336,7 @@ dependencies = [
  "humantime",
  "lazy_static",
  "log",
+ "metrics",
  "platform",
  "proc-macro-regex",
  "serde",
@@ -3345,7 +3346,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "utils-validation",
  "validator",
@@ -3368,12 +3368,12 @@ dependencies = [
  "hoprd-inbox",
  "libp2p-identity",
  "log",
+ "metrics",
  "serde",
  "serde_json",
  "serde_with",
  "strum 0.25.0",
  "tide",
- "utils-metrics",
  "utils-types",
  "utoipa",
  "utoipa-swagger-ui",
@@ -4367,6 +4367,15 @@ name = "memchr"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
+
+[[package]]
+name = "metrics"
+version = "1.1.0"
+dependencies = [
+ "platform",
+ "prometheus",
+ "regex",
+]
 
 [[package]]
 name = "mime"
@@ -7646,15 +7655,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-types",
-]
-
-[[package]]
-name = "utils-metrics"
-version = "1.1.0"
-dependencies = [
- "platform",
- "prometheus",
- "regex",
 ]
 
 [[package]]

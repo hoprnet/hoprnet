@@ -34,7 +34,7 @@ chain-actions = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 platform = { workspace = true }
-utils-metrics = { workspace = true, optional = true, default-features = false }
+metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -49,4 +49,4 @@ futures = "0.3.28"
 [features]
 default = ["prometheus"]
 wasm = ["dep:getrandom" ]
-prometheus = [ "dep:utils-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]
+prometheus = [ "dep:metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

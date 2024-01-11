@@ -2032,7 +2032,7 @@ mod node {
     }
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    use utils_metrics::metrics::gather_all_metrics as collect_metrics;
+    use metrics::metrics::gather_all_metrics as collect_metrics;
 
     #[cfg(any(not(feature = "prometheus"), test))]
     fn collect_metrics() -> Result<String, ApiErrorStatus> {

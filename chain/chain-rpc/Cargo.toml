@@ -37,7 +37,7 @@ chain-db = { workspace = true }
 chain-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -53,5 +53,5 @@ mockall = "0.11.4"
 [features]
 default = ["prometheus"]
 wasm = [ "chain-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
-prometheus = ["dep:utils-metrics"]
+prometheus = ["dep:metrics"]
 reqwest = ["dep:reqwest"]

@@ -32,7 +32,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 platform = { workspace = true }
 log = { workspace = true }
 utils-types = { workspace = true }
@@ -47,4 +47,4 @@ hex-literal = "0.4"
 default = ["prometheus"]
 wasm = [ "chain-db/wasm", "chain-types/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
-prometheus = [ "dep:utils-metrics", "chain-rpc/prometheus" ]
+prometheus = [ "dep:metrics", "chain-rpc/prometheus" ]

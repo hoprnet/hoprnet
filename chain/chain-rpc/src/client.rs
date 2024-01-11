@@ -11,7 +11,7 @@ use crate::helper::{Request, Response};
 use crate::HttpPostRequestor;
 
 #[cfg(feature = "prometheus")]
-use utils_metrics::metrics::MultiCounter;
+use metrics::metrics::MultiCounter;
 
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {

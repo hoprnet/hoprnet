@@ -34,7 +34,7 @@ use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
+use metrics::metrics::{SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

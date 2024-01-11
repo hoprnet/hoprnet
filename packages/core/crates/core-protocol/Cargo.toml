@@ -13,9 +13,9 @@ default = ["prometheus"]
 wasm = [
     "dep:getrandom",
     "core-crypto/wasm", "chain-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-types/wasm", "utils-metrics?/wasm",
+    "utils-db/wasm", "utils-types/wasm", "metrics?/wasm",
 ]
-prometheus = ["dep:utils-metrics", "core-path/prometheus", "core-packet/prometheus"]
+prometheus = ["dep:metrics", "core-path/prometheus", "core-packet/prometheus"]
 
 [dependencies]
 # a better separation of tcp + async-std for non wasm case could be designed
@@ -44,7 +44,7 @@ core-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 utils-types = { workspace = true }
-utils-metrics = { optional = true, workspace = true }
+metrics = { optional = true, workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10.0"

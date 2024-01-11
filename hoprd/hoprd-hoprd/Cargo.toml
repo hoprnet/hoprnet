@@ -39,7 +39,7 @@ hoprd-keypair = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 utils-validation = { workspace = true }
 humantime = "2.1.0"
@@ -61,11 +61,11 @@ wasm = [
     "hoprd-keypair/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-metrics?/wasm",
+    "metrics?/wasm",
     "utils-types/wasm",
 ]
 prometheus = [
-    "dep:utils-metrics",
+    "dep:metrics",
     "dep:lazy_static",
     "hopr-lib/prometheus",
     "core-transport/prometheus",

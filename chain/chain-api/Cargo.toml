@@ -14,9 +14,9 @@ default = ["prometheus"]
 wasm = [
     "chain-db/wasm", "chain-actions/wasm", "chain-rpc/wasm", "chain-indexer/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-metrics?/wasm", "utils-types/wasm"
+    "utils-db/wasm", "metrics?/wasm", "utils-types/wasm"
 ]
-prometheus = ["dep:utils-metrics", "chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
+prometheus = ["dep:metrics", "chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
 
 [dependencies]
 async-std = { workspace = true }
@@ -39,6 +39,6 @@ core-path = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 

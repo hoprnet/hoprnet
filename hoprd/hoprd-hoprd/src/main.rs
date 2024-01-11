@@ -13,7 +13,7 @@ use log::{error, info, warn};
 use utils_types::traits::{PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::SimpleHistogram;
+use metrics::metrics::SimpleHistogram;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 

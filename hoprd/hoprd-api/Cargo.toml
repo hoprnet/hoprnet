@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["hopr-lib/prometheus", "dep:utils-metrics"]
+prometheus = ["hopr-lib/prometheus", "dep:metrics"]
 
 
 [dependencies]
@@ -40,5 +40,5 @@ core-transport = { workspace = true }
 core-types = { workspace = true }
 utils-types = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 

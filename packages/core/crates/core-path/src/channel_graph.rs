@@ -13,7 +13,7 @@ use utils_types::primitives::Address;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     core_types::channels::ChannelDirection,
-    utils_metrics::metrics::{MultiGauge, SimpleGauge},
+    metrics::metrics::{MultiGauge, SimpleGauge},
     utils_types::traits::ToHex,
 };
 

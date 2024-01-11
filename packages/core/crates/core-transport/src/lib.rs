@@ -58,7 +58,7 @@ use utils_types::primitives::Address;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     core_path::path::Path,
-    utils_metrics::metrics::{SimpleCounter, SimpleHistogram},
+    metrics::metrics::{SimpleCounter, SimpleHistogram},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]

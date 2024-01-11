@@ -37,7 +37,7 @@ chain-indexer = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -57,7 +57,7 @@ wasm = [
     "chain-rpc/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
-    "utils-metrics?/wasm",
+    "metrics?/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["dep:utils-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]
+prometheus = ["dep:metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]

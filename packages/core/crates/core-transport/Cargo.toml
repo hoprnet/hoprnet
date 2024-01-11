@@ -14,10 +14,10 @@ default = ["prometheus"]
 wasm = [
     "chain-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
     "core-protocol/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "utils-metrics?/wasm", "utils-types/wasm",
+    "utils-db/wasm", "platform/wasm-bindgen", "metrics?/wasm", "utils-types/wasm",
 ]
 prometheus = [
-    "dep:lazy_static", "dep:utils-metrics",
+    "dep:lazy_static", "dep:metrics",
     "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "chain-rpc/prometheus"
 ]
 
@@ -47,7 +47,7 @@ core-types = { workspace = true }
 utils-db = { workspace = true}
 log = { workspace = true }
 platform = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 utils-validation = { workspace = true }
 

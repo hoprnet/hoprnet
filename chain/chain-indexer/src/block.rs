@@ -12,7 +12,7 @@ use utils_types::primitives::{Snapshot, U256};
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
+use metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
 
 use async_std::task::spawn;
 

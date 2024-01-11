@@ -26,7 +26,7 @@ validator = { workspace = true }
 core-crypto = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
-utils-metrics = { workspace = true, optional = true}
+metrics = { workspace = true, optional = true}
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -41,6 +41,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "utils-metrics/wasm", "utils-types/wasm"]
+wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm", "utils-types/wasm"]
 compat-ping = []
-prometheus = ["dep:utils-metrics"]
+prometheus = ["dep:metrics"]
