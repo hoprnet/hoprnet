@@ -20,9 +20,7 @@ COPY transport transport/
 COPY vendor vendor/
 
 RUN make build-solidity-types \
-    && cargo build --release \
-    && cargo install --root ./artifacts --path hoprd/hoprd/ \
-    && cargo install --root ./artifacts --path hoprd/rest-api/
+    && cargo build --release
 
 # Debian 11.7
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
@@ -40,7 +38,8 @@ RUN apt-get update && \
     # permissions when mapped to a volume
     mkdir -p hoprd-db
 
-COPY --from=build /app/hoprnet/artifacts/bin/ /usr/local/bin/
+COPY --from=build /app/hoprnet/target/release/hoprd-cfg /usr/local/bin/
+COPY --from=build /app/hoprnet/target/release/hoprd /usr/local/bin/
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprnet/hoprd-db"]

@@ -246,8 +246,7 @@ fn workspace_dir() -> std::path::PathBuf {
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let mut anvil = ethers::utils::Anvil::new()
-        .path(workspace_dir().join(".foundry/bin/anvil"));
+    let mut anvil = ethers::utils::Anvil::new().path(workspace_dir().join(".foundry/bin/anvil"));
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());

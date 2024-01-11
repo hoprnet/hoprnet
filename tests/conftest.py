@@ -366,7 +366,7 @@ def swarm7(request):
         private_key = data["private_keys"][0]
 
     logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
-    
+
     shutil.copyfile(PROTOCOL_CONFIG_FILE, TEST_PROTOCOL_CONFIG_FILE)
     mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK1)
     mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK2)
