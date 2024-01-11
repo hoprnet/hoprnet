@@ -8,19 +8,19 @@ resolver = "2"
 
 members = [
     "crypto",
-    "chain/chain-actions",
-    "chain/chain-api",
-    "chain/chain-db",
-    "chain/chain-indexer",
-    "chain/chain-types",
-    "chain/chain-rpc",
+    "chain/actions",
+    "chain/api",
+    "chain/db",
+    "chain/indexer",
+    "chain/types",
+    "chain/rpc",
     "ethereum/bindings",
     "hopli",
     "hopr",
-    "hoprd/hoprd-api",
-    "hoprd/hoprd-hoprd",
-    "hoprd/hoprd-inbox",
-    "hoprd/hoprd-keypair",
+    "hoprd/rest-api",
+    "hoprd/hoprd",
+    "hoprd/inbox",
+    "hoprd/keypair",
     "logic/core-path",
     "logic/core-strategy",
     "misc/metrics",
@@ -62,12 +62,12 @@ thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
 
 bindings = { path = "ethereum/bindings", default-features = false }
-chain-actions = { path = "chain/chain-actions", default-features = false }
-chain-api = { path = "chain/chain-api", default-features = false }
-chain-db = { path = "chain/chain-db", default-features = false }
-chain-rpc = { path = "chain/chain-rpc", default-features = false }
-chain-types = { path = "chain/chain-types", default-features = false }
-chain-indexer = { path = "chain/chain-indexer", default-features = false }
+chain-actions = { path = "chain/actions", default-features = false }
+chain-api = { path = "chain/api", default-features = false }
+chain-db = { path = "chain/db", default-features = false }
+chain-rpc = { path = "chain/rpc", default-features = false }
+chain-types = { path = "chain/types", default-features = false }
+chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-crypto = { path = "crypto", default-features = false }
 core-network = { path = "transport/core-network", default-features = false }
 core-packet = { path = "transport/core-packet", default-features = false }
@@ -78,9 +78,9 @@ core-strategy = { path = "logic/core-strategy", default-features = false }
 core-transport = { path = "transport/core-transport", default-features = false }
 core-types = { path = "transport/core-types", default-features = false }
 hopr-lib = { path = "hopr", default-features = false }
-hoprd-api = { path = "hoprd/hoprd-api", default-features = false }
-hoprd-inbox = { path = "hoprd/hoprd-inbox", default-features = false }
-hoprd-keypair = { path = "hoprd/hoprd-keypair", default-features = false }
+hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd-inbox = { path = "hoprd/inbox", default-features = false }
+hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 metrics = { path = "misc/metrics", default-features = false }
 platform = { path = "misc/platform" }
 utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
