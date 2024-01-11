@@ -681,6 +681,8 @@ mod tests {
 
         peers.update(&peer, Ok(ts.clone()));
 
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
         let actual = peers.debug_output();
 
         assert!(actual.contains("heartbeats sent=1"));

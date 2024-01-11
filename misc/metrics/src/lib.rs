@@ -40,42 +40,42 @@
 //! #### Example use in Rust
 //!
 //! ```rust
-//! use utils_metrics::*;
+//! use metrics::metrics::*;
 //!
 //! fn main() {
-//!     let metric_counter = SimpleCounter::new("test_counter", "Some testing counter");
+//!     let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
 //!
 //!     // Counter can be only incremented by integers only
 //!     metric_counter.increment_by(10);
 //!
-//!     let metric_gauge = SimpleGauge::new("test_gauge", "Some testing gauge");
+//!     let metric_gauge = SimpleGauge::new("test_gauge", "Some testing gauge").unwrap();
 //!
 //!     // Gauges can be incremented and decrements and support floats
-//!     metric_gauge.increment_by(5);
-//!     metric_gauge.decrement_by(3.2);
+//!     metric_gauge.increment(5.0);
+//!     metric_gauge.decrement(3.2);
 //!
-//!     let metric_histogram = SimpleHistogram::new("test_histogram", "Some testing histogram");
+//!     let metric_histogram = SimpleHistogram::new("test_histogram", "Some testing histogram", vec![1.0, 2.0]).unwrap();
 //!
 //!     // Histograms can observe floating point values
 //!     metric_histogram.observe(10.1);
 //!
 //!     // ... and also can be used to measure time durations in seconds
 //!     let timer = metric_histogram.start_measure();
-//!     foo();
+//!     std::thread::sleep(std::time::Duration::from_secs(1));
 //!     metric_histogram.record_measure(timer);
 //!
 //!     // Multi-metrics are labeled extensions
-//!     let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]);
+//!     let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
 //!
 //!     // Tracks counters per different versions
-//!     metric_counts_per_version.increment_by("1.0.0", 2);
-//!     metric_counts_per_version.increment_by("1.0.1", 1);
+//!     metric_counts_per_version.increment_by(&["1.0.0"], 2);
+//!     metric_counts_per_version.increment_by(&["1.0.1"], 1);
 //!
 //!     // All metrics live in a global state and can be serialized at any time
 //!     let gathered_metrics = gather_all_metrics();
 //!
 //!     // Metrics are in text format and can be exposed using an HTTP API endpoint
-//!     println!("{}", gathered_metrics);
+//!     println!("{:?}", gathered_metrics);
 //! }
 //! ```
 //!
@@ -135,10 +135,10 @@
 //! Each Rust crate that will become a separate WASM runtime instantiated from the TS in HOPRd, must declare a public WASM-bound
 //! function for gathering metrics:
 //!
-//! ```rust
+//! ```js
 //! #[wasm_bindgen]
 //! pub fn my_crate_gather_metrics() -> JsResult<String> {
-//!     utils_metrics::metrics::wasm::gather_all_metrics()
+//!     metrics::metrics::wasm::gather_all_metrics()
 //! }
 //! ```
 //!
@@ -151,16 +151,5 @@
 //! my_crate_initialize_crate()
 //! registerMetricsCollector(my_crate_gather_metrics)
 //! ```
-//!
-//! If TS code in HOPRd is using the WASM bindings from `utils_metrics` directly, it does not need to do anything
-//! to register these metrics for scraping as this is done automatically by HOPRd.
-//!
-//! #### Avoid taking metrics in low-level crates
-//!
-//! Before HOPRd is fully migrated to Rust, it is highly recommended to **NOT** gather metrics in low-level Rust crates
-//! that might be possibly used by separate WASM runtimes in HOPRd. This will result in metrics duplication when scraped from different WASM runtimes.
-//! The metrics are trivially de-duplicated before publishing, but this necessarily results in inaccuracies of the metrics. It is not possible
-//! to determine which duplicate metric is more recent and should therefore take precedence.
-//!
 
 pub mod metrics;
