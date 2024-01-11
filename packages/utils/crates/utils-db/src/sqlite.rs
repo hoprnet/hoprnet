@@ -1,6 +1,6 @@
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use async_trait::async_trait;
-use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteStatement};
+use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteStatement, SqliteSynchronous};
 use sqlx::{Executor, SqlitePool, Statement};
 use std::fmt::Debug;
 use std::ops::DerefMut;
@@ -77,8 +77,12 @@ impl SqliteShim<'_> {
                 .filename(dir.join(SQL_DB_FILE_NAME))
                 .create_if_missing(create_if_missing)
                 .journal_mode(SqliteJournalMode::Wal)
+                .synchronous(SqliteSynchronous::Normal)
                 .auto_vacuum(SqliteAutoVacuum::Full)
-                .page_size(4096),
+                .optimize_on_close(true, None)
+                .page_size(4096)
+                .pragma("cache_size", "-30000"), // 32M
+
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
