@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError, RetryPolicy};
+use log::trace;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use log::trace;
 
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};

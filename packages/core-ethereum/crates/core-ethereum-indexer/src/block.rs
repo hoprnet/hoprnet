@@ -12,34 +12,12 @@ use utils_types::primitives::{Snapshot, U256};
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
+use utils_metrics::metrics::SimpleGauge;
 
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_ERROR_COUNT: MultiCounter =
-        MultiCounter::new(
-            "hopr_indexer_errors_count",
-            "Multicounter for provider errors in Indexer",
-            &["type"]
-    ).unwrap();
-    static ref METRIC_INDEXER_UNCONFIRMED_BLOCK_COUNT: SimpleCounter =
-        SimpleCounter::new(
-            "hopr_indexer_processed_unconfirmed_blocks_count",
-            "Number of processed unconfirmed blocks",
-    ).unwrap();
-    static ref METRIC_INDEXER_ANNOUNCEMENTS_COUNT: SimpleCounter =
-        SimpleCounter::new(
-            "hopr_indexer_processed_announcements_count",
-            "Number of processed announcements",
-    ).unwrap();
-    static ref METRIC_INDEXER_OBSERVED_CHANNEL_STATUS: MultiGauge =
-        MultiGauge::new(
-            "core_indexer_channel_statuses",
-            "Status of different channels",
-            &["channel"]
-        ).unwrap();
     static ref METRIC_INDEXER_CURRENT_BLOCK: SimpleGauge =
         SimpleGauge::new(
             "core_ethereum_gauge_indexer_block_number",
@@ -225,11 +203,7 @@ where
                 if tx.is_some() {
                     let indexing_scope = chain_head - latest_block_in_db;
                     let progress = 1_f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64));
-                    info!(
-                        "Sync progress {:.2}% @ block {}",
-                         progress * 100_f64,
-                        current_block
-                    );
+                    info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_INDEXER_SYNC_PROGRESS.set(progress);

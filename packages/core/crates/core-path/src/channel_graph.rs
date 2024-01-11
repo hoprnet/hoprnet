@@ -11,21 +11,14 @@ use std::fmt::Debug;
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    core_types::channels::ChannelDirection,
-    utils_metrics::metrics::{MultiGauge, SimpleGauge},
-    utils_types::traits::ToHex,
-};
+use {core_types::channels::ChannelDirection, utils_metrics::metrics::MultiGauge, utils_types::traits::ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NUMBER_OF_OUTGOING_CHANNEL: SimpleGauge = SimpleGauge::new(
-        "core_gauge_num_outgoing_channels",
-        "Number of outgoing channels"
-    ).unwrap();
-    static ref METRIC_NUMBER_OF_INCOMING_CHANNEL: SimpleGauge = SimpleGauge::new(
-        "core_gauge_num_incoming_channels",
-        "Number of incoming channels"
+    static ref METRIC_NUMBER_OF_CHANNELS: MultiGauge = MultiGauge::new(
+        "core_gauge_num_channels",
+        "Number of channels per direction",
+        &["direction"]
     ).unwrap();
     static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
         "core_mgauge_channel_balances",
@@ -113,39 +106,36 @@ impl ChannelGraph {
                 match direction {
                     ChannelDirection::Outgoing => match channel.status {
                         ChannelStatus::Closed => {
-                            METRIC_NUMBER_OF_OUTGOING_CHANNEL.decrement(1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &[channel.destination.to_hex().as_str(), "out"],
-                                0.0,
-                            );
+                            METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 1.0);
+                            METRIC_CHANNEL_BALANCES.set(&[channel.destination.to_hex().as_str(), "out"], 0.0);
                         }
                         ChannelStatus::Open => {
-                            METRIC_NUMBER_OF_OUTGOING_CHANNEL.increment(1.0);
+                            METRIC_NUMBER_OF_CHANNELS.increment(&["out"], 1.0);
                             METRIC_CHANNEL_BALANCES.set(
                                 &[channel.destination.to_hex().as_str(), "out"],
                                 channel
                                     .balance
                                     .amount_base_units()
                                     .parse::<f64>()
-                                    .expect("Formatted balance must be convertible to float"),
+                                    .unwrap_or(f64::INFINITY),
                             );
                         }
                         ChannelStatus::PendingToClose => {}
                     },
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
-                            METRIC_NUMBER_OF_INCOMING_CHANNEL.decrement(1.0);
+                            METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 1.0);
                             METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], 0.0);
                         }
                         ChannelStatus::Open => {
-                            METRIC_NUMBER_OF_INCOMING_CHANNEL.increment(1.0);
+                            METRIC_NUMBER_OF_CHANNELS.increment(&["in"], 1.0);
                             METRIC_CHANNEL_BALANCES.set(
                                 &[channel.source.to_hex().as_str(), "in"],
                                 channel
                                     .balance
                                     .amount_base_units()
                                     .parse::<f64>()
-                                    .expect("Formatted balance must be convertible to float"),
+                                    .unwrap_or(f64::INFINITY),
                             );
                         }
                         ChannelStatus::PendingToClose => {}

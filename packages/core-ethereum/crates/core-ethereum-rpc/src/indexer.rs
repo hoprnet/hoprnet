@@ -11,6 +11,18 @@ use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleGauge;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_RPC_CHAIN_HEAD: SimpleGauge =
+        SimpleGauge::new(
+            "core_ethereum_gauge_chain_head",
+            "Current block number of chain head",
+    ).unwrap();
+}
+
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
@@ -41,6 +53,9 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         // This is a hard-failure on subsequent iterations which is unrecoverable
                         // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
                         assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
                         // Range is inclusive
                         let range_filter = ethers::types::Filter::from(filter.clone())

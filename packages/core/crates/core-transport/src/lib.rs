@@ -56,17 +56,10 @@ use std::sync::Arc;
 use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    core_path::path::Path,
-    utils_metrics::metrics::{SimpleCounter, SimpleHistogram},
-};
+use {core_path::path::Path, utils_metrics::metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
-        "core_counter_failed_send_messages",
-        "Number of sent messages failures"
-    ).unwrap();
     static ref METRIC_PATH_LENGTH: SimpleHistogram = SimpleHistogram::new(
         "core_histogram_path_length",
         "Distribution of number of hops of sent messages",

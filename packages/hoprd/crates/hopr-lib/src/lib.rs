@@ -71,7 +71,7 @@ use utils_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_SEND_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
         "core_counter_failed_send_messages",
         "Number of sent messages failures"
     ).unwrap();
@@ -899,7 +899,7 @@ impl Hopr {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         if result.is_err() {
-            SimpleCounter::increment(&METRIC_MESSAGE_FAIL_COUNT);
+            SimpleCounter::increment(&METRIC_SEND_MESSAGE_FAIL_COUNT);
         }
 
         Ok(result?)

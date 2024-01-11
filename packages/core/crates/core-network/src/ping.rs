@@ -12,7 +12,7 @@ use platform::time::native::current_timestamp;
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
+use utils_metrics::metrics::{MultiCounter, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -22,13 +22,10 @@ lazy_static::lazy_static! {
             "Measures total time it takes to ping a single node (seconds)",
             vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
         ).unwrap();
-    static ref METRIC_SUCCESSFUL_PING_COUNT: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
             "core_counter_heartbeat_successful_pings",
-            "Total number of successful pings",
-        ).unwrap();
-    static ref METRIC_FAILED_PINT_COUNT: SimpleCounter = SimpleCounter::new(
-            "core_counter_heartbeat_failed_pings",
-            "Total number of failed pings",
+            "Total number of pings",
+            &["type"]
         ).unwrap();
 }
 
@@ -170,10 +167,10 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             match result {
                 Ok(duration) => {
                     METRIC_TIME_TO_PING.observe(duration.as_millis() as f64);
-                    METRIC_SUCCESSFUL_PING_COUNT.increment();
+                    METRIC_PING_COUNT.increment(&["true"]);
                 }
                 Err(_) => {
-                    METRIC_FAILED_PINT_COUNT.increment();
+                    METRIC_PING_COUNT.increment(&["false"]);
                 }
             }
 

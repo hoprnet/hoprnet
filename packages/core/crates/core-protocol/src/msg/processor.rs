@@ -34,19 +34,19 @@ use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
+use utils_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet processing
-    static ref METRIC_FWD_MESSAGE_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages").unwrap();
-    static ref METRIC_RECV_MESSAGE_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_received_messages", "Number of received messages").unwrap();
+    static ref METRIC_PACKET_COUNT: MultiCounter =
+        MultiCounter::new(
+        "core_counter_packets",
+        "Number of processed packets of different types (sent, received, forwarded)",
+        &["type"]
+    ).unwrap();
     static ref METRIC_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
-    static ref METRIC_PACKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_rejected_tickets", "Number of rejected tickets").unwrap();
     // mixer
@@ -658,7 +658,7 @@ impl PacketInteraction {
                             data,
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PACKETS_COUNT.increment();
+                            METRIC_PACKET_COUNT.increment(&["sent"]);
 
                             if let Some(finalizer) = finalizer {
                                 finalizer.finalize(ack_challenge);
@@ -674,7 +674,7 @@ impl PacketInteraction {
                         } => match ApplicationData::from_bytes(plain_text.as_ref()) {
                             Ok(app_data) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_RECV_MESSAGE_COUNT.increment();
+                                METRIC_PACKET_COUNT.increment(&["received"]);
 
                                 Ok(MsgProcessed::Receive(previous_hop, app_data, ack))
                             }
@@ -689,7 +689,7 @@ impl PacketInteraction {
                             ..
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_FWD_MESSAGE_COUNT.increment();
+                            METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
                             Ok(MsgProcessed::Forward(next_hop, data, previous_hop, ack))
                         }

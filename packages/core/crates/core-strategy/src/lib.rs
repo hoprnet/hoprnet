@@ -10,13 +10,13 @@ use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
 use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
 
-pub mod strategy;
 pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
 pub mod decision;
 pub mod errors;
 pub mod promiscuous;
+pub mod strategy;
 
 /// Enumerates all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
