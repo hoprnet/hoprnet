@@ -58,7 +58,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         }
     }
 
-    pub async fn init_cache1(&mut self) -> Result<()> {
+    pub async fn init_cache(&mut self) -> Result<()> {
         // let channels = self.get_channels().await?;
         // info!("Cleaning up invalid tickets from {} tracked channels...", channels.len());
         // for channel in channels.iter() {

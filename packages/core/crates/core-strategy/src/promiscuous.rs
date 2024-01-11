@@ -421,13 +421,6 @@ mod tests {
             .collect();
     }
 
-    lazy_static! {
-        static ref PEERS: Vec<(Address, PeerId)> = (0..10)
-            .into_iter()
-            .map(|_| (Address::random(), OffchainKeypair::random().public().to_peerid()))
-            .collect();
-    }
-
     mock! {
         ChannelAct { }
         #[async_trait]
