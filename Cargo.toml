@@ -26,10 +26,10 @@ members = [
     "ethereum/bindings",
     "hopli",
     "hopr",
-    "packages/hoprd/crates/hoprd-api",
-    "packages/hoprd/crates/hoprd-hoprd",
-    "packages/hoprd/crates/hoprd-inbox",
-    "packages/hoprd/crates/hoprd-keypair",
+    "hoprd/hoprd-api",
+    "hoprd/hoprd-hoprd",
+    "hoprd/hoprd-inbox",
+    "hoprd/hoprd-keypair",
     "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-types",
@@ -78,9 +78,9 @@ core-strategy = { path = "packages/core/crates/core-strategy", default-features 
 core-transport = { path = "packages/core/crates/core-transport", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }
 hopr-lib = { path = "hopr", default-features = false }
-hoprd-api = { path = "packages/hoprd/crates/hoprd-api", default-features = false }
-hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
-hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
+hoprd-api = { path = "hoprd/hoprd-api", default-features = false }
+hoprd-inbox = { path = "hoprd/hoprd-inbox", default-features = false }
+hoprd-keypair = { path = "hoprd/hoprd-keypair", default-features = false }
 platform = { path = "misc/platform" }
 utils-db = { path = "packages/utils/crates/utils-db", default-features = false, features = ['sqlite'] }
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }

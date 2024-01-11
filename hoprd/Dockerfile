@@ -14,7 +14,7 @@ COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
 
 RUN make build-solidity-types \
     && cargo build --release \
-    && cargo install --root ./artifacts --path packages/hoprd/crates/hoprd-hoprd/
+    && cargo install --root ./artifacts --path hoprd/crates/hoprd-hoprd/
 
 # Debian 11.7
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
@@ -40,7 +40,7 @@ VOLUME ["/app/hoprnet/hoprd-db"]
 # set data directory to user-mountable directory
 ENV HOPRD_DATA=/app/hoprnet/hoprd-db
 
-WORKDIR /app/hoprnet/packages/hoprd
+WORKDIR /app/hoprnet/hoprd
 
 # making sure some standard environment variables are set for production use
 ENV RUST_LOG "debug"

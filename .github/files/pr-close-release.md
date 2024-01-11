@@ -1,6 +1,6 @@
 This Pull requests contains all the required changes needed before releasing a new version.
 
-- [ ] Check that there is an entry in `packages/hoprd/releases.json` for the new release name.
+- [ ] Check that there is an entry in `releases.json` for the new release name.
    - If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
    - If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
 - [ ] Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step.
