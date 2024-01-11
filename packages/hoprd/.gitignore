@@ -1,8 +1,3 @@
-# Exclude node.js stuff
-/node_modules
-
-# Typescript builds
-/lib
 /db
 /hoprd-db
 
