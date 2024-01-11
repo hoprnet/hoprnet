@@ -25,7 +25,7 @@ lazy_static::lazy_static! {
     static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
             "core_counter_heartbeat_successful_pings",
             "Total number of pings",
-            &["type"]
+            &["success"]
         ).unwrap();
 }
 
