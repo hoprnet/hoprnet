@@ -8,14 +8,6 @@ resolver = "2"
 
 members = [
     "crypto",
-    "packages/core/crates/core-network",
-    "packages/core/crates/core-path",
-    "packages/core/crates/core-packet",
-    "packages/core/crates/core-protocol",
-    "packages/core/crates/core-p2p",
-    "packages/core/crates/core-strategy",
-    "packages/core/crates/core-transport",
-    "packages/core/crates/core-types",
     "chain/chain-actions",
     "chain/chain-api",
     "chain/chain-db",
@@ -29,11 +21,19 @@ members = [
     "hoprd/hoprd-hoprd",
     "hoprd/hoprd-inbox",
     "hoprd/hoprd-keypair",
+    "logic/core-path",
+    "logic/core-strategy",
     "misc/metrics",
     "misc/platform",
     "misc/utils-db",
     "misc/utils-types",
-    "misc/utils-validation"
+    "misc/utils-validation",
+    "transport/core-network",
+    "transport/core-packet",
+    "transport/core-protocol",
+    "transport/core-p2p",
+    "transport/core-transport",
+    "transport/core-types",
 ]
 
 [workspace.dependencies]
@@ -69,14 +69,14 @@ chain-rpc = { path = "chain/chain-rpc", default-features = false }
 chain-types = { path = "chain/chain-types", default-features = false }
 chain-indexer = { path = "chain/chain-indexer", default-features = false }
 hopr-crypto = { path = "crypto", default-features = false }
-core-network = { path = "packages/core/crates/core-network", default-features = false }
-core-packet = { path = "packages/core/crates/core-packet", default-features = false }
-core-path = { path = "packages/core/crates/core-path", default-features = false }
-core-protocol = { path = "packages/core/crates/core-protocol", default-features = false }
-core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
-core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
-core-transport = { path = "packages/core/crates/core-transport", default-features = false }
-core-types = { path = "packages/core/crates/core-types", default-features = false }
+core-network = { path = "transport/core-network", default-features = false }
+core-packet = { path = "transport/core-packet", default-features = false }
+core-path = { path = "logic/core-path", default-features = false }
+core-protocol = { path = "transport/core-protocol", default-features = false }
+core-p2p = { path = "transport/core-p2p", default-features = false }
+core-strategy = { path = "logic/core-strategy", default-features = false }
+core-transport = { path = "transport/core-transport", default-features = false }
+core-types = { path = "transport/core-types", default-features = false }
 hopr-lib = { path = "hopr", default-features = false }
 hoprd-api = { path = "hoprd/hoprd-api", default-features = false }
 hoprd-inbox = { path = "hoprd/hoprd-inbox", default-features = false }
