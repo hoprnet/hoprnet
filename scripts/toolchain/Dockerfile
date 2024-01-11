@@ -30,6 +30,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
+# Enable cargo vendoring
+COPY .cargo/config.toml .cargo
 COPY Makefile rust-toolchain.toml Cargo.toml ./
 
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
