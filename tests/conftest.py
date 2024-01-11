@@ -150,13 +150,10 @@ def setup_node(args):
     api_token = args["api_token"] if "api_token" in args else ""
     api_token_param = f"--api-token={api_token}" if "api_token" in args else "--disableApiAuthentication"
     custom_env = {
-        "DEBUG": "hopr*",
-        "NODE_ENV": "development",
         "HOPRD_HEARTBEAT_INTERVAL": "2500",
         "HOPRD_HEARTBEAT_THRESHOLD": "2500",
         "HOPRD_HEARTBEAT_VARIANCE": "1000",
         "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
-        "NODE_OPTIONS": "--experimental-wasm-modules",
     }
     cmd = [
         "target/debug/hoprd",

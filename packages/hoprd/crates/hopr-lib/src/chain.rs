@@ -204,17 +204,6 @@ fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<boo
     Ok(allowed_versions.matches(&version))
 }
 
-/// Check whether the version is allowed
-fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<bool> {
-    let allowed_versions = VersionReq::parse(allowed_versions)
-        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize allowed version string: {}", e)))?;
-
-    let version = Version::from_str(version)
-        .map_err(|e| HoprLibError::GeneralError(format!("failed to deserialize current lib version string: {}", e)))?;
-
-    Ok(allowed_versions.matches(&version))
-}
-
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
     pub fn new(
