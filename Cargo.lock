@@ -5830,7 +5830,8 @@ dependencies = [
 [[package]]
 name = "rust-stream-ext-concurrent"
 version = "1.0.0"
-source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#19d9a67f66eb1c8a6af37572a346dcebd04640b3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fcbb9e3686614306ac9c81f7e604936ace84019eea4c6de1ae4e039a6a2866e"
 dependencies = [
  "futures",
  "pin-project",

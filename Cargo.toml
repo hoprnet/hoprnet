@@ -54,7 +54,7 @@ libp2p-mplex = "0.40.0"
 libp2p = "0.52.4"
 log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
-rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
+rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
