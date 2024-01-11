@@ -24,7 +24,7 @@ members = [
     "chain/chain-types",
     "chain/chain-rpc",
     "ethereum/bindings",
-    "packages/hopli",
+    "hopli",
     "packages/hoprd/crates/hopr-lib",
     "packages/hoprd/crates/hoprd-api",
     "packages/hoprd/crates/hoprd-hoprd",

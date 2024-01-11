@@ -21,10 +21,10 @@ COPY misc misc/
 
 RUN make build-solidity-types
 
-WORKDIR /app/hoprnet/packages/hopli
+WORKDIR /app/hoprnet/hopli
 
 RUN rustup target install $(uname -m)-unknown-linux-musl
-RUN OPENSSL_LIB_DIR=/usr/lib/$(uname -m)-linux-gnu RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target $(uname -m)-unknown-linux-musl --target-dir /app/hoprnet/packages/hopli/target
+RUN OPENSSL_LIB_DIR=/usr/lib/$(uname -m)-linux-gnu RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target $(uname -m)-unknown-linux-musl --target-dir /app/hoprnet/hopli/target
 RUN rm -rf target/release && \
     mv target/$(uname -m)-unknown-linux-musl/release target/
 
@@ -46,7 +46,7 @@ COPY ethereum/contracts ethereum/contracts
 COPY Makefile .
 COPY vendor/solidity vendor/solidity
 
-COPY --from=builder /app/hoprnet/packages/hopli/target/release/hopli /bin/hopli
+COPY --from=builder /app/hoprnet/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
     apt install --no-install-recommends -y git curl ca-certificates make && \
     make install-foundry && \

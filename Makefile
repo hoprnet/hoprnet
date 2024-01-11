@@ -87,13 +87,13 @@ install-foundry: ## install foundry
 	else \
 		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
 		curl -L "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
-	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
+	    chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
 		$(foundryup) --repo ${FOUNDRY_REPO} --version ${FOUNDRY_VSN}; \
 	else \
-	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
+	    echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
 	@if [[ "${name}" =~ nix-shell* ]]; then \
 		echo "Patching foundry binaries"; \
@@ -136,7 +136,8 @@ build-docs: ## build typedocs, Rest API docs
 
 .PHONY: install
 install:
-	$(cargo) install --path packages/hopli
+	$(cargo) install --path hopli
+	$(cargo) install --path packages/crates/hoprd-hoprd
 
 .PHONY: clean
 clean: # Cleanup build directories

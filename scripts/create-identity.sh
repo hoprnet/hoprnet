@@ -18,7 +18,7 @@ workspace_dir="${script_dir}/.."
 
 
 if ! command -v hopli; then
-    export PATH="${PATH}:${workspace_dir}/packages/hopli/.cargo/bin"
+    export PATH="${PATH}:${workspace_dir}/hopli/.cargo/bin"
 fi
 
 network=${1}
