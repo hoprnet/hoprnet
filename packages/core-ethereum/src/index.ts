@@ -176,6 +176,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         log('Connector started')
       } catch (err) {
         log('error: failed to start the indexer', err)
+        throw Error(`Failed to start the indexer: ${err.toString()}`)
       }
       return this
     }
