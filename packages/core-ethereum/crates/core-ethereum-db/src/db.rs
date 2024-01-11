@@ -80,7 +80,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
                 if let Some((current_channel_epoch, current_ticket_index)) =
-                    cached_channel.get(&ticket.channel_id).cloned()
+                    cached_channel.get(&ticket.channel_id).copied()
                 {
                     // from the cached_channel
                     (current_channel_epoch, current_ticket_index)
@@ -110,7 +110,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 let unrealized_balance = self
                     .cached_unrealized_value
                     .get(&ticket.channel_id)
-                    .map(|b| b.clone())
+                    .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
                     .add(&ticket.amount);
 
