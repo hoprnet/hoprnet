@@ -488,6 +488,8 @@ generate-python-sdk:
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
 		-c /local/scripts/python-sdk-config.json
+
+	rm openapi.spec.json
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

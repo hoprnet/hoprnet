@@ -1006,6 +1006,173 @@ dependencies = [
 ]
 
 [[package]]
+name = "chain-actions"
+version = "0.5.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "futures",
+ "futures-timer",
+ "hex",
+ "hex-literal",
+ "lazy_static",
+ "log",
+ "mockall",
+ "multiaddr",
+ "platform",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-metrics",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-api"
+version = "0.2.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "chain-actions",
+ "chain-db",
+ "chain-indexer",
+ "chain-rpc",
+ "chain-types",
+ "core-crypto",
+ "core-path",
+ "core-types",
+ "ethers",
+ "futures",
+ "hex",
+ "log",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-metrics",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-db"
+version = "0.4.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "hex",
+ "hex-literal",
+ "lazy_static",
+ "log",
+ "mockall",
+ "platform",
+ "serde",
+ "utils-db",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-indexer"
+version = "0.1.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "futures",
+ "hex",
+ "hex-literal",
+ "lazy_static",
+ "log",
+ "mockall",
+ "multiaddr",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-metrics",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-rpc"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-stream",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-types",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "ethers-providers",
+ "ethnum",
+ "futures",
+ "futures-timer",
+ "hex",
+ "hex-literal",
+ "lazy_static",
+ "log",
+ "mockall",
+ "pin-project",
+ "primitive-types",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "surf",
+ "thiserror",
+ "utils-db",
+ "utils-metrics",
+ "utils-types",
+ "validator",
+]
+
+[[package]]
+name = "chain-types"
+version = "0.8.0"
+dependencies = [
+ "async-std",
+ "bindings",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "hex",
+ "hex-literal",
+ "libp2p-identity",
+ "log",
+ "mockall",
+ "multiaddr",
+ "platform",
+ "serde",
+ "utils-types",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1294,173 +1461,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-ethereum-actions"
-version = "0.5.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "futures",
- "futures-timer",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "multiaddr",
- "platform",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-api"
-version = "0.2.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "core-crypto",
- "core-ethereum-actions",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-path",
- "core-types",
- "ethers",
- "futures",
- "hex",
- "log",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-db"
-version = "0.4.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "core-crypto",
- "core-types",
- "env_logger",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "platform",
- "serde",
- "utils-db",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-indexer"
-version = "0.1.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "futures",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "multiaddr",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-rpc"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "async-stream",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "ethers-providers",
- "ethnum",
- "futures",
- "futures-timer",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "pin-project",
- "primitive-types",
- "reqwest",
- "serde",
- "serde_json",
- "surf",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
- "validator",
-]
-
-[[package]]
-name = "core-ethereum-types"
-version = "0.8.0"
-dependencies = [
- "async-std",
- "bindings",
- "core-crypto",
- "core-types",
- "env_logger",
- "ethers",
- "hex",
- "hex-literal",
- "libp2p-identity",
- "log",
- "mockall",
- "multiaddr",
- "platform",
- "serde",
- "utils-types",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1531,9 +1531,9 @@ dependencies = [
  "async-process",
  "async-std",
  "async-trait",
+ "chain-db",
+ "chain-types",
  "core-crypto",
- "core-ethereum-db",
- "core-ethereum-types",
  "core-path",
  "core-types",
  "env_logger",
@@ -1559,8 +1559,8 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-db",
  "core-crypto",
- "core-ethereum-db",
  "core-types",
  "futures",
  "hex-literal",
@@ -1586,8 +1586,8 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-db",
  "core-crypto",
- "core-ethereum-db",
  "core-packet",
  "core-path",
  "core-types",
@@ -1621,10 +1621,10 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-actions",
+ "chain-db",
+ "chain-types",
  "core-crypto",
- "core-ethereum-actions",
- "core-ethereum-db",
- "core-ethereum-types",
  "core-network",
  "core-protocol",
  "core-types",
@@ -1654,10 +1654,10 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
  "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
  "core-network",
  "core-p2p",
  "core-packet",
@@ -3284,13 +3284,13 @@ version = "2.1.0-rc.1"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
+ "chain-actions",
+ "chain-api",
+ "chain-db",
+ "chain-indexer",
+ "chain-rpc",
+ "chain-types",
  "const_format",
- "core-ethereum-actions",
- "core-ethereum-api",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-rpc",
- "core-ethereum-types",
  "core-path",
  "core-strategy",
  "core-transport",
@@ -3318,11 +3318,11 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-db",
+ "chain-indexer",
+ "chain-types",
  "chrono",
  "clap",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-types",
  "core-network",
  "core-strategy",
  "core-transport",
@@ -3356,9 +3356,9 @@ name = "hoprd-api"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "chain-actions",
  "const_format",
  "core-crypto",
- "core-ethereum-actions",
  "core-protocol",
  "core-transport",
  "core-types",
