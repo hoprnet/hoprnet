@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use core_types::channels::{ChannelDirection, ChannelStatus};
@@ -166,7 +166,7 @@ mod tests {
     use crate::errors::CoreEthereumActionsError;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
-    use core_crypto::{random::random_bytes, types::Hash};
+    use hopr_crypto::{random::random_bytes, types::Hash};
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};

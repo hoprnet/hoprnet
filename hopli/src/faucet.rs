@@ -6,8 +6,8 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use core_crypto::keypairs::Keypair;
-use core_crypto::types::ToChecksum;
+use hopr_crypto::keypairs::Keypair;
+use hopr_crypto::types::ToChecksum;
 use ethers::{types::U256, utils::parse_units};
 use log::{log, Level};
 use std::{env, str::FromStr};

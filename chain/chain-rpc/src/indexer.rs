@@ -98,7 +98,7 @@ mod test {
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use log::debug;
     use utils_types::primitives::Address;

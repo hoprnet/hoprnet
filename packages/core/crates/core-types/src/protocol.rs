@@ -1,9 +1,9 @@
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 use async_trait::async_trait;
 use bloomfilter::Bloom;
-use core_crypto::derivation::PacketTag;
-use core_crypto::random::random_bytes;
-use core_crypto::types::OffchainPublicKey;
+use hopr_crypto::derivation::PacketTag;
+use hopr_crypto::random::random_bytes;
+use hopr_crypto::types::OffchainPublicKey;
 use ethers::utils::hex;
 use log::warn;
 use serde::{Deserialize, Serialize};
@@ -168,7 +168,7 @@ impl BinarySerializable for ApplicationData {
 #[cfg(test)]
 mod tests {
     use crate::protocol::{ApplicationData, TagBloomFilter};
-    use core_crypto::random::random_bytes;
+    use hopr_crypto::random::random_bytes;
     use utils_types::traits::BinarySerializable;
 
     #[test]
@@ -193,8 +193,8 @@ mod tests {
         let items = (0..10_000)
             .into_iter()
             .map(|i| {
-                let mut ret = random_bytes::<{ core_crypto::parameters::PACKET_TAG_LENGTH }>();
-                ret[i % core_crypto::parameters::PACKET_TAG_LENGTH] = 0xaa; // ensure it is not completely just zeroes
+                let mut ret = random_bytes::<{ hopr_crypto::parameters::PACKET_TAG_LENGTH }>();
+                ret[i % hopr_crypto::parameters::PACKET_TAG_LENGTH] = 0xaa; // ensure it is not completely just zeroes
                 ret
             })
             .collect::<Vec<_>>();

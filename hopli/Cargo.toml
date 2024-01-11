@@ -12,7 +12,7 @@ clap = { version = "4.4", features = ["derive", "env", "string"] }
 ethers = { workspace = true }
 serde = "1.0"
 serde_json = "1.0"
-core-crypto = { workspace = true, default-features = false }
+hopr-crypto = { workspace = true, default-features = false }
 hoprd-keypair = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 thiserror = "1.0"

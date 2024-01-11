@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use core_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto::keypairs::{ChainKeypair, Keypair};
 use chain_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -211,7 +211,7 @@ pub mod tests {
     use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
     use async_std::task::sleep;
     use bindings::hopr_token::HoprToken;
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;

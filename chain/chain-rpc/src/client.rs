@@ -332,14 +332,14 @@ pub mod native {
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
-    signer: &core_crypto::keypairs::ChainKeypair,
+    signer: &hopr_crypto::keypairs::ChainKeypair,
 ) -> std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R>>,
         ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
     >,
 > {
-    use core_crypto::keypairs::Keypair;
+    use hopr_crypto::keypairs::Keypair;
     use ethers::signers::Signer;
 
     let wallet =
@@ -355,7 +355,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;

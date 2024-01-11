@@ -1,6 +1,6 @@
 use crate::errors::{CoreTypesError, Result};
 use bindings::hopr_channels::RedeemTicketCall;
-use core_crypto::{
+use hopr_crypto::{
     errors::CryptoError::SignatureVerification,
     keypairs::{ChainKeypair, Keypair},
     types::{Hash, PublicKey, Signature},
@@ -699,7 +699,7 @@ impl Ticket {
 
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self, domain_separator: &Hash) -> core_crypto::errors::Result<PublicKey> {
+    pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto::errors::Result<PublicKey> {
         PublicKey::from_signature_hash(
             &self.get_hash(domain_separator).to_bytes(),
             self.signature.as_ref().expect("ticket not signed"),
@@ -708,7 +708,7 @@ impl Ticket {
 
     /// Verifies the signature of this ticket.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> hopr_crypto::errors::Result<()> {
         let recovered = self.recover_signer(domain_separator)?;
         recovered
             .to_address()
@@ -836,7 +836,7 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
 #[cfg(test)]
 pub mod tests {
     use crate::channels::{f64_to_win_prob, ChannelEntry, ChannelStatus, Ticket};
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
     };

@@ -1,8 +1,8 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use core_crypto::types::OffchainPublicKey;
-use core_crypto::types::{HalfKeyChallenge, Hash};
+use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::{HalfKeyChallenge, Hash};
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},

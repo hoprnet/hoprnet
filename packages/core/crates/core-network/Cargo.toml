@@ -23,7 +23,7 @@ serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
 
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
 metrics = { workspace = true, optional = true}
@@ -41,6 +41,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:getrandom", "core-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm", "utils-types/wasm"]
+wasm = ["dep:getrandom", "hopr-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm", "utils-types/wasm"]
 compat-ping = []
 prometheus = ["dep:metrics"]

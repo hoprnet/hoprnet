@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 default = ["prometheus"]
 wasm = [
     "dep:getrandom",
-    "core-crypto/wasm", "chain-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
+    "hopr-crypto/wasm", "chain-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-types/wasm", "metrics?/wasm",
 ]
 prometheus = ["dep:metrics", "core-path/prometheus", "core-packet/prometheus"]
@@ -36,7 +36,7 @@ serde_with = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }

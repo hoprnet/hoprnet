@@ -19,7 +19,7 @@ hex-literal = "0.4.1"
 serde = "1.0"
 
 bindings = { workspace = true }
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
@@ -37,4 +37,4 @@ hex = { workspace = true }
 
 [features]
 default = []
-wasm = [ "core-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
+wasm = [ "hopr-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]

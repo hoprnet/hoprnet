@@ -19,7 +19,7 @@ pub use {
         processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
     },
-    core_crypto::{
+    hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },

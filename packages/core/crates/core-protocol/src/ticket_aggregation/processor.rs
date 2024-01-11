@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use async_lock::RwLock;
-use core_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
+use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
@@ -724,7 +724,7 @@ where
 #[cfg(test)]
 mod tests {
     use async_lock::RwLock;
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

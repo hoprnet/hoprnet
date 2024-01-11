@@ -2,7 +2,7 @@ use crate::channel_graph::{ChannelEdge, ChannelGraph};
 use crate::errors::{PathError, Result};
 use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
-use core_crypto::random::random_float;
+use hopr_crypto::random::random_float;
 use core_types::channels::ChannelEntry;
 use core_types::protocol::INTERMEDIATE_HOPS;
 use petgraph::visit::EdgeRef;

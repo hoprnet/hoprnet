@@ -84,9 +84,9 @@ mod tests {
     use crate::auto_redeeming::{AutoRedeemingStrategy, AutoRedeemingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_actions::redeem::TicketRedeemActions;
     use chain_types::actions::Action;

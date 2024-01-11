@@ -1,6 +1,6 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;

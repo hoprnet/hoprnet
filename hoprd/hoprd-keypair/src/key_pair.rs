@@ -6,8 +6,8 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
-use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use core_crypto::random::random_bytes;
+use hopr_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+use hopr_crypto::random::random_bytes;
 use hex;
 use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
@@ -442,7 +442,7 @@ mod tests {
     use std::fs;
 
     use super::HoprKeys;
-    use core_crypto::keypairs::Keypair;
+    use hopr_crypto::keypairs::Keypair;
     use tempfile::tempdir;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";

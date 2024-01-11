@@ -1,7 +1,7 @@
 use crate::CoreEthereumActions;
 use async_lock::RwLock;
 use async_trait::async_trait;
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
@@ -241,9 +241,9 @@ mod tests {
     use crate::redeem::TicketRedeemActions;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;

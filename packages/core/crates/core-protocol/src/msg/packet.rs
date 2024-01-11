@@ -1,7 +1,7 @@
 use core_path::path::TransportPath;
 use libp2p_identity::PeerId;
 
-use core_crypto::{derivation::PacketTag, keypairs::OffchainKeypair, types::HalfKeyChallenge};
+use hopr_crypto::{derivation::PacketTag, keypairs::OffchainKeypair, types::HalfKeyChallenge};
 use core_packet::errors::Result;
 use core_types::acknowledgement::Acknowledgement;
 

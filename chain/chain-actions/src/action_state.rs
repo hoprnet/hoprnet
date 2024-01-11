@@ -1,6 +1,6 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
 use log::{debug, error};
@@ -150,8 +150,8 @@ mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
     use crate::errors::CoreEthereumActionsError;
     use async_std::prelude::FutureExt;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::Hash;
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::Hash;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use std::sync::Arc;
     use std::time::Duration;

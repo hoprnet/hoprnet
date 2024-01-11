@@ -7,7 +7,7 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents,
 };
-use core_crypto::types::OffchainSignature;
+use hopr_crypto::types::OffchainSignature;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
@@ -618,7 +618,7 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{Keypair, OffchainKeypair},
         types::Hash,
     };

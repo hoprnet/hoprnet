@@ -14,7 +14,7 @@ use bindings::{
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
-use core_crypto::{keypairs::ChainKeypair, types::VrfParameters};
+use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
 use chain_types::ContractAddresses;
 use chain_types::{create_eip1559_transaction, TypedTransaction};
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
@@ -561,7 +561,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
 #[cfg(test)]
 pub mod tests {
     use bindings::{hopr_channels::HoprChannels, hopr_token::HoprToken};
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

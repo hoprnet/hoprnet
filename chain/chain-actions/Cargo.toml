@@ -26,7 +26,7 @@ serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
@@ -45,6 +45,6 @@ hex-literal = "0.4"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-types/wasm", "core-crypto/wasm", "core-types/wasm",
+wasm = [ "chain-db/wasm", "chain-types/wasm", "hopr-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = [ "dep:metrics", "chain-rpc/prometheus" ]

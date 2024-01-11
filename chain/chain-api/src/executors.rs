@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_actions::action_queue::TransactionExecutor;
 use chain_actions::payload::PayloadGenerator;
 use chain_rpc::errors::RpcError;

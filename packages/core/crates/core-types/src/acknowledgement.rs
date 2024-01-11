@@ -6,7 +6,7 @@ use crate::{
         Result as CoreTypesResult,
     },
 };
-use core_crypto::{
+use hopr_crypto::{
     derivation::derive_vrf_parameters,
     errors::CryptoError::{InvalidChallenge, InvalidVrfValues, SignatureVerification},
     keypairs::{ChainKeypair, OffchainKeypair},
@@ -184,7 +184,7 @@ impl AcknowledgedTicket {
         issuer: &Address,
         recipient: &Address,
         domain_separator: &Hash,
-    ) -> core_crypto::errors::Result<()> {
+    ) -> hopr_crypto::errors::Result<()> {
         if self.ticket.verify(issuer, domain_separator).is_err() {
             return Err(SignatureVerification);
         }
@@ -319,13 +319,13 @@ impl UnacknowledgedTicket {
     }
 
     /// Verifies if signature on the embedded ticket using the embedded public key.
-    pub fn verify_signature(&self, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+    pub fn verify_signature(&self, domain_separator: &Hash) -> hopr_crypto::errors::Result<()> {
         self.ticket.verify(&self.signer, domain_separator)
     }
 
     /// Verifies if the challenge on the embedded ticket matches the solution
     /// from the given acknowledgement and the embedded half key.
-    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<()> {
+    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> hopr_crypto::errors::Result<()> {
         if self
             .ticket
             .challenge
@@ -337,7 +337,7 @@ impl UnacknowledgedTicket {
         }
     }
 
-    pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
+    pub fn get_response(&self, acknowledgement: &HalfKey) -> hopr_crypto::errors::Result<Response> {
         Response::from_half_keys(&self.own_key, acknowledgement)
     }
 
@@ -434,7 +434,7 @@ pub mod test {
         channels::Ticket,
     };
     use bincode::{deserialize, serialize};
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
     };

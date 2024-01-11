@@ -2,7 +2,7 @@ use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-use core_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::OffchainPublicKey;
 use core_types::channels::ChannelStatus;
 use core_types::protocol::PeerAddressResolver;
 use futures::future::FutureExt;
@@ -245,7 +245,7 @@ mod tests {
     use crate::channel_graph::ChannelGraph;
     use crate::path::{ChannelPath, Path, TransportPath};
     use async_trait::async_trait;
-    use core_crypto::types::{OffchainPublicKey, PublicKey};
+    use hopr_crypto::types::{OffchainPublicKey, PublicKey};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;

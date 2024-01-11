@@ -1,4 +1,4 @@
-use core_crypto::errors::CryptoError;
+use hopr_crypto::errors::CryptoError;
 use core_path::errors::PathError;
 use core_types::errors::CoreTypesError;
 use thiserror::Error;

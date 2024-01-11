@@ -1,4 +1,4 @@
-use core_crypto::errors::CryptoError;
+use hopr_crypto::errors::CryptoError;
 use hex::FromHexError;
 use platform::error::PlatformError;
 use serde_json::Error as JsonError;

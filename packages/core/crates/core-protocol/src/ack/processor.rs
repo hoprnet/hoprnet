@@ -1,8 +1,8 @@
 use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
-use core_crypto::keypairs::ChainKeypair;
-use core_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
+use hopr_crypto::keypairs::ChainKeypair;
+use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
 use core_packet::errors::Result;

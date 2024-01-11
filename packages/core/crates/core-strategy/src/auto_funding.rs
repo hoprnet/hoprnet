@@ -113,8 +113,8 @@ mod tests {
     use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::Hash;
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::Hash;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_actions::channels::ChannelActions;
     use chain_types::actions::Action;

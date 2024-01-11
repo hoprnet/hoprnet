@@ -1,4 +1,4 @@
-use core_crypto::{
+use hopr_crypto::{
     derivation::{derive_ack_key_share, PacketTag},
     keypairs::{ChainKeypair, OffchainKeypair},
     shared_keys::SphinxSuite,
@@ -111,7 +111,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> =
+            let mp: MetaPacket<hopr_crypto::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
@@ -225,8 +225,8 @@ impl ChainPacketComponents {
 mod tests {
     use super::ChainPacketComponents;
     use async_trait::async_trait;
-    use core_crypto::types::OffchainPublicKey;
-    use core_crypto::{
+    use hopr_crypto::types::OffchainPublicKey;
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, PublicKey},
     };

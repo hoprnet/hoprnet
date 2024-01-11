@@ -9,7 +9,7 @@ use chain_db::db::CoreEthereumDb;
 use std::sync::Arc;
 use std::time::Duration;
 
-use core_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto::keypairs::{ChainKeypair, Keypair};
 use chain_actions::CoreEthereumActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_indexer::block::{Indexer, IndexerConfig};

@@ -1,5 +1,5 @@
 use async_lock::RwLock;
-use core_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::OffchainPublicKey;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::{network::Network, PeerId};
 use core_p2p::libp2p_swarm::derive_prelude::Multiaddr;

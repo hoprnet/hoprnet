@@ -6,7 +6,7 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use core_crypto::keypairs::Keypair;
+use hopr_crypto::keypairs::Keypair;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits

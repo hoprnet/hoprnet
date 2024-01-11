@@ -32,7 +32,7 @@ validator = { workspace = true }
 
 bindings = { workspace = true }
 core-types = { workspace = true }
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 chain-types = { workspace = true }
 utils-db = { workspace = true }
@@ -52,6 +52,6 @@ mockall = "0.11.4"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
+wasm = [ "chain-db/wasm", "hopr-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
 prometheus = ["dep:metrics"]
 reqwest = ["dep:reqwest"]

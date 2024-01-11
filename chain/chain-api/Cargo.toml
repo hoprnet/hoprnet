@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 default = ["prometheus"]
 wasm = [
     "chain-db/wasm", "chain-actions/wasm", "chain-rpc/wasm", "chain-indexer/wasm",
-    "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
+    "hopr-crypto/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:metrics", "chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
@@ -29,7 +29,7 @@ hex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 chain-actions = { workspace = true }
 chain-db = { workspace = true }
 chain-indexer = { workspace = true }

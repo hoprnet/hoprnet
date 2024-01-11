@@ -804,7 +804,7 @@ mod peers {
 
 mod channels {
     use super::*;
-    use core_crypto::types::Hash;
+    use hopr_crypto::types::Hash;
     use chain_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
@@ -1605,7 +1605,7 @@ mod network {
 }
 mod tickets {
     use super::*;
-    use core_crypto::types::Hash;
+    use hopr_crypto::types::Hash;
     use core_protocol::errors::ProtocolError;
     use core_transport::errors::HoprTransportError;
     use core_transport::TicketStatistics;

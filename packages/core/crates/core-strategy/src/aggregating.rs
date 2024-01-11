@@ -327,7 +327,7 @@ mod tests {
     use crate::strategy::SingularStrategy;
     use async_lock::RwLock;
     use async_trait::async_trait;
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

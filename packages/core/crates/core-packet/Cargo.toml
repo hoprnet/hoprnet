@@ -18,7 +18,7 @@ lazy_static = { workspace = true }
 thiserror = "1.0"
 typenum = "1.16"
 
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }
@@ -41,5 +41,5 @@ serial_test = "2.0"
 
 [features]
 default = ["prometheus"]
-wasm = [ "core-crypto/wasm", "chain-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "metrics?/wasm", "chain-types/wasm" ]
+wasm = [ "hopr-crypto/wasm", "chain-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "metrics?/wasm", "chain-types/wasm" ]
 prometheus = [ "dep:metrics", "core-path/prometheus" ]

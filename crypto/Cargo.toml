@@ -1,5 +1,5 @@
 [package]
-name = "core-crypto"
+name = "hopr-crypto"
 version = "0.5.3"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]

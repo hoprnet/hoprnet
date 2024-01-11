@@ -2,7 +2,7 @@ use crate::errors::{
     PacketError::{OutOfFunds, TicketValidation},
     Result,
 };
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use log::{debug, info};
@@ -107,10 +107,10 @@ mod tests {
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::HalfKey;
-    use core_crypto::types::OffchainPublicKey;
-    use core_crypto::{
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::HalfKey;
+    use hopr_crypto::types::OffchainPublicKey;
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash},
     };

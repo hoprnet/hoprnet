@@ -1,4 +1,4 @@
-use core_crypto::{
+use hopr_crypto::{
     errors::CryptoError,
     keypairs::{Keypair, OffchainKeypair},
     types::{OffchainPublicKey, OffchainSignature},
@@ -150,7 +150,7 @@ impl Display for AnnouncementData {
 #[cfg(test)]
 mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
-    use core_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::{

@@ -1,4 +1,4 @@
-use core_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::OffchainPublicKey;
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
@@ -394,9 +394,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::keypairs::{Keypair, OffchainKeypair};
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::Hash;
+    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto::random::random_bytes;
+    use hopr_crypto::types::Hash;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;

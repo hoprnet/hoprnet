@@ -1,5 +1,5 @@
 use crate::account::AccountType::{Announced, NotAnnounced};
-use core_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::OffchainPublicKey;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -199,7 +199,7 @@ mod test {
         AccountEntry,
         AccountType::{Announced, NotAnnounced},
     };
-    use core_crypto::types::OffchainPublicKey;
+    use hopr_crypto::types::OffchainPublicKey;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::{primitives::Address, traits::BinarySerializable};

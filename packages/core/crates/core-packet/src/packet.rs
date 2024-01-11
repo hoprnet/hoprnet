@@ -1,5 +1,5 @@
 use crate::errors::PacketError::PacketDecodingError;
-use core_crypto::{
+use hopr_crypto::{
     derivation::{derive_packet_tag, PacketTag},
     keypairs::Keypair,
     primitives::{DigestLike, SimpleMac},
@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Currently used ciphersuite for Sphinx
-pub type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
+pub type CurrentSphinxSuite = hopr_crypto::ec_groups::X25519Suite;
 
 /// Length of the packet including header and the payload
 pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
@@ -243,7 +243,7 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
 mod tests {
     use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::{
+    use hopr_crypto::{
         ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         shared_keys::SphinxSuite,

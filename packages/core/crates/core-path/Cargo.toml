@@ -23,7 +23,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 chain-db = { workspace = true }
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
@@ -41,6 +41,6 @@ wasm-bindgen-test = "0.3.36"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+wasm = [ "chain-db/wasm", "hopr-crypto/wasm", "core-types/wasm", "utils-db/wasm", "metrics?/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
 prometheus = ["dep:metrics" ]
 

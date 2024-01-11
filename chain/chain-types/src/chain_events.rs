@@ -1,4 +1,4 @@
-use core_crypto::types::Hash;
+use hopr_crypto::types::Hash;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 use libp2p_identity::PeerId;

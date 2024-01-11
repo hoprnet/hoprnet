@@ -7,7 +7,7 @@ exclude = [
 resolver = "2"
 
 members = [
-    "packages/core/crates/core-crypto",
+    "crypto",
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
@@ -68,7 +68,7 @@ chain-db = { path = "chain/chain-db", default-features = false }
 chain-rpc = { path = "chain/chain-rpc", default-features = false }
 chain-types = { path = "chain/chain-types", default-features = false }
 chain-indexer = { path = "chain/chain-indexer", default-features = false }
-core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
+hopr-crypto = { path = "crypto", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-path = { path = "packages/core/crates/core-path", default-features = false }

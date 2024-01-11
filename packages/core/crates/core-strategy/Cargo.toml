@@ -26,7 +26,7 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 core-types = { workspace = true }
-core-crypto = { workspace = true }
+hopr-crypto = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 chain-db = { workspace = true }

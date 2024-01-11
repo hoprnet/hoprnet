@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_types::channels::ChannelDirection;
 use core_types::{
     account::AccountEntry,
@@ -1343,7 +1343,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::{
+    use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Response},
     };

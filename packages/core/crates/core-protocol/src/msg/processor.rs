@@ -8,7 +8,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
-use core_crypto::{
+use hopr_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
@@ -778,8 +778,8 @@ mod tests {
     };
     use async_lock::RwLock;
     use async_trait::async_trait;
-    use core_crypto::types::OffchainPublicKey;
-    use core_crypto::{
+    use hopr_crypto::types::OffchainPublicKey;
+    use hopr_crypto::{
         derivation::derive_ack_key_share,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         random::{random_bytes, random_integer},
