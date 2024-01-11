@@ -5,3 +5,7 @@ npm-debug.log
 Dockerfile
 .git
 .gitignore
+
+.cargo
+# Needed for cargo vendoring
+!.cargo/config.yaml
