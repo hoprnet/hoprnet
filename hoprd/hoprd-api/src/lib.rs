@@ -1,3 +1,5 @@
+//! REST API for the HOPRd node.
+
 pub mod config;
 
 use std::error::Error;

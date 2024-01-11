@@ -1,3 +1,5 @@
+//! Basic storage implementations for the Storage mechanism used by the Rust backend.
+
 pub mod constants;
 pub mod db;
 pub mod errors;

@@ -37,13 +37,13 @@ use crate::ping::Pinging;
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
-    /// Round-to-round variance to complicate network sync [seconds]
+    /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub variance: std::time::Duration,
-    /// Interval in which the heartbeat is triggered [seconds]
+    /// Interval in which the heartbeat is triggered in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub interval: std::time::Duration,
-    /// The time interval for which to consider peer heartbeat renewal [seconds]
+    /// The time interval for which to consider peer heartbeat renewal in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub threshold: std::time::Duration,
 }

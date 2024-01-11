@@ -1,3 +1,5 @@
+//! Crate containing the API object for chain operations used by the HOPRd node.
+
 pub mod errors;
 pub mod executors;
 

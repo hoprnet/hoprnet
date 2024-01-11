@@ -1,3 +1,5 @@
+//! Primitives and structs for the network components.
+
 pub mod constants;
 pub mod errors;
 pub mod heartbeat;

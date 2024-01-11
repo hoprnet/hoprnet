@@ -1,3 +1,6 @@
+//! HOPR library creating a unified `Hopr` object that can be used on its own, as well as integrated
+//! into other systems and libraries.
+
 mod chain;
 pub mod config;
 pub mod constants;

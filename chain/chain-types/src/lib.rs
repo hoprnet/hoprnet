@@ -1,3 +1,7 @@
+//! This crate contains various on-chain related modules and types:
+//! - `constants`: constants related to on-chain operations
+//! - `actions`: types related to high-level core-ethereum Actions
+
 use bindings::hopr_announcements::HoprAnnouncements;
 use bindings::hopr_channels::HoprChannels;
 use bindings::hopr_dummy_proxy_for_network_registry::HoprDummyProxyForNetworkRegistry;

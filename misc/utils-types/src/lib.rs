@@ -1,3 +1,5 @@
+//! This crate contains basic types used throughout the entire HOPR codebase.
+
 extern crate core;
 
 pub mod errors;
