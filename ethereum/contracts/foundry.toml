@@ -8,7 +8,7 @@ out = 'out'
 libs = ['lib']
 verbosity = 3
 fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
-allow_paths = ["../../../vendor/solidity"]
+allow_paths = ["../../vendor/solidity"]
 offline = false
 build_info = true
 build_info_path = "build-info"

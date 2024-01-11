@@ -1,6 +1,6 @@
 # Gets all solidity files which the bindings depend on
 SOLIDITY_SRC_FILES := $(shell find ./src -type f -name "*.sol")
-SOLIDITY_DEP_FILES := $(shell find ./../../../vendor/solidity -type f -name "*.sol")
+SOLIDITY_DEP_FILES := $(shell find ./../../vendor/solidity -type f -name "*.sol")
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_DEP_FILES)
 
 # Use local foundry directory (for binaries)
@@ -31,14 +31,14 @@ sc-audit-coverage:
 forked-local-anvil:
 	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
 
-../crates/bindings/src: ${SOLIDITY_FILES}
-../crates/bindings/src: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ../crates/bindings --crate-name bindings \
+../bindings/src: ${SOLIDITY_FILES}
+../bindings/src: ## Only create types for Hopr* contracts
+	$(forge-bind) --bindings-path ../bindings --crate-name bindings \
 		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: check-sc-bindings
 check-sc-bindings: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ./crates/bindings --root ./contracts \
+	$(forge-bind) --bindings-path ./bindings --root ./contracts \
 		--crate-name bindings --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: anvil-deploy-erc1820
