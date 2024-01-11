@@ -189,7 +189,8 @@ def balance_str_to_int(balance: str):
 
 
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
-# correct ticket price from api@pytest.mark.asyncio
+# correct ticket price from api
+@pytest.mark.asyncio
 async def test_hoprd_swarm_connectivity(swarm7):
     async def check_all_connected(me, others: list):
         others2 = set(others)

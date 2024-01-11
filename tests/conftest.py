@@ -86,34 +86,34 @@ NODES = {
         "api_port": 19091,
         "p2p_port": 13301,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_0",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
         "host_addr": "localhost",
     },
     "2": {
         "api_port": 19092,
         "p2p_port": 13302,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
         "host_addr": "127.0.0.1",
     },
     "3": {
         "api_port": 19093,
         "p2p_port": 13303,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
         "host_addr": "localhost",
     },
     "4": {
         "api_port": 19094,
         "p2p_port": 13304,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
         "host_addr": "127.0.0.1",
     },
     "5": {
         "api_port": 19095,
         "p2p_port": 13305,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
         "host_addr": "localhost",
         "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5.cfg.yaml",
     },
@@ -121,7 +121,7 @@ NODES = {
         "api_port": 19096,
         "p2p_port": 13306,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
         "host_addr": "127.0.0.1",
         "network": ANVIL_NETWORK2,
     },
@@ -129,10 +129,10 @@ NODES = {
         "api_port": 19097,
         "p2p_port": 13307,
         "api_token": DEFAULT_API_TOKEN,
-        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_7",
         "host_addr": "localhost",
     },
-}  # TODO: add remaining 3 nodes back in
+}
 
 
 def cleanup_node(args):
@@ -143,12 +143,12 @@ def cleanup_node(args):
         pass
 
 
-def setup_node(args):
+def setup_node(args: dict):
     logging.info(f"Setting up a node with configuration: {args}")
     log_file = open(f"{args['dir']}.log", "w")
-    network = args["network"] if "network" in args else ANVIL_NETWORK1
-    api_token = args["api_token"] if "api_token" in args else ""
-    api_token_param = f"--api-token={api_token}" if "api_token" in args else "--disableApiAuthentication"
+    network = args.get("network", ANVIL_NETWORK1)
+    api_token = args.get("api_token", None)
+    api_token_param = f"--api-token={api_token}" if api_token else "--disableApiAuthentication"
     custom_env = {
         "HOPRD_HEARTBEAT_INTERVAL": "2500",
         "HOPRD_HEARTBEAT_THRESHOLD": "2500",
@@ -238,7 +238,7 @@ def reuse_pregenerated_identities():
         logging.info(f"Removed file {FIXTURE_FILES_DIR}{f}")
 
     # we copy and rename the files according to the expected file name format and destination folder
-    node_nr = 0
+    node_nr = 1
     id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
 
     def is_relevant_file(f):
