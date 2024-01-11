@@ -6,13 +6,23 @@ FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet
 
-RUN mv /app/hoprnet-toolchain/.cargo . && \
-    mv /app/hoprnet-toolchain/.yarn .
+
+# DO NOT BACK_MERGE THIS
+COPY .yarn .yarn
+# END DO NOT BACK_MERGE THIS
 
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml .nvmrc ./
+
+# DO NOT BACK_MERGE THIS
+# Latest toolchain image does not include Node.js
+COPY scripts/toolchain/install-toolchain.sh scripts/toolchain/
+RUN scripts/toolchain/install-toolchain.sh --runtime-only --with-wasm-utilities
+
+RUN corepack enable
+# END DO NOT BACK_MERGE THIS
 
 LABEL description="Launches a hoprd node"
 
