@@ -1,0 +1,44 @@
+[package]
+name = "hoprd-api"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "API server using the hopr-lib created HOPR node and exposing it using a HTTP REST API"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["prometheus"]
+prometheus = ["hopr-lib/prometheus", "dep:metrics"]
+
+
+[dependencies]
+async-std = { workspace = true, features = ["attributes"] }
+const_format = "0.2.32"
+env_logger = { workspace = true }
+futures = { workspace = true }
+libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+serde_json = { workspace = true }
+strum = { version = "0.25.0", features = ["derive"] }
+tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
+utoipa = { version = "4.1" }
+utoipa-swagger-ui = { version = "5.0.0" }
+validator = { workspace = true }
+
+hopr-lib = { workspace = true }
+hoprd-inbox = { workspace = true }
+hopr-crypto = { workspace = true }
+chain-actions = { workspace = true }
+core-protocol = { workspace = true }
+core-transport = { workspace = true }
+core-types = { workspace = true }
+utils-types = { workspace = true }
+log = { workspace = true }
+metrics = { workspace = true, optional = true }
+

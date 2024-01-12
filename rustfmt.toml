@@ -1,5 +1,5 @@
 edition = "2021"
 reorder_imports = true
 fn_params_layout = "Tall"
-#group_imports = "StdExternalCrate"
+# group_imports = "StdExternalCrate"
 max_width=120

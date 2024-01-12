@@ -125,7 +125,7 @@ fi
 
 if [ "${skip_deploy}" != "true" ]; then
   log "Deploying contracts"
-  DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C "${mydir}"/../packages/ethereum/contracts/ anvil-deploy-all
+  DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C "${mydir}"/../ethereum/contracts/ anvil-deploy-all
   log "Deploying contracts finished"
 fi
 

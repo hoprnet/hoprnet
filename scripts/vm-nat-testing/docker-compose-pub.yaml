@@ -13,12 +13,11 @@ services:
       - -c
       - |
         ./prepare-node.sh
-        node /opt/hopr/packages/hoprd/lib/main.cjs \
+        hoprd \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --network anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-public.id --testUseWeakCrypto --announce
     volumes:
-      - '/opt/hopr:/opt/hopr'
       - '/var/hopr/identities:/var/hopr/identities'
     networks:
       - 'hoprd-isolated'

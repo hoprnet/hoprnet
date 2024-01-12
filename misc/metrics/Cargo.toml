@@ -1,0 +1,22 @@
+[package]
+name = "metrics"
+version = "1.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Rust WASM module containing support for general metrics collection"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+prometheus = "0.13"
+regex = "1"
+
+platform = { workspace = true }
+
+[features]
+default = []
+wasm = [ "platform/wasm-bindgen" ]

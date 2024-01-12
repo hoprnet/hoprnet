@@ -27,12 +27,12 @@ log "get default network id"
 declare branch=$(git rev-parse --abbrev-ref HEAD)
 
 declare network
-for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+for git_ref in $(cat "${mydir}/../releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
-    network=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
+    network=$(cat "${mydir}/../releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
     # if no default is set we take the first entry
     if [ -z "${network}" ]; then
-      network=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | ${key_to_extract}" | sed q)
+      network=$(cat "${mydir}/../releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | ${key_to_extract}" | sed q)
     fi
     break
   fi
