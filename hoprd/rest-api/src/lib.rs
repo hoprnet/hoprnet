@@ -1422,7 +1422,7 @@ mod messages {
         received_at: std::time::Duration,
     }
 
-    fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
+    fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopRes, String> {
         if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
                 Ok(data_str) => Ok(MessagePopRes {
