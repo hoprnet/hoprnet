@@ -264,6 +264,9 @@ impl<T: NetworkExternalActions> Network<T> {
         let mut excluded = HashSet::new();
         excluded.insert(my_peer_id);
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_NETWORK_HEALTH.set(0.0);
+
         Network {
             me: my_peer_id,
             cfg,
