@@ -1417,7 +1417,7 @@ mod messages {
     pub(crate) struct MessagePopRes {
         tag: u16,
         body: String,
-        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
         #[schema(value_type = u64)]
         received_at: std::time::Duration,
     }
