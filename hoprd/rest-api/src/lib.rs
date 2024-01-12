@@ -1563,7 +1563,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
             content = GetMessageReq,
-            description = "Tag of message queue and optionally a timestamp since from to peek from",
+            description = "Tag of message queue and optionally a timestamp since from to start peeking",
             content_type = "application/json"
         ),
         responses(
