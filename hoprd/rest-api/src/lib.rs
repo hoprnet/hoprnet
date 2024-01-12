@@ -1225,7 +1225,6 @@ mod messages {
     use std::time::Duration;
 
     use hopr_lib::HalfKeyChallenge;
-    use log::debug;
 
     use super::*;
 

@@ -52,7 +52,7 @@ pub mod node;
 pub mod payload;
 pub mod redeem;
 
-///! Contains all actions that a node can execute on-chain.
+/// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
