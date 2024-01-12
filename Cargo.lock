@@ -1006,6 +1006,173 @@ dependencies = [
 ]
 
 [[package]]
+name = "chain-actions"
+version = "0.5.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "futures",
+ "futures-timer",
+ "hex",
+ "hex-literal",
+ "hopr-crypto",
+ "lazy_static",
+ "log",
+ "metrics",
+ "mockall",
+ "multiaddr",
+ "platform",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-api"
+version = "0.2.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "chain-actions",
+ "chain-db",
+ "chain-indexer",
+ "chain-rpc",
+ "chain-types",
+ "core-path",
+ "core-types",
+ "ethers",
+ "futures",
+ "hex",
+ "hopr-crypto",
+ "log",
+ "metrics",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-db"
+version = "0.4.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "core-types",
+ "env_logger",
+ "hex",
+ "hex-literal",
+ "hopr-crypto",
+ "lazy_static",
+ "log",
+ "mockall",
+ "platform",
+ "serde",
+ "utils-db",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-indexer"
+version = "0.1.0"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "futures",
+ "hex",
+ "hex-literal",
+ "hopr-crypto",
+ "lazy_static",
+ "log",
+ "metrics",
+ "mockall",
+ "multiaddr",
+ "primitive-types",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-types",
+]
+
+[[package]]
+name = "chain-rpc"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-stream",
+ "async-trait",
+ "bindings",
+ "chain-db",
+ "chain-types",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "ethers-providers",
+ "ethnum",
+ "futures",
+ "futures-timer",
+ "hex",
+ "hex-literal",
+ "hopr-crypto",
+ "lazy_static",
+ "log",
+ "metrics",
+ "mockall",
+ "pin-project",
+ "primitive-types",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "surf",
+ "thiserror",
+ "utils-db",
+ "utils-types",
+ "validator",
+]
+
+[[package]]
+name = "chain-types"
+version = "0.8.0"
+dependencies = [
+ "async-std",
+ "bindings",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "hex",
+ "hex-literal",
+ "hopr-crypto",
+ "libp2p-identity",
+ "log",
+ "mockall",
+ "multiaddr",
+ "platform",
+ "serde",
+ "utils-types",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1260,207 +1427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-crypto"
-version = "0.5.3"
-dependencies = [
- "aes 0.8.3",
- "blake2",
- "chacha20",
- "ctr 0.9.2",
- "curve25519-dalek",
- "digest 0.10.7",
- "ed25519-dalek",
- "elliptic-curve",
- "generic-array",
- "getrandom 0.2.12",
- "hex",
- "hex-literal",
- "hkdf 0.12.4",
- "k256",
- "libp2p-identity",
- "log",
- "parameterized",
- "platform",
- "primitive-types",
- "rand 0.8.5",
- "serde",
- "sha2 0.10.8",
- "sha3",
- "subtle",
- "thiserror",
- "typenum",
- "utils-types",
- "zeroize",
-]
-
-[[package]]
-name = "core-ethereum-actions"
-version = "0.5.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "futures",
- "futures-timer",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "multiaddr",
- "platform",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-api"
-version = "0.2.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "core-crypto",
- "core-ethereum-actions",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-path",
- "core-types",
- "ethers",
- "futures",
- "hex",
- "log",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-db"
-version = "0.4.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "core-crypto",
- "core-types",
- "env_logger",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "platform",
- "serde",
- "utils-db",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-indexer"
-version = "0.1.0"
-dependencies = [
- "async-lock 2.8.0",
- "async-std",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "futures",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "multiaddr",
- "primitive-types",
- "serde",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
-]
-
-[[package]]
-name = "core-ethereum-rpc"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "async-stream",
- "async-trait",
- "bindings",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-types",
- "core-types",
- "env_logger",
- "ethers",
- "ethers-providers",
- "ethnum",
- "futures",
- "futures-timer",
- "hex",
- "hex-literal",
- "lazy_static",
- "log",
- "mockall",
- "pin-project",
- "primitive-types",
- "reqwest",
- "serde",
- "serde_json",
- "surf",
- "thiserror",
- "utils-db",
- "utils-metrics",
- "utils-types",
- "validator",
-]
-
-[[package]]
-name = "core-ethereum-types"
-version = "0.8.0"
-dependencies = [
- "async-std",
- "bindings",
- "core-crypto",
- "core-types",
- "env_logger",
- "ethers",
- "hex",
- "hex-literal",
- "libp2p-identity",
- "log",
- "mockall",
- "multiaddr",
- "platform",
- "serde",
- "utils-types",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1482,13 +1448,14 @@ version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
- "core-crypto",
  "futures",
  "futures-lite 1.13.0",
  "getrandom 0.2.12",
+ "hopr-crypto",
  "lazy_static",
  "libp2p-identity",
  "log",
+ "metrics",
  "mockall",
  "more-asserts",
  "multiaddr",
@@ -1497,7 +1464,6 @@ dependencies = [
  "serde",
  "serde_with",
  "thiserror",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1531,16 +1497,17 @@ dependencies = [
  "async-process",
  "async-std",
  "async-trait",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-types",
+ "chain-db",
+ "chain-types",
  "core-path",
  "core-types",
  "env_logger",
  "hex",
  "hex-literal",
+ "hopr-crypto",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "parameterized",
  "platform",
@@ -1548,7 +1515,6 @@ dependencies = [
  "thiserror",
  "typenum",
  "utils-db",
- "utils-metrics",
  "utils-types",
 ]
 
@@ -1559,14 +1525,15 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
- "core-crypto",
- "core-ethereum-db",
+ "chain-db",
  "core-types",
  "futures",
  "hex-literal",
+ "hopr-crypto",
  "lazy_static",
  "libp2p-identity",
  "log",
+ "metrics",
  "mockall",
  "petgraph",
  "platform",
@@ -1574,7 +1541,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "wasm-bindgen-test",
 ]
@@ -1586,8 +1552,7 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
- "core-crypto",
- "core-ethereum-db",
+ "chain-db",
  "core-packet",
  "core-path",
  "core-types",
@@ -1596,10 +1561,12 @@ dependencies = [
  "futures-lite 1.13.0",
  "getrandom 0.2.12",
  "hex-literal",
+ "hopr-crypto",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
  "log",
+ "metrics",
  "more-asserts",
  "parameterized",
  "rand 0.8.5",
@@ -1609,7 +1576,6 @@ dependencies = [
  "serial_test",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1621,10 +1587,9 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
- "core-crypto",
- "core-ethereum-actions",
- "core-ethereum-db",
- "core-ethereum-types",
+ "chain-actions",
+ "chain-db",
+ "chain-types",
  "core-network",
  "core-protocol",
  "core-types",
@@ -1632,8 +1597,10 @@ dependencies = [
  "futures",
  "getrandom 0.2.12",
  "hex-literal",
+ "hopr-crypto",
  "lazy_static",
  "log",
+ "metrics",
  "mockall",
  "platform",
  "rand 0.8.5",
@@ -1642,7 +1609,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -1654,10 +1620,9 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
- "core-crypto",
- "core-ethereum-db",
- "core-ethereum-rpc",
- "core-ethereum-types",
+ "chain-db",
+ "chain-rpc",
+ "chain-types",
  "core-network",
  "core-p2p",
  "core-packet",
@@ -1666,15 +1631,16 @@ dependencies = [
  "core-types",
  "futures",
  "futures-concurrency",
+ "hopr-crypto",
  "lazy_static",
  "libp2p",
  "log",
+ "metrics",
  "multiaddr",
  "platform",
  "serde",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "utils-validation",
  "validator",
@@ -1688,10 +1654,10 @@ dependencies = [
  "bincode",
  "bindings",
  "bloomfilter",
- "core-crypto",
  "enum-iterator",
  "ethers",
  "hex-literal",
+ "hopr-crypto",
  "lazy_static",
  "log",
  "multiaddr",
@@ -3267,8 +3233,8 @@ name = "hopli"
 version = "0.4.0"
 dependencies = [
  "clap",
- "core-crypto",
  "ethers",
+ "hopr-crypto",
  "hoprd-keypair",
  "log",
  "serde",
@@ -3279,18 +3245,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-crypto"
+version = "0.5.3"
+dependencies = [
+ "aes 0.8.3",
+ "blake2",
+ "chacha20",
+ "ctr 0.9.2",
+ "curve25519-dalek",
+ "digest 0.10.7",
+ "ed25519-dalek",
+ "elliptic-curve",
+ "generic-array",
+ "getrandom 0.2.12",
+ "hex",
+ "hex-literal",
+ "hkdf 0.12.4",
+ "k256",
+ "libp2p-identity",
+ "log",
+ "parameterized",
+ "platform",
+ "primitive-types",
+ "rand 0.8.5",
+ "serde",
+ "sha2 0.10.8",
+ "sha3",
+ "subtle",
+ "thiserror",
+ "typenum",
+ "utils-types",
+ "zeroize",
+]
+
+[[package]]
 name = "hopr-lib"
 version = "2.1.0-rc.1"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
+ "chain-actions",
+ "chain-api",
+ "chain-db",
+ "chain-indexer",
+ "chain-rpc",
+ "chain-types",
  "const_format",
- "core-ethereum-actions",
- "core-ethereum-api",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-rpc",
- "core-ethereum-types",
  "core-path",
  "core-strategy",
  "core-transport",
@@ -3298,6 +3298,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
+ "metrics",
  "platform",
  "semver 1.0.21",
  "serde",
@@ -3306,7 +3307,6 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "validator",
 ]
@@ -3318,11 +3318,11 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
+ "chain-db",
+ "chain-indexer",
+ "chain-types",
  "chrono",
  "clap",
- "core-ethereum-db",
- "core-ethereum-indexer",
- "core-ethereum-types",
  "core-network",
  "core-strategy",
  "core-transport",
@@ -3336,6 +3336,7 @@ dependencies = [
  "humantime",
  "lazy_static",
  "log",
+ "metrics",
  "platform",
  "proc-macro-regex",
  "serde",
@@ -3345,7 +3346,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-metrics",
  "utils-types",
  "utils-validation",
  "validator",
@@ -3356,24 +3356,24 @@ name = "hoprd-api"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "chain-actions",
  "const_format",
- "core-crypto",
- "core-ethereum-actions",
  "core-protocol",
  "core-transport",
  "core-types",
  "env_logger",
  "futures",
+ "hopr-crypto",
  "hopr-lib",
  "hoprd-inbox",
  "libp2p-identity",
  "log",
+ "metrics",
  "serde",
  "serde_json",
  "serde_with",
  "strum 0.25.0",
  "tide",
- "utils-metrics",
  "utils-types",
  "utoipa",
  "utoipa-swagger-ui",
@@ -3402,10 +3402,10 @@ name = "hoprd-keypair"
 version = "0.2.0"
 dependencies = [
  "aes 0.8.3",
- "core-crypto",
  "ctr 0.9.2",
  "getrandom 0.2.12",
  "hex",
+ "hopr-crypto",
  "log",
  "platform",
  "scrypt 0.11.0",
@@ -4367,6 +4367,15 @@ name = "memchr"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
+
+[[package]]
+name = "metrics"
+version = "1.1.0"
+dependencies = [
+ "platform",
+ "prometheus",
+ "regex",
+]
 
 [[package]]
 name = "mime"
@@ -5821,7 +5830,8 @@ dependencies = [
 [[package]]
 name = "rust-stream-ext-concurrent"
 version = "1.0.0"
-source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#19d9a67f66eb1c8a6af37572a346dcebd04640b3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fcbb9e3686614306ac9c81f7e604936ace84019eea4c6de1ae4e039a6a2866e"
 dependencies = [
  "futures",
  "pin-project",
@@ -7646,15 +7656,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-types",
-]
-
-[[package]]
-name = "utils-metrics"
-version = "1.1.0"
-dependencies = [
- "platform",
- "prometheus",
- "regex",
 ]
 
 [[package]]

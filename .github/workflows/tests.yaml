@@ -20,6 +20,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-8-core
     timeout-minutes: 30
     if: github.event.pull_request.draft == false
@@ -71,6 +72,7 @@ jobs:
         run: nix develop -c make -j build
 
   unit-tests:
+    name: Test | Unit
     needs:
       - build
     runs-on: ubuntu-2-core
@@ -123,6 +125,7 @@ jobs:
           HOPR_NETWORK: anvil-localhost
 
   smoke-tests:
+    name: Test | Smoke
     needs:
       - build
     strategy:

@@ -50,9 +50,9 @@ done
 
 cd "${mydir}/../"
 
-declare release_config="${mydir}/../packages/hoprd/releases.json"
-declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
-declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+declare release_config="${mydir}/../releases.json"
+declare protocol_config="${mydir}/../hopr/data/protocol-config.json"
+declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.json"
 
 for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
@@ -62,7 +62,7 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
 
       log "deploying for network ${network} on chain ${chain} of type ${environment_type}"
 
-      make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts network="${network}" environment-type="${environment_type}"
+      make -C "${mydir}/../ethereum/contracts/" anvil-deploy-contracts network="${network}" environment-type="${environment_type}"
 
       # update the deployed files in protocol-config
       update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${network}" "${network}"
