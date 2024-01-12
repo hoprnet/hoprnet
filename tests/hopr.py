@@ -132,7 +132,6 @@ class HoprdAPI:
         :return: bool
         """
 
-        
         body = FundRequest(amount=amount)
         status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
@@ -324,7 +323,7 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp:int =None) -> dict:
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = None) -> dict:
         """
         Peek all messages from the inbox
         :param: tag = 0x0320
@@ -334,7 +333,7 @@ class HoprdAPI:
             body = GetMessageReq(tag=tag)
         else:
             body = GetMessageReq(tag=tag, timestamp=timestamp)
-            
+
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 

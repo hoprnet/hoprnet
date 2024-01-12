@@ -709,12 +709,13 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
     assert isinstance(price, int)
     assert price > 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_peeking_messages_with_timestamp(src, dest, swarm7):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = random.randint(10, 65530)
-    
+
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
@@ -722,7 +723,9 @@ async def test_peeking_messages_with_timestamp(src, dest, swarm7):
     for packet in packets:
         await src_peer["api"].send_message(dest_peer["peer_id"], packet, [], random_tag)
 
-    await asyncio.wait_for(check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+    await asyncio.wait_for(
+        check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
+    )
 
     packets = await dest_peer["api"].messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
@@ -731,12 +734,13 @@ async def test_peeking_messages_with_timestamp(src, dest, swarm7):
 
     assert len(packets.messages) == 3
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_return_timestamp(src, dest, swarm7):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = random.randint(10, 65530)
-    
+
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
