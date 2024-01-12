@@ -26,6 +26,26 @@ use hopr_lib::{Address, Balance, BalanceType, Hopr};
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use metrics::metrics::{MultiCounter, MultiHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
+        "hopr_http_api_call_count",
+        "Number of different REST API calls and their statuses",
+        &["endpoint", "method", "status"]
+    )
+    .unwrap();
+    static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+        "hopr_http_api_call_timing_sec",
+        "Timing of different REST API calls in seconds",
+        vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
+        &["endpoint", "method"]
+    )
+    .unwrap();
+}
+
 #[derive(Clone)]
 pub struct State<'a> {
     pub hopr: Arc<Hopr>,         // checks
@@ -189,17 +209,28 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
         let peer_addr = req.peer_addr().map(String::from);
         let path = req.url().path().to_owned();
         let method = req.method().to_string();
+
+        let start = std::time::Instant::now();
         let response = next.run(req).await;
+        let response_duration = start.elapsed();
+
         let status = response.status();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+        }
 
         log::log!(
             self.0,
-            r#"{} "{method} {path}" {status} {}"#,
+            r#"{} "{method} {path}" {status} {} {}ms"#,
             peer_addr.as_deref().unwrap_or("-"),
             response
                 .len()
                 .map(|l| l.to_string())
                 .unwrap_or_else(|| String::from("-")),
+            response_duration.as_millis()
         );
         Ok(response)
     }

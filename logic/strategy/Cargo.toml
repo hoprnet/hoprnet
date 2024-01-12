@@ -21,7 +21,7 @@ rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
 lazy_static = { workspace = true }
-strum = { version = "0.25", features = ["derive"] }
+strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 

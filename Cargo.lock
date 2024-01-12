@@ -753,6 +753,7 @@ name = "bindings"
 version = "0.1.0"
 dependencies = [
  "ethers",
+ "serde",
 ]
 
 [[package]]
@@ -1031,6 +1032,7 @@ dependencies = [
  "platform",
  "primitive-types",
  "serde",
+ "strum 0.25.0",
  "thiserror",
  "utils-db",
  "utils-types",
@@ -1168,6 +1170,7 @@ dependencies = [
  "multiaddr",
  "platform",
  "serde",
+ "strum 0.25.0",
  "utils-types",
 ]
 
@@ -1568,6 +1571,7 @@ dependencies = [
  "metrics",
  "more-asserts",
  "parameterized",
+ "platform",
  "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
@@ -3365,6 +3369,7 @@ dependencies = [
  "hopr-crypto",
  "hopr-lib",
  "hoprd-inbox",
+ "lazy_static",
  "libp2p-identity",
  "log",
  "metrics",
@@ -7645,6 +7650,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "log",
+ "metrics",
  "mockall",
  "pin-project-lite 0.2.13",
  "platform",

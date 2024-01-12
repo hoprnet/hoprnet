@@ -32,10 +32,10 @@ use {
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_count_closure_finalization", "Count of channels where closure finalizing was initiated automatically").unwrap();
+        SimpleCounter::new("hopr_strategy_closure_auto_finalization_count", "Count of channels where closure finalizing was initiated automatically").unwrap();
 
     static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
-        MultiGauge::new("core_multi_gauge_strategy_enabled_strategies", "List of enabled strategies", Strategy::VARIANTS).unwrap();
+        MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
 }
 
 /// Basic single strategy.

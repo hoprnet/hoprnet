@@ -48,6 +48,7 @@ futures-concurrency = "7.3.0"
 futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
+hex-literal = "0.4.1"
 lazy_static = "1.4.0"
 libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519"] }
 libp2p-mplex = "0.40.0"
@@ -58,6 +59,7 @@ rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
+strum = { version = "0.25.0", features = ["derive"] }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
 

@@ -15,8 +15,9 @@ crate-type = ["rlib"]
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 ethers = { workspace = true }
-hex-literal = "0.4.1"
-serde = "1.0"
+hex-literal = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
 
 bindings = { workspace = true }
 hopr-crypto = { workspace = true }

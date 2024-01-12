@@ -5,7 +5,8 @@ use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance};
 
 /// Enumerates all possible on-chain state change requests
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum Action {
     /// Redeem the given acknowledged ticket
     RedeemTicket(AcknowledgedTicket),

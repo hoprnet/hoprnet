@@ -34,23 +34,14 @@ use crate::errors::Result;
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use metrics::metrics::MultiCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_SUCCESSFUL_ACTIONS: SimpleCounter = SimpleCounter::new(
-        "chain_counter_successful_actions",
-        "Number of successful actions"
-    )
-    .unwrap();
-    static ref METRIC_COUNT_FAILED_ACTIONS: SimpleCounter = SimpleCounter::new(
-        "chain_counter_failed_actions",
-        "Number of failed actions"
-    )
-    .unwrap();
-    static ref METRIC_COUNT_TIMEOUT_ACTIONS: SimpleCounter = SimpleCounter::new(
-        "chain_counter_timeout_actions",
-        "Number of timed out actions"
+    static ref METRIC_COUNT_ACTIONS: MultiCounter = MultiCounter::new(
+        "hopr_chain_actions_count",
+        "Number of different chain actions and their results",
+        &["action", "result"]
     )
     .unwrap();
 }
@@ -374,7 +365,8 @@ where
             let exec_context = self.ctx.clone();
             spawn(async move {
                 let act_id = act.to_string();
-                debug!("start executing {act_id}");
+                let act_name: &'static str = (&act).into();
+                debug!("start executing {act_id} ({act_name})");
 
                 let db_clone = exec_context.db.clone();
                 let tx_result = exec_context.execute_action(act.clone()).await;
@@ -383,7 +375,7 @@ where
                         info!("successful {confirmation}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_SUCCESSFUL_ACTIONS.increment();
+                        METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
@@ -400,12 +392,12 @@ where
                             error!("timeout while waiting for confirmation of {act_id}");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_TIMEOUT_ACTIONS.increment();
+                            METRIC_COUNT_ACTIONS.increment(&[act_name, "timeout"]);
                         } else {
                             error!("{act_id} failed: {err}");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_FAILED_ACTIONS.increment();
+                            METRIC_COUNT_ACTIONS.increment(&[act_name, "failure"]);
                         }
                     }
                 }
@@ -413,6 +405,6 @@ where
                 let _ = tx_finisher.send(tx_result);
             });
         }
-        warn!("transaction queue has finished");
+        warn!("action queue has finished");
     }
 }

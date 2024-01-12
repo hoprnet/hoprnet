@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError, RetryPolicy};
+use log::trace;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -11,18 +12,21 @@ use crate::helper::{Request, Response};
 use crate::HttpPostRequestor;
 
 #[cfg(feature = "prometheus")]
-use metrics::metrics::MultiCounter;
+use metrics::metrics::{MultiCounter, MultiHistogram};
 
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
-        "chain_counter_rpc_calls",
-        "Number of successful RPC calls over HTTP",
-        &[
-            "eth_blockNumber", "eth_getBalance", "eth_sign", "eth_signTransaction", "eth_sendTransaction",
-            "eth_sendRawTransaction", "eth_call", "eth_getBlockByHash", "eth_getBlockByNumber",
-            "eth_getTransactionByHash", "eth_getLogs"
-        ]
+        "hopr_rpc_call_count",
+        "Number of Ethereum RPC calls over HTTP and their result",
+        &["call", "result"]
+    )
+    .unwrap();
+    static ref METRIC_COUNT_RPC_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+        "hopr_rpc_call_time_sec",
+        "Timing of RPC calls over HTTP in seconds",
+        vec![0.1, 0.5, 1.0, 2.0, 5.0, 7.0, 10.0],
+        &["call"]
     )
     .unwrap();
 }
@@ -76,20 +80,40 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req
         })?;
 
         // Perform the actual request
+        let start = std::time::Instant::now();
         let body = self.requestor.http_post(self.url.as_ref(), &serialized_payload).await?;
+        let req_duration = start.elapsed();
+
+        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
 
         // First deserialize the Response object
         let raw = match serde_json::from_str(&body) {
             Ok(Response::Success { result, .. }) => result.to_owned(),
-            Ok(Response::Error { error, .. }) => return Err(error.into()),
+            Ok(Response::Error { error, .. }) => {
+                #[cfg(feature = "prometheus")]
+                METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
+
+                return Err(error.into());
+            }
             Ok(_) => {
                 let err = Self::Error::SerdeJson {
                     err: serde::de::Error::custom("unexpected notification over HTTP transport"),
                     text: body,
                 };
+                #[cfg(feature = "prometheus")]
+                METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
+
                 return Err(err);
             }
-            Err(err) => return Err(Self::Error::SerdeJson { err, text: body }),
+            Err(err) => {
+                #[cfg(feature = "prometheus")]
+                METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
+
+                return Err(Self::Error::SerdeJson { err, text: body });
+            }
         };
 
         // Next, deserialize the data out of the Response object
@@ -99,7 +123,7 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req
         })?;
 
         #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS.increment(&[method]);
+        METRIC_COUNT_RPC_CALLS.increment(&[method, "success"]);
 
         Ok(res)
     }

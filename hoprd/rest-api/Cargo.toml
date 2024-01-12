@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["hopr-lib/prometheus", "dep:metrics"]
+prometheus = ["hopr-lib/prometheus", "dep:metrics", "dep:lazy_static"]
 
 
 [dependencies]
@@ -22,10 +22,11 @@ const_format = "0.2.32"
 env_logger = { workspace = true }
 futures = { workspace = true }
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
+lazy_static = { workspace = true, optional = true}
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
-strum = { version = "0.25.0", features = ["derive"] }
+strum = { workspace = true }
 tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
 utoipa = { version = "4.1" }
 utoipa-swagger-ui = { version = "5.0.0" }

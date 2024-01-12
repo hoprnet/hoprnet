@@ -41,10 +41,11 @@ chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }
-utils-db = { workspace = true }
 log = { workspace = true }
-utils-types = { workspace = true }
 metrics = { optional = true, workspace = true }
+platform = { workspace = true }
+utils-db = { workspace = true }
+utils-types = { workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10.0"
