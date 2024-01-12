@@ -1426,7 +1426,7 @@ mod messages {
                 Ok(data_str) => Ok(MessagePopRes {
                     tag,
                     body: data_str.into(),
-                    received_at
+                    received_at,
                 }),
                 Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
             }
