@@ -1286,8 +1286,7 @@ mod messages {
     }
 
     #[serde_as]
-    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
-    #[into_params(parameter_in = Query)]
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
     pub(crate) struct GetMessageReq {
         /// The message tag used to filter messages based on application
         #[schema(required = false)]
