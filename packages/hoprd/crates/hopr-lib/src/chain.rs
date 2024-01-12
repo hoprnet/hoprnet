@@ -360,7 +360,6 @@ where
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
         tx_confirmations: chain_config.confirmations as usize,
         logs_page_size: chain_config.logs_page_size,
-        ..RpcOperationsConfig::default()
     };
     let rpc_client_cfg = RpcEthereumClientConfig::default();
     let action_queue_cfg = ActionQueueConfig::default();
