@@ -247,10 +247,9 @@ def reuse_pregenerated_identities():
         return fnmatch.fnmatch(f, "*.id")
 
     for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
-        path = shutil.copyfile(
+        shutil.copyfile(
             f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-node_{node_nr}.id"
         )
-        logging.info(f"Copied file {PREGENERATED_IDENTITIES_DIR}/{f} to {path}")
         node_nr += 1
 
 

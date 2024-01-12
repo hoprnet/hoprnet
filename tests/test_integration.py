@@ -310,27 +310,6 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
     await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
 
-# @pytest.mark.asyncio
-# @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-# async def test_peeking_messages_with_tag(src, dest, swarm7):
-#     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-
-#     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-#     random_tag = await send_and_receive_packets_with_peek(packets, src=swarm7[src], dest=swarm7[dest], path=[])
-
-#     # after checking that messages are in the destination inbox, a second check should again assert
-#     # that they are there. This shows that peeking does not remove the messages from the inbox
-#     await asyncio.wait_for(
-#         check_received_packets_with_peek(
-#             swarm7[dest],
-#             packets,
-#             tag=random_tag,
-#             sort=True,
-#         ),
-#         MULTIHOP_MESSAGE_SEND_TIMEOUT,
-#     )
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "src,dest", [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
@@ -729,3 +708,47 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
 
     assert isinstance(price, int)
     assert price > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_peeking_messages_with_timestamp(src, dest, swarm7):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    random_tag = random.randint(10, 65530)
+
+    src_peer = swarm7[src]
+    dest_peer = swarm7[dest]
+
+    packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
+    for packet in packets:
+        await src_peer["api"].send_message(dest_peer["peer_id"], packet, [], random_tag)
+
+    await asyncio.wait_for(
+        check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
+    )
+
+    packets = await dest_peer["api"].messages_peek_all(random_tag)
+    timestamps = sorted([message.received_at for message in packets.messages])
+
+    packets = await dest_peer["api"].messages_peek_all(random_tag, timestamps[-3])
+
+    assert len(packets.messages) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+async def test_send_message_return_timestamp(src, dest, swarm7):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    random_tag = random.randint(10, 65530)
+
+    src_peer = swarm7[src]
+    dest_peer = swarm7[dest]
+
+    packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
+    timestamps = []
+    for packet in packets:
+        res = await src_peer["api"].send_message(dest_peer["peer_id"], packet, [], random_tag)
+        timestamps.append(res.timestamp)
+
+    assert len(timestamps) == message_count
+    assert timestamps == sorted(timestamps)

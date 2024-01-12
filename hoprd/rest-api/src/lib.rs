@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
 use tide::http::mime;
 use tide::utils::async_trait;
@@ -111,7 +111,7 @@ pub struct InternalState {
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
+            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1311,6 +1311,23 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
+        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
+        pub timestamp: std::time::Duration,
+    }
+
+    #[serde_as]
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct GetMessageReq {
+        /// The message tag used to filter messages based on application
+        #[schema(required = false)]
+        #[serde(default)]
+        pub tag: Option<u16>,
+        /// Timestamp to filter messages received after this timestamp
+        #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
+        #[schema(required = false, value_type = u64)]
+        #[serde(default)]
+        pub timestamp: Option<std::time::Duration>,
     }
 
     /// Send a message to another peer using a given path.
@@ -1356,11 +1373,17 @@ mod messages {
             }
         }
 
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
             .await
         {
-            Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes { challenge })).build()),
+            Ok(challenge) => Ok(Response::builder(202)
+                .body(json!(SendMessageRes { challenge, timestamp }))
+                .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
@@ -1410,6 +1433,7 @@ mod messages {
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
           "body": "Test message 1",
@@ -1420,16 +1444,18 @@ mod messages {
     pub(crate) struct MessagePopRes {
         tag: u16,
         body: String,
-        received_at: u128,
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
+        received_at: std::time::Duration,
     }
 
-    fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
+    fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopRes, String> {
         if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
                 Ok(data_str) => Ok(MessagePopRes {
                     tag,
                     body: data_str.into(),
-                    received_at: ts.as_millis(),
+                    received_at,
                 }),
                 Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
             }
@@ -1507,7 +1533,7 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        let messages = inbox
+        let messages: Vec<MessagePopRes> = inbox
             .pop_all(tag.tag)
             .await
             .into_iter()
@@ -1556,15 +1582,15 @@ mod messages {
         }
     }
 
-    /// Peek the list of messages currently present in the nodes message inbox.
-    ///
+    /// Peek the list of messages currently present in the nodes message inbox, filtered by tag,
+    /// and optionally by timestamp (epoch in milliseconds).
     /// The messages are not removed from the inbox.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
-            content = TagQuery,
-            description = "Tag of message queue to peek from",
+            content = GetMessageReq,
+            description = "Tag of message queue and optionally a timestamp since from to start peeking",
             content_type = "application/json"
         ),
         responses(
@@ -1578,13 +1604,14 @@ mod messages {
         ),
         tag = "Messages"
     )]
+
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.body_json().await?;
+        let args: GetMessageReq = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(tag.tag)
+            .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
