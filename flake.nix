@@ -102,10 +102,25 @@
               cp .cargo/config.toml vendor/cargo/
             '';
           });
+          # FIXME: the docker image built is not working on macOS arm platforms
+          # and will simply be a no-op. Likely, some form of cross-compilation
+          # or distributed build is required.
+          hoprdDocker = pkgs.dockerTools.buildImage {
+            name = "hoprd";
+            tag = "latest";
+            # breaks binary reproducibility, but makes usage easier
+            created = "now";
+            copyToRoot = [ hoprd ];
+            config = {
+              Cmd = [
+                "${hoprd}/bin/hoprd"
+              ];
+            };
+          };
         in
         {
           packages = {
-            inherit hoprd;
+            inherit hoprd hoprdDocker;
             default = hoprd;
           };
           devShells.default = import ./shell.nix {

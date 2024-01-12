@@ -46,6 +46,8 @@ let
     # custom pkg groups
     macosPkgs
     linuxPkgs
+
+    dive
   ];
 in
 with pkgs;
