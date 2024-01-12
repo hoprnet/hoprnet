@@ -1348,8 +1348,6 @@ mod messages {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();
 
-        debug!("Timestamp {:}", timestamp.as_millis());
-
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
             .await
