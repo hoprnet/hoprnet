@@ -1296,8 +1296,7 @@ mod messages {
         pub tag: Option<u16>,
         /// Timestamp to filter messages received after this timestamp
         #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
-        #[schema(required = false)]
-        #[schema(value_type = u64)]
+        #[schema(required = false, value_type = u64)]
         #[serde(default)]
         pub timestamp: Option<std::time::Duration>,
     }
