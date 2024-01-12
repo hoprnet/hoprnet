@@ -37,6 +37,7 @@ scrape_configs:
 - `hopr_heartbeat_pings_count`: 
 - `hopr_heartbeat_round_time_sec`: Measures total time in seconds it takes to probe all other nodes, buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
 - `hopr_network_health`: Connectivity health indicator
+- `hopr_relayed_packet_processing_time_with_mixing_sec`: Histogram of measured processing and mixing time for a relayed packet in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
 - `hopr_peers_by_quality`: Number different peer types by quality
 - `hopr_peer_count`: Number of all peers
 - `hopr_time_to_green_sec`: Total number of pings by result, keys: `success`

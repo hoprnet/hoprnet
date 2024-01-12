@@ -753,6 +753,7 @@ name = "bindings"
 version = "0.1.0"
 dependencies = [
  "ethers",
+ "serde",
 ]
 
 [[package]]
@@ -1570,6 +1571,7 @@ dependencies = [
  "metrics",
  "more-asserts",
  "parameterized",
+ "platform",
  "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
