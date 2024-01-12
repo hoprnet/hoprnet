@@ -89,7 +89,7 @@ pub struct InternalState {
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
+            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1223,6 +1223,7 @@ mod messages {
     use std::time::Duration;
 
     use hopr_lib::HalfKeyChallenge;
+    use log::debug;
 
     use super::*;
 
@@ -1278,19 +1279,25 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
-        #[serde_as(as = "DurationMilliSeconds<u64>")]
-        pub timestamp: Duration,
+        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
+        pub timestamp: std::time::Duration,
     }
 
     #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, validator::Validate)]
-    #[serde(rename_all = "camelCase")]
-    struct GetMessageReq {
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+    #[into_params(parameter_in = Query)]
+    pub(crate) struct GetMessageReq {
         /// The message tag used to filter messages based on application
-        pub tag: u16,
+        #[schema(required = false)]
+        #[serde(default)]
+        pub tag: Option<u16>,
         /// Timestamp to filter messages received after this timestamp
         #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
-        pub timestamp: Option<Duration>,
+        #[schema(required = false)]
+        #[schema(value_type = u64)]
+        #[serde(default)]
+        pub timestamp: Option<std::time::Duration>,
     }
 
     /// Send a message to another peer using a given path.
@@ -1339,6 +1346,8 @@ mod messages {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();
+
+        debug!("Timestamp {:}", timestamp.as_millis());
 
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
@@ -1408,6 +1417,7 @@ mod messages {
         tag: u16,
         body: String,
         #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
         received_at: std::time::Duration,
     }
 
@@ -1573,7 +1583,7 @@ mod messages {
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(Some(args.tag), args.timestamp)
+            .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
