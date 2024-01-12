@@ -31,7 +31,7 @@
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
           crateNameFromCargoToml = craneLib.crateNameFromCargoToml {
-            cargoToml = ./packages/hoprd/crates/hoprd-hoprd/Cargo.toml;
+            cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           ethereumBindings = pkgs.stdenv.mkDerivation {
@@ -41,21 +41,20 @@
               root = ./.;
               fileset = fs.unions [
                 (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-                (fs.fileFilter (file: file.hasExt "sol") ./packages/ethereum/contracts/src)
-                ./packages/ethereum/contracts/foundry.toml
-                ./packages/ethereum/contracts/remappings.txt
+                (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+                ./ethereum/contracts/foundry.toml
+                ./ethereum/contracts/remappings.txt
               ];
             };
             buildInputs = with pkgs; [ foundry-bin solcDefault ];
             buildPhase = ''
-              cd ./packages/ethereum/contracts
+              cd ./ethereum/contracts
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" foundry.toml
-              forge bind --bindings-path ../crates/bindings --crate-name bindings \
+              forge bind --bindings-path ../bindings --crate-name bindings \
                 --overwrite --select '^Hopr.*?(Boost|[^t])$$'
             '';
             installPhase = ''
-              echo `pwd`
-              cp -r --no-preserve=mode,ownership ../crates/bindings $out/
+              cp -r --no-preserve=mode,ownership ../bindings $out/
             '';
           };
           src = fs.toSource {
@@ -66,7 +65,7 @@
               ./Cargo.lock
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
-              ./packages/hoprd/crates/hopr-lib/data
+              ./hopr/data
             ];
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -98,7 +97,7 @@
           hoprd = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
             preBuild = ''
-              cp -r ${ethereumBindings}/src ./packages/ethereum/crates/bindings/
+              cp -r ${ethereumBindings}/src ./ethereum/bindings/
               cp .cargo/config.toml vendor/cargo/
             '';
           });
@@ -109,7 +108,7 @@
             name = "hoprd";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
-            created = "now";
+            created = builtins.substring 0 8 self.lastModifiedDate;
             copyToRoot = [ hoprd ];
             config = {
               Cmd = [
@@ -123,9 +122,40 @@
             inherit hoprd hoprdDocker;
             default = hoprd;
           };
-          devShells.default = import ./shell.nix {
-            inherit pkgs;
+          devShells.default = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
+            buildInputs = with pkgs; [
+              # testing utilities
+              jq
+              yq-go
+              curl
+
+              # test Github automation
+              act
+
+              # docker image inspection and handling
+              dive
+              skopeo
+
+              # test coverage generation
+              lcov
+
+              # solidity development and chain interaction
+              foundry-bin
+
+              ## python is required by integration tests
+              python39
+              python39Packages.venvShellHook
+              autoPatchelfHook
+            ];
             inputsFrom = [ hoprd ];
+            venvDir = "./.venv";
+            postVenvCreation = ''
+              unset SOURCE_DATE_EPOCH
+              pip install -U pip setuptools wheel
+              pip install -r tests/requirements.txt
+              autoPatchelf ./.venv
+            '';
           };
         };
       systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];

@@ -13,18 +13,8 @@ concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
 jobs:
-  build_toolchain:
-    name: Toolchain
-    if: github.event.pull_request.draft == false
-    uses: ./.github/workflows/build-toolchain.yaml
-    secrets:
-      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
   build_hopli:
     name: Hopli
-    needs:
-      - build_toolchain
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -32,8 +22,6 @@ jobs:
 
   build_hoprd:
     name: Hoprd
-    needs:
-      - build_toolchain
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -41,8 +29,6 @@ jobs:
 
   build_anvil:
     name: Anvil
-    needs:
-      - build_toolchain
     uses: ./.github/workflows/build-anvil.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
