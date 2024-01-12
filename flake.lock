@@ -7,17 +7,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1704463269,
-        "narHash": "sha256-C0WCgJytEHDa0WPbJ2joUo9hEQlzsWAVXBZ6fRd/hDI=",
-        "ref": "refs/heads/master",
-        "rev": "67851d60508af238f68ace71bb42cb1fa54da37f",
-        "revCount": 483,
-        "type": "git",
-        "url": "file:///Users/tbr/work/hopr/crane"
+        "lastModified": 1704819371,
+        "narHash": "sha256-oFUfPWrWGQTZaCM3byxwYwrMLwshDxVGOrMH5cVP/X8=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "5c234301a1277e4cc759c23a2a7a00a06ddd7111",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///Users/tbr/work/hopr/crane"
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
       }
     },
     "flake-parts": {
@@ -43,16 +43,40 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1681202837,
-        "narHash": "sha256-H+Rh19JDwRtpVPAWp64F+rlEtxUWBAQW28eAi3SRSzg=",
+        "lastModified": 1701680307,
+        "narHash": "sha256-kAuep2h5ajznlPMD9rnQyffWG8EM/C73lejGofXvdM8=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "cfacdce06f30d2b68473a46042957675eebb3401",
+        "rev": "4022d587cbbfd70fe950c1e2083a02621806a725",
         "type": "github"
       },
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "foundry": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1704964255,
+        "narHash": "sha256-ycOn/YR6cFgddtHlWj6xtDZuh4wpe6YAQxrVZjOA9lg=",
+        "owner": "shazow",
+        "repo": "foundry.nix",
+        "rev": "d5172f514d1cfa5e01e13ce31f624b990c9f53f4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "shazow",
+        "ref": "monthly",
+        "repo": "foundry.nix",
         "type": "github"
       }
     },
@@ -94,13 +118,18 @@
       "inputs": {
         "crane": "crane",
         "flake-parts": "flake-parts",
+        "flake-utils": "flake-utils",
+        "foundry": "foundry",
         "nixpkgs": "nixpkgs",
-        "rust-overlay": "rust-overlay"
+        "rust-overlay": "rust-overlay",
+        "solc": "solc"
       }
     },
     "rust-overlay": {
       "inputs": {
-        "flake-utils": "flake-utils",
+        "flake-utils": [
+          "flake-utils"
+        ],
         "nixpkgs": [
           "nixpkgs"
         ]
@@ -117,6 +146,29 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "rev": "647bff9f5e10d7f1756d86eee09831e6b1b06430",
+        "type": "github"
+      }
+    },
+    "solc": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1700417764,
+        "narHash": "sha256-ssdwqKWkYUd/Nr6P9veR4D/PrtlwGJkPoUQoEgVJVpo=",
+        "owner": "hellwolf",
+        "repo": "solc.nix",
+        "rev": "80d2e38e98e589872b0dc3770f838c4be847305e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hellwolf",
+        "repo": "solc.nix",
         "type": "github"
       }
     },

@@ -76,7 +76,7 @@ deps: ## Installs dependencies for local setup
 	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
-	$(MAKE) cargo-update
+	# $(MAKE) cargo-update
 
 .PHONY: install-foundry
 install-foundry: ## install foundry
