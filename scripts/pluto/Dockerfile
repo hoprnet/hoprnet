@@ -28,7 +28,7 @@ WORKDIR /app/hoprnet
 
 COPY --from=hoprd /app/hoprnet/ ./
 
-COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY ethereum/contracts ethereum/contracts
 COPY scripts/ scripts
 COPY Makefile .
 

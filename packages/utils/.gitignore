@@ -1,5 +1,0 @@
-# Exclude auto-generated docs
-/docs
-
-# Exclude built npm packages
-/*.tgz

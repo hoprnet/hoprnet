@@ -1,0 +1,35 @@
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-toolchain:latest}
+
+# Creates a Docker container that encapsulates a local testnet with deployed smart contracts
+
+FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE}
+
+WORKDIR /app/hoprnet
+
+LABEL description="Launches an anvil node running a local network with the HOPR contracts deployed and available."
+
+COPY ethereum/contracts ethereum/contracts
+COPY scripts/ scripts
+COPY Makefile .
+COPY vendor/solidity vendor/solidity
+
+ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
+ENV ETHERSCAN_API_KEY="random_giberish"
+
+# install missing process runner
+RUN apt-get update \
+ && apt-get install -y \
+      time tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+# start anvil, deploy contracts, then terminate
+RUN make -f Makefile run-anvil \
+ && sleep 2 \
+ && make -f Makefile kill-anvil \
+ && rm -rf ethereum/contracts/broadcast/ \
+ && rm -f /tmp/*.log \
+ && rm -f .anvil.state.json
+
+# start anvil in foreground, don't deploy contracts again
+ENTRYPOINT ["/usr/bin/tini", "--", "make", "run-anvil-foreground"]
