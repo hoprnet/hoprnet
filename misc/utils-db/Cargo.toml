@@ -25,7 +25,7 @@ thiserror = "1.0"
 
 log = { workspace = true }
 utils-types = { workspace = true }
-utils-metrics = { workspace = true, optional = true }
+metrics = { workspace = true, optional = true }
 platform = { workspace = true }
 
 [dev-dependencies]

@@ -27,7 +27,7 @@ pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiCounter, MultiHistogram};
+use metrics::metrics::{MultiCounter, MultiHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

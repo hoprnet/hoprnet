@@ -12,7 +12,7 @@ use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::SimpleGauge;
+use metrics::metrics::SimpleGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
