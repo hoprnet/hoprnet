@@ -12,7 +12,7 @@ To meet these requirements, HOPR uses an iterated on-chain commitment scheme tha
 
 The commitment scheme in HOPR is a tuple of three algorithms, $(\mathsf{KeyGen}, \mathsf{Commit}, \mathsf{Open})$. \textsf{KeyGen} takes a security parameter and returns a seed $x$. \textsf{Commit} takes $x$ and produces the commitment as $ cm = Commit(x) $. \textsf{Open} takes a commitment $cm$ and $r$\footnote{TODO: Properly introduce this value} and fails if $x$ does not fit to $cm$, otherwise it return $1$.
 
-The commitment scheme is called binding if it is infeasible for an adversary to find a value $x' \ne x$ such that $\mathsf{Open}(cm, x') = 1$. It is called hiding if it is infeasible for an adversary to derive the commited value $x$ from $cm$.
+The commitment scheme is called binding if it is infeasible for an adversary to find a value $x' \ne x$ such that $\mathsf{Open}(cm, x') = 1$. It is called hiding if it is infeasible for an adversary to derive the committed value $x$ from $cm$.
 
 The iterated commitment scheme is computed as
 
