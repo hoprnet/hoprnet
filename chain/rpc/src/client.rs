@@ -1,13 +1,13 @@
 use async_trait::async_trait;
-use ethers_providers::JsonRpcClient;
+use ethers_providers::{JsonRpcClient, JsonRpcError};
 use log::trace;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::errors::JsonRpcProviderClientError;
+use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
 use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
 
@@ -32,16 +32,99 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-pub struct JsonRpcSimpleRetryPolicy;
+pub struct SimpleRetryPolicy {
+    pub max_retries: Option<u32>,
+    pub initial_backoff: Duration,
+    pub backoff_coefficient: f64,
+    pub max_backoff: Duration,
+    pub retryable_json_rpc_errors: Vec<i64>,
+    pub retryable_http_errors: Vec<u16>,
+    pub max_retry_queue_size: u32,
+}
 
-impl RetryPolicy<JsonRpcProviderClientError> for JsonRpcSimpleRetryPolicy {
+impl Default for SimpleRetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: Some(10),
+            initial_backoff: Duration::from_secs(1),
+            backoff_coefficient: 1.001,
+            max_backoff: Duration::from_secs(120),
+            retryable_json_rpc_errors: vec![-32005, -32016, 429],
+            retryable_http_errors: vec![429], // Too Many Requests
+            max_retry_queue_size: 3,
+        }
+    }
+}
+
+impl RetryPolicy<JsonRpcProviderClientError> for SimpleRetryPolicy {
     fn is_retryable_error(
         &self,
         err: &JsonRpcProviderClientError,
         num_retries: u32,
         retry_queue_size: u32,
     ) -> RetryAction {
-        todo!()
+        if self.max_retries.is_some_and(|max| num_retries > max) {
+            return NoRetry;
+        }
+
+        if retry_queue_size > self.max_retry_queue_size {
+            return NoRetry;
+        }
+
+        // next_backoff = initial_backoff * (1 + backoff_coefficient)^(num_retries - 1)
+        let backoff = self
+            .initial_backoff
+            .mul_f64(f64::powi(1_f64 + self.backoff_coefficient, (num_retries - 1) as i32));
+
+        let maybe_retry_with_backoff = if backoff < self.max_backoff {
+            RetryAfter(backoff)
+        } else {
+            NoRetry
+        };
+
+        match err {
+            // Retryable JSON RPC errors are retries with backoff
+            JsonRpcProviderClientError::JsonRpcError(ethers_providers::JsonRpcError { code, message, .. })
+                if self.retryable_json_rpc_errors.contains(code) || message.contains("rate limit") =>
+            {
+                maybe_retry_with_backoff
+            }
+
+            // Retryable HTTP errors are retries with backoff
+            JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(e))
+                if self.retryable_http_errors.contains(e) =>
+            {
+                maybe_retry_with_backoff
+            }
+
+            // Transport error and timeouts are retried at a constant rate
+            JsonRpcProviderClientError::BackendError(HttpRequestError::Timeout)
+            | JsonRpcProviderClientError::BackendError(HttpRequestError::TransportError(_))
+            | JsonRpcProviderClientError::BackendError(HttpRequestError::UnknownError(_)) => {
+                RetryAfter(self.initial_backoff)
+            }
+
+            // Some providers send invalid JSON RPC in the error case (no `id:u64`), but the text is a `JsonRpcError`
+            JsonRpcProviderClientError::SerdeJson { text, .. } => {
+                #[derive(Deserialize)]
+                struct Resp {
+                    error: JsonRpcError,
+                }
+
+                if let Ok(resp) = serde_json::from_str::<Resp>(text) {
+                    if self.retryable_json_rpc_errors.contains(&resp.error.code) {
+                        maybe_retry_with_backoff
+                    } else {
+                        NoRetry
+                    }
+                } else {
+                    NoRetry
+                }
+            }
+
+            // Anything else is not retried
+            _ => NoRetry,
+        }
     }
 }
 
@@ -224,7 +307,6 @@ where
 pub mod native {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
-    use futures::TryFutureExt;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
 
@@ -273,20 +355,25 @@ pub mod native {
             url: &str,
             data: T,
         ) -> Result<Box<[u8]>, HttpRequestError> {
-            let result = self
+            let request = self
                 .client
                 .post(url)
                 .body_json(&data)
-                .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?
-                .and_then(|mut resp| async move { resp.body_bytes().await })
-                .timeout(self.cfg.http_request_timeout) // set global request timeout on the future
-                .await;
+                .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
 
-            match result {
-                Ok(Ok(data)) => Ok(data.into_boxed_slice()),
-                Ok(Err(e)) => Err(HttpRequestError::HttpError(e.status().into())),
-                Err(_) => Err(HttpRequestError::Timeout),
+            async move {
+                match request.await {
+                    Ok(mut response) if response.status().is_success() => match response.body_bytes().await {
+                        Ok(data) => Ok(data.into_boxed_slice()),
+                        Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
+                    },
+                    Ok(response) => Err(HttpRequestError::HttpError(response.status().into())),
+                    Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
+                }
             }
+            .timeout(self.cfg.http_request_timeout)
+            .await
+            .map_err(|_| HttpRequestError::Timeout)?
         }
     }
 }
@@ -299,7 +386,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     signer: &hopr_crypto::keypairs::ChainKeypair,
 ) -> std::sync::Arc<
     ethers::middleware::SignerMiddleware<
-        ethers::providers::Provider<JsonRpcProviderClient<R, JsonRpcSimpleRetryPolicy>>,
+        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleRetryPolicy>>,
         ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
     >,
 > {
@@ -308,7 +395,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
-    let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, JsonRpcSimpleRetryPolicy);
+    let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, SimpleRetryPolicy::default());
     let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10u64));
 
     std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
@@ -327,7 +414,7 @@ pub mod tests {
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, JsonRpcSimpleRetryPolicy};
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleRetryPolicy};
     use crate::errors::JsonRpcProviderClientError;
     use crate::MockHttpPostRequestor;
 
@@ -357,7 +444,11 @@ pub mod tests {
         let block_time = Duration::from_secs(1);
 
         let anvil = create_anvil(Some(block_time));
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default(), JsonRpcSimpleRetryPolicy);
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleRetryPolicy::default(),
+        );
 
         let mut last_number = 0;
 
@@ -377,7 +468,11 @@ pub mod tests {
     #[async_std::test]
     async fn test_client_should_fail_on_malformed_request() {
         let anvil = create_anvil(None);
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default(), JsonRpcSimpleRetryPolicy);
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleRetryPolicy::default(),
+        );
 
         let err = client
             .request::<_, ethers::types::U64>("eth_blockNumber_bla", ())
@@ -396,7 +491,7 @@ pub mod tests {
             .withf(|url, _| url == "localhost")
             .returning(|_, _| futures::future::ok("}{malformed".to_string()).boxed());
 
-        let client = JsonRpcProviderClient::new("localhost".into(), mock_requestor, JsonRpcSimpleRetryPolicy);
+        let client = JsonRpcProviderClient::new("localhost".into(), mock_requestor, SimpleRetryPolicy::default());
 
         let err = client
             .request::<_, ethers::types::U64>("eth_blockNumber", ())
