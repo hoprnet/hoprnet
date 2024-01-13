@@ -14,9 +14,9 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use crate::errors::{HttpRequestError, Result};
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
+use crate::RetryAction::NoRetry;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 use serde::Serialize;
-use crate::RetryAction::NoRetry;
 
 /// Extended `JsonRpcClient` abstraction
 /// This module contains custom implementation of `ethers::providers::JsonRpcClient`
@@ -134,7 +134,7 @@ pub enum RetryAction {
     /// Request should not be retried
     NoRetry,
     /// Request should be retried after the given duration has elapsed.
-    RetryAfter(Duration)
+    RetryAfter(Duration),
 }
 
 /// Simple retry policy trait
@@ -148,7 +148,7 @@ pub trait RetryPolicy<E> {
 
 pub struct ZeroRetryPolicy<E>(PhantomData<E>);
 
-impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> { }
+impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for HTTP client that perform HTTP POST with serializable request data.
 #[async_trait]
@@ -157,7 +157,8 @@ pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
     /// and obtains the JSON response.
     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
-    where T: Serialize + Send + Sync;
+    where
+        T: Serialize + Send + Sync;
 }
 
 /// Short-hand for creating new EIP1559 transaction object.

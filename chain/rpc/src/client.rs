@@ -11,9 +11,9 @@ use crate::errors::JsonRpcProviderClientError;
 use crate::helper::{Request, Response};
 use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
 
+use crate::client::RetryAction::{NoRetry, RetryAfter};
 #[cfg(feature = "prometheus")]
 use metrics::metrics::{MultiCounter, MultiHistogram};
-use crate::client::RetryAction::{NoRetry, RetryAfter};
 
 #[cfg(feature = "prometheus")]
 lazy_static::lazy_static! {
@@ -35,7 +35,12 @@ lazy_static::lazy_static! {
 pub struct JsonRpcSimpleRetryPolicy;
 
 impl RetryPolicy<JsonRpcProviderClientError> for JsonRpcSimpleRetryPolicy {
-    fn is_retryable_error(&self, err: &JsonRpcProviderClientError, num_retries: u32, retry_queue_size: u32) -> RetryAction {
+    fn is_retryable_error(
+        &self,
+        err: &JsonRpcProviderClientError,
+        num_retries: u32,
+        retry_queue_size: u32,
+    ) -> RetryAction {
         todo!()
     }
 }
@@ -49,7 +54,7 @@ pub struct JsonRpcProviderClient<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcP
     requests_enqueued: AtomicU32,
     url: String,
     requestor: Req,
-    retry_policy: R
+    retry_policy: R,
 }
 
 impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpcProviderClient<Req, R> {
@@ -60,14 +65,14 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
             requests_enqueued: AtomicU32::new(0),
             url: base_url.to_owned(),
             requestor,
-            retry_policy
+            retry_policy,
         }
     }
 
     async fn send_request_internal<T, A>(&self, method: &str, params: T) -> Result<A, JsonRpcProviderClientError>
-        where
-            T: Serialize + Send + Sync,
-            A: DeserializeOwned
+    where
+        T: Serialize + Send + Sync,
+        A: DeserializeOwned,
     {
         // Create the Request object
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
@@ -106,7 +111,10 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
                 #[cfg(feature = "prometheus")]
                 METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
 
-                return Err(JsonRpcProviderClientError::SerdeJson { err, text: String::from_utf8_lossy(&body).to_string() });
+                return Err(JsonRpcProviderClientError::SerdeJson {
+                    err,
+                    text: String::from_utf8_lossy(&body).to_string(),
+                });
             }
         };
 
@@ -133,14 +141,16 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> Debug f
     }
 }
 
-impl<Req: HttpPostRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> + Clone> Clone for JsonRpcProviderClient<Req, R> {
+impl<Req: HttpPostRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> + Clone> Clone
+    for JsonRpcProviderClient<Req, R>
+{
     fn clone(&self) -> Self {
         Self {
             id: AtomicU64::new(1),
             url: self.url.clone(),
             requests_enqueued: AtomicU32::new(0),
             requestor: self.requestor.clone(),
-            retry_policy: self.retry_policy.clone()
+            retry_policy: self.retry_policy.clone(),
         }
     }
 }
@@ -148,13 +158,16 @@ impl<Req: HttpPostRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<Req, R> JsonRpcClient for JsonRpcProviderClient<Req, R>
-where Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError> + Send + Sync {
+where
+    Req: HttpPostRequestor,
+    R: RetryPolicy<JsonRpcProviderClientError> + Send + Sync,
+{
     type Error = JsonRpcProviderClientError;
 
     async fn request<T, A>(&self, method: &str, params: T) -> Result<A, Self::Error>
     where
         T: Serialize + Send + Sync,
-        A: DeserializeOwned + Send
+        A: DeserializeOwned + Send,
     {
         // Helper type that caches the `params` value across several retries
         // This is necessary because the wrapper provider is supposed to skip he `params` if it's of
@@ -167,10 +180,8 @@ where Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError> + Send 
         let params = if std::mem::size_of::<A>() == 0 {
             RetryParams::Zst(())
         } else {
-            let params = serde_json::to_value(params).map_err(|err| JsonRpcProviderClientError::SerdeJson{
-                err,
-                text: "".into()
-            })?;
+            let params = serde_json::to_value(params)
+                .map_err(|err| JsonRpcProviderClientError::SerdeJson { err, text: "".into() })?;
             RetryParams::Value(params)
         };
 
@@ -188,16 +199,21 @@ where Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError> + Send 
                 match resp {
                     Ok(ret) => {
                         self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
-                        return Ok(ret)
+                        return Ok(ret);
                     }
-                    Err(req_err) => err = req_err,
+                    Err(req_err) => {
+                        err = req_err;
+                        num_retries += 1;
+                    }
                 }
             }
 
-            match self.retry_policy.is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst)) {
+            match self
+                .retry_policy
+                .is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst))
+            {
                 NoRetry => return Err(err),
                 RetryAfter(backoff) => {
-                    num_retries += 1;
                     async_std::task::sleep(backoff).await;
                 }
             }
@@ -206,11 +222,11 @@ where Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError> + Send 
 }
 
 pub mod native {
+    use async_std::prelude::FutureExt;
     use async_trait::async_trait;
+    use futures::TryFutureExt;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
-    use async_std::prelude::FutureExt;
-    use futures::TryFutureExt;
 
     use crate::errors::HttpRequestError;
     use crate::HttpPostRequestor;
@@ -236,7 +252,7 @@ pub mod native {
     #[derive(Clone, Debug, Default)]
     pub struct SurfRequestor {
         client: surf::Client,
-        cfg: HttpPostRequestorConfig
+        cfg: HttpPostRequestorConfig,
     }
 
     impl SurfRequestor {
@@ -245,29 +261,31 @@ pub mod native {
             // but rather the timeout is set on the entire Future in `http_post`
             Self {
                 client: surf::client(),
-                cfg
+                cfg,
             }
         }
     }
 
     #[async_trait]
     impl HttpPostRequestor for SurfRequestor {
-        async fn http_post<T: Serialize + Send + Sync>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError> {
+        async fn http_post<T: Serialize + Send + Sync>(
+            &self,
+            url: &str,
+            data: T,
+        ) -> Result<Box<[u8]>, HttpRequestError> {
             let result = self
                 .client
                 .post(url)
                 .body_json(&data)
                 .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?
-                .and_then(|mut resp| async move {
-                    resp.body_bytes().await
-                })
+                .and_then(|mut resp| async move { resp.body_bytes().await })
                 .timeout(self.cfg.http_request_timeout) // set global request timeout on the future
                 .await;
 
             match result {
                 Ok(Ok(data)) => Ok(data.into_boxed_slice()),
                 Ok(Err(e)) => Err(HttpRequestError::HttpError(e.status().into())),
-                Err(_) => Err(HttpRequestError::Timeout)
+                Err(_) => Err(HttpRequestError::Timeout),
             }
         }
     }

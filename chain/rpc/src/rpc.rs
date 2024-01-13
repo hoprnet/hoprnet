@@ -65,8 +65,7 @@ impl Default for RpcOperationsConfig {
     }
 }
 
-pub(crate) type HoprMiddleware<P> =
-    NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -90,8 +89,7 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
-    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self>
-    {
+    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
 
         let provider = Arc::new(
@@ -277,8 +275,7 @@ pub mod tests {
 
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default(), JsonRpcSimpleRetryPolicy);
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -311,8 +308,7 @@ pub mod tests {
 
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default(), JsonRpcSimpleRetryPolicy);
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -359,8 +355,7 @@ pub mod tests {
         };
 
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default(), JsonRpcSimpleRetryPolicy);
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -414,8 +409,7 @@ pub mod tests {
         .await;
 
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
         assert_eq!(amount, balance.value().as_u64(), "invalid balance");
