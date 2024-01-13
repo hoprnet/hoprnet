@@ -14,10 +14,10 @@ ecosystem toolset is running a local HOPR cluster, either in your workstation or
 # Tooling
 
 As of the time of writing, the best way to set up a local HOPR cluster is by following these steps[^3]. Please bear in mind that these steps
-had been tested only on `macOS` and `Linux` devices, for Windows please use our cloud setup instead.
+had been tested only on `Darwin` and `Linux` devices, for Windows please use our cloud setup instead.
 
 1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^4]
-   and unzip it in your local folder (roughly `~30 Mbs` at the time of writing). For the next tasks, we will assume you are within that folder.
+   and unzip it in your local folder and enter the unzipped directory.
 
 ```
 wget https://github.com/hoprnet/hoprnet/archive/refs/heads/master.zip
@@ -25,14 +25,12 @@ unzip master.zip
 cd hoprnet-master
 ```
 
-2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), ie `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
-   to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^5]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
-
+1. **Install the dependencies of the project and build it**:
 ```
 make -j deps && make -j build
 ```
 
-3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
+1. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
    alongside, then make sure to pass the `-m` flag with your MyneChat instance URL. Please wait while this script creates
    the local blockchain network and deploys the project contracts. In average, the process can take between 2-6 minutes,
    depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer
@@ -69,4 +67,3 @@ the basic commands. Afterwards, it might also make sense to check the API v2 Swa
     to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
     release. The latest stable release known at the time of writing is [`providence`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/providence.zip).
 
-[^5]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.

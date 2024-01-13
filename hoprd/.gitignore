@@ -1,0 +1,23 @@
+/db
+/hoprd-db
+
+# Exclude built npm packages
+/*.tgz
+/cache
+/.testid
+
+/**/*.swp
+
+# Next.js builds
+/build
+
+# used only in release and should not be tracked
+/default-network.json
+
+# auto-generated file
+/rest-api-v2-full-spec.json
+/rest-api-v3-full-spec.json
+/npm-shrinkwrap.json
+
+# Exclude auto-generated docs
+/docs

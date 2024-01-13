@@ -44,14 +44,14 @@ disk_name() {
 # $1=network id
 get_network() {
   local network="${1}"
-  jq -r ".networks.\"${network}\".chain" "${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
+  jq -r ".networks.\"${network}\".chain" "${mydir}/../hopr/data/protocol-config.json"
 }
 
 # $1=network id
 get_environment_type() {
   local network="${1}"
   # use `contracts-addresses.json` because it stores 
-  jq -r ".networks.\"${network}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+  jq -r ".networks.\"${network}\".environment_type" "${mydir}/../ethereum/contracts/contracts-addresses.json"
 }
 
 # $1=network id
@@ -59,7 +59,7 @@ get_rpc() {
   local chain
   chain="$(get_network "${1}")"
 
-  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json" | envsubst
+  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../hopr/data/protocol-config.json" | envsubst
 }
 
 # $1 = network id
@@ -188,7 +188,7 @@ start_chain_provider(){
       --create-disk name=$(disk_name "$1"),size=10GB,type=pd-standard,mode=rw \
       --container-image='hopr-provider'
 
-  #hardhat node --config packages/ethereum/hardhat.config.ts
+  #hardhat node --config ethereum/hardhat.config.ts
 }
 
 # $1 authorized keys file

@@ -1,0 +1,16 @@
+# Exclude vim swap files
+*.swp
+
+# Exclude logs
+*.log
+log.txt
+
+# Exclude built npm packages
+/*.tgz
+
+# Exclude coverage
+/.nyc_output
+/coverage
+
+# Exclude auto-generated docs
+/docs

@@ -1,0 +1,34 @@
+[package]
+name = "hoprd-inbox"
+version = "0.2.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Implements Message inbox and filtering functionality on top of HOPR protocol messages"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+async-lock = { workspace = true }
+async-trait = { workspace = true }
+ringbuffer = "0.15.0"
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+validator = { workspace = true }
+
+core-types = { workspace = true }
+platform = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
+tempfile = "3"
+
+
+[features]
+default = []
+wasm = [ "core-types/wasm" ]
+

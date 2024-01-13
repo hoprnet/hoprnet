@@ -208,7 +208,7 @@ deploy_safes() {
       hopli create-safe-module \
       --network "${NETWORK}" \
       --identity-from-path "${id_path}" \
-      --contracts-root "./packages/ethereum/contracts" > safe.log
+      --contracts-root "./ethereum/contracts" > safe.log
 
     # store safe arguments in separate file for later use
     grep -oE "(\-\-safeAddress.*)" safe.log > "${id_path}.safe.args"

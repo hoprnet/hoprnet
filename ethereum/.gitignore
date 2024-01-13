@@ -1,0 +1,28 @@
+contracts/cache/
+contracts/out/
+contracts/build-info
+
+# Ignore Environment Variables!
+.env
+.env.prod
+
+# Ignore all vscode settings
+.vscode/
+
+# temporary files
+test.txt
+
+# braadcast files
+# ignore local files
+contracts/broadcast/*.*/*/*
+!contracts/broadcast/*.*/*/run-latest.json
+contracts/broadcast/*.*/31337
+
+target/
+
+# ignore coverage test outpout
+contracts/lcov.info
+contracts/report
+
+# Ignore generated bindings source files
+bindings/src

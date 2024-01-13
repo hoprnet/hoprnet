@@ -1,36 +1,39 @@
 [workspace]
 
+exclude = [
+    "vendor/cargo/scale-info-2.10.0"
+]
+
 resolver = "2"
 
 members = [
-    "packages/core/crates/core-crypto",
-    "packages/core/crates/core-network",
-    "packages/core/crates/core-path",
-    "packages/core/crates/core-packet",
-    "packages/core/crates/core-protocol",
-    "packages/core/crates/core-p2p",
-    "packages/core/crates/core-strategy",
-    "packages/core/crates/core-transport",
-    "packages/core/crates/core-types",
-    "packages/core-ethereum/crates/core-ethereum-actions",
-    "packages/core-ethereum/crates/core-ethereum-api",
-    "packages/core-ethereum/crates/core-ethereum-db",
-    "packages/core-ethereum/crates/core-ethereum-indexer",
-    "packages/core-ethereum/crates/core-ethereum-types",
-    "packages/core-ethereum/crates/core-ethereum-rpc",
-    "packages/ethereum/crates/bindings",
-    "packages/hopli",
-    "packages/real/crates/real-base",
-    "packages/hoprd/crates/hopr-lib",
-    "packages/hoprd/crates/hoprd-hoprd",
-    "packages/hoprd/crates/hoprd-inbox",
-    "packages/hoprd/crates/hoprd-keypair",
-    "packages/utils/crates/utils-db",
-    "packages/utils/crates/utils-log",
-    "packages/utils/crates/utils-metrics",
-    "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-types",
-    "packages/utils/crates/utils-validation"
+    "crypto",
+    "chain/actions",
+    "chain/api",
+    "chain/db",
+    "chain/indexer",
+    "chain/types",
+    "chain/rpc",
+    "ethereum/bindings",
+    "hopli",
+    "hopr",
+    "hoprd/rest-api",
+    "hoprd/hoprd",
+    "hoprd/inbox",
+    "hoprd/keypair",
+    "logic/path",
+    "logic/strategy",
+    "misc/metrics",
+    "misc/platform",
+    "misc/utils-db",
+    "misc/utils-types",
+    "misc/utils-validation",
+    "transport/network",
+    "transport/packet",
+    "transport/protocol",
+    "transport/p2p",
+    "transport/api",
+    "transport/types",
 ]
 
 [workspace.dependencies]
@@ -38,60 +41,60 @@ async-lock = "2.7.0"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
 ethers = { version = "2.0.10", default-features = false }
+env_logger = "0.10"
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
 futures-timer = "3.0.2"
 getrandom = "0.2.10"
 hex = "0.4.3"
-js-sys = "0.3.64"
-gloo-timers = { version = "0.3.0", features = ["futures"] }
+hex-literal = "0.4.1"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
-libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519"] }
+libp2p-mplex = "0.40.0"
+libp2p = "0.52.4"
+log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
-rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
+rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
-serde-wasm-bindgen = { version = "0.6" }
+strum = { version = "0.25.0", features = ["derive"] }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
-wasm-pack = "0.12.0"
-wasm-opt = "0.112.0"
-wasm-bindgen = "0.2.86"
-wasm-bindgen-futures = "0.4.36"
 
-bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
-core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
-core-ethereum-api = { path = "packages/core-ethereum/crates/core-ethereum-api", default-features = false }
-core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
-core-ethereum-rpc = { path = "packages/core-ethereum/crates/core-ethereum-rpc", default-features = false }
-core-ethereum-types = { path = "packages/core-ethereum/crates/core-ethereum-types", default-features = false }
-core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
-core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
-core-misc = { path = "packages/core/crates/core-misc", default-features = false }
-core-network = { path = "packages/core/crates/core-network", default-features = false }
-core-packet = { path = "packages/core/crates/core-packet", default-features = false }
-core-path = { path = "packages/core/crates/core-path", default-features = false }
-core-protocol = { path = "packages/core/crates/core-protocol", default-features = false }
-core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
-core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
-core-transport = { path = "packages/core/crates/core-transport", default-features = false }
-core-types = { path = "packages/core/crates/core-types", default-features = false }
-hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
-hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
-hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
-real-base = { path = "packages/real/crates/real-base", default-features = false }
-utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
-utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
-utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
-utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
-utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
-utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
+bindings = { path = "ethereum/bindings", default-features = false }
+chain-actions = { path = "chain/actions", default-features = false }
+chain-api = { path = "chain/api", default-features = false }
+chain-db = { path = "chain/db", default-features = false }
+chain-rpc = { path = "chain/rpc", default-features = false }
+chain-types = { path = "chain/types", default-features = false }
+chain-indexer = { path = "chain/indexer", default-features = false }
+hopr-crypto = { path = "crypto", default-features = false }
+core-network = { path = "transport/network", default-features = false }
+core-packet = { path = "transport/packet", default-features = false }
+core-path = { path = "logic/path", default-features = false }
+core-protocol = { path = "transport/protocol", default-features = false }
+core-p2p = { path = "transport/p2p", default-features = false }
+core-strategy = { path = "logic/strategy", default-features = false }
+core-transport = { path = "transport/api", default-features = false }
+core-types = { path = "transport/types", default-features = false }
+hopr-lib = { path = "hopr", default-features = false }
+hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd-inbox = { path = "hoprd/inbox", default-features = false }
+hoprd-keypair = { path = "hoprd/keypair", default-features = false }
+metrics = { path = "misc/metrics", default-features = false }
+platform = { path = "misc/platform" }
+utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
+utils-types = { path = "misc/utils-types", default-features = false }
+utils-validation = { path = "misc/utils-validation", default-features = false }
+
+# [build]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
 
 [profile.release]
-opt-level = "s"     # optimize for small code size
-#debug=true
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+strip = true
+opt-level = 3
