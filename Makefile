@@ -482,17 +482,19 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
-	target/debug/hoprd-api-schema >| openapi.spec.json
+	target/debug/hoprd-api-schema >| /tmp/openapi.spec.json
 
-	jq --argjson specContent "$$(cat openapi.spec.json)" --arg version $$(./scripts/get-current-version.sh docker) '.spec += $$specContent | .options.additionalProperties.packageVersion=$$version' scripts/python-sdk-config.json > scripts/python-sdk-config_parsed.json
+	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
+    
 	mkdir -p ./hoprd-sdk-python/
-	rm -rf ./hoprd-sdk-python/{*,.swagger-codegen,.swagger-codegen-ignore,.travis.yml,.gitignore}
-	export http_response_code=$$(curl -s -w "%{http_code}" -X POST https://generator3.swagger.io/api/generate -H 'content-type: application/json' -d @scripts/python-sdk-config_parsed.json --output hoprd-sdk-python.zip)
-	if [[ "$$http_response_code" != 200 ]]; then \
-		cat ./hoprd-sdk-python.zip;  \
-		exit 1; \
-	fi
-	unzip -o ./hoprd-sdk-python.zip -d ./hoprd-sdk-python && rm hoprd-sdk-python.zip
+	rm -rf ./hoprd-sdk-python/*
+	
+	swagger-codegen3 generate \
+		-l python \
+		-o hoprd-sdk-python \
+		-i /tmp/openapi.spec.json \
+		-c /tmp/python-sdk-config.json
+
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

@@ -29,6 +29,7 @@ let
     patchelf
 
     curl # v7.88.0
+    swagger-codegen3
 
     # integration testing utilities
     python39Packages.pip
