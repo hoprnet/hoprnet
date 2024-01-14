@@ -41,6 +41,11 @@ lazy_static::lazy_static! {
 }
 
 /// Defines a retry policy suitable for `JsonRpcProviderClient`.
+/// This retry policy distinguishes between 4 types of RPC request failures:
+/// - JSON RPC error (based on error code)
+/// - HTTP error (based on HTTP status)
+/// - Transport error (e.g. connection timeout)
+/// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
 /// The policy will make up to `max_retries` once a JSON RPC request fails.
 /// Each retry `k > 0` will be separated by a delay of `initial_backoff * (1 + backoff_coefficient)^(k - 1)`,
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
