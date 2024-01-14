@@ -341,6 +341,7 @@ pub async fn run_hopr_api(
         api.at("/messages/peek").post(messages::peek);
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
+        api.at("/messages/websocket").get(messages::websocket);
 
         api.at("/network/price").get(network::price);
 
@@ -1383,6 +1384,71 @@ mod messages {
                 .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
+    }
+
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(value_type = String)]//, format = Binary)]
+    pub struct Text(String);
+
+    /// Websocket endpoint exposing a subset of message functions.
+    ///
+    /// Incoming messages from other nodes are sent to the websocket client.
+    ///
+    /// The following message can be set to the server by the client:
+    /// ```
+    /// {
+    ///     cmd: "sendmsg",
+    ///     args: {
+    ///         peerId: "SOME_PEER_ID",
+    ///         path: [],
+    ///         hops: 1
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+    ///
+    /// The following messages may be sent by the server over the Websocket connection:
+    /// ````
+    /// {
+    ///   type: "message",
+    ///   tag: 12,
+    ///   body: "my example message"
+    /// }
+    ///
+    /// {
+    ///   type: "message-ack",
+    ///   id: "some challenge id"
+    /// }
+    ///
+    /// {
+    ///   type: "message-ack-challenge",
+    ///   id: "some challenge id"
+    /// }
+    ///
+    /// Authentication (if enabled) is done by cookie `X-Auth-Token`. 
+    ///
+    /// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
+        responses(
+            (status = 101, description = "Switching protocols."),
+            (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Messages",
+    )]
+    pub async fn websocket(mut req: Request<InternalState>) -> tide::Result<Response> {
+        return Ok(Response::builder(422)
+            .body(ApiErrorStatus::UnknownFailure(
+                "unimplemented".into(),
+            ))
+            .build());
     }
 
     /// Delete messages from nodes message inbox.

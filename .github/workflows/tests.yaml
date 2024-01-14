@@ -132,8 +132,8 @@ jobs:
       matrix:
         suite:
           - integration
-          #- security      TODO: re-enable when fixed
-          #- websocket_api TODO: re-enable when fixed
+          - security
+          - websocket_api
     runs-on: ubuntu-8-core
     timeout-minutes: 30
     if: github.event.pull_request.draft == false
