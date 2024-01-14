@@ -491,6 +491,7 @@ pub mod tests {
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::errors::JsonRpcProviderClientError;
+    use crate::ZeroRetryPolicy;
 
     #[async_std::test]
     async fn test_client_should_deploy_contracts() {
@@ -616,6 +617,29 @@ pub mod tests {
     }
 
     #[async_std::test]
+    async fn test_client_should_not_retry_with_zero_retry_policy() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(404)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body("{}")
+            .expect(1)
+            .create();
+
+        let client = JsonRpcProviderClient::new(&server.url(), SurfRequestor::default(), ZeroRetryPolicy::default());
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+    }
+
+    #[async_std::test]
     async fn test_client_should_retry_on_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -642,6 +666,47 @@ pub mod tests {
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![-32603],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            },
+        );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+    }
+
+    #[async_std::test]
+    async fn test_client_should_not_retry_on_nonretryable_json_rpc_error() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(
+                r#"{
+              "jsonrpc": "2.0",
+              "id": 1,
+              "error": {
+                "message": "some message",
+                "code": -32000
+              }
+            }"#,
+            )
+            .expect(1)
+            .create();
+
+        let client = JsonRpcProviderClient::new(
+            &server.url(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_json_rpc_errors: vec![],
                 initial_backoff: Duration::from_millis(100),
                 ..SimpleJsonRpcRetryPolicy::default()
             },

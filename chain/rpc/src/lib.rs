@@ -146,7 +146,15 @@ pub trait RetryPolicy<E> {
     }
 }
 
+/// Performs no retries.
+#[derive(Clone, Debug)]
 pub struct ZeroRetryPolicy<E>(PhantomData<E>);
+
+impl<E> Default for ZeroRetryPolicy<E> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
