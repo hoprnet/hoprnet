@@ -476,6 +476,7 @@ pub mod tests {
     use ethers_providers::JsonRpcClient;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use std::time::Duration;
+    use serde_json::json;
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
@@ -552,7 +553,9 @@ pub mod tests {
 
         let m = server.mock("POST", "/")
             .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("}malformed{")
+            .expect(1)
             .create();
 
         let client = JsonRpcProviderClient::new(
@@ -566,6 +569,7 @@ pub mod tests {
             .await
             .expect_err("expected error");
 
+        m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
     }
 
@@ -574,15 +578,104 @@ pub mod tests {
         let mut server = mockito::Server::new_async().await;
 
         let m = server.mock("POST", "/")
-            .with_status(429)
+            .with_status(http_types::StatusCode::TooManyRequests as usize)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
+            .expect(3)
             .create();
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
             SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default()
+            SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_http_errors: vec![ http_types::StatusCode::TooManyRequests ],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            }
         );
 
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+    }
+
+    #[async_std::test]
+    async fn test_client_should_retry_on_json_rpc_error() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server.mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(r#"{
+              "jsonrpc": "2.0",
+              "id": 1,
+              "error": {
+                "message": "some message",
+                "code": -32603
+              }
+            }"#)
+            .expect(3)
+            .create();
+
+        let client = JsonRpcProviderClient::new(
+            &server.url(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_json_rpc_errors: vec![ -32603 ],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            }
+        );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+    }
+
+    #[async_std::test]
+    async fn test_client_should_retry_on_malformed_json_rpc_error() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server.mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(r#"{
+              "jsonrpc": "2.0",
+              "error": {
+                "message": "some message",
+                "code": -32600
+              }
+            }"#)
+            .expect(3)
+            .create();
+
+        let client = JsonRpcProviderClient::new(
+            &server.url(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_json_rpc_errors: vec![ -32600 ],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            }
+        );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
     }
 }
