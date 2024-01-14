@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::trace;
+use log::{debug, trace, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -13,10 +13,10 @@ use crate::helper::{Request, Response};
 use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
-#[cfg(feature = "prometheus")]
+#[cfg(all(feature = "prometheus", not(test)))]
 use metrics::metrics::{MultiCounter, MultiHistogram};
 
-#[cfg(feature = "prometheus")]
+#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
         "hopr_rpc_call_count",
@@ -24,46 +24,66 @@ lazy_static::lazy_static! {
         &["call", "result"]
     )
     .unwrap();
-    static ref METRIC_COUNT_RPC_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+    static ref METRIC_RPC_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
         "hopr_rpc_call_time_sec",
         "Timing of RPC calls over HTTP in seconds",
         vec![0.1, 0.5, 1.0, 2.0, 5.0, 7.0, 10.0],
         &["call"]
     )
     .unwrap();
+    static ref METRIC_RETRIES_PER_RPC_CALL: MultiHistogram = MultiHistogram::new(
+        "hopr_retries_per_rpc_call",
+        "Number of retries per RPC call",
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+        &["call"]
+    )
+    .unwrap();
 }
 
 /// Defines a retry policy suitable for `JsonRpcProviderClient`.
-#[derive(Clone, Debug, Validate)]
+/// The policy will make up to `max_retries` once a JSON RPC request fails.
+/// Each retry `k > 0` will be separated by a delay of `initial_backoff * (1 + backoff_coefficient)^(k - 1)`,
+/// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
+/// specified in `retryable_http_errors`.
+/// Transport and connection errors (such as connection timeouts) are retried without backoff
+/// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
+/// No more additional retries are allowed on new requests, if the maximum number of concurrent
+/// requests being retried has reached `max_retry_queue_size`.
+#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
     /// Maximum number of retries.
     /// If `None` is given, will keep retrying indefinitely.
     /// Default is 10.
-    #[validate(min = 1)]
+    #[validate(range(min = 1))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
+    /// NOTE: Transport and connection errors (such as connection timeouts) are retried at
+    /// a constant rate (no backoff) with this delay if `backoff_on_transport_errors` is not set.
     /// Default is 1 second.
     pub initial_backoff: Duration,
     /// Backoff coefficient by which will be each retry multiplied.
     /// Must be non-negative. If set to `0`, no backoff will be applied and the
     /// requests will be retried at a constant rate.
     /// Default is 1.001
-    #[validate(min = 0)]
+    #[validate(range(min = 0))]
     pub backoff_coefficient: f64,
     /// Maximum backoff value.
     /// Once reached, the requests will be retried at a constant rate with this timeout.
     /// Default is 120 seconds.
     pub max_backoff: Duration,
+    /// Indicates whether to also apply backoff to transport and connection errors (such as connection timeouts).
+    /// Default is false.
+    pub backoff_on_transport_errors: bool,
     /// List of JSON RPC errors that should be retried with backoff
     /// Default is [429, -32005, -32016]
     pub retryable_json_rpc_errors: Vec<i64>,
     /// List of HTTP errors that should be retried with backoff.
     /// Default is [429]
-    pub retryable_http_errors: Vec<u16>,
+    pub retryable_http_errors: Vec<http_types::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
     /// If any additional request fails after this number is attained, it won't be retried.
     /// Defaults to 3
-    #[validate(min = 1)]
+    #[validate(range(min = 1))]
     pub max_retry_queue_size: u32,
 }
 
@@ -74,10 +94,22 @@ impl Default for SimpleJsonRpcRetryPolicy {
             initial_backoff: Duration::from_secs(1),
             backoff_coefficient: 1.001,
             max_backoff: Duration::from_secs(120),
+            backoff_on_transport_errors: false,
             retryable_json_rpc_errors: vec![-32005, -32016, 429],
-            retryable_http_errors: vec![429], // Too Many Requests
+            retryable_http_errors: vec![ http_types::StatusCode::TooManyRequests ],
             max_retry_queue_size: 3,
         }
+    }
+}
+
+impl SimpleJsonRpcRetryPolicy {
+    fn is_retryable_json_rpc_error(&self, err: &JsonRpcError) -> bool {
+        self.retryable_json_rpc_errors.contains(&err.code) ||
+            err.message.contains("rate limit")
+    }
+
+    fn is_retryable_http_error(&self, status: &http_types::StatusCode) -> bool {
+        self.retryable_http_errors.contains(status)
     }
 }
 
@@ -89,10 +121,12 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
         retry_queue_size: u32,
     ) -> RetryAction {
         if self.max_retries.is_some_and(|max| num_retries > max) {
+            warn!("max number of retries {} has been reached", self.max_retries.unwrap());
             return NoRetry;
         }
 
         if retry_queue_size > self.max_retry_queue_size {
+            warn!("maximum size of retry queue {} has been reached", self.max_retry_queue_size);
             return NoRetry;
         }
 
@@ -104,24 +138,27 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
-            JsonRpcProviderClientError::JsonRpcError(ethers_providers::JsonRpcError { code, message, .. })
-                if self.retryable_json_rpc_errors.contains(code) || message.contains("rate limit") =>
+            JsonRpcProviderClientError::JsonRpcError(e)
+                if self.is_retryable_json_rpc_error(e) =>
             {
+                debug!("encountered retryable JSON RPC error code: {e}");
                 RetryAfter(backoff)
             }
 
             // Retryable HTTP errors are retries with backoff
             JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(e))
-                if self.retryable_http_errors.contains(e) =>
+                if self.is_retryable_http_error(e) =>
             {
+                debug!("encountered retryable HTTP error code: {e}");
                 RetryAfter(backoff)
             }
 
-            // Transport error and timeouts are retried at a constant rate
-            JsonRpcProviderClientError::BackendError(HttpRequestError::Timeout)
-            | JsonRpcProviderClientError::BackendError(HttpRequestError::TransportError(_))
-            | JsonRpcProviderClientError::BackendError(HttpRequestError::UnknownError(_)) => {
-                RetryAfter(self.initial_backoff)
+            // Transport error and timeouts are retried at a constant rate if specified
+            JsonRpcProviderClientError::BackendError(e @ HttpRequestError::Timeout)
+            | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::TransportError(_))
+            | JsonRpcProviderClientError::BackendError(e@ HttpRequestError::UnknownError(_)) => {
+                debug!("encountered retryable transport error: {e}");
+                RetryAfter(if self.backoff_on_transport_errors { backoff } else { self.initial_backoff })
             }
 
             // Some providers send invalid JSON RPC in the error case (no `id:u64`), but the text is a `JsonRpcError`
@@ -132,9 +169,14 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
                 }
 
                 match serde_json::from_str::<Resp>(text) {
-                    Ok(resp) if self.retryable_json_rpc_errors.contains(&resp.error.code) =>
-                        RetryAfter(backoff),
-                    _ => NoRetry
+                    Ok(Resp { error }) if self.is_retryable_json_rpc_error(&error) => {
+                        debug!("encountered retryable JSON RPC error: {error}");
+                        RetryAfter(backoff)
+                    },
+                    _ => {
+                        debug!("unparseable JSON RPC error: {text}");
+                        NoRetry
+                    }
                 }
             }
 
@@ -184,14 +226,14 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
 
         trace!("rpc call {method} took {}ms", req_duration.as_millis());
 
-        #[cfg(feature = "prometheus")]
-        METRIC_COUNT_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
 
         // First deserialize the Response object
         let raw = match serde_json::from_slice(&body) {
             Ok(Response::Success { result, .. }) => result.to_owned(),
             Ok(Response::Error { error, .. }) => {
-                #[cfg(feature = "prometheus")]
+                #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
 
                 return Err(error.into());
@@ -201,13 +243,13 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
                     err: serde::de::Error::custom("unexpected notification over HTTP transport"),
                     text: String::from_utf8_lossy(&body).to_string(),
                 };
-                #[cfg(feature = "prometheus")]
+                #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
 
                 return Err(err);
             }
             Err(err) => {
-                #[cfg(feature = "prometheus")]
+                #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_RPC_CALLS.increment(&[method, "failure"]);
 
                 return Err(JsonRpcProviderClientError::SerdeJson {
@@ -223,7 +265,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
             text: raw.to_string(),
         })?;
 
-        #[cfg(feature = "prometheus")]
+        #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_COUNT_RPC_CALLS.increment(&[method, "success"]);
 
         Ok(res)
@@ -299,6 +341,10 @@ where
                 match resp {
                     Ok(ret) => {
                         self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
+
                         return Ok(ret);
                     }
                     Err(req_err) => {
@@ -312,10 +358,13 @@ where
                 .retry_policy
                 .is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst))
             {
-                NoRetry => return Err(err),
-                RetryAfter(backoff) => {
-                    async_std::task::sleep(backoff).await;
-                }
+                NoRetry => {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
+
+                    return Err(err)
+                },
+                RetryAfter(backoff) => async_std::task::sleep(backoff).await,
             }
         }
     }
@@ -384,7 +433,7 @@ pub mod native {
                         Ok(data) => Ok(data.into_boxed_slice()),
                         Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
                     },
-                    Ok(response) => Err(HttpRequestError::HttpError(response.status().into())),
+                    Ok(response) => Err(HttpRequestError::HttpError(response.status())),
                     Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
                 }
             }

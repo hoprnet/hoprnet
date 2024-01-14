@@ -1146,6 +1146,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "hopr-crypto",
+ "http-types",
  "lazy_static",
  "log",
  "metrics",
