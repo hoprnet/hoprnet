@@ -96,7 +96,7 @@ impl Default for SimpleJsonRpcRetryPolicy {
             max_backoff: Duration::from_secs(120),
             backoff_on_transport_errors: false,
             retryable_json_rpc_errors: vec![-32005, -32016, 429],
-            retryable_http_errors: vec![ http_types::StatusCode::TooManyRequests ],
+            retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
             max_retry_queue_size: 3,
         }
     }
@@ -104,8 +104,7 @@ impl Default for SimpleJsonRpcRetryPolicy {
 
 impl SimpleJsonRpcRetryPolicy {
     fn is_retryable_json_rpc_error(&self, err: &JsonRpcError) -> bool {
-        self.retryable_json_rpc_errors.contains(&err.code) ||
-            err.message.contains("rate limit")
+        self.retryable_json_rpc_errors.contains(&err.code) || err.message.contains("rate limit")
     }
 
     fn is_retryable_http_error(&self, status: &http_types::StatusCode) -> bool {
@@ -126,7 +125,10 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
         }
 
         if retry_queue_size > self.max_retry_queue_size {
-            warn!("maximum size of retry queue {} has been reached", self.max_retry_queue_size);
+            warn!(
+                "maximum size of retry queue {} has been reached",
+                self.max_retry_queue_size
+            );
             return NoRetry;
         }
 
@@ -138,9 +140,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
-            JsonRpcProviderClientError::JsonRpcError(e)
-                if self.is_retryable_json_rpc_error(e) =>
-            {
+            JsonRpcProviderClientError::JsonRpcError(e) if self.is_retryable_json_rpc_error(e) => {
                 debug!("encountered retryable JSON RPC error code: {e}");
                 RetryAfter(backoff)
             }
@@ -156,9 +156,13 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             // Transport error and timeouts are retried at a constant rate if specified
             JsonRpcProviderClientError::BackendError(e @ HttpRequestError::Timeout)
             | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::TransportError(_))
-            | JsonRpcProviderClientError::BackendError(e@ HttpRequestError::UnknownError(_)) => {
+            | JsonRpcProviderClientError::BackendError(e @ HttpRequestError::UnknownError(_)) => {
                 debug!("encountered retryable transport error: {e}");
-                RetryAfter(if self.backoff_on_transport_errors { backoff } else { self.initial_backoff })
+                RetryAfter(if self.backoff_on_transport_errors {
+                    backoff
+                } else {
+                    self.initial_backoff
+                })
             }
 
             // Some providers send invalid JSON RPC in the error case (no `id:u64`), but the text is a `JsonRpcError`
@@ -172,7 +176,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
                     Ok(Resp { error }) if self.is_retryable_json_rpc_error(&error) => {
                         debug!("encountered retryable JSON RPC error: {error}");
                         RetryAfter(backoff)
-                    },
+                    }
                     _ => {
                         debug!("unparseable JSON RPC error: {text}");
                         NoRetry
@@ -362,8 +366,8 @@ where
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
-                    return Err(err)
-                },
+                    return Err(err);
+                }
                 RetryAfter(backoff) => async_std::task::sleep(backoff).await,
             }
         }
@@ -475,8 +479,8 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use std::time::Duration;
     use serde_json::json;
+    use std::time::Duration;
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
@@ -551,7 +555,8 @@ pub mod tests {
     async fn test_client_should_fail_on_malformed_response() {
         let mut server = mockito::Server::new_async().await;
 
-        let m = server.mock("POST", "/")
+        let m = server
+            .mock("POST", "/")
             .with_status(200)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("}malformed{")
@@ -561,7 +566,7 @@ pub mod tests {
         let client = JsonRpcProviderClient::new(
             &server.url(),
             SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default()
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let err = client
@@ -577,7 +582,8 @@ pub mod tests {
     async fn test_client_should_retry_on_http_error() {
         let mut server = mockito::Server::new_async().await;
 
-        let m = server.mock("POST", "/")
+        let m = server
+            .mock("POST", "/")
             .with_status(http_types::StatusCode::TooManyRequests as usize)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
@@ -589,10 +595,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
-                retryable_http_errors: vec![ http_types::StatusCode::TooManyRequests ],
+                retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
                 initial_backoff: Duration::from_millis(100),
                 ..SimpleJsonRpcRetryPolicy::default()
-            }
+            },
         );
 
         let err = client
@@ -608,17 +614,20 @@ pub mod tests {
     async fn test_client_should_retry_on_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
-        let m = server.mock("POST", "/")
+        let m = server
+            .mock("POST", "/")
             .with_status(200)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-            .with_body(r#"{
+            .with_body(
+                r#"{
               "jsonrpc": "2.0",
               "id": 1,
               "error": {
                 "message": "some message",
                 "code": -32603
               }
-            }"#)
+            }"#,
+            )
             .expect(3)
             .create();
 
@@ -627,10 +636,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
-                retryable_json_rpc_errors: vec![ -32603 ],
+                retryable_json_rpc_errors: vec![-32603],
                 initial_backoff: Duration::from_millis(100),
                 ..SimpleJsonRpcRetryPolicy::default()
-            }
+            },
         );
 
         let err = client
@@ -646,16 +655,19 @@ pub mod tests {
     async fn test_client_should_retry_on_malformed_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
-        let m = server.mock("POST", "/")
+        let m = server
+            .mock("POST", "/")
             .with_status(200)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-            .with_body(r#"{
+            .with_body(
+                r#"{
               "jsonrpc": "2.0",
               "error": {
                 "message": "some message",
                 "code": -32600
               }
-            }"#)
+            }"#,
+            )
             .expect(3)
             .create();
 
@@ -664,10 +676,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
-                retryable_json_rpc_errors: vec![ -32600 ],
+                retryable_json_rpc_errors: vec![-32600],
                 initial_backoff: Duration::from_millis(100),
                 ..SimpleJsonRpcRetryPolicy::default()
-            }
+            },
         );
 
         let err = client
