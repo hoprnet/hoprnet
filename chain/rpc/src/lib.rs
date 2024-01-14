@@ -152,7 +152,6 @@ impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for HTTP client that perform HTTP POST with serializable request data.
 #[async_trait]
-//#[cfg_attr(test, mockall::automock)]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
     /// and obtains the JSON response.

@@ -119,7 +119,7 @@ mod test {
     use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleRetryPolicy};
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
@@ -154,7 +154,7 @@ mod test {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let rpc = RpcOperations::new(client, &chain_key_0, Default::default()).expect("failed to construct rpc");
@@ -199,7 +199,7 @@ mod test {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
@@ -304,7 +304,7 @@ mod test {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");

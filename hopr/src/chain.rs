@@ -15,7 +15,7 @@ use chain_actions::{action_queue::ActionQueue, CoreEthereumActions};
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-use chain_rpc::client::SimpleRetryPolicy;
+use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
@@ -348,7 +348,7 @@ where
     let rpc_client = JsonRpcClient::new(
         &chain_config.chain.default_provider,
         DefaultHttpPostRequestor::default(),
-        SimpleRetryPolicy::default(),
+        SimpleJsonRpcRetryPolicy::default(),
     );
 
     // TODO: extract these configs from the global config type

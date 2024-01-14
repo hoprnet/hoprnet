@@ -206,7 +206,7 @@ pub mod tests {
     use utils_types::primitives::{Address, BalanceType, U256};
 
     use crate::client::native::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleRetryPolicy};
+    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     pub async fn mint_tokens<M: Middleware + 'static>(
         hopr_token: HoprToken<M>,
@@ -272,7 +272,7 @@ pub mod tests {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
@@ -309,7 +309,7 @@ pub mod tests {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
@@ -361,7 +361,7 @@ pub mod tests {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -419,7 +419,7 @@ pub mod tests {
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
-            SimpleRetryPolicy::default(),
+            SimpleJsonRpcRetryPolicy::default(),
         );
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
