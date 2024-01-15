@@ -1,6 +1,6 @@
 //! # HOPR Metrics Collection
 //!
-//! The purpose of the `utils-hopr_metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
+//! The purpose of the `hopr_metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
 //! over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 //!
 //! The reason for making this wrapper is to make it suitable for `wasm-bindgen` bindings to JS/TS. The
@@ -22,20 +22,20 @@
 //! - `SimpleHistogram`
 //! - `MultiHistogram`
 //!
-//! The "simple" types represent a singular named hopr_metrics, whereas the "multi" hopr_metrics represent a
+//! The "simple" types represent a singular named metrics, whereas the "multi" metrics represent a
 //! vector extension.
 //!
-//! The vector extensions basically maintain multiple labelled hopr_metrics in a single
+//! The vector extensions basically maintain multiple labelled metrics in a single
 //! entity. This makes it possible to have categorized metric values within a single metric, e.g.
 //! counter of successful HTTP requests categorized by HTTP method.
 //!
-//! The hopr_metrics are registered within global hopr_metrics registry (singleton).
+//! The metrics are registered within global metrics registry (singleton).
 //! Currently, the crate does not support additional individual registries apart from the global one.
 //!
 //! ### Usage in Rust code
 //!
 //! When writing pure Rust code that uses this crate, one can use the above structs by directly instantiating them.
-//! During their construction, the metric registers itself in the global hopr_metrics registry.
+//! During their construction, the metric registers itself in the global metrics registry.
 //!
 //! #### Example use in Rust
 //!
@@ -64,18 +64,18 @@
 //!     std::thread::sleep(std::time::Duration::from_secs(1));
 //!     metric_histogram.record_measure(timer);
 //!
-//!     // Multi-hopr_metrics are labeled extensions
+//!     // Multi-metrics are labeled extensions
 //!     let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
 //!
 //!     // Tracks counters per different versions
 //!     metric_counts_per_version.increment_by(&["1.0.0"], 2);
 //!     metric_counts_per_version.increment_by(&["1.0.1"], 1);
 //!
-//!     // All hopr_metrics live in a global state and can be serialized at any time
-//!     let gathered_hopr_metrics = gather_all_metrics();
+//!     // All metrics live in a global state and can be serialized at any time
+//!     let gathered_metrics = gather_all_metrics();
 //!
 //!     // Metrics are in text format and can be exposed using an HTTP API endpoint
-//!     println!("{:?}", gathered_hopr_metrics);
+//!     println!("{:?}", gathered_metrics);
 //! }
 //! ```
 //!
@@ -84,7 +84,7 @@
 //! Because the crate is WASM compatible, it contains also TS/JS bindings via
 //! `wasm-bindgen`.
 //! Once a metric is created, it lives in a global registry. Values of all
-//! created hopr_metrics can be gathered in a serialized text for at any time.
+//! created metrics can be gathered in a serialized text for at any time.
 //!
 //! See the example below for details.
 //!
@@ -112,44 +112,44 @@
 //! foo()
 //! metric_histogram.record_measure(timer)
 //!
-//! // Multi-hopr_metrics are labeled extensions
+//! // Multi-metrics are labeled extensions
 //! const metric_countsPerVersion = create_multi_counter('test_multi_counter', 'Testing labeled counter', ['version'])
 //!
 //! // Tracks counters per different versions
 //! metric_countsPerVersion.increment_by('1.0.0', 2)
 //! metric_countsPerVersion.increment_by('1.0.1', 1)
 //!
-//! // All hopr_metrics live in a global state and can be serialized at any time
-//! let gathered_hopr_metrics = gather_all_hopr_metrics()
+//! // All metrics live in a global state and can be serialized at any time
+//! let gathered_metrics = gather_all_metrics()
 //!
 //! // Metrics are in text format and can be exposed using an HTTP API endpoint
-//! console.log(gathered_hopr_metrics)
+//! console.log(gathered_metrics)
 //! ```
 //!
-//! ### Scraping hopr_metrics across separate WASM runtimes in HOPRd
+//! ### Scraping metrics across separate WASM runtimes in HOPRd
 //!
 //! Each WASM module runs in its own separate runtime and has a private memory space. This has implications for the metric
 //! registries used by Prometheus in HOPRd. As a direct consequence of this fact, each WASM runtime has its own global metric
-//! registry which has to be scraped separately in order to have all the hopr_metrics exposed.
+//! registry which has to be scraped separately in order to have all the metrics exposed.
 //!
 //! Each Rust crate that will become a separate WASM runtime instantiated from the TS in HOPRd, must declare a public WASM-bound
-//! function for gathering hopr_metrics:
+//! function for gathering metrics:
 //!
 //! ```js
 //! #[wasm_bindgen]
-//! pub fn my_crate_gather_hopr_metrics() -> JsResult<String> {
-//!     hopr_metrics::metrics::wasm::gather_all_hopr_metrics()
+//! pub fn my_crate_gather_metrics() -> JsResult<String> {
+//!     hopr_metrics::metrics::wasm::gather_all_metrics()
 //! }
 //! ```
 //!
 //! and when initializing the crate in TS, `registerMetricsCollector` function must be called
-//! passing the `my_crate_gather_hopr_metrics` as argument:
+//! passing the `my_crate_gather_metrics` as argument:
 //!
 //! ```typescript
 //! import registerMetricsCollector from '@hoprnet/hopr-utils'
-//! import { my_crate_initialize_crate, my_crate_gather_hopr_metrics } from '../lib/my_crate.js'
+//! import { my_crate_initialize_crate, my_crate_gather_metrics } from '../lib/my_crate.js'
 //! my_crate_initialize_crate()
-//! registerMetricsCollector(my_crate_gather_hopr_metrics)
+//! registerMetricsCollector(my_crate_gather_metrics)
 //! ```
 
 pub mod metrics;

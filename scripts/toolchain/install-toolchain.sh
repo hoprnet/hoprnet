@@ -21,14 +21,6 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 #   x86_64: macOS
 #   x86_64: GitHub Actions images: macos-latest + ubuntu-latest
 
-function usage() {
-  msg
-  msg "Usage: $0 [-h|--help]"
-  msg
-  msg "This script installs all required toolchain utilities to build hoprnet monorepo"
-  msg
-}
-
 # Set PATH such that `cargo` is available within this script
 export CARGO_BIN_DIR="${mydir}/../../.cargo/bin"
 export PATH=${PATH}:${CARGO_BIN_DIR}
