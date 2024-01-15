@@ -17,7 +17,7 @@ use core_protocol::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
 };
-use core_types::{
+use hopr_internal_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
     channels::Ticket,
 };

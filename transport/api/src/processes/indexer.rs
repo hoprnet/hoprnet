@@ -6,7 +6,7 @@ use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
 use hopr_crypto::types::OffchainPublicKey;
 use log::{error, warn};
 use std::{pin::Pin, sync::Arc};
-use utils_types::traits::PeerIdLike;
+use hopr_primitive_types::traits::PeerIdLike;
 
 use async_std::task::spawn;
 

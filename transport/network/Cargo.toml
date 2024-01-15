@@ -26,7 +26,7 @@ hopr-crypto = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
 metrics = { workspace = true, optional = true}
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.11.3"
@@ -40,6 +40,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["hopr-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm"]
+wasm = ["platform/js", "metrics/js"]
 compat-ping = []
 prometheus = ["dep:metrics"]

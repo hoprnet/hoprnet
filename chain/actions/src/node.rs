@@ -4,11 +4,11 @@ use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
-use core_types::announcement::{AnnouncementData, KeyBinding};
+use hopr_internal_types::announcement::{AnnouncementData, KeyBinding};
 use hopr_crypto::keypairs::OffchainKeypair;
 use log::info;
 use multiaddr::Multiaddr;
-use utils_types::primitives::{Address, Balance};
+use hopr_primitive_types::primitives::{Address, Balance};
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]
@@ -64,8 +64,8 @@ mod tests {
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[async_std::test]
     async fn test_withdraw() {

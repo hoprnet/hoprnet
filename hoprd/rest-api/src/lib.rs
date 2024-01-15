@@ -838,10 +838,10 @@ mod peers {
 mod channels {
     use super::*;
     use chain_actions::errors::CoreEthereumActionsError;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
     use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_primitive_types::traits::ToHex;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1668,9 +1668,9 @@ mod tickets {
     use core_protocol::errors::ProtocolError;
     use core_transport::errors::HoprTransportError;
     use core_transport::TicketStatistics;
-    use core_types::channels::Ticket;
+    use hopr_internal_types::channels::Ticket;
     use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_primitive_types::traits::ToHex;
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

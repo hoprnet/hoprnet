@@ -155,8 +155,8 @@ mod tests {
     use hopr_crypto::types::Hash;
     use std::sync::Arc;
     use std::time::Duration;
-    use utils_types::primitives::Address;
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::primitives::Address;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[async_std::test]
     async fn test_expectation_should_resolve() {

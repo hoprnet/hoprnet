@@ -10,7 +10,7 @@ use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use log::{error, info, warn};
-use utils_types::traits::{PeerIdLike, ToHex};
+use hopr_primitive_types::traits::{PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use metrics::metrics::SimpleHistogram;
@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let recv_at = SystemTime::now();
 
                     // TODO: remove RLP in 3.0
-                    match utils_types::rlp::decode(&data.plain_text) {
+                    match hopr_primitive_types::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
                             let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
 
@@ -194,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Running HOPRd with the API...");
 
         // TODO: remove RLP in 3.0
-        let msg_encoder = |data: &[u8]| utils_types::rlp::encode(data, platform::time::native::current_timestamp());
+        let msg_encoder = |data: &[u8]| hopr_primitive_types::rlp::encode(data, platform::time::native::current_timestamp());
 
         let host_listen = match &cfg.api.host.address {
             core_transport::config::HostType::IPv4(a) | core_transport::config::HostType::Domain(a) => {

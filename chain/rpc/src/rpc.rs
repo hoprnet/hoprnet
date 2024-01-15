@@ -12,7 +12,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -201,9 +201,9 @@ pub mod tests {
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use primitive_types::H160;
+    use hopr_primitive_types::H160;
     use std::time::Duration;
-    use utils_types::primitives::{Address, BalanceType, U256};
+    use hopr_primitive_types::primitives::{Address, BalanceType, U256};
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -242,7 +242,7 @@ pub mod tests {
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
         tx.set_to(H160::from(to));
-        tx.set_value(ethers::types::U256(primitive_types::U256::from(amount).0));
+        tx.set_value(ethers::types::U256(hopr_primitive_types::U256::from(amount).0));
         tx
     }
 

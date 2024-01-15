@@ -12,7 +12,7 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use log::{info, warn};
-use utils_types::sma::{SingleSumSMA, SMA};
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {

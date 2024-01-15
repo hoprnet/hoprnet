@@ -4,9 +4,9 @@ use chain_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
-use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use core_types::channels::ChannelDirection::Incoming;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use hopr_internal_types::channels::ChannelDirection::Incoming;
+use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -16,7 +16,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use utils_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -333,9 +333,9 @@ mod tests {
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
     };
-    use core_types::channels::ChannelDirection::Incoming;
-    use core_types::channels::{ChannelChange, ChannelStatus};
-    use core_types::{
+    use hopr_internal_types::channels::ChannelDirection::Incoming;
+    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
+    use hopr_internal_types::{
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
@@ -352,7 +352,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike},
     };

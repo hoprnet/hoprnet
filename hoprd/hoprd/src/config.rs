@@ -8,7 +8,7 @@ use validator::{Validate, ValidationError};
 
 use core_strategy::{Strategy, Strategy::AutoRedeeming};
 use core_transport::config::HostConfig;
-use utils_types::primitives::Address;
+use hopr_primitive_types::primitives::Address;
 
 use hopr_lib::{config::HoprLibConfig, ProtocolsConfig};
 

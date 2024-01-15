@@ -9,7 +9,7 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use utils_types::{
+use hopr_primitive_types::{
     errors::GeneralError::{self, InvalidInput, NonSpecificError},
     primitives::Address,
     traits::{BinarySerializable, PeerIdLike},
@@ -153,7 +153,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use multiaddr::Multiaddr;
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::Address,
         traits::{BinarySerializable, PeerIdLike},
     };

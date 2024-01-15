@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use core_types::channels::ChannelDirection;
-use core_types::{
+use hopr_internal_types::channels::ChannelDirection;
+use hopr_internal_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
@@ -15,7 +15,7 @@ use utils_db::{
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_types::{
+use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
 };
@@ -1343,7 +1343,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_types::channels::ChannelEntry;
+    use hopr_internal_types::channels::ChannelEntry;
     use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
@@ -1352,7 +1352,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::{Address, EthereumChallenge},
         traits::BinarySerializable,
     };

@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-keypair"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM modules for HOPRd"
@@ -23,9 +23,9 @@ thiserror = { workspace = true }
 typenum = "1.16.0"
 uuid = { version = "1.3.3", features = ["serde", "v4"] }
 
-hopr-crypto = { workspace = true, default-features = false }
+hopr-crypto = { workspace = true }
 platform = { workspace = true }
-utils-types = { workspace = true, default-features = false }
+hopr-primitive-types = { workspace = true}
 log = { workspace = true }
 
 [dev-dependencies]
@@ -34,4 +34,4 @@ tempfile = "3"
 
 [features]
 default = []
-wasm = [ "hopr-crypto/wasm", "platform/wasm-bindgen" ]
+wasm = ["platform/js"]

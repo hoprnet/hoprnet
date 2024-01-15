@@ -21,7 +21,7 @@ pub use {
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
-    core_types::protocol::ApplicationData,
+    hopr_internal_types::protocol::ApplicationData,
     hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -41,7 +41,7 @@ use core_protocol::{
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
-use core_types::{
+use hopr_internal_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{ChannelEntry, Ticket},
     protocol::TagBloomFilter,
@@ -53,7 +53,7 @@ use futures::{
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
-use utils_types::primitives::Address;
+use hopr_primitive_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, metrics::metrics::SimpleHistogram};
@@ -215,13 +215,13 @@ pub struct TicketStatistics {
     pub losing: u64,
     pub win_proportion: f64,
     pub unredeemed: u64,
-    pub unredeemed_value: utils_types::primitives::Balance,
+    pub unredeemed_value: hopr_primitive_types::primitives::Balance,
     pub redeemed: u64,
-    pub redeemed_value: utils_types::primitives::Balance,
+    pub redeemed_value: hopr_primitive_types::primitives::Balance,
     pub neglected: u64,
-    pub neglected_value: utils_types::primitives::Balance,
+    pub neglected_value: hopr_primitive_types::primitives::Balance,
     pub rejected: u64,
-    pub rejected_value: utils_types::primitives::Balance,
+    pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
 pub struct PublicNodesResult {
@@ -236,11 +236,11 @@ use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
-use core_types::channels::ChannelStatus;
+use hopr_internal_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use utils_types::primitives::{Balance, BalanceType};
-use utils_types::traits::PeerIdLike;
+use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::traits::PeerIdLike;
 
 #[derive(Debug, Clone)]
 pub struct HoprTransport {

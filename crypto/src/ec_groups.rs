@@ -4,7 +4,7 @@ use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 use crate::types::CurvePoint;
 use curve25519_dalek::traits::IsIdentity;
 use elliptic_curve::{Group, PrimeField};
-use utils_types::traits::BinarySerializable;
+use hopr_primitive_types::traits::BinarySerializable;
 
 use crate::keypairs::{ChainKeypair, OffchainKeypair};
 use crate::random::{random_bytes, random_fill};

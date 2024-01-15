@@ -10,12 +10,12 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_types::protocol::PeerAddressResolver;
+use hopr_internal_types::protocol::PeerAddressResolver;
 use hopr_crypto::types::OffchainPublicKey;
 use log::error;
 use std::sync::Arc;
 use utils_db::CurrentDbShim;
-use utils_types::primitives::Address;
+use hopr_primitive_types::primitives::Address;
 
 /// DB backed packet key to chain key resolver
 #[derive(Debug, Clone)]

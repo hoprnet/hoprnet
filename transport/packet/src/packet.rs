@@ -1,5 +1,5 @@
 use crate::errors::PacketError::PacketDecodingError;
-use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
+use hopr_internal_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use hopr_crypto::{
     derivation::{derive_packet_tag, PacketTag},
     keypairs::Keypair,
@@ -9,7 +9,7 @@ use hopr_crypto::{
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
 use typenum::Unsigned;
-use utils_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
+use hopr_primitive_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
 
 use crate::{
     errors::Result,
@@ -220,7 +220,7 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
     const SIZE: usize =
         <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 packet: data.into(),
@@ -243,7 +243,7 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
 mod tests {
     use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_types::protocol::INTERMEDIATE_HOPS;
+    use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
     use hopr_crypto::{
         ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},

@@ -35,8 +35,7 @@ platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
-utils-validation = { workspace = true }
+hopr-primitive-types = { workspace = true }
 humantime = "2.1.0"
 
 [dev-dependencies]
@@ -50,9 +49,9 @@ wasm = [
     "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",
-    "platform/wasm-bindgen",
-    "utils-db/wasm",
-    "metrics?/wasm",
+    "platform/js",
+    "utils-db/js",
+    "metrics?/js",
 ]
 prometheus = [
     "dep:metrics",

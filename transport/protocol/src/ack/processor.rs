@@ -4,7 +4,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
 use core_packet::errors::Result;
-use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
+use hopr_internal_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
@@ -14,7 +14,7 @@ use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_types::traits::{PeerIdLike, ToHex};
+use hopr_primitive_types::traits::{PeerIdLike, ToHex};
 
 use async_std::task::spawn;
 

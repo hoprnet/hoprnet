@@ -11,7 +11,7 @@ use hopr_crypto::keypairs::Keypair;
 use hopr_crypto::types::ToChecksum;
 use log::{log, Level};
 use std::{env, str::FromStr};
-use utils_types::primitives::Address;
+use primitive_types::primitives::Address;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]

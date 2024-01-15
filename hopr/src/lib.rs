@@ -9,8 +9,8 @@ mod helpers;
 
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
-    core_transport::{config::HostConfig, ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput},
-    utils_types::primitives::{Address, Balance, BalanceType},
+    core_transport::{config::{HostConfig, looks_like_domain}, ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput},
+    hopr_primitive_types::primitives::{Address, Balance, BalanceType},
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -33,8 +33,8 @@ use chain_api::{can_register_with_safe, wait_for_funds, ChannelEntry, Significan
 use chain_types::chain_events::ChainEventType;
 use core_transport::TicketStatistics;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use core_types::protocol::TagBloomFilter;
-use core_types::{
+use hopr_internal_types::protocol::TagBloomFilter;
+use hopr_internal_types::{
     account::AccountEntry,
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, ChannelStatus, Ticket},
@@ -42,7 +42,7 @@ use core_types::{
 
 use log::debug;
 use utils_db::db::DB;
-use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
 use chain_api::HoprChain;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -58,7 +58,7 @@ use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair
 use log::{error, info};
 use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::CurrentDbShim;
-use utils_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
 use crate::chain::SmartContractConfig;
@@ -110,7 +110,7 @@ pub struct OpenChannelResult {
 
 pub struct CloseChannelResult {
     pub tx_hash: Hash,
-    pub status: core_types::channels::ChannelStatus,
+    pub status: hopr_internal_types::channels::ChannelStatus,
 }
 
 /// Enum differentiator for loop component futures.
@@ -234,15 +234,15 @@ where
                                 )
                                 .await;
                             }
-                        } else if channel.status == core_types::channels::ChannelStatus::Open {
+                        } else if channel.status == hopr_internal_types::channels::ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
                             let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                 &*multi_strategy,
                                 &channel,
                                 own_channel_direction,
-                                core_types::channels::ChannelChange::Status {
-                                    left: core_types::channels::ChannelStatus::Closed,
-                                    right: core_types::channels::ChannelStatus::Open,
+                                hopr_internal_types::channels::ChannelChange::Status {
+                                    left: hopr_internal_types::channels::ChannelStatus::Closed,
+                                    right: hopr_internal_types::channels::ChannelStatus::Open,
                                 },
                             )
                             .await;
@@ -1111,7 +1111,7 @@ impl Hopr {
     pub async fn close_channel(
         &self,
         counterparty: &Address,
-        direction: core_types::channels::ChannelDirection,
+        direction: hopr_internal_types::channels::ChannelDirection,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
         if self.status() != State::Running {

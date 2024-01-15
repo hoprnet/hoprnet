@@ -19,7 +19,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 validator = { workspace = true }
 
-core-types = { workspace = true }
+hopr-internal-types = { workspace = true }
 platform = { workspace = true }
 
 [dev-dependencies]
@@ -29,5 +29,5 @@ tempfile = "3"
 
 [features]
 default = []
-wasm = [ "core-types/wasm" ]
+wasm = []
 

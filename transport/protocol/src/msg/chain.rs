@@ -4,8 +4,8 @@ use core_packet::{
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
 use core_path::path::{Path, TransportPath};
-use core_types::channels::Ticket;
-use core_types::protocol::INTERMEDIATE_HOPS;
+use hopr_internal_types::channels::Ticket;
+use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
 use hopr_crypto::{
     derivation::{derive_ack_key_share, PacketTag},
     keypairs::{ChainKeypair, OffchainKeypair},
@@ -14,7 +14,7 @@ use hopr_crypto::{
 };
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 
 /// Indicates the packet type.
 #[derive(Debug, Clone)]
@@ -227,8 +227,8 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
-    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use core_types::protocol::PeerAddressResolver;
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use hopr_internal_types::protocol::PeerAddressResolver;
     use hopr_crypto::types::OffchainPublicKey;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -236,8 +236,8 @@ mod tests {
     };
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
-    use utils_types::primitives::Address;
-    use utils_types::{
+    use hopr_primitive_types::primitives::Address;
+    use hopr_primitive_types::{
         primitives::{Balance, BalanceType, EthereumChallenge, U256},
         traits::PeerIdLike,
     };

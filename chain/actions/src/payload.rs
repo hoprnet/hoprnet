@@ -16,14 +16,14 @@ use bindings::{
 };
 use chain_types::ContractAddresses;
 use chain_types::{create_eip1559_transaction, TypedTransaction};
-use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
+use hopr_internal_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::types::NameOrAddress;
 use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
 use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
-use utils_types::{
+use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
 };
@@ -564,7 +564,7 @@ pub mod tests {
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::native::SurfRequestor;
     use chain_types::{create_anvil, ContractInstances};
-    use core_types::{
+    use hopr_internal_types::{
         acknowledgement::AcknowledgedTicket,
         announcement::{AnnouncementData, KeyBinding},
         channels::Ticket,
@@ -580,8 +580,8 @@ pub mod tests {
     };
     use multiaddr::Multiaddr;
     use std::{str::FromStr, sync::Arc};
-    use utils_types::primitives::Address;
-    use utils_types::{
+    use hopr_primitive_types::primitives::Address;
+    use hopr_primitive_types::{
         primitives::{Address as HoprAddress, Balance, BalanceType, U256 as HoprU256},
         traits::BinarySerializable,
     };

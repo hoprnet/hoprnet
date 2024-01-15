@@ -32,7 +32,7 @@ hopr-crypto = { workspace = true }
 chain-types = { workspace = true }
 log = { workspace = true }
 metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding", "middleware-logger"] }
@@ -47,5 +47,5 @@ mockito = "1.2.0"
 
 [features]
 default = ["prometheus"]
-wasm = ["hopr-crypto/wasm"]
+wasm = []
 prometheus = ["dep:metrics"]

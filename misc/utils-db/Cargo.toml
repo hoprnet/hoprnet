@@ -23,7 +23,7 @@ sqlx = { version = "0.7.3", optional = true, default-features = false, features 
 thiserror = "1.0"
 
 log = { workspace = true }
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 platform = { workspace = true }
 
 [dev-dependencies]
@@ -33,8 +33,6 @@ scopeguard = "1.1.0"
 tempfile = "3.5.0"
 
 [features]
-default = [ "sqlite" ]
-sqlite = [ "dep:sqlx" ]
-leveldb = ["dep:rusty-leveldb"]
-hashmap = []
-wasm = [ "platform/wasm-bindgen" ]
+default = ["sqlite"]
+sqlite = ["dep:sqlx"]
+js = ["platform/js", "dep:rusty-leveldb"]

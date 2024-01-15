@@ -1,7 +1,7 @@
 use ethers::core::abi::Error as AbiError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use utils_types::{errors::GeneralError, primitives::Address};
+use hopr_primitive_types::{errors::GeneralError, primitives::Address};
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {

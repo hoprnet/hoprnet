@@ -95,7 +95,7 @@ impl CurrentDbShim {
         }
     }
 
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
@@ -104,7 +104,7 @@ impl CurrentDbShim {
         }
     }
 
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     pub fn new(path: &str, create_if_missing: bool) -> Self {
         let mut opts = wasm::NodeJsEnv::create_options();
         opts.create_if_missing = create_if_missing;
@@ -221,7 +221,7 @@ impl AsyncKVStorage for CurrentDbShim {
     }
 }
 
-#[cfg(any(feature = "wasm", test))]
+#[cfg(any(feature = "js", test))]
 fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u64) {
     log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
@@ -471,7 +471,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "js")]
 pub mod wasm {
     use crate::rusty::test_env;
     use js_sys::{JsString, Uint8Array};

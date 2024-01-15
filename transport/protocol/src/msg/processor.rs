@@ -16,17 +16,17 @@ use core_packet::errors::PacketError::{
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
-use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::Ticket;
-use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
+use hopr_internal_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
+use hopr_internal_types::channels::Ticket;
+use hopr_internal_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 use hopr_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
 
 use log::{debug, error, warn};
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -828,8 +828,8 @@ mod tests {
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
-    use core_types::protocol::PeerAddressResolver;
-    use core_types::{
+    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_internal_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
         protocol::{Tag, TagBloomFilter},
@@ -853,7 +853,7 @@ mod tests {
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::PeerIdLike,
     };

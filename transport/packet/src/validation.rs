@@ -3,10 +3,10 @@ use crate::errors::{
     Result,
 };
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use hopr_crypto::types::Hash;
 use log::{debug, info};
-use utils_types::primitives::{Address, Balance};
+use hopr_primitive_types::primitives::{Address, Balance};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
@@ -109,9 +109,9 @@ mod tests {
     use async_trait::async_trait;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
-    use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
-    use core_types::channels::{f64_to_win_prob, ChannelStatus};
-    use core_types::{
+    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
+    use hopr_internal_types::channels::{f64_to_win_prob, ChannelStatus};
+    use hopr_internal_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
     };
@@ -127,8 +127,8 @@ mod tests {
     use mockall::mock;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+    use hopr_primitive_types::traits::BinarySerializable;
 
     const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const TARGET_PRIV_BYTES: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");

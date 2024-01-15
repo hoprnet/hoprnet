@@ -6,7 +6,7 @@ use elliptic_curve::sec1::ToEncodedPoint;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use k256::{Scalar, Secp256k1};
-use utils_types::traits::BinarySerializable;
+use hopr_primitive_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE};

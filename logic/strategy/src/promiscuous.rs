@@ -1,10 +1,10 @@
-use core_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_crypto::types::OffchainPublicKey;
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use utils_types::primitives::{Address, Balance, BalanceType};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_types::sma::{SingleSumSMA, SMA};
-use utils_types::traits::PeerIdLike;
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
+use hopr_primitive_types::traits::PeerIdLike;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -407,7 +407,7 @@ mod tests {
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
-    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto::random::random_bytes;
@@ -416,8 +416,8 @@ mod tests {
     use mockall::mock;
     use platform::time::native::current_timestamp;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::primitives::{Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::primitives::{Snapshot, U256};
+    use hopr_primitive_types::traits::BinarySerializable;
 
     lazy_static! {
         static ref PEERS: Vec<(Address, PeerId)> = (0..10)

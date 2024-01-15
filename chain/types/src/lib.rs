@@ -19,7 +19,7 @@ use hopr_crypto::keypairs::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
-use utils_types::primitives::Address;
+use hopr_primitive_types::primitives::Address;
 
 pub mod actions;
 pub mod chain_events;

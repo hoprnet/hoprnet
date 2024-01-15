@@ -26,7 +26,6 @@ validator = { workspace = true }
 
 core-path = { workspace = true }
 core-transport = { workspace = true }
-core-types = { workspace = true }
 core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
@@ -38,7 +37,8 @@ platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 serde_yaml = { version = "0.9" }
@@ -48,15 +48,14 @@ default = ["prometheus"]
 wasm = [
     "core-path/wasm",
     "core-transport/wasm",
-    "core-types/wasm",
     "core-strategy/wasm",
     "chain-actions/wasm",
     "chain-api/wasm",
     "chain-db/wasm",
     "chain-indexer/wasm",
     "chain-rpc/wasm",
-    "platform/wasm-bindgen",
-    "utils-db/wasm",
-    "metrics?/wasm",
+    "platform/js",
+    "utils-db/js",
+    "metrics?/js",
 ]
 prometheus = ["dep:metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]

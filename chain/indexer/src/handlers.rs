@@ -10,7 +10,7 @@ use bindings::{
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
-use core_types::{
+use hopr_internal_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
@@ -20,7 +20,7 @@ use hopr_crypto::types::OffchainSignature;
 use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
-use utils_types::{
+use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,
 };
@@ -230,7 +230,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     .unwrap_or(ChannelEntry::new(
                         source,
                         destination,
-                        Balance::new(0u64.into(), utils_types::primitives::BalanceType::HOPR),
+                        Balance::new(0u64.into(), hopr_primitive_types::primitives::BalanceType::HOPR),
                         0u64.into(),
                         ChannelStatus::Open,
                         1u64.into(),
@@ -620,7 +620,7 @@ pub mod tests {
     };
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::ContractAddresses;
-    use core_types::{
+    use hopr_internal_types::{
         account::{AccountEntry, AccountType},
         announcement::KeyBinding,
         channels::{generate_channel_id, ChannelEntry, ChannelStatus},
@@ -636,9 +636,9 @@ pub mod tests {
         types::Hash,
     };
     use multiaddr::Multiaddr;
-    use primitive_types::H256;
+    use hopr_primitive_types::H256;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
     };

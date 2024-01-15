@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API server using the hopr-lib created HOPR node and exposing it using a HTTP REST API"
@@ -15,13 +15,13 @@ crate-type = ["rlib"]
 default = ["prometheus"]
 prometheus = ["hopr-lib/prometheus", "dep:metrics", "dep:lazy_static"]
 
-
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 const_format = "0.2.32"
 futures = { workspace = true }
-libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
 lazy_static = { workspace = true, optional = true}
+libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
+log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
@@ -37,8 +37,7 @@ hopr-crypto = { workspace = true }
 chain-actions = { workspace = true }
 core-protocol = { workspace = true }
 core-transport = { workspace = true }
-core-types = { workspace = true }
-utils-types = { workspace = true }
-log = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 metrics = { workspace = true, optional = true }
 

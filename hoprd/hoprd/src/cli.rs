@@ -8,7 +8,7 @@ use hex;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-use utils_validation::network::looks_like_domain;
+use hopr_lib::looks_like_domain;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;

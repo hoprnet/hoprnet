@@ -18,7 +18,7 @@ pub enum HoprLibError {
     DbError(#[from] utils_db::errors::DbError),
 
     #[error("'{0}'")]
-    TypeError(#[from] utils_types::errors::GeneralError),
+    TypeError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, HoprLibError>;

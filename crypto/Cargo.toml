@@ -35,7 +35,7 @@ typenum = "1.16"
 thiserror = { workspace = true }
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 log = { workspace = true }
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"
@@ -43,4 +43,3 @@ parameterized = "1.0"
 
 [features]
 default = []
-wasm = []

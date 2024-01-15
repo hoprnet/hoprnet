@@ -28,12 +28,12 @@ hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
-core-types = { workspace = true }
 utils-db = { workspace = true }
 metrics = { workspace = true, optional = true }
 platform = { workspace = true }
 log = { workspace = true }
-utils-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
@@ -43,6 +43,5 @@ hex-literal = "0.4"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-types/wasm", "hopr-crypto/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen" ]
+wasm = [ "chain-db/wasm", "chain-types/wasm", "utils-db/js", "platform/js" ]
 prometheus = [ "dep:metrics", "chain-rpc/prometheus"]

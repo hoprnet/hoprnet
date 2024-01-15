@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use core_types::channels::ChannelDirection::Outgoing;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_internal_types::channels::ChannelDirection::Outgoing;
+use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use utils_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -117,15 +117,15 @@ mod tests {
     use chain_actions::channels::ChannelActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use core_types::channels::ChannelChange::CurrentBalance;
-    use core_types::channels::ChannelDirection::Outgoing;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::ChannelChange::CurrentBalance;
+    use hopr_internal_types::channels::ChannelDirection::Outgoing;
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::Hash;
     use mockall::mock;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+    use hopr_primitive_types::traits::BinarySerializable;
 
     mock! {
         ChannelAct { }
@@ -136,7 +136,7 @@ mod tests {
             async fn close_channel(
                 &self,
                 counterparty: Address,
-                direction: core_types::channels::ChannelDirection,
+                direction: hopr_internal_types::channels::ChannelDirection,
                 redeem_before_close: bool,
             ) -> chain_actions::errors::Result<PendingAction>;
         }

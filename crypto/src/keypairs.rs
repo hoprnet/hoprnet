@@ -3,9 +3,9 @@ use generic_array::{ArrayLength, GenericArray};
 use sha2::Sha512;
 use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
-use utils_types::traits::PeerIdLike;
-use utils_types::{primitives::Address, traits::BinarySerializable};
 use zeroize::ZeroizeOnDrop;
+use hopr_primitive_types::traits::PeerIdLike;
+use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
 
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
@@ -176,7 +176,7 @@ mod tests {
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
     use subtle::ConstantTimeEq;
-    use utils_types::traits::PeerIdLike;
+    use primitive_types::traits::PeerIdLike;
 
     #[test]
     fn test_offchain_keypair() {

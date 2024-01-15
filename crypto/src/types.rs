@@ -43,7 +43,7 @@ use crate::{
     random::random_group_element,
 };
 use log::warn;
-use utils_types::{
+use hopr_primitive_types::{
     errors::GeneralError::{self, ParseError},
     primitives::{Address, EthereumChallenge, U256},
     traits::{BinarySerializable, PeerIdLike, ToHex},
@@ -171,7 +171,7 @@ impl From<CurvePoint> for AffinePoint {
 impl BinarySerializable for CurvePoint {
     const SIZE: usize = 65; // Stores uncompressed data
 
-    fn from_bytes(bytes: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(bytes: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         // Deserializes both compressed and uncompressed
         elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
             .map_err(|_| ParseError)
@@ -276,7 +276,7 @@ impl From<Response> for Challenge {
 impl BinarySerializable for Challenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         // Accepts both compressed and uncompressed points
         CurvePoint::from_bytes(data).map(|curve_point| Challenge { curve_point })
     }
@@ -335,7 +335,7 @@ impl HalfKey {
 impl BinarySerializable for HalfKey {
     const SIZE: usize = 32;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = HalfKey::default();
             ret.hkey.copy_from_slice(data);
@@ -393,7 +393,7 @@ impl HalfKeyChallenge {
 impl BinarySerializable for HalfKeyChallenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED; // Size of the compressed secp256k1 point.
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = HalfKeyChallenge::default();
             ret.hkc.copy_from_slice(data);
@@ -471,7 +471,7 @@ impl Hash {
 impl BinarySerializable for Hash {
     const SIZE: usize = 32; // Defined by Keccak256.
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self([0u8; Self::SIZE]);
             ret.0.copy_from_slice(data);
@@ -531,7 +531,7 @@ pub struct OffchainPublicKey {
 impl BinarySerializable for OffchainPublicKey {
     const SIZE: usize = 32;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
                 compressed: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?,
@@ -555,7 +555,7 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
 }
 
 impl PeerIdLike for OffchainPublicKey {
-    fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
+    fn from_peerid(peer_id: &PeerId) -> hopr_primitive_types::errors::Result<Self> {
         let mh = peer_id.as_ref();
         if mh.code() == 0 {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
@@ -675,7 +675,7 @@ impl PublicKey {
         (private, cp.try_into().unwrap())
     }
 
-    pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         match data.len() {
             Self::SIZE_UNCOMPRESSED => {
                 // already has 0x04 prefix
@@ -801,7 +801,7 @@ pub struct CompressedPublicKey(pub PublicKey);
 impl BinarySerializable for CompressedPublicKey {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         PublicKey::from_bytes(data).map(CompressedPublicKey)
     }
 
@@ -883,7 +883,7 @@ impl std::fmt::Display for VrfParameters {
 impl BinarySerializable for VrfParameters {
     const SIZE: usize = CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(VrfParameters {
                 v: CurvePoint::from_bytes(&data[0..CurvePoint::SIZE]).unwrap(),
@@ -1015,7 +1015,7 @@ impl Response {
 impl BinarySerializable for Response {
     const SIZE: usize = 32;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Response::new(data))
         } else {
@@ -1060,7 +1060,7 @@ impl OffchainSignature {
 impl BinarySerializable for OffchainSignature {
     const SIZE: usize = ed25519_dalek::Signature::BYTE_SIZE;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         ed25519_dalek::Signature::try_from(data)
             .map_err(|_| ParseError)
             .map(|signature| Self { signature })
@@ -1173,7 +1173,7 @@ impl Signature {
 impl BinarySerializable for Signature {
     const SIZE: usize = 64;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
@@ -1255,7 +1255,7 @@ pub mod tests {
     };
     use libp2p_identity::PeerId;
     use std::str::FromStr;
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::Address,
         traits::{BinarySerializable, PeerIdLike, ToHex},
     };

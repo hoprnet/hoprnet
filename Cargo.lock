@@ -1025,13 +1025,14 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
- "core-types",
  "env_logger",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "metrics",
@@ -1041,7 +1042,6 @@ dependencies = [
  "serde",
  "thiserror",
  "utils-db",
- "utils-types",
 ]
 
 [[package]]
@@ -1057,14 +1057,14 @@ dependencies = [
  "chain-rpc",
  "chain-types",
  "core-path",
- "core-types",
  "futures",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "log",
  "serde",
  "thiserror",
  "utils-db",
- "utils-types",
 ]
 
 [[package]]
@@ -1073,15 +1073,15 @@ version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
- "core-types",
  "env_logger",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "mockall",
  "utils-db",
- "utils-types",
 ]
 
 [[package]]
@@ -1095,12 +1095,13 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
- "core-types",
  "env_logger",
  "ethers",
  "futures",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "metrics",
@@ -1109,7 +1110,6 @@ dependencies = [
  "primitive-types",
  "thiserror",
  "utils-db",
- "utils-types",
 ]
 
 [[package]]
@@ -1128,6 +1128,7 @@ dependencies = [
  "futures-timer",
  "hex-literal",
  "hopr-crypto",
+ "hopr-primitive-types",
  "http-types",
  "lazy_static",
  "log",
@@ -1139,7 +1140,6 @@ dependencies = [
  "serde_json",
  "surf",
  "thiserror",
- "utils-types",
  "validator",
 ]
 
@@ -1149,18 +1149,18 @@ version = "0.8.0"
 dependencies = [
  "async-std",
  "bindings",
- "core-types",
  "env_logger",
  "ethers",
  "hex",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "libp2p-identity",
  "mockall",
  "multiaddr",
  "serde",
  "strum 0.25.0",
- "utils-types",
 ]
 
 [[package]]
@@ -1452,6 +1452,7 @@ dependencies = [
  "futures",
  "futures-lite 1.13.0",
  "hopr-crypto",
+ "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
  "log",
@@ -1463,7 +1464,6 @@ dependencies = [
  "serde",
  "serde_with",
  "thiserror",
- "utils-types",
  "validator",
 ]
 
@@ -1474,10 +1474,10 @@ dependencies = [
  "async-std",
  "core-network",
  "core-protocol",
- "core-types",
  "env_logger",
  "futures",
  "futures-lite 1.13.0",
+ "hopr-internal-types",
  "libp2p",
  "libp2p-mplex",
  "log",
@@ -1497,11 +1497,12 @@ dependencies = [
  "chain-db",
  "chain-types",
  "core-path",
- "core-types",
  "env_logger",
  "hex",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "mockall",
@@ -1510,7 +1511,6 @@ dependencies = [
  "thiserror",
  "typenum",
  "utils-db",
- "utils-types",
 ]
 
 [[package]]
@@ -1521,10 +1521,11 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-db",
- "core-types",
  "futures",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
  "log",
@@ -1535,7 +1536,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-types",
  "wasm-bindgen-test",
 ]
 
@@ -1549,12 +1549,13 @@ dependencies = [
  "chain-db",
  "core-packet",
  "core-path",
- "core-types",
  "env_logger",
  "futures",
  "futures-lite 1.13.0",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
@@ -1570,7 +1571,6 @@ dependencies = [
  "serial_test",
  "thiserror",
  "utils-db",
- "utils-types",
  "validator",
 ]
 
@@ -1586,11 +1586,12 @@ dependencies = [
  "chain-types",
  "core-network",
  "core-protocol",
- "core-types",
  "env_logger",
  "futures",
  "hex-literal",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "metrics",
@@ -1602,7 +1603,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "utils-db",
- "utils-types",
  "validator",
 ]
 
@@ -1620,44 +1620,22 @@ dependencies = [
  "core-packet",
  "core-path",
  "core-protocol",
- "core-types",
  "futures",
  "futures-concurrency",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "libp2p",
  "log",
  "metrics",
  "multiaddr",
  "platform",
+ "proc-macro-regex",
  "serde",
  "thiserror",
  "utils-db",
- "utils-types",
- "utils-validation",
  "validator",
-]
-
-[[package]]
-name = "core-types"
-version = "0.4.1"
-dependencies = [
- "async-trait",
- "bincode",
- "bindings",
- "bloomfilter",
- "enum-iterator",
- "ethers",
- "hex-literal",
- "hopr-crypto",
- "lazy_static",
- "log",
- "multiaddr",
- "serde",
- "serde_bytes",
- "serde_repr",
- "thiserror",
- "utils-types",
 ]
 
 [[package]]
@@ -3211,13 +3189,14 @@ dependencies = [
  "clap",
  "ethers",
  "hopr-crypto",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "hoprd-keypair",
  "log",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
- "utils-types",
 ]
 
 [[package]]
@@ -3236,6 +3215,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "hkdf 0.12.4",
+ "hopr-primitive-types",
  "k256",
  "libp2p-identity",
  "log",
@@ -3248,8 +3228,29 @@ dependencies = [
  "subtle",
  "thiserror",
  "typenum",
- "utils-types",
  "zeroize",
+]
+
+[[package]]
+name = "hopr-internal-types"
+version = "0.5.0"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bindings",
+ "bloomfilter",
+ "enum-iterator",
+ "ethers",
+ "hex-literal",
+ "hopr-crypto",
+ "hopr-primitive-types",
+ "lazy_static",
+ "log",
+ "multiaddr",
+ "serde",
+ "serde_bytes",
+ "serde_repr",
+ "thiserror",
 ]
 
 [[package]]
@@ -3268,8 +3269,9 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-transport",
- "core-types",
  "futures",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "lazy_static",
  "log",
  "metrics",
@@ -3281,8 +3283,25 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "utils-db",
- "utils-types",
  "validator",
+]
+
+[[package]]
+name = "hopr-primitive-types"
+version = "0.3.2"
+dependencies = [
+ "bincode",
+ "ethnum",
+ "hex",
+ "hex-literal",
+ "libp2p-identity",
+ "primitive-types",
+ "rand 0.8.5",
+ "regex",
+ "ringbuffer",
+ "rlp",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -3299,6 +3318,7 @@ dependencies = [
  "futures",
  "hex",
  "hopr-lib",
+ "hopr-primitive-types",
  "hoprd-api",
  "hoprd-inbox",
  "hoprd-keypair",
@@ -3315,24 +3335,23 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-db",
- "utils-types",
- "utils-validation",
  "validator",
 ]
 
 [[package]]
 name = "hoprd-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-std",
  "chain-actions",
  "const_format",
  "core-protocol",
  "core-transport",
- "core-types",
  "futures",
  "hopr-crypto",
+ "hopr-internal-types",
  "hopr-lib",
+ "hopr-primitive-types",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
@@ -3343,7 +3362,6 @@ dependencies = [
  "serde_with",
  "strum 0.25.0",
  "tide",
- "utils-types",
  "utoipa",
  "utoipa-swagger-ui",
  "validator",
@@ -3356,7 +3374,7 @@ dependencies = [
  "async-lock 2.8.0",
  "async-std",
  "async-trait",
- "core-types",
+ "hopr-internal-types",
  "platform",
  "ringbuffer",
  "serde",
@@ -3367,12 +3385,13 @@ dependencies = [
 
 [[package]]
 name = "hoprd-keypair"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aes 0.8.3",
  "ctr 0.9.2",
  "hex",
  "hopr-crypto",
+ "hopr-primitive-types",
  "log",
  "platform",
  "scrypt 0.11.0",
@@ -3382,7 +3401,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "typenum",
- "utils-types",
  "uuid 1.6.1",
 ]
 
@@ -7529,6 +7547,7 @@ dependencies = [
  "futures-lite 1.13.0",
  "hex",
  "hex-literal",
+ "hopr-primitive-types",
  "log",
  "mockall",
  "pin-project-lite 0.2.13",
@@ -7539,32 +7558,6 @@ dependencies = [
  "sqlx",
  "tempfile",
  "thiserror",
- "utils-types",
-]
-
-[[package]]
-name = "utils-types"
-version = "0.3.2"
-dependencies = [
- "bincode",
- "ethnum",
- "hex",
- "hex-literal",
- "libp2p-identity",
- "primitive-types",
- "rand 0.8.5",
- "regex",
- "ringbuffer",
- "rlp",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "utils-validation"
-version = "0.1.0"
-dependencies = [
- "proc-macro-regex",
 ]
 
 [[package]]

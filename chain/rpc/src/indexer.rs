@@ -116,7 +116,7 @@ mod test {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use log::debug;
-    use utils_types::primitives::Address;
+    use hopr_primitive_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
