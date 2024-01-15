@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 ethers = { version = "2", default-features = false, features = ["abigen"] }
-serde = "1"
