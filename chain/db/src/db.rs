@@ -7,7 +7,7 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
-use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use hopr_crypto_types::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use log::{debug, error, info};
 use utils_db::errors::DbError;
 use utils_db::{
@@ -1345,7 +1345,7 @@ mod tests {
     use super::*;
     use core_types::channels::ChannelEntry;
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Response},
     };

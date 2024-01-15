@@ -7,8 +7,8 @@ use aes::{
     Aes128,
 };
 use hex;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_crypto::random::random_bytes;
+use hopr_crypto_random::random_bytes;
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -442,7 +442,7 @@ mod tests {
     use std::fs;
 
     use super::HoprKeys;
-    use hopr_crypto::keypairs::Keypair;
+    use hopr_crypto_types::keypairs::Keypair;
     use tempfile::tempdir;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";

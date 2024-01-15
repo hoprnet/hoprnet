@@ -7,7 +7,7 @@ use core_types::protocol::PeerAddressResolver;
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use libp2p_identity::PeerId;
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
@@ -248,7 +248,7 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;
-    use hopr_crypto::types::{OffchainPublicKey, PublicKey};
+    use hopr_crypto_types::types::{OffchainPublicKey, PublicKey};
     use libp2p_identity::PeerId;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::PeerIdLike;

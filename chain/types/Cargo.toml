@@ -20,7 +20,7 @@ serde = { workspace = true }
 strum = { workspace = true }
 
 bindings = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
 log = { workspace = true }
@@ -38,4 +38,4 @@ hex = { workspace = true }
 
 [features]
 default = []
-wasm = [ "hopr-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
+wasm = [ "utils-types/wasm", "platform/wasm-bindgen" ]

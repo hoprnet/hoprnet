@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use multiaddr::Error as MultiaddrError;
 
-use hopr_crypto::errors::CryptoError;
+use hopr_crypto_types::errors::CryptoError;
 
 #[derive(Error, Debug)]
 pub enum CoreTypesError {

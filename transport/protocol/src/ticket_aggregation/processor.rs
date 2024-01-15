@@ -17,7 +17,7 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
+use hopr_crypto_types::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
@@ -732,7 +732,7 @@ mod tests {
     };
     use futures_lite::StreamExt;
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

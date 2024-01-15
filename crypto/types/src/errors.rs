@@ -1,3 +1,4 @@
+use k256::elliptic_curve;
 use thiserror::Error;
 use utils_types::errors::GeneralError;
 

@@ -1,8 +1,8 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
+use hopr_crypto_types::primitives::SecretKey;
 use zeroize::ZeroizeOnDrop;
 
 use crate::derivation::generate_key_iv;
-use crate::primitives::SecretKey;
 
 // Module-specific constants
 const AES_BLOCK_SIZE: usize = 16;
@@ -117,8 +117,7 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::prg::{PRGParameters, AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
-    use crate::primitives::SecretKey;
+    use super::*;
     use hex_literal::hex;
 
     #[test]

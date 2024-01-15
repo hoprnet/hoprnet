@@ -1,6 +1,6 @@
 use core_path::errors::PathError;
 use core_types::errors::CoreTypesError;
-use hopr_crypto::errors::CryptoError;
+use hopr_crypto_types::errors::CryptoError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;

@@ -26,7 +26,7 @@ thiserror = { workspace = true }
 
 bindings = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
-hopr-crypto = { workspace = true, default-features = false }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true, default-features = false }
 chain-rpc = { workspace = true, default-features = false }
 chain-types = { workspace = true, default-features = false }
@@ -42,5 +42,5 @@ mockall = "0.11"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-rpc/wasm", "chain-types/wasm", "hopr-crypto/wasm", "core-types/wasm", "utils-db/wasm", "metrics?/wasm", "utils-types/wasm" ]
+wasm = [ "chain-db/wasm", "chain-rpc/wasm", "chain-types/wasm", "core-types/wasm", "utils-db/wasm", "metrics?/wasm", "utils-types/wasm" ]
 prometheus = ["dep:metrics", "chain-rpc/prometheus" ]

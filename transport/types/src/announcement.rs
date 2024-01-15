@@ -1,4 +1,4 @@
-use hopr_crypto::{
+use hopr_crypto_types::{
     errors::CryptoError,
     keypairs::{Keypair, OffchainKeypair},
     types::{OffchainPublicKey, OffchainSignature},
@@ -151,7 +151,7 @@ impl Display for AnnouncementData {
 mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
     use hex_literal::hex;
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use multiaddr::Multiaddr;
     use utils_types::{
         primitives::Address,

@@ -1,12 +1,10 @@
 use crate::derivation::generate_key_iv;
-use crate::errors::CryptoError::InvalidParameterSize;
-use crate::errors::Result;
+use hopr_crypto_types::errors::CryptoError::InvalidParameterSize;
+use hopr_crypto_types::primitives::{SecretKey, SimpleStreamCipher};
+use hopr_crypto_types::utils;
 use blake2::Blake2bMac;
 use digest::{FixedOutput, Mac};
 use zeroize::ZeroizeOnDrop;
-
-use crate::primitives::{SecretKey, SimpleStreamCipher};
-use crate::utils;
 
 // Module-specific constants
 const PRP_INTERMEDIATE_KEY_LENGTH: usize = 32;
@@ -94,14 +92,14 @@ impl PRP {
 impl PRP {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
-    pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
+    pub fn forward(&self, plaintext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
         let mut out = Vec::from(plaintext);
         self.forward_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
 
     /// Applies forward permutation on the given plaintext and modifies the given buffer in-place.
-    pub fn forward_inplace(&self, plaintext: &mut [u8]) -> Result<()> {
+    pub fn forward_inplace(&self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
         if plaintext.len() >= PRP_MIN_LENGTH {
             Self::xor_keystream(plaintext, &self.keys[0], &self.ivs[0]);
             Self::xor_hash(plaintext, &self.keys[1], &self.ivs[1]);
@@ -118,14 +116,14 @@ impl PRP {
 
     /// Applies inverse permutation on the given plaintext and returns a new buffer
     /// containing the result.
-    pub fn inverse(&self, ciphertext: &[u8]) -> Result<Box<[u8]>> {
+    pub fn inverse(&self, ciphertext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
         let mut out = Vec::from(ciphertext);
         self.inverse_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
 
     /// Applies inverse permutation on the given ciphertext and modifies the given buffer in-place.
-    pub fn inverse_inplace(&self, ciphertext: &mut [u8]) -> Result<()> {
+    pub fn inverse_inplace(&self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
         if ciphertext.len() >= PRP_MIN_LENGTH {
             Self::xor_hash(ciphertext, &self.keys[3], &self.ivs[3]);
             Self::xor_keystream(ciphertext, &self.keys[2], &self.ivs[2]);
@@ -170,10 +168,9 @@ impl PRP {
 
 #[cfg(test)]
 mod tests {
-    use crate::primitives::SecretKey;
-    use crate::prp::{PRPParameters, PRP};
-    use crate::random::random_bytes;
+    use super::*;
     use hex_literal::hex;
+    use hopr_crypto_random::random_bytes;
 
     #[test]
     fn test_prp_fixed() {

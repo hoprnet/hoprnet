@@ -6,8 +6,8 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
-use hopr_crypto::types::OffchainPublicKey;
-use hopr_crypto::types::{HalfKeyChallenge, Hash};
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 #[async_trait]

@@ -1,10 +1,8 @@
-use crate::shared_keys::Scalar as _;
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
 use elliptic_curve::{
-    hash2curve::{ExpandMsgXmd, GroupDigest},
     sec1::EncodedPoint,
     NonZeroScalar, ProjectivePoint,
 };
@@ -20,7 +18,7 @@ use k256::{
         sec1::{FromEncodedPoint, ToEncodedPoint},
         CurveArithmetic,
     },
-    AffinePoint, Scalar, Secp256k1,
+    AffinePoint, Secp256k1,
 };
 
 use libp2p_identity::PeerId;
@@ -40,7 +38,6 @@ use crate::{
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     primitives::{DigestLike, EthDigest},
-    random::random_group_element,
 };
 use log::warn;
 use utils_types::{
@@ -48,6 +45,7 @@ use utils_types::{
     primitives::{Address, EthereumChallenge, U256},
     traits::{BinarySerializable, PeerIdLike, ToHex},
 };
+use crate::utils::random_group_element;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -112,7 +110,7 @@ mod arrays {
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct CurvePoint {
-    affine: AffinePoint,
+    pub(crate) affine: AffinePoint,
 }
 
 impl CurvePoint {
@@ -603,6 +601,12 @@ impl From<&OffchainPublicKey> for MontgomeryPoint {
     }
 }
 
+/// Length of a packet tag
+pub const PACKET_TAG_LENGTH: usize = 16;
+
+/// Represents a fixed size packet verification tag
+pub type PacketTag = [u8; PACKET_TAG_LENGTH];
+
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -825,130 +829,6 @@ impl From<&CompressedPublicKey> for k256::ProjectivePoint {
 impl CompressedPublicKey {
     pub fn to_address(&self) -> Address {
         self.0.to_address()
-    }
-}
-
-/// Bundles values given to the smart contract to prove that a ticket is a win.
-///
-/// The VRF is thereby needed because it generates on-demand determinitstic
-/// entropy that can only be derived by the ticket redeemer.
-#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct VrfParameters {
-    /// the pseudo-random point
-    pub v: CurvePoint,
-    pub h: Scalar,
-    pub s: Scalar,
-    /// helper value for smart contract
-    pub h_v: CurvePoint,
-    /// helper value for smart contract
-    pub s_b: CurvePoint,
-}
-
-impl std::fmt::Display for VrfParameters {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v_encoded = self.v.affine.to_encoded_point(false);
-        let h_v_encoded = self.h_v.affine.to_encoded_point(false);
-        let s_b_encoded = self.s_b.affine.to_encoded_point(false);
-        f.debug_struct("VrfParameters")
-            .field(
-                "V",
-                &format!(
-                    "({},{})",
-                    hex::encode(v_encoded.x().unwrap()),
-                    hex::encode(v_encoded.y().unwrap())
-                ),
-            )
-            .field("h", &hex::encode(self.h.to_bytes()))
-            .field("s", &hex::encode(self.s.to_bytes()))
-            .field(
-                "h_v",
-                &format!(
-                    "({},{})",
-                    hex::encode(h_v_encoded.x().unwrap()),
-                    hex::encode(h_v_encoded.y().unwrap())
-                ),
-            )
-            .field(
-                "s_b",
-                &format!(
-                    "({},{})",
-                    hex::encode(s_b_encoded.x().unwrap()),
-                    hex::encode(s_b_encoded.y().unwrap())
-                ),
-            )
-            .finish()
-    }
-}
-
-impl BinarySerializable for VrfParameters {
-    const SIZE: usize = CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE;
-
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(VrfParameters {
-                v: CurvePoint::from_bytes(&data[0..CurvePoint::SIZE]).unwrap(),
-                h: k256::Scalar::from_bytes(&data[CurvePoint::SIZE..CurvePoint::SIZE + 32]).unwrap(),
-                s: k256::Scalar::from_bytes(&data[CurvePoint::SIZE + 32..CurvePoint::SIZE + 32 + 32]).unwrap(),
-                h_v: CurvePoint::from_bytes(
-                    &data[CurvePoint::SIZE + 32 + 32..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE],
-                )
-                .unwrap(),
-                s_b: CurvePoint::from_bytes(
-                    &data[CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE
-                        ..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE],
-                )
-                .unwrap(),
-            })
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.v.to_bytes());
-        ret.extend_from_slice(&self.h.to_bytes());
-        ret.extend_from_slice(&self.s.to_bytes());
-        ret.extend_from_slice(&self.h_v.to_bytes());
-        ret.extend_from_slice(&self.s_b.to_bytes());
-        ret.into_boxed_slice()
-    }
-}
-
-impl VrfParameters {
-    /// Verifies that VRF values are valid
-    pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> Result<()> {
-        let cap_b =
-            Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.to_bytes(), msg], &[dst]).unwrap();
-
-        // Check point witness
-        if self.s_b.to_projective_point() != cap_b * self.s {
-            return Err(CalculationError);
-        }
-
-        // Check point witness
-        if self.h_v.to_projective_point() != self.v.to_projective_point() * self.h {
-            return Err(CalculationError);
-        }
-
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.to_projective_point() * self.h;
-
-        let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
-            &[
-                &creator.to_bytes(),
-                &self.v.to_bytes()[1..],
-                &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
-                msg,
-            ],
-            &[dst],
-        )
-        .unwrap();
-
-        if h_check != self.h {
-            return Err(CalculationError);
-        }
-
-        Ok(())
     }
 }
 
@@ -1238,12 +1118,10 @@ impl ToChecksum for Address {
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        derivation::derive_vrf_parameters,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        random::random_group_element,
         types::{
             Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
-            Response, Signature, ToChecksum, VrfParameters,
+            Response, Signature, ToChecksum,
         },
     };
     use ed25519_dalek::Signer;
@@ -1259,6 +1137,7 @@ pub mod tests {
         primitives::Address,
         traits::{BinarySerializable, PeerIdLike, ToHex},
     };
+    use crate::utils::random_group_element;
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
@@ -1657,29 +1536,5 @@ pub mod tests {
             value_4, "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
             "checksumed address does not match"
         );
-    }
-
-    #[test]
-    fn vrf_values_serialize_deserialize() {
-        let keypair = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
-
-        let test_msg: [u8; 32] = hex!("8248a966b9215e154c8f673cb154da030916be3fb31af3b1220419a1c98eeaed");
-
-        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, &Hash::default().to_bytes()).unwrap();
-
-        assert_eq!(vrf_values, VrfParameters::from_bytes(&vrf_values.to_bytes()).unwrap());
-    }
-
-    #[test]
-    fn vrf_values_crypto() {
-        let keypair = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
-
-        let test_msg: [u8; 32] = hex!("8248a966b9215e154c8f673cb154da030916be3fb31af3b1220419a1c98eeaed");
-
-        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, &Hash::default().to_bytes()).unwrap();
-
-        assert!(vrf_values
-            .verify(&keypair.public().to_address(), &test_msg, &Hash::default().to_bytes())
-            .is_ok());
     }
 }

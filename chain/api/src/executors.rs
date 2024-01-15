@@ -8,7 +8,7 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;

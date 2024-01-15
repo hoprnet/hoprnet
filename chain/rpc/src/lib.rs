@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use futures::{FutureExt, Stream};
 use primitive_types::H256;
 
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};

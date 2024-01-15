@@ -16,7 +16,7 @@ use core_types::{
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use hopr_crypto::types::OffchainSignature;
+use hopr_crypto_types::types::OffchainSignature;
 use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
@@ -631,7 +631,7 @@ pub mod tests {
         types::U256 as EthU256,
     };
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{Keypair, OffchainKeypair},
         types::Hash,
     };

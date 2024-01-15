@@ -840,7 +840,7 @@ mod channels {
     use chain_actions::errors::CoreEthereumActionsError;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_types::types::Hash;
     use utils_types::traits::ToHex;
 
     #[serde_as]
@@ -1669,7 +1669,7 @@ mod tickets {
     use core_transport::errors::HoprTransportError;
     use core_transport::TicketStatistics;
     use core_types::channels::Ticket;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_types::types::Hash;
     use utils_types::traits::ToHex;
 
     #[serde_as]

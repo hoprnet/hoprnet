@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::protocol::PeerAddressResolver;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use log::error;
 use std::sync::Arc;
 use utils_db::CurrentDbShim;

@@ -4,7 +4,7 @@ use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
 use core_types::channels::ChannelEntry;
 use core_types::protocol::INTERMEDIATE_HOPS;
-use hopr_crypto::random::random_float;
+use hopr_crypto_random::random_float;
 use petgraph::visit::EdgeRef;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};

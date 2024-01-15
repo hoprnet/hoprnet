@@ -1,6 +1,5 @@
-use hopr_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
-use hopr_crypto::shared_keys::SharedSecret;
-use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use hopr_crypto_sphinx::{derivation::{derive_ack_key_share, derive_own_key_share}, shared_keys::SharedSecret};
+use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use log::error;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;
@@ -163,9 +162,9 @@ mod tests {
         pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response, ProofOfRelayString,
         ProofOfRelayValues,
     };
-    use hopr_crypto::derivation::derive_ack_key_share;
-    use hopr_crypto::shared_keys::SharedSecret;
-    use hopr_crypto::types::Response;
+    use hopr_crypto_sphinx::derivation::derive_ack_key_share;
+    use hopr_crypto_sphinx::shared_keys::SharedSecret;
+    use hopr_crypto_types::types::Response;
     use utils_types::traits::BinarySerializable;
 
     #[test]

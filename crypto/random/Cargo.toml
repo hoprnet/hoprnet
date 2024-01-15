@@ -1,9 +1,10 @@
 [package]
-name = "bindings"
+name = "hopr-crypto-random"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ethers = { version = "2", default-features = false, features = ["abigen"] }
+rand = "0.8.5"
+generic-array = { version = "0.14.7", features = ["zeroize"] }

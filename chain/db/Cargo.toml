@@ -19,7 +19,7 @@ hex-literal = "0.4"
 lazy_static = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 core-types = { workspace = true }
 platform = { workspace = true }
 utils-db = { workspace = true }
@@ -34,4 +34,4 @@ env_logger = "0.10.0"
 
 [features]
 default = []
-wasm = [ "hopr-crypto/wasm", "dep:async-lock",  "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+wasm = [ "dep:async-lock",  "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]

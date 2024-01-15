@@ -6,11 +6,13 @@ use core_packet::{
 use core_path::path::{Path, TransportPath};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
-use hopr_crypto::{
-    derivation::{derive_ack_key_share, PacketTag},
-    keypairs::{ChainKeypair, OffchainKeypair},
+use hopr_crypto_sphinx::{
+    derivation::derive_ack_key_share,
     shared_keys::SphinxSuite,
-    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
+};
+use hopr_crypto_types::{
+    keypairs::{ChainKeypair, OffchainKeypair},
+    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PacketTag},
 };
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
@@ -111,7 +113,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let mp: MetaPacket<hopr_crypto::ec_groups::X25519Suite> =
+            let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
@@ -229,10 +231,9 @@ mod tests {
     use core_path::path::TransportPath;
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use core_types::protocol::PeerAddressResolver;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, PublicKey},
+        types::{Hash, PublicKey, OffchainPublicKey},
     };
     use libp2p_identity::PeerId;
     use parameterized::parameterized;

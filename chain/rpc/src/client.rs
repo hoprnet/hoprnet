@@ -356,7 +356,7 @@ pub mod native {
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
-    signer: &hopr_crypto::keypairs::ChainKeypair,
+    signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R>>,
@@ -364,7 +364,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     >,
 > {
     use ethers::signers::Signer;
-    use hopr_crypto::keypairs::Keypair;
+    use hopr_crypto_types::keypairs::Keypair;
 
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
@@ -382,7 +382,7 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use std::time::Duration;
     use utils_types::primitives::Address;
 

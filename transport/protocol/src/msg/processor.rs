@@ -19,7 +19,7 @@ use core_path::path::{Path, TransportPath};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
-use hopr_crypto::{
+use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
@@ -839,13 +839,14 @@ mod tests {
         pin_mut, StreamExt,
     };
     use hex_literal::hex;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
+    use hopr_crypto_random::{random_bytes, random_integer};
+    use hopr_crypto_sphinx::{
         derivation::derive_ack_key_share,
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        random::{random_bytes, random_integer},
         shared_keys::SharedSecret,
-        types::{HalfKeyChallenge, Hash},
+    };
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     };
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
@@ -1283,7 +1284,7 @@ mod tests {
 
         let test_msgs = (0..pending_packets)
             .map(|i| ApplicationData {
-                application_tag: (i == 0).then(|| random_integer(1, Some(65535)).unwrap() as Tag),
+                application_tag: (i == 0).then(|| random_integer(1, Some(65535)) as Tag),
                 plain_text: random_bytes::<300>().into(),
             })
             .collect::<Vec<_>>();

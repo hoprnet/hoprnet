@@ -7,7 +7,7 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -214,7 +214,7 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use primitive_types::H160;
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};

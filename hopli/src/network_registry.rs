@@ -6,7 +6,7 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use hopr_crypto::keypairs::Keypair;
+use hopr_crypto_types::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
 

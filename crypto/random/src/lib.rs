@@ -1,12 +1,7 @@
-use elliptic_curve::rand_core::OsRng;
-use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
 use generic_array::{ArrayLength, GenericArray};
-use k256::Secp256k1;
 use rand::{Rng, RngCore};
 
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::errors::Result;
-use crate::types::CurvePoint;
+pub use rand::rngs::OsRng;
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
@@ -20,27 +15,14 @@ pub fn random_float() -> f64 {
 
 /// Generates random unsigned integer which is at least `start` and optionally strictly less than `end`.
 /// If `end` is not given, `MAX_RANDOM_INTEGER` value is used.
-pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
+/// The caller must make sure that 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`, otherwise the function will panic.
+pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
 
-    if real_end <= start || real_end > MAX_RANDOM_INTEGER {
-        Err(InvalidInputValue)
-    } else {
-        let bound = real_end - start;
-        Ok(start + OsRng.gen_range(0..bound))
-    }
-}
+    assert!(real_end > start && real_end <= MAX_RANDOM_INTEGER, "invalid bounds");
 
-/// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
-/// Returns the encoded secret scalar and the corresponding point.
-pub fn random_group_element() -> ([u8; 32], CurvePoint) {
-    let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(1u32.into()).unwrap();
-    let mut point = ProjectivePoint::<Secp256k1>::IDENTITY;
-    while point.is_identity().into() {
-        scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
-        point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
-    }
-    (scalar.to_bytes().into(), point.to_affine().into())
+    let bound = real_end - start;
+    start + OsRng.gen_range(0..bound)
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
@@ -65,15 +47,13 @@ pub fn random_array<L: ArrayLength<u8>>() -> GenericArray<u8, L> {
 
 #[cfg(test)]
 mod tests {
-    use crate::random::{random_fill, random_float, random_group_element, random_integer};
-    use crate::types::CurvePoint;
-    use elliptic_curve::Group;
+    use super::*;
 
     #[test]
     fn test_random_integer() {
-        assert!(random_integer(10, None).unwrap() > 10);
+        assert!(random_integer(10, None) > 10);
 
-        let bounded = random_integer(10, Some(20)).unwrap();
+        let bounded = random_integer(10, Some(20));
         assert!(bounded >= 10);
         assert!(bounded < 20)
     }
@@ -83,15 +63,7 @@ mod tests {
         let f = random_float();
         assert!((0.0..1.0).contains(&f));
     }
-
-    #[test]
-    fn test_random_element() {
-        let (scalar, point) = random_group_element();
-        let is_identity: bool = point.to_projective_point().is_identity().into();
-        assert!(!is_identity);
-        assert_eq!(CurvePoint::from_exponent(&scalar).unwrap(), point);
-    }
-
+    
     #[test]
     fn test_random_fill() {
         let mut buffer = [0u8; 10];

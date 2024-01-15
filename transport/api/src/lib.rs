@@ -22,7 +22,7 @@ pub use {
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
-    hopr_crypto::{
+    hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },

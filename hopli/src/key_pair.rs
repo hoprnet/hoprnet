@@ -84,7 +84,7 @@ pub fn create_identity(
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto::keypairs::Keypair;
+    use hopr_crypto_types::keypairs::Keypair;
     use std::path::Path;
     use tempfile::tempdir;
 

@@ -121,8 +121,8 @@ mod tests {
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::Hash;
     use mockall::mock;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::BinarySerializable;

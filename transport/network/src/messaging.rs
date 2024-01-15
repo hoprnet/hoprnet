@@ -1,5 +1,5 @@
 use crate::errors::NetworkingError::MessagingError;
-use hopr_crypto::derivation::derive_ping_pong;
+use hopr_crypto_sphinx::derivation::derive_ping_pong;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
@@ -62,7 +62,7 @@ impl ControlMessage {
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
-    nonce: [u8; hopr_crypto::parameters::PING_PONG_NONCE_SIZE],
+    nonce: [u8; hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE],
 }
 
 impl PingMessage {
@@ -77,7 +77,7 @@ impl utils_types::traits::AutoBinarySerializable for PingMessage {}
 
 #[cfg(feature = "compat-ping")]
 impl utils_types::traits::BinarySerializable for PingMessage {
-    const SIZE: usize = hopr_crypto::parameters::PING_PONG_NONCE_SIZE;
+    const SIZE: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
 
     // This implementation is backwards compatible with older HOPR versions
 

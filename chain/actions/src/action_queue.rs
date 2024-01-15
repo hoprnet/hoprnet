@@ -15,7 +15,7 @@ use core_types::{
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

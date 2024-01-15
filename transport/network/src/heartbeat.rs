@@ -107,11 +107,10 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 let interval_ms = self.config.interval.as_millis() as u64;
                 let variance_ms = self.config.interval.as_millis() as u64;
 
-                hopr_crypto::random::random_integer(
+                hopr_crypto_random::random_integer(
                     interval_ms,
                     Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)),
                 )
-                .unwrap_or(interval_ms)
             });
 
             let timeout = sleep(this_round_planned_duration).fuse();

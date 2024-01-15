@@ -34,7 +34,7 @@ validator = { workspace = true }
 
 hopr-lib = { workspace = true }
 hoprd-inbox = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-actions = { workspace = true }
 core-protocol = { workspace = true }
 core-transport = { workspace = true }

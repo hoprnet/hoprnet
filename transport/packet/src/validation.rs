@@ -4,7 +4,7 @@ use crate::errors::{
 };
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use log::{debug, info};
 use utils_types::primitives::{Address, Balance};
 
@@ -116,10 +116,10 @@ mod tests {
         channels::{ChannelEntry, Ticket},
     };
     use hex_literal::hex;
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::HalfKey;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::HalfKey;
+    use hopr_crypto_types::types::OffchainPublicKey;
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash},
     };

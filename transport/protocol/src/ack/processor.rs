@@ -8,8 +8,8 @@ use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAc
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
-use hopr_crypto::keypairs::ChainKeypair;
-use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::types::{HalfKeyChallenge, OffchainPublicKey};
 use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use std::pin::Pin;

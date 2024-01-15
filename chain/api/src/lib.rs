@@ -19,7 +19,7 @@ use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
 use core_types::account::AccountEntry;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use log::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};

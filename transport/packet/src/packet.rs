@@ -1,12 +1,15 @@
 use crate::errors::PacketError::PacketDecodingError;
 use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
-use hopr_crypto::{
-    derivation::{derive_packet_tag, PacketTag},
-    keypairs::Keypair,
-    primitives::{DigestLike, SimpleMac},
+use hopr_crypto_sphinx::{
+    derivation::derive_packet_tag,
     prp::{PRPParameters, PRP},
     routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+};
+use hopr_crypto_types::{
+    types::PacketTag,
+    keypairs::Keypair,
+    primitives::{DigestLike, SimpleMac},
 };
 use typenum::Unsigned;
 use utils_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
@@ -18,7 +21,7 @@ use crate::{
 };
 
 /// Currently used ciphersuite for Sphinx
-pub type CurrentSphinxSuite = hopr_crypto::ec_groups::X25519Suite;
+pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
 
 /// Length of the packet including header and the payload
 pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
@@ -244,11 +247,11 @@ mod tests {
     use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
     use core_types::protocol::INTERMEDIATE_HOPS;
-    use hopr_crypto::{
+    use hopr_crypto_sphinx::{
         ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         shared_keys::SphinxSuite,
     };
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use parameterized::parameterized;
 
     #[test]
@@ -310,18 +313,16 @@ mod tests {
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    #[ignore]
-    fn test_ed25519_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
-    }
-
-    #[parameterized(amount = { 4, 3, 2 })]
     fn test_x25519_meta_packet(amount: usize) {
         generic_test_meta_packet::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    #[ignore]
+    fn test_ed25519_meta_packet(amount: usize) {
+        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
+    }
+
+    #[parameterized(amount = { 4, 3, 2 })]
     fn test_secp256k1_meta_packet(amount: usize) {
         generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }

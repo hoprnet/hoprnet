@@ -5,7 +5,7 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use hopr_crypto::types::ToChecksum;
+use hopr_crypto_types::types::ToChecksum;
 use log::{error, log, Level};
 use std::{env, iter, str::FromStr};
 use utils_types::primitives::Address;
