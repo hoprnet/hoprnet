@@ -1,9 +1,9 @@
 use crate::derivation::generate_key_iv;
+use blake2::Blake2bMac;
+use digest::{FixedOutput, Mac};
 use hopr_crypto_types::errors::CryptoError::InvalidParameterSize;
 use hopr_crypto_types::primitives::{SecretKey, SimpleStreamCipher};
 use hopr_crypto_types::utils;
-use blake2::Blake2bMac;
-use digest::{FixedOutput, Mac};
 use zeroize::ZeroizeOnDrop;
 
 // Module-specific constants

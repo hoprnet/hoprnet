@@ -840,10 +840,7 @@ mod tests {
     };
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
-    use hopr_crypto_sphinx::{
-        derivation::derive_ack_key_share,
-        shared_keys::SharedSecret,
-    };
+    use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},

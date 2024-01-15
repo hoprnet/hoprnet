@@ -250,8 +250,8 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, Hash};
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;

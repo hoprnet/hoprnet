@@ -138,8 +138,6 @@ impl SimpleStreamCipher {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;

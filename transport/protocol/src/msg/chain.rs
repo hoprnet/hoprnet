@@ -6,10 +6,7 @@ use core_packet::{
 use core_path::path::{Path, TransportPath};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
-use hopr_crypto_sphinx::{
-    derivation::derive_ack_key_share,
-    shared_keys::SphinxSuite,
-};
+use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, OffchainKeypair},
     types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PacketTag},
@@ -233,7 +230,7 @@ mod tests {
     use core_types::protocol::PeerAddressResolver;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, PublicKey, OffchainPublicKey},
+        types::{Hash, OffchainPublicKey, PublicKey},
     };
     use libp2p_identity::PeerId;
     use parameterized::parameterized;

@@ -409,8 +409,8 @@ mod tests {
     };
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::types::Hash;
     use lazy_static::lazy_static;
     use mockall::mock;

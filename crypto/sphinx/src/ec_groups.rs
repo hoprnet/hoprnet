@@ -1,10 +1,10 @@
+use curve25519_dalek::traits::IsIdentity;
 use elliptic_curve::ops::MulByGenerator;
 use elliptic_curve::Group;
-use curve25519_dalek::traits::IsIdentity;
 use hopr_crypto_random::{random_bytes, random_fill};
-use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
 use hopr_crypto_types::errors::CryptoError::InvalidInputValue;
 use hopr_crypto_types::errors::Result;
+use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
 use hopr_crypto_types::types::CurvePoint;
 use hopr_crypto_types::utils::{k256_scalar_from_bytes, x25519_scalar_from_bytes};
 use utils_types::traits::BinarySerializable;

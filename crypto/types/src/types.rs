@@ -2,10 +2,7 @@ use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
-use elliptic_curve::{
-    sec1::EncodedPoint,
-    NonZeroScalar, ProjectivePoint,
-};
+use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
 use k256::{
     ecdsa::{
         self,
@@ -31,6 +28,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::utils::random_group_element;
 use crate::{
     errors::{
         CryptoError::{self, CalculationError, InvalidInputValue},
@@ -45,7 +43,6 @@ use utils_types::{
     primitives::{Address, EthereumChallenge, U256},
     traits::{BinarySerializable, PeerIdLike, ToHex},
 };
-use crate::utils::random_group_element;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -1117,6 +1114,7 @@ impl ToChecksum for Address {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::utils::random_group_element;
     use crate::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{
@@ -1137,7 +1135,6 @@ pub mod tests {
         primitives::Address,
         traits::{BinarySerializable, PeerIdLike, ToHex},
     };
-    use crate::utils::random_group_element;
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");

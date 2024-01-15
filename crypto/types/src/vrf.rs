@@ -1,16 +1,16 @@
-use k256::{Scalar, Secp256k1};
-use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-use k256::elliptic_curve::ProjectivePoint;
-use k256::elliptic_curve::sec1::ToEncodedPoint;
-use serde::{Deserialize, Serialize};
-use hopr_crypto_random::random_bytes;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::CalculationError;
 use crate::keypairs::{ChainKeypair, Keypair};
 use crate::types::CurvePoint;
 use crate::utils::k256_scalar_from_bytes;
+use hopr_crypto_random::random_bytes;
+use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::elliptic_curve::ProjectivePoint;
+use k256::{Scalar, Secp256k1};
+use serde::{Deserialize, Serialize};
+use utils_types::errors::GeneralError::ParseError;
+use utils_types::primitives::Address;
+use utils_types::traits::BinarySerializable;
 
 /// Bundles values given to the smart contract to prove that a ticket is a win.
 ///
@@ -76,12 +76,12 @@ impl BinarySerializable for VrfParameters {
                 h_v: CurvePoint::from_bytes(
                     &data[CurvePoint::SIZE + 32 + 32..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE],
                 )
-                    .unwrap(),
+                .unwrap(),
                 s_b: CurvePoint::from_bytes(
                     &data[CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE
                         ..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE],
                 )
-                    .unwrap(),
+                .unwrap(),
             })
         } else {
             Err(ParseError)
@@ -126,7 +126,7 @@ impl VrfParameters {
             ],
             &[dst],
         )
-            .unwrap();
+        .unwrap();
 
         if h_check != self.h {
             return Err(CalculationError);
@@ -189,8 +189,8 @@ pub fn derive_vrf_parameters<const T: usize>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use hex_literal::hex;
     use crate::types::Hash;
+    use hex_literal::hex;
 
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 

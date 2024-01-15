@@ -12,7 +12,7 @@ use hopr_crypto_random::random_bytes;
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-use crate::utils::{k256_scalar_from_bytes, random_group_element, SecretValue, x25519_scalar_from_bytes};
+use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue};
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.

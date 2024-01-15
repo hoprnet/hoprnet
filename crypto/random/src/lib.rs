@@ -63,7 +63,7 @@ mod tests {
         let f = random_float();
         assert!((0.0..1.0).contains(&f));
     }
-    
+
     #[test]
     fn test_random_fill() {
         let mut buffer = [0u8; 10];

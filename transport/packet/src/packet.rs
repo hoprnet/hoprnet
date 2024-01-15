@@ -7,9 +7,9 @@ use hopr_crypto_sphinx::{
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
 use hopr_crypto_types::{
-    types::PacketTag,
     keypairs::Keypair,
     primitives::{DigestLike, SimpleMac},
+    types::PacketTag,
 };
 use typenum::Unsigned;
 use utils_types::{errors::GeneralError::ParseError, traits::BinarySerializable};

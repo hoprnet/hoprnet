@@ -2,9 +2,9 @@ use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
-use hopr_crypto_types::types::PacketTag;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_crypto_types::types::PacketTag;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -194,7 +194,7 @@ mod tests {
             .into_iter()
             .map(|i| {
                 let mut ret = random_bytes::<{ hopr_crypto_types::types::PACKET_TAG_LENGTH }>();
-                ret[i % hopr_crypto_types::types::PACKET_TAG_LENGTH ] = 0xaa; // ensure it is not completely just zeroes
+                ret[i % hopr_crypto_types::types::PACKET_TAG_LENGTH] = 0xaa; // ensure it is not completely just zeroes
                 ret
             })
             .collect::<Vec<_>>();

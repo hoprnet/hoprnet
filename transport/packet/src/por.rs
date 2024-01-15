@@ -1,4 +1,7 @@
-use hopr_crypto_sphinx::{derivation::{derive_ack_key_share, derive_own_key_share}, shared_keys::SharedSecret};
+use hopr_crypto_sphinx::{
+    derivation::{derive_ack_key_share, derive_own_key_share},
+    shared_keys::SharedSecret,
+};
 use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use log::error;
 use utils_types::errors::GeneralError::ParseError;

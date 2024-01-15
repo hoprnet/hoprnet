@@ -138,10 +138,10 @@ mod tests {
     use super::*;
     use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
     use hex_literal::hex;
-    use k256::Scalar;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::PublicKey;
     use hopr_crypto_types::vrf::derive_vrf_parameters;
+    use k256::Scalar;
     use utils_types::traits::BinarySerializable;
 
     #[test]

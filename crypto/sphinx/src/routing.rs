@@ -273,9 +273,9 @@ pub fn forward_header<S: SphinxSuite>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use parameterized::parameterized;
-    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use crate::ec_groups::Secp256k1Suite;
+    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
+    use parameterized::parameterized;
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
