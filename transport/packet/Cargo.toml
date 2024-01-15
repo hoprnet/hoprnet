@@ -39,5 +39,4 @@ serial_test = "2.0"
 
 [features]
 default = [ "prometheus" ]
-wasm = [ "chain-db/wasm", "core-path/wasm", "utils-db/js", "chain-types/wasm" ]
 prometheus = [ "core-path/prometheus" ]

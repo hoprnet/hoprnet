@@ -201,7 +201,7 @@ pub mod tests {
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::H160;
+    use primitive_types::H160;
     use std::time::Duration;
     use hopr_primitive_types::primitives::{Address, BalanceType, U256};
 
@@ -242,7 +242,7 @@ pub mod tests {
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
         tx.set_to(H160::from(to));
-        tx.set_value(ethers::types::U256(hopr_primitive_types::U256::from(amount).0));
+        tx.set_value(ethers::types::U256(primitive_types::U256::from(amount).0));
         tx
     }
 

@@ -636,7 +636,7 @@ pub mod tests {
         types::Hash,
     };
     use multiaddr::Multiaddr;
-    use hopr_primitive_types::H256;
+    use primitive_types::H256;
     use utils_db::{db::DB, CurrentDbShim};
     use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},

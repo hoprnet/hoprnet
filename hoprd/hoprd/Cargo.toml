@@ -43,16 +43,6 @@ tempfile = "3"
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "core-transport/wasm",
-    "core-strategy/wasm",
-    "hopr-lib/wasm",
-    "hoprd-inbox/wasm",
-    "hoprd-keypair/wasm",
-    "platform/js",
-    "utils-db/js",
-    "metrics?/js",
-]
 prometheus = [
     "dep:metrics",
     "dep:lazy_static",

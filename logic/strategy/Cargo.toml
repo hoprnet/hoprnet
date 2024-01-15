@@ -47,5 +47,4 @@ futures = "0.3.28"
 
 [features]
 default = ["prometheus"]
-wasm = []
 prometheus = [ "dep:metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

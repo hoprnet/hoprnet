@@ -21,8 +21,6 @@
 //!
 //! Finally, the backends must hold some sort of timestamp information of when each message was `push`ed. That's because
 //! the backend must also support a `purge` operation which removes messages older than the given Unix timestamp.
-//! Because e.g. in WASM environments the timestamps cannot be retrieved via `std::time::SystemTime`, the backend needs to
-//! be given a timestamp supplier function.
 //!
 //! ## The Frontend
 //! The MI has a front-end type `MessageInbox`, which is thin thread-safe wrapper over a selected backend. It contains choices

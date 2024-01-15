@@ -11,10 +11,6 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "chain-db/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
-    "core-protocol/wasm", "utils-db/js", "platform/js", "metrics?/js",
-]
 prometheus = [
     "dep:lazy_static", "dep:metrics",
     "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"

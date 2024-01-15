@@ -30,4 +30,4 @@ env_logger = "0.10.0"
 
 [features]
 default = []
-wasm = ["utils-db/js"]
+js = ["utils-db/js"]

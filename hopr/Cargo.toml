@@ -45,17 +45,4 @@ serde_yaml = { version = "0.9" }
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "core-path/wasm",
-    "core-transport/wasm",
-    "core-strategy/wasm",
-    "chain-actions/wasm",
-    "chain-api/wasm",
-    "chain-db/wasm",
-    "chain-indexer/wasm",
-    "chain-rpc/wasm",
-    "platform/js",
-    "utils-db/js",
-    "metrics?/js",
-]
 prometheus = ["dep:metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]

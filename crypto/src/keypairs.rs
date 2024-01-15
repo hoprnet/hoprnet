@@ -176,7 +176,7 @@ mod tests {
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
     use subtle::ConstantTimeEq;
-    use primitive_types::traits::PeerIdLike;
+    use hopr_primitive_types::traits::PeerIdLike;
 
     #[test]
     fn test_offchain_keypair() {

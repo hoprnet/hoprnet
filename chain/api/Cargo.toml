@@ -11,10 +11,6 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "chain-db/wasm", "chain-actions/wasm", "chain-rpc/wasm", "chain-indexer/wasm",
-    "core-path/wasm", "utils-db/js"
-]
 prometheus = ["chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
 
 [dependencies]

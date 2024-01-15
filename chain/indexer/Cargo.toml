@@ -40,5 +40,4 @@ mockall = "0.11"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-rpc/wasm", "chain-types/wasm", "utils-db/js", "metrics?/js" ]
 prometheus = ["dep:metrics", "chain-rpc/prometheus" ]

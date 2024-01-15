@@ -10,10 +10,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-wasm = [
-    "libp2p/wasm-bindgen",
-    "core-network/wasm",
-]
 
 [dependencies]
 futures = { workspace = true }

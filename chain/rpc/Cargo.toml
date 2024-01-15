@@ -47,5 +47,4 @@ mockito = "1.2.0"
 
 [features]
 default = ["prometheus"]
-wasm = []
 prometheus = ["dep:metrics"]

@@ -33,7 +33,5 @@ hex-literal = "0.4"
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 hex = { workspace = true }
 
-
 [features]
 default = []
-wasm = []

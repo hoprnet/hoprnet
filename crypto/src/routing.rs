@@ -279,7 +279,7 @@ pub mod tests {
     use crate::shared_keys::{SharedSecret, SphinxSuite};
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
-    use primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {

@@ -32,14 +32,7 @@ hopr-primitive-types = { workspace = true }
 mockall = "0.11.3"
 more-asserts = "0.3.1"
 
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["platform/js", "metrics/js"]
 compat-ping = []
 prometheus = ["dep:metrics"]

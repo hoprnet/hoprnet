@@ -254,7 +254,7 @@ mod tests {
     use crate::traits::MockAsyncKVStorage;
     use mockall::predicate;
     use serde::Deserialize;
-    use primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     impl Clone for MockAsyncKVStorage {
         fn clone(&self) -> Self {
@@ -282,9 +282,9 @@ mod tests {
         const SIZE: usize = 1;
 
         /// Deserializes the type from a binary blob.
-        fn from_bytes(data: &[u8]) -> primitive_types::errors::Result<Self> {
+        fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
             if data.len() != Self::SIZE {
-                Err(primitive_types::errors::GeneralError::InvalidInput)
+                Err(hopr_primitive_types::errors::GeneralError::InvalidInput)
             } else {
                 Ok(Self { v: data[0] })
             }

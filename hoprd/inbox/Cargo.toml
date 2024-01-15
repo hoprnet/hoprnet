@@ -29,5 +29,3 @@ tempfile = "3"
 
 [features]
 default = []
-wasm = []
-

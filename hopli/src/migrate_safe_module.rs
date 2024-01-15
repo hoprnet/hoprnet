@@ -10,7 +10,7 @@ use hopr_crypto::keypairs::Keypair;
 use hopr_crypto::types::ToChecksum;
 use log::{log, Level};
 use std::{env, str::FromStr};
-use primitive_types::primitives::Address;
+use hopr_primitive_types::primitives::Address;
 
 /// CLI arguments for `hopli migrate-safe-module`
 #[derive(Parser, Default, Debug)]

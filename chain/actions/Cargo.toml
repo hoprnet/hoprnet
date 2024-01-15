@@ -43,5 +43,4 @@ hex-literal = "0.4"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-types/wasm", "utils-db/js", "platform/js" ]
 prometheus = [ "dep:metrics", "chain-rpc/prometheus"]

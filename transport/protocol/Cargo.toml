@@ -10,14 +10,9 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "chain-db/wasm", "core-packet/wasm", "core-path/wasm",
-    "utils-db/js", "metrics?/js",
-]
 prometheus = ["dep:metrics", "core-path/prometheus", "core-packet/prometheus"]
 
 [dependencies]
-# a better separation of tcp + async-std for non wasm case could be designed
 async-trait = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }

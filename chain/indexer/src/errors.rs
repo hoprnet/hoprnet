@@ -52,10 +52,3 @@ pub enum CoreEthereumIndexerError {
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumIndexerError>;
-
-#[cfg(feature = "wasm")]
-impl From<CoreEthereumIndexerError> for wasm_bindgen::JsValue {
-    fn from(value: CoreEthereumIndexerError) -> Self {
-        value.to_string().into()
-    }
-}

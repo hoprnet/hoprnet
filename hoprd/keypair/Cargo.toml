@@ -3,7 +3,7 @@ name = "hoprd-keypair"
 version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust WASM modules for HOPRd"
+description = "Rust keypair modules for HOPRd"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -31,7 +31,6 @@ log = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 
-
 [features]
 default = []
-wasm = ["platform/js"]
+js = ["platform/js"]
