@@ -2086,7 +2086,7 @@ mod node {
     }
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    use hopr_metrics::metrics::gather_all_hopr_metrics as collect_hopr_metrics;
+    use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
 
     #[cfg(any(not(feature = "prometheus"), test))]
     fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {

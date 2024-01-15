@@ -487,7 +487,6 @@ pub mod tests {
     use serde_json::json;
     use std::time::Duration;
     use hopr_primitive_types::primitives::Address;
-    use std::time::Duration;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

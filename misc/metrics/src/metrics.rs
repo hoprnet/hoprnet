@@ -7,8 +7,8 @@ use regex::Regex;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
-/// Gathers all the global Prometheus hopr_metrics.
-pub fn gather_all_hopr_metrics() -> prometheus::Result<String> {
+/// Gathers all the global Prometheus metrics.
+pub fn gather_all_metrics() -> prometheus::Result<String> {
     let families = prometheus::gather();
 
     let encoder = TextEncoder::new();
@@ -16,24 +16,24 @@ pub fn gather_all_hopr_metrics() -> prometheus::Result<String> {
 }
 
 /// A naive merging method for two serialized metric registries.
-/// It performs union of the sets, removing those hopr_metrics which have the same name and type.
-pub fn merge_encoded_hopr_metrics(hopr_metrics1: &str, hopr_metrics2: &str) -> String {
-    let mut merged_hopr_metrics = BTreeMap::new();
+/// It performs union of the sets, removing those metrics which have the same name and type.
+pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
+    let mut merged_metrics = BTreeMap::new();
     let metric_expr =
         Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+").unwrap();
 
-    let merged_texts = hopr_metrics1.to_owned() + hopr_metrics2;
+    let merged_texts = metrics1.to_owned() + metrics2;
 
-    // Search for all hopr_metrics in the merged texts and skip those with duplicate name and type, first comes first served.
+    // Search for all metrics in the merged texts and skip those with duplicate name and type, first comes first served.
     for complete_metric in metric_expr.captures_iter(&merged_texts) {
         let metric_key = format!("{}~{}", &complete_metric["name"], &complete_metric["type"]);
-        if let Entry::Vacant(metric) = merged_hopr_metrics.entry(metric_key) {
+        if let Entry::Vacant(metric) = merged_metrics.entry(metric_key) {
             metric.insert(complete_metric[0].to_string());
         }
     }
 
-    // Output hopr_metrics sorted lexicographically by name
-    merged_hopr_metrics.values().fold("".into(), |mut a, b| {
+    // Output metrics sorted lexicographically by name
+    merged_metrics.values().fold("".into(), |mut a, b| {
         a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
         a.push_str(b);
         a
@@ -484,8 +484,8 @@ mod tests {
 
         assert_eq!(1, counter.get());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_ctr 1"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_ctr 1"));
     }
 
     #[test]
@@ -502,9 +502,9 @@ mod tests {
         assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
         assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
-        assert!(hopr_metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
+        assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
     }
 
     #[test]
@@ -517,15 +517,15 @@ mod tests {
 
         assert_eq!(10.0, gauge.get());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_gauge 10"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_gauge 10"));
 
         gauge.decrement(5.1);
 
         assert_eq!(4.9, gauge.get());
 
-        let hopr_metrics2 = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics2.contains("my_gauge 4.9"));
+        let metrics2 = gather_all_metrics().unwrap();
+        assert!(metrics2.contains("my_gauge 4.9"));
     }
 
     #[test]
@@ -543,9 +543,9 @@ mod tests {
         assert_eq!(25.0, gauge.get(&["1.90.1"]).unwrap());
         assert_eq!(3.0, gauge.get(&["1.89.20"]).unwrap());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
-        assert!(hopr_metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
+        assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
     }
 
     #[test]
@@ -562,12 +562,12 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count());
         assert_eq!(10.0, histogram.get_sample_sum());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
-        assert!(hopr_metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
-        assert!(hopr_metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
-        assert!(hopr_metrics.contains("my_histogram_bucket{le=\"4\"} 3"));
-        assert!(hopr_metrics.contains("my_histogram_bucket{le=\"5\"} 4"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"4\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"5\"} 4"));
 
         let timer = histogram_start_measure!(histogram);
         histogram.cancel_measure(timer);
@@ -598,14 +598,14 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).unwrap());
         assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).unwrap());
 
-        let hopr_metrics = gather_all_hopr_metrics().unwrap();
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"4\"} 3"));
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"5\"} 4"));
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"4\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"5\"} 4"));
 
-        assert!(hopr_metrics.contains("my_mhistogram_bucket{version=\"1.89.20\",le=\"+Inf\"} 1"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.89.20\",le=\"+Inf\"} 1"));
 
         let timer = histogram_start_measure!(histogram, &["1.90.0"]).unwrap();
         histogram.cancel_measure(timer);
@@ -620,7 +620,7 @@ mod tests {
         multi_gauge.increment(&["1.10.11", "get"], 3.0);
         multi_gauge.increment(&["1.10.11", "post"], 1.0);
 
-        let hopr_metrics1 = gather_all_hopr_metrics().unwrap();
+        let metrics1 = gather_all_metrics().unwrap();
 
         let counter2 = SimpleCounter::new("a_my_test_ctr_2", "test counter 2").unwrap();
         counter2.increment_by(2);
@@ -628,9 +628,9 @@ mod tests {
         let histogram = SimpleHistogram::new("b_histogram", "test histogram", vec![0.5, 1.0, 5.0]).unwrap();
         histogram.observe(0.3);
 
-        let hopr_metrics2 = gather_all_hopr_metrics().unwrap();
+        let metrics2 = gather_all_metrics().unwrap();
 
-        let res1 = merge_encoded_hopr_metrics(&hopr_metrics1, &hopr_metrics2);
+        let res1 = merge_encoded_metrics(&metrics1, &metrics2);
         assert!(res1.contains("b_my_test_ctr"));
         assert_eq!(3, res1.match_indices("b_my_test_ctr").count());
 
@@ -644,16 +644,16 @@ mod tests {
 
         // Test degenerate cases
 
-        let res2 = merge_encoded_hopr_metrics(&hopr_metrics1, &hopr_metrics1);
+        let res2 = merge_encoded_metrics(&metrics1, &metrics1);
         assert!(res2.contains("b_my_test_ctr"));
         assert_eq!(3, res2.match_indices("b_my_test_ctr").count());
 
-        let res3 = merge_encoded_hopr_metrics(&hopr_metrics1, "");
-        assert_eq!(hopr_metrics1, res3);
+        let res3 = merge_encoded_metrics(&metrics1, "");
+        assert_eq!(metrics1, res3);
 
-        let res4 = merge_encoded_hopr_metrics("", &hopr_metrics1);
-        assert_eq!(hopr_metrics1, res4);
+        let res4 = merge_encoded_metrics("", &metrics1);
+        assert_eq!(metrics1, res4);
 
-        assert!(merge_encoded_hopr_metrics("", "").trim().is_empty());
+        assert!(merge_encoded_metrics("", "").trim().is_empty());
     }
 }

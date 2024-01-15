@@ -72,7 +72,7 @@
 //!     metric_counts_per_version.increment_by(&["1.0.1"], 1);
 //!
 //!     // All hopr_metrics live in a global state and can be serialized at any time
-//!     let gathered_hopr_metrics = gather_all_hopr_metrics();
+//!     let gathered_hopr_metrics = gather_all_metrics();
 //!
 //!     // Metrics are in text format and can be exposed using an HTTP API endpoint
 //!     println!("{:?}", gathered_hopr_metrics);
