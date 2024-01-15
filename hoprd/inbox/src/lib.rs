@@ -51,5 +51,6 @@ pub mod config;
 pub mod inbox;
 pub mod ring;
 
-pub type Inbox =
-    inbox::MessageInbox<ring::RingBufferInboxBackend<hopr_internal_types::protocol::Tag, hopr_internal_types::protocol::ApplicationData>>;
+pub type Inbox = inbox::MessageInbox<
+    ring::RingBufferInboxBackend<hopr_internal_types::protocol::Tag, hopr_internal_types::protocol::ApplicationData>,
+>;

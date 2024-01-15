@@ -9,9 +9,9 @@ use clap::Parser;
 use ethers::{types::U256, utils::parse_units};
 use hopr_crypto::keypairs::Keypair;
 use hopr_crypto::types::ToChecksum;
+use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
 use std::{env, str::FromStr};
-use hopr_primitive_types::primitives::Address;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]

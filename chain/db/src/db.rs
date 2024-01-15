@@ -1,23 +1,23 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use hopr_internal_types::channels::ChannelDirection;
 use hopr_internal_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
-use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use hopr_primitive_types::{
+    primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
+    traits::BinarySerializable,
+};
 use log::{debug, error, info};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
     traits::AsyncKVStorage,
-};
-use hopr_primitive_types::{
-    primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
-    traits::BinarySerializable,
 };
 
 use crate::{errors::Result, traits::HoprCoreEthereumDbActions};
@@ -1343,19 +1343,19 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hopr_internal_types::channels::ChannelEntry;
     use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Response},
     };
-    use lazy_static::lazy_static;
-    use std::str::FromStr;
-    use utils_db::{db::serialize_to_bytes, CurrentDbShim};
+    use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::{
         primitives::{Address, EthereumChallenge},
         traits::BinarySerializable,
     };
+    use lazy_static::lazy_static;
+    use std::str::FromStr;
+    use utils_db::{db::serialize_to_bytes, CurrentDbShim};
 
     const ALICE: [u8; 32] = hex!("37eafd5038311f90fc08d13ff9ee16c6709be666e7d96808ba9a786c18f868a8");
     const BOB: [u8; 32] = hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26");

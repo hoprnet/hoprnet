@@ -6,7 +6,7 @@ use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use hopr_lib::{config::HoprLibConfig, ProtocolsConfig, Address, HostConfig, Strategy, Strategy::AutoRedeeming};
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig, Strategy, Strategy::AutoRedeeming};
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;

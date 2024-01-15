@@ -5,12 +5,12 @@ use ethers::utils::hex;
 use hopr_crypto::derivation::PacketTag;
 use hopr_crypto::random::random_bytes;
 use hopr_crypto::types::OffchainPublicKey;
-use log::warn;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::primitives::Address;
 use hopr_primitive_types::traits::{AutoBinarySerializable, BinarySerializable};
+use log::warn;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;

@@ -6,8 +6,8 @@ use crate::errors::{PathError::MissingChannel, Result};
 use crate::path::{ChannelPath, Path};
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
 use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
-use std::ops::Add;
 use hopr_primitive_types::primitives::{Address, U256};
+use std::ops::Add;
 
 /// Computes weights of edges corresponding to `ChannelEntry`.
 pub trait EdgeWeighting<W>

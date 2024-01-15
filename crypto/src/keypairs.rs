@@ -1,11 +1,11 @@
 use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
+use hopr_primitive_types::traits::PeerIdLike;
+use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
 use sha2::Sha512;
 use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::ZeroizeOnDrop;
-use hopr_primitive_types::traits::PeerIdLike;
-use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
 
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
@@ -175,8 +175,8 @@ impl From<&ChainKeypair> for Address {
 mod tests {
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-    use subtle::ConstantTimeEq;
     use hopr_primitive_types::traits::PeerIdLike;
+    use subtle::ConstantTimeEq;
 
     #[test]
     fn test_offchain_keypair() {

@@ -3,16 +3,16 @@ use hopr_crypto::{
     keypairs::{Keypair, OffchainKeypair},
     types::{OffchainPublicKey, OffchainSignature},
 };
+use hopr_primitive_types::{
+    errors::GeneralError::{self, InvalidInput, NonSpecificError},
+    primitives::Address,
+    traits::{BinarySerializable, PeerIdLike},
+};
 use log::debug;
 use multiaddr::Multiaddr;
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
-};
-use hopr_primitive_types::{
-    errors::GeneralError::{self, InvalidInput, NonSpecificError},
-    primitives::Address,
-    traits::{BinarySerializable, PeerIdLike},
 };
 
 /// Holds the signed binding of the chain key and the packet key.
@@ -152,11 +152,11 @@ mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
     use hex_literal::hex;
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
-    use multiaddr::Multiaddr;
     use hopr_primitive_types::{
         primitives::Address,
         traits::{BinarySerializable, PeerIdLike},
     };
+    use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();

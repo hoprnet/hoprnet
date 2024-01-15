@@ -9,23 +9,23 @@ mod helpers;
 
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
-    core_transport::{
-        config::{HostType, HostConfig, looks_like_domain},
-        errors::{HoprTransportError, ProtocolError},
-        constants::PEER_METADATA_PROTOCOL_VERSION,
-        ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput, Keypair, TicketStatistics, 
-    },
-    core_strategy::{Strategy, Strategy::AutoRedeeming},
     chain_actions::errors::CoreEthereumActionsError,
-    hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType},
-        traits::{PeerIdLike, ToHex},
-        rlp
+    core_strategy::{Strategy, Strategy::AutoRedeeming},
+    core_transport::{
+        config::{looks_like_domain, HostConfig, HostType},
+        constants::PEER_METADATA_PROTOCOL_VERSION,
+        errors::{HoprTransportError, ProtocolError},
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
     },
     hopr_internal_types::{
         channels::{ChannelEntry, ChannelStatus, Ticket},
-        protocol::{Tag, DEFAULT_APPLICATION_TAG}
-    }
+        protocol::{Tag, DEFAULT_APPLICATION_TAG},
+    },
+    hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType},
+        rlp,
+        traits::{PeerIdLike, ToHex},
+    },
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -47,15 +47,11 @@ use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_types::chain_events::ChainEventType;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_internal_types::protocol::TagBloomFilter;
-use hopr_internal_types::{
-    account::AccountEntry,
-    acknowledgement::AcknowledgedTicket,
-    channels::generate_channel_id,
-};
+use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 
+use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use utils_db::db::DB;
-use hopr_primitive_types::traits::BinarySerializable;
 
 use chain_api::HoprChain;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -68,10 +64,10 @@ use core_transport::{
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
-use log::{error, info};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use utils_db::CurrentDbShim;
 use hopr_primitive_types::primitives::{Snapshot, U256};
+use log::{error, info};
+use utils_db::CurrentDbShim;
 
 use crate::chain::ChainNetworkConfig;
 use crate::chain::SmartContractConfig;

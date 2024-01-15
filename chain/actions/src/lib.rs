@@ -39,8 +39,8 @@
 
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use std::sync::Arc;
 use hopr_primitive_types::primitives::Address;
+use std::sync::Arc;
 
 use crate::action_queue::ActionSender;
 

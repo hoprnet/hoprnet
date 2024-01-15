@@ -308,11 +308,11 @@ pub mod tests {
     };
     use futures::{join, Stream};
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_primitive_types::traits::PeerIdLike;
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};
-    use hopr_primitive_types::traits::PeerIdLike;
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
 

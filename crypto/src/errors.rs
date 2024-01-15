@@ -1,5 +1,5 @@
-use thiserror::Error;
 use hopr_primitive_types::errors::GeneralError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {

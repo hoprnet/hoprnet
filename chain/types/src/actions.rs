@@ -1,8 +1,8 @@
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::announcement::AnnouncementData;
 use hopr_internal_types::channels::{ChannelDirection, ChannelEntry};
-use std::fmt::{Display, Formatter};
 use hopr_primitive_types::primitives::{Address, Balance};
+use std::fmt::{Display, Formatter};
 
 /// Enumerates all possible on-chain state change requests
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]

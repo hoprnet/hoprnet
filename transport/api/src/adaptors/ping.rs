@@ -7,8 +7,8 @@ use hopr_crypto::types::OffchainPublicKey;
 use core_network::{network::Network, ping::PingExternalAPI, types::Result, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
-use log::{debug, error};
 use hopr_primitive_types::traits::PeerIdLike;
+use log::{debug, error};
 
 use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_METADATA_PROTOCOL_VERSION};
 

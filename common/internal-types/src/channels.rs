@@ -8,6 +8,7 @@ use hopr_crypto::{
     keypairs::{ChainKeypair, Keypair},
     types::{Hash, PublicKey, Signature},
 };
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -17,7 +18,6 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
 };
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 use hopr_primitive_types::traits::{BinarySerializable, ToHex};
 

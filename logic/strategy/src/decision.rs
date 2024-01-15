@@ -1,6 +1,6 @@
 use hopr_internal_types::channels::ChannelEntry;
-use std::fmt::{Display, Formatter};
 use hopr_primitive_types::primitives::{Address, Balance};
+use std::fmt::{Display, Formatter};
 
 /// A decision made by a strategy on each tick,
 /// represents which channels should be closed and which should be opened.

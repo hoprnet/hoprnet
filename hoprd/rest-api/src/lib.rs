@@ -22,7 +22,7 @@ use utoipa_swagger_ui::Config;
 use crate::config::Auth;
 use hopr_lib::{
     errors::HoprLibError,
-    {Address, Balance, BalanceType, Hopr}
+    {Address, Balance, BalanceType, Hopr},
 };
 
 pub const BASE_PATH: &str = "/api/v3";
@@ -99,7 +99,7 @@ pub struct InternalState {
         tickets::aggregate_tickets_in_channel,
         node::version,
         node::peers,
-        node::hopr_metrics,
+        node::metrics,
         node::info,
         node::entry_nodes,
         peers::show_peer_info,
@@ -349,7 +349,7 @@ pub async fn run_hopr_api(
         api.at("/node/info").get(node::info);
         api.at("/node/peers").get(node::peers);
         api.at("/node/entryNodes").get(node::entry_nodes);
-        api.at("/node/hopr_metrics").get(node::hopr_metrics);
+        api.at("/node/metrics").get(node::metrics);
 
         api
     });
@@ -726,7 +726,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use hopr_lib::{Multiaddr, PEER_METADATA_PROTOCOL_VERSION, HoprTransportError};
+    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -827,7 +827,7 @@ mod peers {
                     .build()),
                 Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build())
-                },
+                }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build()),
@@ -837,9 +837,9 @@ mod peers {
 
 mod channels {
     use super::*;
-    use hopr_lib::{CoreEthereumActionsError, ToHex, ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
     use hopr_crypto::types::Hash;
+    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1664,7 +1664,7 @@ mod network {
 mod tickets {
     use super::*;
     use hopr_crypto::types::Hash;
-    use hopr_lib::{Ticket, ToHex, TicketStatistics, HoprTransportError, ProtocolError};
+    use hopr_lib::{HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -2093,12 +2093,12 @@ mod node {
         Err(ApiErrorStatus::UnknownFailure("BUILT WITHOUT METRICS SUPPORT".into()))
     }
 
-    /// Retrieve Prometheus hopr_metrics from the running node.
+    /// Retrieve Prometheus metrics from the running node.
     #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/node/hopr_metrics"),
+        path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
         responses(
-            (status = 200, description = "Fetched node hopr_metrics", body = String),
+            (status = 200, description = "Fetched node metrics", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -2107,10 +2107,10 @@ mod node {
         ),
         tag = "Node"
     )]
-    pub(crate) async fn hopr_metrics(_req: Request<InternalState>) -> tide::Result<Response> {
+    pub(crate) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
         match collect_hopr_metrics() {
-            Ok(hopr_metrics) => Ok(Response::builder(200)
-                .body(Body::from_string(hopr_metrics))
+            Ok(metrics) => Ok(Response::builder(200)
+                .body(Body::from_string(metrics))
                 .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))
                 .build()),
             Err(error) => Ok(Response::builder(422).body(ApiErrorStatus::from(error)).build()),
@@ -2120,23 +2120,23 @@ mod node {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "announcedAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "chain": "anvil-localhost",
-      "channelClosurePeriod": 15,
-      "connectivityStatus": "Green",
-      "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-      "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
-      "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
-      "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
-      "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
-      "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
-      "isEligible": true,
-      "listeningAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "network": "anvil-localhost"
+        "announcedAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "chain": "anvil-localhost",
+        "channelClosurePeriod": 15,
+        "connectivityStatus": "Green",
+        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+        "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+        "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
+        "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+        "isEligible": true,
+        "listeningAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "network": "anvil-localhost"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoRes {

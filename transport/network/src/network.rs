@@ -11,8 +11,8 @@ use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
-use log::{info, warn};
 use hopr_primitive_types::sma::{SingleSumSMA, SMA};
+use log::{info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -567,8 +567,8 @@ mod tests {
     use crate::network::{
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
-    use libp2p_identity::PeerId;
     use hopr_platform::time::native::current_timestamp;
+    use libp2p_identity::PeerId;
 
     struct DummyNetworkAction {}
 

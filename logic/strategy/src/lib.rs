@@ -138,10 +138,10 @@
 //!       aggregation_threshold: 1000
 //! ```
 
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use strum::{Display, EnumString, EnumVariantNames};
-use hopr_primitive_types::primitives::{Balance, BalanceType};
 
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;

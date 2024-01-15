@@ -1,10 +1,10 @@
-use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_crypto::types::OffchainPublicKey;
+use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -13,12 +13,12 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
+use hopr_primitive_types::traits::PeerIdLike;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use hopr_primitive_types::sma::{SingleSumSMA, SMA};
-use hopr_primitive_types::traits::PeerIdLike;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -407,17 +407,17 @@ mod tests {
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::Hash;
-    use lazy_static::lazy_static;
-    use mockall::mock;
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use hopr_platform::time::native::current_timestamp;
-    use utils_db::{db::DB, CurrentDbShim};
     use hopr_primitive_types::primitives::{Snapshot, U256};
     use hopr_primitive_types::traits::BinarySerializable;
+    use lazy_static::lazy_static;
+    use mockall::mock;
+    use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
         static ref PEERS: Vec<(Address, PeerId)> = (0..10)

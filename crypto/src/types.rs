@@ -42,12 +42,12 @@ use crate::{
     primitives::{DigestLike, EthDigest},
     random::random_group_element,
 };
-use log::warn;
 use hopr_primitive_types::{
     errors::GeneralError::{self, ParseError},
     primitives::{Address, EthereumChallenge, U256},
     traits::{BinarySerializable, PeerIdLike, ToHex},
 };
+use log::warn;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -1248,6 +1248,10 @@ pub mod tests {
     };
     use ed25519_dalek::Signer;
     use hex_literal::hex;
+    use hopr_primitive_types::{
+        primitives::Address,
+        traits::{BinarySerializable, PeerIdLike, ToHex},
+    };
     use k256::{
         ecdsa::VerifyingKey,
         elliptic_curve::{sec1::ToEncodedPoint, CurveArithmetic},
@@ -1255,10 +1259,6 @@ pub mod tests {
     };
     use libp2p_identity::PeerId;
     use std::str::FromStr;
-    use hopr_primitive_types::{
-        primitives::Address,
-        traits::{BinarySerializable, PeerIdLike, ToHex},
-    };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");

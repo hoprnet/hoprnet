@@ -44,7 +44,6 @@ hex-literal = "0.4"
 mockall = "0.11.4"
 mockito = "1.2.0"
 
-
 [features]
 default = ["prometheus"]
-prometheus = ["dep:metrics"]
+prometheus = ["dep:hopr-metrics"]

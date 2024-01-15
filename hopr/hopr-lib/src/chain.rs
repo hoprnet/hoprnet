@@ -21,8 +21,8 @@ use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
-use utils_db::CurrentDbShim;
 use hopr_primitive_types::primitives::Address;
+use utils_db::CurrentDbShim;
 
 use crate::errors::HoprLibError;
 

@@ -115,8 +115,8 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use log::debug;
     use hopr_primitive_types::primitives::Address;
+    use log::debug;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

@@ -111,7 +111,6 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

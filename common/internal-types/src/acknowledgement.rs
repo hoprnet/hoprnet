@@ -12,14 +12,14 @@ use hopr_crypto::{
     keypairs::{ChainKeypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
-use log::debug;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 use hopr_primitive_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,
     traits::{BinarySerializable, ToHex},
 };
+use log::debug;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

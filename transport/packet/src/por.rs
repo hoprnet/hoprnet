@@ -1,10 +1,10 @@
 use hopr_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
 use hopr_crypto::shared_keys::SharedSecret;
 use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
-use log::error;
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::primitives::EthereumChallenge;
 use hopr_primitive_types::traits::BinarySerializable;
+use log::error;
 
 use crate::errors::{PacketError, Result};
 

@@ -3,15 +3,15 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
+use hopr_crypto::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use hopr_internal_types::channels::{generate_channel_id, ChannelEntry};
-use hopr_crypto::types::Hash;
+use hopr_primitive_types::primitives::{Address, U256};
 use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
-use hopr_primitive_types::primitives::{Address, U256};
 
 use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
@@ -245,20 +245,20 @@ mod tests {
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
     use chain_types::chain_events::SignificantChainEvent;
-    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
+    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use hopr_primitive_types::primitives::{Balance, BalanceType, Snapshot, U256};
+    use hopr_primitive_types::traits::BinarySerializable;
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
-    use hopr_primitive_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

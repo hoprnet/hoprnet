@@ -16,13 +16,13 @@ use bindings::{
 };
 use chain_types::ContractAddresses;
 use chain_types::{create_eip1559_transaction, TypedTransaction};
-use hopr_internal_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::types::NameOrAddress;
 use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
 use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
+use hopr_internal_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -564,11 +564,6 @@ pub mod tests {
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::native::SurfRequestor;
     use chain_types::{create_anvil, ContractInstances};
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        announcement::{AnnouncementData, KeyBinding},
-        channels::Ticket,
-    };
     use ethers::{
         providers::Middleware,
         types::{Bytes, Eip1559TransactionRequest, H160, U256},
@@ -578,13 +573,18 @@ pub mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use multiaddr::Multiaddr;
-    use std::{str::FromStr, sync::Arc};
+    use hopr_internal_types::{
+        acknowledgement::AcknowledgedTicket,
+        announcement::{AnnouncementData, KeyBinding},
+        channels::Ticket,
+    };
     use hopr_primitive_types::primitives::Address;
     use hopr_primitive_types::{
         primitives::{Address as HoprAddress, Balance, BalanceType, U256 as HoprU256},
         traits::BinarySerializable,
     };
+    use multiaddr::Multiaddr;
+    use std::{str::FromStr, sync::Arc};
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
 

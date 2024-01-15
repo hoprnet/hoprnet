@@ -21,11 +21,11 @@ pub use {
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
-    hopr_internal_types::protocol::ApplicationData,
     hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
+    hopr_internal_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::execute_on_tick,
@@ -41,19 +41,19 @@ use core_protocol::{
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
+use futures::{
+    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
+    FutureExt, SinkExt,
+};
 use hopr_internal_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{ChannelEntry, Ticket},
     protocol::TagBloomFilter,
 };
-use futures::{
-    channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
-    FutureExt, SinkExt,
-};
+use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
-use hopr_primitive_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
@@ -236,9 +236,9 @@ use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
-use hopr_internal_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
+use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
 use hopr_primitive_types::traits::PeerIdLike;
 

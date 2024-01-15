@@ -6,9 +6,9 @@ use crate::{
 };
 use clap::Parser;
 use hopr_crypto::types::ToChecksum;
+use hopr_primitive_types::primitives::Address;
 use log::{error, log, Level};
 use std::{env, iter, str::FromStr};
-use hopr_primitive_types::primitives::Address;
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum SyncNetworkRegistryType {

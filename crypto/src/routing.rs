@@ -278,8 +278,8 @@ pub mod tests {
     use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
     use crate::shared_keys::{SharedSecret, SphinxSuite};
     use crate::utils::xor_inplace;
-    use parameterized::parameterized;
     use hopr_primitive_types::traits::BinarySerializable;
+    use parameterized::parameterized;
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {

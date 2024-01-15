@@ -7,6 +7,7 @@ use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggreg
 use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_internal_types::channels::ChannelDirection::Incoming;
 use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -16,7 +17,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use hopr_primitive_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -333,12 +333,6 @@ mod tests {
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
     };
-    use hopr_internal_types::channels::ChannelDirection::Incoming;
-    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, Ticket},
-    };
     use futures::channel::oneshot::Receiver;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
@@ -346,16 +340,22 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
+    use hopr_internal_types::channels::ChannelDirection::Incoming;
+    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
+    use hopr_internal_types::{
+        acknowledgement::AcknowledgedTicket,
+        channels::{generate_channel_id, ChannelEntry, Ticket},
+    };
+    use hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::{BinarySerializable, PeerIdLike},
+    };
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
     use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![

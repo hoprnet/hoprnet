@@ -10,20 +10,20 @@ use bindings::{
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
+use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use hopr_crypto::types::OffchainSignature;
 use hopr_internal_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
-use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use hopr_crypto::types::OffchainSignature;
-use log::{debug, error};
-use multiaddr::Multiaddr;
-use std::{str::FromStr, sync::Arc};
 use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType, Snapshot, U256},
     traits::PeerIdLike,
 };
+use log::{debug, error};
+use multiaddr::Multiaddr;
+use std::{str::FromStr, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
@@ -620,11 +620,6 @@ pub mod tests {
     };
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::ContractAddresses;
-    use hopr_internal_types::{
-        account::{AccountEntry, AccountType},
-        announcement::KeyBinding,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
-    };
     use ethers::{
         abi::{encode, Address as EthereumAddress, RawLog, Token},
         prelude::*,
@@ -635,13 +630,18 @@ pub mod tests {
         keypairs::{Keypair, OffchainKeypair},
         types::Hash,
     };
-    use multiaddr::Multiaddr;
-    use primitive_types::H256;
-    use utils_db::{db::DB, CurrentDbShim};
+    use hopr_internal_types::{
+        account::{AccountEntry, AccountType},
+        announcement::KeyBinding,
+        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
+    };
     use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
     };
+    use multiaddr::Multiaddr;
+    use primitive_types::H256;
+    use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

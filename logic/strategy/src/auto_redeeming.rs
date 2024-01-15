@@ -88,16 +88,16 @@ mod tests {
     use chain_actions::redeem::TicketRedeemActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
-    use mockall::mock;
+    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
     use hopr_primitive_types::traits::BinarySerializable;
+    use mockall::mock;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

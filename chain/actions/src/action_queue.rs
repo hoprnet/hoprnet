@@ -3,6 +3,10 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::future::Either;
+use futures::{pin_mut, FutureExt, StreamExt};
+use hopr_crypto::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus;
 use hopr_internal_types::announcement::AnnouncementData;
 use hopr_internal_types::{
@@ -12,10 +16,7 @@ use hopr_internal_types::{
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
-use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_primitive_types::primitives::{Address, Balance};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -23,7 +24,6 @@ use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use hopr_primitive_types::primitives::{Address, Balance};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::CoreEthereumActionsError::{

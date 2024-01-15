@@ -153,10 +153,10 @@ mod tests {
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::Hash;
-    use std::sync::Arc;
-    use std::time::Duration;
     use hopr_primitive_types::primitives::Address;
     use hopr_primitive_types::traits::BinarySerializable;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     #[async_std::test]
     async fn test_expectation_should_resolve() {

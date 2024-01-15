@@ -2,12 +2,12 @@ use crate::{
     errors::{DbError, Result},
     traits::AsyncKVStorage,
 };
+use hopr_primitive_types::traits::BinarySerializable;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::{Display, Formatter},
     ops::Deref,
 };
-use hopr_primitive_types::traits::BinarySerializable;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -252,9 +252,9 @@ mod tests {
     use super::*;
     use crate::errors::DbError;
     use crate::traits::MockAsyncKVStorage;
+    use hopr_primitive_types::traits::BinarySerializable;
     use mockall::predicate;
     use serde::Deserialize;
-    use hopr_primitive_types::traits::BinarySerializable;
 
     impl Clone for MockAsyncKVStorage {
         fn clone(&self) -> Self {

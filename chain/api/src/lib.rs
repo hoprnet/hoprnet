@@ -18,11 +18,11 @@ use chain_indexer::handlers::ContractEventHandlers;
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
-use hopr_internal_types::account::AccountEntry;
 use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_internal_types::account::AccountEntry;
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 use log::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};
 
