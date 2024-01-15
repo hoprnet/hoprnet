@@ -458,7 +458,7 @@ mod test {
         rb.push(Some(1), 5).await;
 
         // sleep for 10ms to ensure a break between timestamps
-        async_std::task::sleep(Duration::from_millis(10)).await;
+        async_std::task::sleep(Duration::from_secs(2)).await;
         let close_past = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();
