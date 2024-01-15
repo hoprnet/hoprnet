@@ -37,7 +37,7 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
         const PATH_RANDOMNESS: f64 = 0.1;
 
         let r = random_float() * PATH_RANDOMNESS;
-        let base = channel.balance.value().addn(1);
+        let base = channel.balance.value() + 1u32;
 
         base.add(base.multiply_f64(r).unwrap())
     }
@@ -76,17 +76,45 @@ impl<CW> DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
+    /// Determines whether a node is considered "interesting"
+    /// 
+    /// To achieve privacy, we need at least one honest node along
+    /// the path. Each additional node decreases the probability of
+    /// having only malicious nodes, so we can sort out many nodes.
+    /// Nodes that have shown to be unreliable are of no use, so 
+    /// drop them.
     fn filter_channel(
         &self,
         channel: &ChannelEdge,
+        source: &Address,
         destination: &Address,
-        current: &[Address],
-        dead_ends: &HashSet<Address>,
+        current_path: &[Address],
     ) -> bool {
-        !destination.eq(&channel.channel.destination) &&                    // last hop does not need a channel
-            channel.quality.unwrap_or(1_f64) > self.quality_threshold &&  // quality threshold
-            !current.contains(&channel.channel.destination) &&     // must not be in the path already (no loops allowed)
-            !dead_ends.contains(&channel.channel.destination) // must not be in the dead end list
+        if source.eq(&channel.channel.destination) {
+            // looping back to self does not give any privacy
+            return false;
+        }
+
+        if destination.eq(&channel.channel.destination) {
+            // We cannot use destination as last intermediate hop as
+            // this would be a loopback which does not give any privacy
+            return false;
+        }
+
+        // Check node reliability, new nodes are considered reliable
+        // unless the opposite has been observed
+        if channel.quality.unwrap_or(1.0f64) < self.quality_threshold {
+            // Only use nodes that have shown to be somewhat reliable
+            return false;
+        }
+
+        if current_path.contains(&channel.channel.destination) {
+            // At the moment, we do not allow circles because they
+            // do not give additional privacy
+            return false;
+        }
+
+        true
     }
 }
 
@@ -99,6 +127,7 @@ where
         graph: &ChannelGraph,
         source: Address,
         destination: Address,
+        min_hops: usize,
         max_hops: usize,
     ) -> Result<ChannelPath> {
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
@@ -112,7 +141,7 @@ where
             .open_channels_from(source)
             .filter_map(|channel| {
                 let w = channel.weight();
-                self.filter_channel(w, &destination, &[], &dead_ends)
+                self.filter_channel(w, &source, &destination, &[], &dead_ends)
                     .then(|| WeightedChannelPath(vec![w.channel.destination], CW::calculate_weight(&w.channel)))
             })
             .for_each(|wcp| queue.push(wcp));
