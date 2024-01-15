@@ -27,10 +27,11 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use crate::errors::{HoprChainError, Result};
 
 use async_std::task::sleep;
+use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 
 pub type DefaultHttpPostRequestor = chain_rpc::client::native::SurfRequestor;
 
-pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor>;
+pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     me: Address,

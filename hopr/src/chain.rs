@@ -348,6 +348,7 @@ where
     let rpc_client = JsonRpcClient::new(
         &chain_config.chain.default_provider,
         DefaultHttpPostRequestor::default(),
+        SimpleJsonRpcRetryPolicy::default(),
     );
 
     // TODO: extract these configs from the global config type
@@ -355,7 +356,6 @@ where
         chain_id: chain_config.chain.chain_id as u64,
         contract_addrs,
         module_address,
-        max_http_retries: 10,
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
         tx_confirmations: chain_config.confirmations as usize,
@@ -364,8 +364,7 @@ where
     let rpc_client_cfg = RpcEthereumClientConfig::default();
     let action_queue_cfg = ActionQueueConfig::default();
 
-    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
-        .expect("failed to initialize RPC");
+    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg).expect("failed to initialize RPC");
 
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
