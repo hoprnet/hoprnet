@@ -41,11 +41,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -72,7 +72,7 @@ jobs:
         run: nix develop -c make -j build
 
   unit-tests:
-    name: Test | Unit
+    name: Unit
     needs:
       - build
     runs-on: ubuntu-2-core
@@ -95,11 +95,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -125,7 +125,7 @@ jobs:
           HOPR_NETWORK: anvil-localhost
 
   smoke-tests:
-    name: Test | Smoke
+    name: Smoke
     needs:
       - build
     strategy:
@@ -161,11 +161,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
