@@ -108,7 +108,7 @@ function install_cargo() {
         local rust_toolchain_toml_path="${mydir}/../../rust-toolchain.toml"
         local rust_version=$(sed -En 's/^channel = "([0-9a-z.]*)"$/\1/p' ${rust_toolchain_toml_path})
         echo "Installing Cargo, Rust compiler v${rust_version}"
-        local target=$(sed -En 's/^targets = \[ "([a-z0-9-]*)" \]$/\1/p' ${rust_toolchain_toml_path})
+        local target=$(sed -En 's/^targets = \[ "([a-z0-9_-]*)" \]$/\1/p' ${rust_toolchain_toml_path})
         local profile=$(sed -En 's/^profile = "([a-z]*)"$/\1/p' ${rust_toolchain_toml_path})
 
         # Always install the version specified in `rust-toolchain.toml`
