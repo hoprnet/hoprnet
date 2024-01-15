@@ -31,8 +31,8 @@ chain-db = { workspace = true }
 chain-actions = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-platform = { workspace = true }
-metrics = { workspace = true, optional = true, default-features = false }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
@@ -47,4 +47,4 @@ futures = "0.3.28"
 
 [features]
 default = ["prometheus"]
-prometheus = [ "dep:metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]
+prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

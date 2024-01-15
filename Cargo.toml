@@ -83,8 +83,8 @@ hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
-metrics = { path = "misc/metrics", default-features = false }
-platform = { path = "misc/platform" }
+hopr-metrics = { path = "misc/metrics", default-features = false }
+hopr-platform = { path = "misc/platform" }
 utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 

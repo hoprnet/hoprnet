@@ -16,7 +16,9 @@ chrono = "0.4.26"
 fern = "0.6.2"
 futures = { workspace = true }
 hex = { workspace = true }
+humantime = "2.1.0"
 lazy_static = { workspace = true, optional = true }
+log = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"
@@ -25,18 +27,12 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-core-transport = { workspace = true }
-core-strategy = { workspace = true }
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
-platform = { workspace = true }
-utils-db = { workspace = true }
-log = { workspace = true }
-metrics = { workspace = true, optional = true }
-hopr-primitive-types = { workspace = true }
-humantime = "2.1.0"
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -44,10 +40,8 @@ tempfile = "3"
 [features]
 default = ["prometheus"]
 prometheus = [
-    "dep:metrics",
+    "dep:hopr-metrics",
     "dep:lazy_static",
     "hopr-lib/prometheus",
-    "core-transport/prometheus",
-    "core-strategy/prometheus",
     "hoprd-api/prometheus"
 ]

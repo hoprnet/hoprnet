@@ -1032,13 +1032,13 @@ dependencies = [
  "hex-literal",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "log",
- "metrics",
  "mockall",
  "multiaddr",
- "platform",
  "serde",
  "thiserror",
  "utils-db",
@@ -1101,10 +1101,10 @@ dependencies = [
  "hex-literal",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
  "hopr-primitive-types",
  "lazy_static",
  "log",
- "metrics",
  "mockall",
  "multiaddr",
  "primitive-types",
@@ -1128,11 +1128,11 @@ dependencies = [
  "futures-timer",
  "hex-literal",
  "hopr-crypto",
+ "hopr-metrics",
  "hopr-primitive-types",
  "http-types",
  "lazy_static",
  "log",
- "metrics",
  "mockall",
  "mockito",
  "primitive-types",
@@ -1442,15 +1442,15 @@ dependencies = [
  "futures",
  "futures-lite 1.13.0",
  "hopr-crypto",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
  "log",
- "metrics",
  "mockall",
  "more-asserts",
  "multiaddr",
- "platform",
  "serde",
  "serde_with",
  "thiserror",
@@ -1515,11 +1515,11 @@ dependencies = [
  "hex-literal",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
  "log",
- "metrics",
  "mockall",
  "petgraph",
  "serde",
@@ -1544,15 +1544,15 @@ dependencies = [
  "hex-literal",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
  "log",
- "metrics",
  "more-asserts",
  "parameterized",
- "platform",
  "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
@@ -1580,12 +1580,12 @@ dependencies = [
  "hex-literal",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "log",
- "metrics",
  "mockall",
- "platform",
  "rand 0.8.5",
  "serde",
  "serde_with",
@@ -1613,13 +1613,13 @@ dependencies = [
  "futures-concurrency",
  "hopr-crypto",
  "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p",
  "log",
- "metrics",
  "multiaddr",
- "platform",
  "proc-macro-regex",
  "serde",
  "thiserror",
@@ -3237,11 +3237,11 @@ dependencies = [
  "core-transport",
  "futures",
  "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "log",
- "metrics",
- "platform",
  "semver 1.0.21",
  "serde",
  "serde_json",
@@ -3250,6 +3250,26 @@ dependencies = [
  "thiserror",
  "utils-db",
  "validator",
+]
+
+[[package]]
+name = "hopr-metrics"
+version = "1.1.0"
+dependencies = [
+ "prometheus",
+ "regex",
+]
+
+[[package]]
+name = "hopr-platform"
+version = "0.2.1"
+dependencies = [
+ "bitflags 2.4.1",
+ "js-sys",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-opt",
+ "wasm-pack",
 ]
 
 [[package]]
@@ -3278,21 +3298,18 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
- "core-strategy",
- "core-transport",
  "fern",
  "futures",
  "hex",
  "hopr-lib",
- "hopr-primitive-types",
+ "hopr-metrics",
+ "hopr-platform",
  "hoprd-api",
  "hoprd-inbox",
  "hoprd-keypair",
  "humantime",
  "lazy_static",
  "log",
- "metrics",
- "platform",
  "proc-macro-regex",
  "serde",
  "serde_json",
@@ -3300,7 +3317,6 @@ dependencies = [
  "strum 0.25.0",
  "tempfile",
  "thiserror",
- "utils-db",
  "validator",
 ]
 
@@ -3317,12 +3333,11 @@ dependencies = [
  "hopr-crypto",
  "hopr-internal-types",
  "hopr-lib",
- "hopr-primitive-types",
+ "hopr-metrics",
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
  "log",
- "metrics",
  "serde",
  "serde_json",
  "serde_with",
@@ -3341,7 +3356,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "hopr-internal-types",
- "platform",
+ "hopr-platform",
  "ringbuffer",
  "serde",
  "serde_with",
@@ -3357,9 +3372,9 @@ dependencies = [
  "ctr 0.9.2",
  "hex",
  "hopr-crypto",
+ "hopr-platform",
  "hopr-primitive-types",
  "log",
- "platform",
  "scrypt 0.11.0",
  "serde",
  "serde_json",
@@ -4269,14 +4284,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
 
 [[package]]
-name = "metrics"
-version = "1.1.0"
-dependencies = [
- "prometheus",
- "regex",
-]
-
-[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4943,18 +4950,6 @@ name = "pkg-config"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69d3587f8a9e599cc7ec2c00e331f71c4e69a5f9a4b8a6efd5b07466b9736f9a"
-
-[[package]]
-name = "platform"
-version = "0.2.1"
-dependencies = [
- "bitflags 2.4.1",
- "js-sys",
- "thiserror",
- "wasm-bindgen",
- "wasm-opt",
- "wasm-pack",
-]
 
 [[package]]
 name = "platforms"
@@ -7433,11 +7428,11 @@ dependencies = [
  "futures-lite 1.13.0",
  "hex",
  "hex-literal",
+ "hopr-platform",
  "hopr-primitive-types",
  "log",
  "mockall",
  "pin-project-lite 0.2.13",
- "platform",
  "rusty-leveldb",
  "scopeguard",
  "serde",

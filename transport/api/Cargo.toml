@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 [features]
 default = ["prometheus"]
 prometheus = [
-    "dep:lazy_static", "dep:metrics",
+    "dep:lazy_static", "dep:hopr-metrics",
     "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
 ]
 
@@ -40,8 +40,8 @@ core-packet = { workspace = true }
 core-protocol = { workspace = true }
 utils-db = { workspace = true}
 log = { workspace = true }
-platform = { workspace = true }
-metrics = { workspace = true, optional = true }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

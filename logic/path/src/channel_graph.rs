@@ -11,7 +11,7 @@ use std::fmt::Debug;
 use hopr_primitive_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {hopr_internal_types::channels::ChannelDirection, metrics::metrics::MultiGauge, hopr_primitive_types::traits::ToHex};
+use {hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge, hopr_primitive_types::traits::ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

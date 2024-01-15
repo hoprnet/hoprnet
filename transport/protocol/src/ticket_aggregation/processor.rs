@@ -34,7 +34,7 @@ use futures::stream::FuturesUnordered;
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]

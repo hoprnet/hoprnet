@@ -24,7 +24,7 @@ thiserror = "1.0"
 
 log = { workspace = true }
 hopr-primitive-types = { workspace = true }
-platform = { workspace = true }
+hopr-platform = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -35,4 +35,4 @@ tempfile = "3.5.0"
 [features]
 default = ["sqlite"]
 sqlite = ["dep:sqlx"]
-js = ["platform/js", "dep:rusty-leveldb"]
+js = ["hopr-platform/js", "dep:rusty-leveldb"]

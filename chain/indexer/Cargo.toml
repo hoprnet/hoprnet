@@ -29,7 +29,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true}
 utils-db = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
@@ -40,4 +40,4 @@ mockall = "0.11"
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:metrics", "chain-rpc/prometheus" ]
+prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus" ]

@@ -56,7 +56,7 @@ use std::sync::Arc;
 use hopr_primitive_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {core_path::path::Path, metrics::metrics::SimpleHistogram};
+use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -67,7 +67,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use {async_std::task::sleep, platform::time::native::current_timestamp};
+use {async_std::task::sleep, hopr_platform::time::native::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,

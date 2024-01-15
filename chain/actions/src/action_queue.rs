@@ -34,7 +34,7 @@ use crate::errors::Result;
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::MultiCounter;
+use hopr_metrics::metrics::MultiCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

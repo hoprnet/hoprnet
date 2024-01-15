@@ -34,7 +34,7 @@ use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -636,7 +636,7 @@ impl PacketInteraction {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     match &packet {
                         Ok(TransportPacket::Forwarded { .. }) => {
-                            metadata.start_time = platform::time::native::current_timestamp();
+                            metadata.start_time = hopr_platform::time::native::current_timestamp();
                         }
                         _ => {}
                     }
@@ -768,7 +768,7 @@ impl PacketInteraction {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    platform::time::native::current_timestamp()
+                                    hopr_platform::time::native::current_timestamp()
                                         .saturating_sub(metadata.start_time)
                                         .as_secs_f64(),
                                 )

@@ -29,8 +29,8 @@ chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 utils-db = { workspace = true }
-metrics = { workspace = true, optional = true }
-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-platform = { workspace = true }
 log = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -43,4 +43,4 @@ hex-literal = "0.4"
 
 [features]
 default = ["prometheus"]
-prometheus = [ "dep:metrics", "chain-rpc/prometheus"]
+prometheus = [ "dep:hopr-metrics", "chain-rpc/prometheus"]

@@ -1,3 +1,4 @@
+pub use core_protocol::errors::ProtocolError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

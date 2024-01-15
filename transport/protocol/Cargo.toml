@@ -10,7 +10,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:metrics", "core-path/prometheus", "core-packet/prometheus"]
+prometheus = ["dep:hopr-metrics", "core-path/prometheus", "core-packet/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -34,8 +34,8 @@ chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
 log = { workspace = true }
-metrics = { optional = true, workspace = true }
-platform = { workspace = true }
+hopr-metrics = { optional = true, workspace = true }
+hopr-platform = { workspace = true }
 utils-db = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }

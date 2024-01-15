@@ -17,7 +17,7 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]

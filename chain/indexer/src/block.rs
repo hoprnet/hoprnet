@@ -12,7 +12,7 @@ use hopr_primitive_types::primitives::{Snapshot, U256};
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleGauge;
+use hopr_metrics::metrics::SimpleGauge;
 
 use async_std::task::spawn;
 

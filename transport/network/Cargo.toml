@@ -23,9 +23,9 @@ thiserror = "1.0"
 validator = { workspace = true }
 
 hopr-crypto = { workspace = true }
-platform = { workspace = true }
+hopr-platform = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true}
+hopr-metrics = { workspace = true, optional = true}
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
@@ -35,4 +35,4 @@ more-asserts = "0.3.1"
 [features]
 default = ["prometheus", "compat-ping"]
 compat-ping = []
-prometheus = ["dep:metrics"]
+prometheus = ["dep:hopr-metrics"]

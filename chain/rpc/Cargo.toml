@@ -31,7 +31,7 @@ bindings = { workspace = true }
 hopr-crypto = { workspace = true }
 chain-types = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
+hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

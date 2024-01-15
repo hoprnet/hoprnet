@@ -25,7 +25,7 @@ use crate::{strategy::SingularStrategy, Strategy};
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

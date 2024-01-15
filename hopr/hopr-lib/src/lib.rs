@@ -9,8 +9,19 @@ mod helpers;
 
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
-    core_transport::{config::{HostConfig, looks_like_domain}, ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput},
-    hopr_primitive_types::primitives::{Address, Balance, BalanceType},
+    core_transport::{
+        config::{HostType, HostConfig, looks_like_domain},
+        errors::{HoprTransportError, ProtocolError},
+        constants::PEER_METADATA_PROTOCOL_VERSION,
+        ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput, Keypair, TicketStatistics, 
+    },
+    core_strategy::{Strategy, Strategy::AutoRedeeming},
+    chain_actions::errors::CoreEthereumActionsError,
+    hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType},
+        traits::{PeerIdLike, ToHex},
+        rlp
+    },
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -25,13 +36,11 @@ use futures::{
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
-    errors::CoreEthereumActionsError,
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
 use chain_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
 use chain_types::chain_events::ChainEventType;
-use core_transport::TicketStatistics;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_internal_types::{
@@ -42,7 +51,7 @@ use hopr_internal_types::{
 
 use log::debug;
 use utils_db::db::DB;
-use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
+use hopr_primitive_types::traits::BinarySerializable;
 
 use chain_api::HoprChain;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -54,9 +63,9 @@ use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
-use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
+use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use log::{error, info};
-use platform::file::native::{join, read_file, remove_dir_all, write};
+use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::CurrentDbShim;
 use hopr_primitive_types::primitives::{Snapshot, U256};
 
@@ -67,10 +76,10 @@ use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -606,7 +615,7 @@ impl Hopr {
         let tbf = read_file(&tbf_path)
             .and_then(|data| {
                 TagBloomFilter::from_bytes(&data)
-                    .map_err(|e| platform::error::PlatformError::GeneralError(e.to_string()))
+                    .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
                 debug!("No tag Bloom filter found, using empty");

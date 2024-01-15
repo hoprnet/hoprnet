@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-prometheus = ["hopr-lib/prometheus", "dep:metrics", "dep:lazy_static"]
+prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
@@ -38,6 +38,5 @@ chain-actions = { workspace = true }
 core-protocol = { workspace = true }
 core-transport = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
-metrics = { workspace = true, optional = true }
+hopr-metrics = { workspace = true, optional = true }
 

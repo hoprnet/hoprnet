@@ -20,7 +20,7 @@ serde_with = { workspace = true }
 validator = { workspace = true }
 
 hopr-internal-types = { workspace = true }
-platform = { workspace = true }
+hopr-platform = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

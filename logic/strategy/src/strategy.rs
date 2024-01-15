@@ -21,11 +21,11 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use validator::Validate;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    metrics::metrics::{MultiGauge, SimpleCounter},
+    hopr_metrics::metrics::{MultiGauge, SimpleCounter},
     strum::VariantNames,
 };
 

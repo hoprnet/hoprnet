@@ -27,7 +27,7 @@ use crate::strategy::SingularStrategy;
 use crate::{decision::ChannelDecision, Strategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -414,7 +414,7 @@ mod tests {
     use hopr_crypto::types::Hash;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use platform::time::native::current_timestamp;
+    use hopr_platform::time::native::current_timestamp;
     use utils_db::{db::DB, CurrentDbShim};
     use hopr_primitive_types::primitives::{Snapshot, U256};
     use hopr_primitive_types::traits::BinarySerializable;
