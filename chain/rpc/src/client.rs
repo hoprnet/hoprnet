@@ -484,9 +484,9 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
     use serde_json::json;
     use std::time::Duration;
-    use hopr_primitive_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
