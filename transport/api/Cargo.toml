@@ -14,11 +14,11 @@ default = ["prometheus"]
 wasm = [
     "chain-db/wasm", "hopr-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
     "core-protocol/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "metrics?/wasm", "utils-types/wasm",
+    "utils-db/wasm", "platform/wasm-bindgen", "metrics?/wasm",
 ]
 prometheus = [
     "dep:lazy_static", "dep:metrics",
-    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "chain-rpc/prometheus"
+    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
 ]
 
 [dependencies]
@@ -37,7 +37,6 @@ lazy_static = { workspace = true, optional = true }
 core-network = { workspace = true }
 hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
-chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
 core-p2p = { workspace = true }

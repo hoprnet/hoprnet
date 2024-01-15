@@ -18,12 +18,9 @@ async-lock = { workspace = true }
 ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
 futures-timer = { workspace = true }
-hex = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
-primitive-types = "0.12.1"
 serde = { workspace = true, features = ["derive"] }
-strum = { workspace = true }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
@@ -47,5 +44,5 @@ hex-literal = "0.4"
 [features]
 default = ["prometheus"]
 wasm = [ "chain-db/wasm", "chain-types/wasm", "hopr-crypto/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+    "utils-db/wasm", "platform/wasm-bindgen" ]
 prometheus = [ "dep:metrics", "chain-rpc/prometheus"]

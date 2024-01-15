@@ -22,8 +22,6 @@ strum = { workspace = true }
 bindings = { workspace = true }
 hopr-crypto = { workspace = true }
 core-types = { workspace = true }
-platform = { workspace = true }
-log = { workspace = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -38,4 +36,4 @@ hex = { workspace = true }
 
 [features]
 default = []
-wasm = [ "hopr-crypto/wasm", "utils-types/wasm", "platform/wasm-bindgen" ]
+wasm = ["hopr-crypto/wasm"]

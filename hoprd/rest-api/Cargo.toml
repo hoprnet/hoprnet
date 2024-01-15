@@ -19,7 +19,6 @@ prometheus = ["hopr-lib/prometheus", "dep:metrics", "dep:lazy_static"]
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 const_format = "0.2.32"
-env_logger = { workspace = true }
 futures = { workspace = true }
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
 lazy_static = { workspace = true, optional = true}

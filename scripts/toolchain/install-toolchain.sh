@@ -23,13 +23,9 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 function usage() {
   msg
-  msg "Usage: $0 [-h|--help] [--runtime-only] [--with-yarn]"
+  msg "Usage: $0 [-h|--help]"
   msg
   msg "This script installs all required toolchain utilities to build hoprnet monorepo"
-  msg
-  msg "Use --runtime-only to install only those utilities that are necessary at runtime"
-  msg "Use --with-yarn to install yarn"
-  msg "Use --with-wasm-utilities to install wasm-pack and wasm-opt"
   msg
 }
 
@@ -40,29 +36,12 @@ export PATH=${PATH}:${CARGO_BIN_DIR}
 declare usr_local="/usr/local"
 declare usr_local_bin="${usr_local}/bin"
 
-declare runtime_only with_yarn with_wasm_utilities
-runtime_only="false"
-with_yarn="false"
-with_wasm_utilities="false"
-
 while (( "$#" )); do
   case "$1" in
     -h|--help)
       # return early with help info when requested
       usage
       exit 0
-      ;;
-    --runtime-only)
-      runtime_only="true"
-      shift
-      ;;
-    --with-yarn)
-      with_yarn="true"
-      shift
-      ;;
-    --with-wasm-utilities)
-      with_wasm_utilities="true"
-      shift
       ;;
     -*|--*=)
       usage

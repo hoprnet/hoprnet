@@ -11,7 +11,6 @@ license = "GPL-3.0-only"
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 async-lock = { workspace = true }
-async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
 fern = "0.6.2"
@@ -27,11 +26,7 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 core-transport = { workspace = true }
-core-network = { workspace = true }
 core-strategy = { workspace = true }
-chain-db = { workspace = true }
-chain-indexer = { workspace = true }
-chain-types = { workspace = true }
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
@@ -51,18 +46,13 @@ tempfile = "3"
 default = ["prometheus"]
 wasm = [
     "core-transport/wasm",
-    "core-network/wasm",
     "core-strategy/wasm",
-    "chain-db/wasm",
-    "chain-indexer/wasm",
-    "chain-types/wasm",
     "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",
     "platform/wasm-bindgen",
     "utils-db/wasm",
     "metrics?/wasm",
-    "utils-types/wasm",
 ]
 prometheus = [
     "dep:metrics",
@@ -70,7 +60,5 @@ prometheus = [
     "hopr-lib/prometheus",
     "core-transport/prometheus",
     "core-strategy/prometheus",
-    "core-network/prometheus",
-    "chain-indexer/prometheus",
     "hoprd-api/prometheus"
 ]

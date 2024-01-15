@@ -11,9 +11,8 @@ crate-type = ["rlib"]
 [features]
 default = ["prometheus"]
 wasm = [
-    "dep:getrandom",
     "hopr-crypto/wasm", "chain-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-types/wasm", "metrics?/wasm",
+    "utils-db/wasm", "metrics?/wasm",
 ]
 prometheus = ["dep:metrics", "core-path/prometheus", "core-packet/prometheus"]
 
@@ -24,7 +23,6 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-getrandom = { workspace = true, optional = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }

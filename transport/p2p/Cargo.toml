@@ -11,7 +11,6 @@ crate-type = ["rlib"]
 [features]
 default = []
 wasm = [
-    "dep:getrandom",
     "libp2p/wasm-bindgen",
     "core-network/wasm",
 ]
@@ -19,11 +18,9 @@ wasm = [
 [dependencies]
 futures = { workspace = true }
 futures-lite = { workspace = true }
-getrandom = { workspace = true, optional = true}
 libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp", "dns"] }
 libp2p-mplex = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
-syn = "2.0.27"      # needed for `features=["macros"]` from `libp2p`
 thiserror = { workspace = true }
 void = "1"          # needed for Behavior implementations from libp2p
 

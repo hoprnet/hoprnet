@@ -21,7 +21,6 @@ validator = { workspace = true }
 
 core-types = { workspace = true }
 platform = { workspace = true }
-log = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

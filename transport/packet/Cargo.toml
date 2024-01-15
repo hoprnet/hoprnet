@@ -22,10 +22,8 @@ hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }
-platform = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
 utils-types = { workspace = true }
 
 [dev-dependencies]
@@ -40,6 +38,6 @@ parameterized = "1.0"
 serial_test = "2.0"
 
 [features]
-default = ["prometheus"]
-wasm = [ "hopr-crypto/wasm", "chain-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm", "metrics?/wasm", "chain-types/wasm" ]
-prometheus = [ "dep:metrics", "core-path/prometheus" ]
+default = [ "prometheus" ]
+wasm = [ "hopr-crypto/wasm", "chain-db/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "chain-types/wasm" ]
+prometheus = [ "core-path/prometheus" ]

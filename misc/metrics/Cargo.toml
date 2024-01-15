@@ -15,8 +15,6 @@ crate-type = ["rlib"]
 prometheus = "0.13"
 regex = "1"
 
-platform = { workspace = true }
-
 [features]
 default = []
-wasm = [ "platform/wasm-bindgen" ]
+wasm = []

@@ -13,11 +13,10 @@ async-std = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-getrandom = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
-rand = { version = "0.8.5", features = ["std_rng"] }
+# rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 thiserror = "1.0"
@@ -41,6 +40,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:getrandom", "hopr-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm", "utils-types/wasm"]
+wasm = ["hopr-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm"]
 compat-ping = []
 prometheus = ["dep:metrics"]

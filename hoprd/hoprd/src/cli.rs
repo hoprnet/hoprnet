@@ -27,7 +27,6 @@ fn parse_host(s: &str) -> Result<HostConfig, String> {
 }
 
 /// Parse a hex string private key to a boxed u8 slice
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
         let mut decoded = [0u8; 64];

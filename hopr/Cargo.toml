@@ -58,6 +58,5 @@ wasm = [
     "platform/wasm-bindgen",
     "utils-db/wasm",
     "metrics?/wasm",
-    "utils-types/wasm",
 ]
 prometheus = ["dep:metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]
