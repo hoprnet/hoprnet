@@ -22,6 +22,10 @@ pub use {
         traits::{PeerIdLike, ToHex},
         rlp
     },
+    hopr_internal_types::{
+        channels::{ChannelEntry, ChannelStatus, Ticket},
+        protocol::{Tag, DEFAULT_APPLICATION_TAG}
+    }
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -39,14 +43,14 @@ use chain_actions::{
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use chain_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
+use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_types::chain_events::ChainEventType;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_internal_types::{
     account::AccountEntry,
     acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, ChannelStatus, Ticket},
+    channels::generate_channel_id,
 };
 
 use log::debug;

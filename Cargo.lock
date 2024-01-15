@@ -3325,13 +3325,9 @@ name = "hoprd-api"
 version = "0.2.0"
 dependencies = [
  "async-std",
- "chain-actions",
  "const_format",
- "core-protocol",
- "core-transport",
  "futures",
  "hopr-crypto",
- "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",
  "hoprd-inbox",

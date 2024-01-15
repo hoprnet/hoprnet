@@ -837,8 +837,7 @@ mod peers {
 
 mod channels {
     use super::*;
-    use hopr_lib::{CoreEthereumActionsError,ToHex};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_lib::{CoreEthereumActionsError, ToHex, ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
     use hopr_crypto::types::Hash;
 
@@ -1664,9 +1663,8 @@ mod network {
 }
 mod tickets {
     use super::*;
-    use hopr_internal_types::channels::Ticket;
     use hopr_crypto::types::Hash;
-    use hopr_lib::{ToHex, TicketStatistics, HoprTransportError, ProtocolError};
+    use hopr_lib::{Ticket, ToHex, TicketStatistics, HoprTransportError, ProtocolError};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
