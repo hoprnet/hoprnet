@@ -18,7 +18,7 @@ members = [
     "chain/rpc",
     "ethereum/bindings",
     "hopli",
-    "hopr",
+    "hopr/hopr-lib",
     "hoprd/rest-api",
     "hoprd/hoprd",
     "hoprd/inbox",
@@ -79,7 +79,7 @@ core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
-hopr-lib = { path = "hopr", default-features = false }
+hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
