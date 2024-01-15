@@ -323,7 +323,7 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = None) -> dict:
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> dict:
         """
         Peek all messages from the inbox
         :param: tag = 0x0320

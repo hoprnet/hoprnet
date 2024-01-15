@@ -157,7 +157,7 @@ where
                     .map(|buf| {
                         buf.iter()
                             .filter_map(|w| {
-                                if w.ts >= timestamp {
+                                if w.ts.as_secs() >= timestamp.as_secs() {
                                     Some((w.payload.clone(), w.ts))
                                 } else {
                                     None

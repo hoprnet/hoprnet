@@ -714,14 +714,22 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7):
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_peeking_messages_with_timestamp(src, dest, swarm7):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    split_index = int(message_count * 0.66)
+
     random_tag = random.randint(10, 65530)
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-    for packet in packets:
+    for packet in packets[:split_index]:
         await src_peer["api"].send_message(dest_peer["peer_id"], packet, [], random_tag)
+
+    await asyncio.sleep(2)
+
+    for packet in packets[split_index:]:
+        await src_peer["api"].send_message(dest_peer["peer_id"], packet, [], random_tag)
+
 
     await asyncio.wait_for(
         check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
@@ -730,9 +738,11 @@ async def test_peeking_messages_with_timestamp(src, dest, swarm7):
     packets = await dest_peer["api"].messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
 
-    packets = await dest_peer["api"].messages_peek_all(random_tag, timestamps[-3])
+    ts_for_query = timestamps[split_index]-1
 
-    assert len(packets.messages) == 3
+    packets = await dest_peer["api"].messages_peek_all(random_tag, ts_for_query)
+
+    assert len(packets.messages) == message_count - split_index
 
 
 @pytest.mark.asyncio

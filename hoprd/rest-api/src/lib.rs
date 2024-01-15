@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use serde_with::{serde_as, DisplayFromStr, DurationSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
 use tide::http::mime;
 use tide::utils::async_trait;
@@ -1311,7 +1311,7 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
-        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[serde_as(as = "serde_with::DurationSeconds<u64>")]
         #[schema(value_type = u64)]
         pub timestamp: std::time::Duration,
     }
@@ -1324,7 +1324,7 @@ mod messages {
         #[serde(default)]
         pub tag: Option<u16>,
         /// Timestamp to filter messages received after this timestamp
-        #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
+        #[serde_as(as = "Option<DurationSeconds<u64>>")]
         #[schema(required = false, value_type = u64)]
         #[serde(default)]
         pub timestamp: Option<std::time::Duration>,
@@ -1444,7 +1444,7 @@ mod messages {
     pub(crate) struct MessagePopRes {
         tag: u16,
         body: String,
-        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        #[serde_as(as = "DurationSeconds<u64>")]
         #[schema(value_type = u64)]
         received_at: std::time::Duration,
     }
@@ -1583,7 +1583,7 @@ mod messages {
     }
 
     /// Peek the list of messages currently present in the nodes message inbox, filtered by tag,
-    /// and optionally by timestamp (epoch in milliseconds).
+    /// and optionally by timestamp (epoch in seconds).
     /// The messages are not removed from the inbox.
     #[utoipa::path(
         post,
