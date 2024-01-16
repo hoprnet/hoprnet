@@ -37,6 +37,9 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
+      - name: Build bindings
+        run: nix develop -c make build-solidity-types
+
       - name: Format generated code to pass the linter
         run: nix develop -c cargo fmt -p bindings
 
