@@ -105,35 +105,14 @@ impl FromStr for Address {
 }
 
 /// Represents a type of the balance: native or HOPR tokens.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString)]
 pub enum BalanceType {
     Native,
     HOPR,
 }
 
-impl Display for BalanceType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Native => write!(f, "Native"),
-            Self::HOPR => write!(f, "HOPR"),
-        }
-    }
-}
-
-impl FromStr for BalanceType {
-    type Err = GeneralError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
-            "NATIVE" => Ok(Self::Native),
-            "HOPR" => Ok(Self::HOPR),
-            _ => Err(ParseError),
-        }
-    }
-}
-
 /// Represents balance of some coin or token.
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Balance(U256, BalanceType);
 
 impl Balance {
@@ -142,12 +121,15 @@ impl Balance {
 
     /// Creates a new balance given the value and type
     pub fn new<T: Into<U256>>(value: T, balance_type: BalanceType) -> Self {
-        (value, balance_type).into()
+        Self(value.into(), balance_type)
     }
 
     /// Creates new balance of the given type from the base 10 integer string
     pub fn new_from_str(value: &str, balance_type: BalanceType) -> Self {
-        Self(U256::from_dec_str(value).unwrap_or_else(|_| panic!("invalid decimal number {value}")), balance_type)
+        Self(
+            U256::from_dec_str(value).unwrap_or_else(|_| panic!("invalid decimal number {value}")),
+            balance_type,
+        )
     }
 
     /// Creates zero balance of the given type
@@ -222,6 +204,14 @@ impl Add for Balance {
     }
 }
 
+impl Add<&Balance> for Balance {
+    type Output = Balance;
+
+    fn add(self, rhs: &Balance) -> Self::Output {
+        self.add(rhs.0)
+    }
+}
+
 impl<T: Into<U256>> Sub<T> for Balance {
     type Output = Balance;
 
@@ -234,6 +224,14 @@ impl Sub for Balance {
     type Output = Balance;
 
     fn sub(self, rhs: Self) -> Self::Output {
+        self.sub(rhs.0)
+    }
+}
+
+impl Sub<&Balance> for Balance {
+    type Output = Balance;
+
+    fn sub(self, rhs: &Balance) -> Self::Output {
         self.sub(rhs.0)
     }
 }
@@ -285,7 +283,10 @@ impl FromStr for Balance {
         let cap = regex.captures(s).ok_or(ParseError)?;
 
         if cap.len() == 3 {
-            Ok(Self::new_from_str(&cap[1], BalanceType::from_str(&cap[2])?))
+            Ok(Self::new_from_str(
+                &cap[1],
+                BalanceType::from_str(&cap[2]).map_err(|_| ParseError)?,
+            ))
         } else {
             Err(ParseError)
         }
@@ -416,7 +417,10 @@ impl UnitaryFloatOps for U256 {
             // special case: prevent from potential underflow errors
             Ok(U256::zero())
         } else {
-            Ok((*self * U256::from((rhs + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffff_u64)) >> U256::from(52_u64))
+            Ok(
+                (*self * U256::from((rhs + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffff_u64))
+                    >> U256::from(52_u64),
+            )
         }
     }
 
@@ -476,11 +480,7 @@ mod tests {
         assert_eq!(test_2 - 10, b4.sub(10).amount().as_u32(), "sub test failed");
 
         assert_eq!(0_u32, b3.sub(b4).amount().as_u32(), "negative test failed");
-        assert_eq!(
-            0_u32,
-            b3.sub(test_2 as u64).amount().as_u32(),
-            "negative test failed"
-        );
+        assert_eq!(0_u32, b3.sub(test_2 as u64).amount().as_u32(), "negative test failed");
 
         assert_eq!(
             test_1 * test_2,

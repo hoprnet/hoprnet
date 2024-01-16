@@ -326,7 +326,7 @@ mod tests {
                 }
                 ChannelChange::CurrentBalance { left, right } => {
                     assert_eq!(
-                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        Balance::new(1_u32, BalanceType::HOPR),
                         left,
                         "previous balance does not match"
                     );
@@ -369,7 +369,7 @@ mod tests {
                 }
                 ChannelChange::CurrentBalance { left, right } => {
                     assert_eq!(
-                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        Balance::new(1_u32, BalanceType::HOPR),
                         left,
                         "previous balance does not match"
                     );

@@ -245,7 +245,7 @@ mod tests {
             Ticket::new(
                 &next_peer_channel_key.to_address(),
                 &Balance::new(
-                    price_per_packet.divide_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
+                    price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
                     BalanceType::HOPR,
                 ),
                 1u64.into(),
@@ -272,7 +272,7 @@ mod tests {
             let c = ChannelEntry::new(
                 last_addr,
                 *addr,
-                Balance::new(1000u32.into(), BalanceType::HOPR),
+                Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
                 0u32.into(),

@@ -23,6 +23,7 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};
 
 use futures::stream::FuturesUnordered;
@@ -332,7 +333,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).addn(1);
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
         self.db
             .write()
@@ -420,7 +421,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         // calculate the new current ticket index
         let current_ticket_index_from_aggregated_ticket =
-            U256::from(aggregated_ticket.index).addn(aggregated_ticket.index_offset);
+            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
 
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
@@ -736,6 +737,7 @@ mod tests {
     };
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use std::ops::{Add, Mul};
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::{db::DB, CurrentDbShim};
@@ -779,7 +781,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &destination.into(),
-            &Balance::new(price_per_packet.divide_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
             index.into(),
             1u64.into(),
             ticket_win_prob,
@@ -869,7 +871,7 @@ mod tests {
         let channel_alice_bob = ChannelEntry::new(
             alice_addr,
             bob_addr,
-            agg_balance.imul(10),
+            agg_balance.mul(10),
             NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),

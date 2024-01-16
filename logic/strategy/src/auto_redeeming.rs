@@ -115,7 +115,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &ALICE.public().to_address(),
-            &Balance::new(price_per_packet.divide_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             0_u32.into(),
             idx_offset.into(),
             1.0f64,

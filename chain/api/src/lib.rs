@@ -79,7 +79,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
         match rpc.get_balance(address, min_balance.balance_type()).await {
             Ok(current_balance) => {
                 info!("current balance is {}", current_balance.to_formatted_string());
-                if current_balance.gte(&min_balance) {
+                if current_balance.ge(&min_balance) {
                     info!("node is funded");
                     return Ok(());
                 } else {

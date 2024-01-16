@@ -152,13 +152,13 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_funding_strategy() {
-        let stake_limit = Balance::new(7_u32.into(), BalanceType::HOPR);
-        let fund_amount = Balance::new(5_u32.into(), BalanceType::HOPR);
+        let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
+        let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
 
         let c1 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(10_u32.into(), BalanceType::HOPR),
+            Balance::new(10_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -168,7 +168,7 @@ mod tests {
         let c2 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(5_u32.into(), BalanceType::HOPR),
+            Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -178,7 +178,7 @@ mod tests {
         let c3 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(5_u32.into(), BalanceType::HOPR),
+            Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::PendingToClose,
             0_u32.into(),

@@ -51,8 +51,8 @@ impl MixerConfig {
 mod tests {
     use super::*;
     use futures_lite::stream::StreamExt;
-    use more_asserts::*;
     use hopr_crypto_random::Rng;
+    use more_asserts::*;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;

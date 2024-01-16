@@ -12,6 +12,7 @@ pub enum TransportOutput {
     Sent(HalfKeyChallenge),
 }
 
+use std::ops::Add;
 pub use {
     crate::{
         adaptors::network::ExternalNetworkInteractions,

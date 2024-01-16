@@ -12,6 +12,7 @@ use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
+use std::ops::Add;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
@@ -26,6 +27,7 @@ use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::prelude::UnitaryFloatOps;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -249,11 +251,11 @@ where
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64);
+            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
             // and there are at least two tickets
-            if unredeemed_value.gte(&diminished_balance) {
+            if unredeemed_value.ge(&diminished_balance) {
                 if aggregatable_tickets > 1 {
                     info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
                     can_aggregate = true;
@@ -349,6 +351,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
+    use std::ops::Add;
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
@@ -416,7 +419,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &destination.into(),
-            &Balance::new(price_per_packet.divide_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
             index.into(),
             1u64.into(),
             ticket_win_prob,
@@ -686,7 +689,7 @@ mod tests {
 
         // Make this ticket aggregated
         acked_tickets[0].ticket.index_offset = 2;
-        channel.balance = Balance::new(100_u32.into(), BalanceType::HOPR);
+        channel.balance = Balance::new(100_u32, BalanceType::HOPR);
 
         dbs[0]
             .write()

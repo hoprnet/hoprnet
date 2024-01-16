@@ -152,10 +152,7 @@ mod tests {
     use crate::announcement::{AnnouncementData, KeyBinding};
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_primitive_types::{
-        primitives::Address,
-        traits::BinarySerializable,
-    };
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {

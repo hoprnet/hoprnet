@@ -43,16 +43,10 @@ use chain_actions::{
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
-use chain_types::chain_events::ChainEventType;
-use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use hopr_internal_types::protocol::TagBloomFilter;
-use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
-use hopr_primitive_types::traits::BinarySerializable;
-use log::debug;
-use utils_db::db::DB;
 use chain_api::HoprChain;
+use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
@@ -62,9 +56,15 @@ use core_transport::{
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
+use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
+use hopr_internal_types::protocol::TagBloomFilter;
+use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use hopr_primitive_types::prelude::*;
+use hopr_primitive_types::traits::BinarySerializable;
+use log::debug;
 use log::{error, info};
+use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 
 use crate::chain::ChainNetworkConfig;
@@ -737,7 +737,7 @@ impl Hopr {
 
         let balance = self.get_balance(BalanceType::Native).await?;
 
-        let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
+        let minimum_balance = Balance::new_from_str(constants::MIN_NATIVE_BALANCE, BalanceType::Native);
 
         info!(
             "Ethereum account {} has {}. Minimum balance is {}",
@@ -746,7 +746,7 @@ impl Hopr {
             minimum_balance.to_formatted_string()
         );
 
-        if balance.lte(&minimum_balance) {
+        if balance.le(&minimum_balance) {
             return Err(errors::HoprLibError::GeneralError(
                 "Cannot start the node without a sufficiently funded wallet".to_string(),
             ));

@@ -19,7 +19,6 @@ ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
-primitive-types = "0.12.1"
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
@@ -36,6 +35,7 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 hex-literal = "0.4"
 mockall = "0.11"
+primitive-types = "0.12.2"
 
 [features]
 default = ["prometheus"]

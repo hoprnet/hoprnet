@@ -90,7 +90,7 @@ fn approve_tx(spender: Address, amount: Balance) -> TypedTransaction {
     tx.set_data(
         ApproveCall {
             spender: spender.into(),
-            value: amount.value().into(),
+            value: amount.amount(),
         }
         .encode()
         .into(),
@@ -205,7 +205,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         tx.set_data(
             FundChannelCall {
                 account: dest.into(),
-                amount: amount.value().as_u128(),
+                amount: amount.amount().as_u128(),
             }
             .encode()
             .into(),
@@ -389,7 +389,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         let call_data = FundChannelSafeCall {
             self_: self.me.into(),
             account: dest.into(),
-            amount: amount.value().as_u128(),
+            amount: amount.amount().as_u128(),
         }
         .encode();
 

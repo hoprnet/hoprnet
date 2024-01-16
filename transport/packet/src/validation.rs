@@ -30,7 +30,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
-    if !ticket.amount.gte(&min_ticket_amount) {
+    if !ticket.amount.ge(&min_ticket_amount) {
         return Err(TicketValidation(format!(
             "ticket amount {} in not at least {min_ticket_amount}",
             ticket.amount
@@ -121,6 +121,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
+    use std::ops::Add;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
@@ -254,7 +255,7 @@ mod tests {
     fn create_valid_ticket() -> Ticket {
         Ticket::new(
             &TARGET_PRIV_KEY.public().to_address(),
-            &Balance::new(1u64.into(), BalanceType::HOPR),
+            &Balance::new(1_u64, BalanceType::HOPR),
             1u64.into(),
             1u64.into(),
             1.0f64,
@@ -270,7 +271,7 @@ mod tests {
         ChannelEntry::new(
             SENDER_PRIV_KEY.public().to_address(),
             TARGET_PRIV_KEY.public().to_address(),
-            Balance::new(100u64.into(), BalanceType::HOPR),
+            Balance::new(100_u64, BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -297,7 +298,7 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
+            Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
             true,
             &Hash::default(),
@@ -319,7 +320,7 @@ mod tests {
             &ticket,
             &channel,
             &TARGET_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
+            Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
             true,
             &Hash::default(),
@@ -346,7 +347,7 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(2u64.into(), BalanceType::HOPR),
+            Balance::new(2_u64, BalanceType::HOPR),
             1.0f64,
             true,
             &Hash::default(),
@@ -376,8 +377,8 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
+            Balance::new(1_u64, BalanceType::HOPR),
+            1.0_f64,
             true,
             &Hash::default(),
         )
@@ -404,8 +405,8 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
+            Balance::new(1_u64, BalanceType::HOPR),
+            1.0_f64,
             true,
             &Hash::default(),
         )
@@ -434,8 +435,8 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
+            Balance::new(1_u64, BalanceType::HOPR),
+            1.0_f64,
             true,
             &Hash::default(),
         )
@@ -468,8 +469,8 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1.0f64,
+            Balance::new(1_u64, BalanceType::HOPR),
+            1.0_f64,
             true,
             &Hash::default(),
         )
@@ -571,7 +572,7 @@ mod tests {
             .await
             .unwrap()
             .expect("db must contain ticket index");
-        assert_eq!(idx, U256::new("2"), "ticket index mismatch. Expecting 2");
+        assert_eq!(idx, 2_u32.into(), "ticket index mismatch. Expecting 2");
     }
 
     #[async_std::test]
@@ -582,7 +583,7 @@ mod tests {
         );
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-        let dummy_index = U256::new("123");
+        let dummy_index = 123_u32.into();
 
         // the ticket index should be equal or greater than the given dummy index
         db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)

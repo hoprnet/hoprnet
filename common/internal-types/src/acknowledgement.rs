@@ -439,6 +439,7 @@ pub mod test {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
     };
+    use hopr_primitive_types::prelude::UnitaryFloatOps;
     use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
         traits::BinarySerializable,
@@ -462,7 +463,7 @@ pub mod test {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
+                price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
             U256::zero(),

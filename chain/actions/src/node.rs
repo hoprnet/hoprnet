@@ -72,7 +72,7 @@ mod tests {
 
         let self_addr = Address::random();
         let bob = Address::random();
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(

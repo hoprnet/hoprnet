@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::{Add, Sub};
 
 use async_trait::async_trait;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
@@ -112,7 +113,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     .get(&ticket.channel_id)
                     .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
-                    .add(&ticket.amount);
+                    .add(ticket.amount);
 
                 self.cached_unrealized_value
                     .insert(ticket.channel_id, unrealized_balance);
@@ -148,7 +149,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .get_or_none::<U256>(prefixed_key.clone())
             .await?
             .unwrap_or(U256::zero());
-        let _evicted = self.db.set(prefixed_key, &current_index.addn(1_u32)).await?;
+        let _evicted = self.db.set(prefixed_key, &current_index.add(1_u32)).await?;
         // Ignoring evicted value
         Ok(())
     }
@@ -1348,6 +1349,7 @@ mod tests {
     use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use std::ops::Mul;
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};
 
@@ -1377,7 +1379,7 @@ mod tests {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(PATH_POS),
+                price_per_packet.div_f64(win_prob).unwrap() * U256::from(PATH_POS),
                 BalanceType::HOPR,
             ),
             index.unwrap_or(U256::one()),
@@ -2254,7 +2256,7 @@ mod tests {
 
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         // Among all the 15 (3 epoch * 5 tickets3 epoch * 5 tickets) tickets, only 2 (start_index + tickets_to_generate_per_epoch - current_channel_ticket_index) tickets from the current epoch
-        let cumulated_ticket_balance = ticket_balance.mul(&Balance::new(2_u32.into(), BalanceType::HOPR));
+        let cumulated_ticket_balance = ticket_balance.mul(2);
         assert_eq!(
             unrealized_balance,
             Ok(current_channel_total_balance.sub(&cumulated_ticket_balance))

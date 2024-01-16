@@ -36,9 +36,9 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
         const PATH_RANDOMNESS: f64 = 0.1;
 
         let r = random_float() * PATH_RANDOMNESS;
-        let base = channel.balance.value().addn(1);
+        let base = channel.balance.amount() + 1;
 
-        base.add(base.multiply_f64(r).unwrap())
+        base.add(base.mul_f64(r).unwrap())
     }
 }
 
@@ -303,7 +303,7 @@ mod tests {
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
         fn calculate_weight(channel: &ChannelEntry) -> U256 {
-            *channel.balance.value() + 1u32
+            channel.balance.amount() + 1u32
         }
     }
 
@@ -311,7 +311,7 @@ mod tests {
     fn test_dfs_should_find_path_in_reliable_star() {
         let star = initialize_star_graph(
             ADDRESSES[1],
-            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, _| 1_f64,
         );
         let selector = DfsPathSelector::<TestWeights>::default();
@@ -329,7 +329,7 @@ mod tests {
             ADDRESSES[1],
             |_, b| {
                 Balance::new(
-                    (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
+                    (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1),
                     BalanceType::HOPR,
                 )
             },
@@ -350,7 +350,7 @@ mod tests {
     fn test_dfs_should_not_find_path_when_does_not_exist() {
         let star = initialize_star_graph(
             ADDRESSES[1],
-            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, _| 1_f64,
         );
         let selector = DfsPathSelector::<TestWeights>::default();
@@ -367,7 +367,7 @@ mod tests {
     fn test_dfs_should_find_path_in_reliable_arrow() {
         let arrow = initialize_arrow_graph(
             ADDRESSES[0],
-            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, _| 1_f64,
         );
         let selector = DfsPathSelector::<TestWeights>::default();
@@ -383,7 +383,7 @@ mod tests {
     fn test_dfs_should_not_find_path_if_unreliable_node_in_arrow() {
         let arrow = initialize_arrow_graph(
             ADDRESSES[0],
-            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, dst| if dst == ADDRESSES[3] { 0.1_f64 } else { 1_f64 },
         ); // node 3 is unreliable
 

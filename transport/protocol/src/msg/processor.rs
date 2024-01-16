@@ -430,7 +430,7 @@ where
 
             let amount = Balance::new(
                 price_per_packet
-                    .divide_f64(TICKET_WIN_PROB)
+                    .div_f64(TICKET_WIN_PROB)
                     .expect("winning probability outside of allowed interval (0.0, 1.0]")
                     * U256::from(path_pos - 1),
                 BalanceType::HOPR,
@@ -1237,7 +1237,7 @@ mod tests {
             let c = ChannelEntry::new(
                 last_addr,
                 *addr,
-                Balance::new(1000u32.into(), BalanceType::HOPR),
+                Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
                 0u32.into(),

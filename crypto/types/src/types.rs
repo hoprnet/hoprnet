@@ -3,6 +3,7 @@ use curve25519_dalek::{
     montgomery::MontgomeryPoint,
 };
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
+use hopr_primitive_types::prelude::*;
 use k256::{
     ecdsa::{
         self,
@@ -17,9 +18,8 @@ use k256::{
     },
     AffinePoint, Secp256k1,
 };
-use hopr_primitive_types::prelude::*;
-use log::warn;
 use libp2p_identity::PeerId;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
@@ -148,7 +148,9 @@ impl FromStr for CurvePoint {
     type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(CurvePoint::from_bytes(&hex::decode(s).map_err(|_| GeneralError::ParseError)?)?)
+        Ok(CurvePoint::from_bytes(
+            &hex::decode(s).map_err(|_| GeneralError::ParseError)?,
+        )?)
     }
 }
 
@@ -552,7 +554,11 @@ impl TryFrom<PeerId> for OffchainPublicKey {
         if mh.code() == 0 {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
                 .map_err(|_| GeneralError::ParseError)
-                .and_then(|pk| pk.try_into_ed25519().map(|p| p.to_bytes()).map_err(|_| GeneralError::ParseError))
+                .and_then(|pk| {
+                    pk.try_into_ed25519()
+                        .map(|p| p.to_bytes())
+                        .map_err(|_| GeneralError::ParseError)
+                })
                 .and_then(|pk| CompressedEdwardsY::from_slice(&pk).map_err(|_| GeneralError::ParseError))
                 .map(|compressed| Self { compressed })
         } else {
@@ -588,7 +594,8 @@ impl OffchainPublicKey {
         let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
         Ok(Self {
-            compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()).map_err(|_| GeneralError::ParseError)?,
+            compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes())
+                .map_err(|_| GeneralError::ParseError)?,
         })
     }
 
@@ -692,7 +699,8 @@ impl PublicKey {
         match data.len() {
             Self::SIZE_UNCOMPRESSED => {
                 // already has 0x04 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| GeneralError::ParseError)?;
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
+                    .map_err(|_| GeneralError::ParseError)?;
 
                 Ok(PublicKey {
                     key,
@@ -711,7 +719,8 @@ impl PublicKey {
             }
             Self::SIZE_COMPRESSED => {
                 // has either 0x02 or 0x03 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| GeneralError::ParseError)?;
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
+                    .map_err(|_| GeneralError::ParseError)?;
 
                 Ok(PublicKey {
                     key,

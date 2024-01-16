@@ -4,14 +4,12 @@ use crate::errors::GeneralError::ParseError;
 use crate::errors::Result;
 
 /// A generic type that can be converted to a hexadecimal string.
-pub trait ToHex {
+pub trait ToHex: Sized {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
 
     /// Tries to parse the type from the hexadecimal representation.
-    fn from_hex(str: &str) -> Result<Self>
-    where
-        Self: Sized;
+    fn from_hex(str: &str) -> Result<Self>;
 }
 
 /// A type that can be serialized and deserialized to a binary form.

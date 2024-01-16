@@ -17,6 +17,7 @@ use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Sub;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -292,7 +293,7 @@ where
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
-                if remaining_balance.lte(&self.cfg.minimum_node_balance) {
+                if remaining_balance.le(&self.cfg.minimum_node_balance) {
                     warn!("ran out of allowed node balance - balance is {remaining_balance}");
                     break;
                 }
@@ -413,7 +414,7 @@ mod tests {
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use hopr_platform::time::native::current_timestamp;
     use hopr_primitive_types::prelude::*;
-        use lazy_static::lazy_static;
+    use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
 

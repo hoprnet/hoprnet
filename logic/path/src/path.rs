@@ -107,9 +107,10 @@ impl ChannelPath {
             .hops
             .iter()
             .map(|addr| {
-                resolver
-                    .resolve_packet_key(addr)
-                    .map(move |opt| opt.map(|k| PeerId::from(k.clone())).ok_or(InvalidPeer(addr.to_string())))
+                resolver.resolve_packet_key(addr).map(move |opt| {
+                    opt.map(|k| PeerId::from(k.clone()))
+                        .ok_or(InvalidPeer(addr.to_string()))
+                })
             })
             .collect::<FuturesOrdered<_>>()
             .try_collect::<Vec<PeerId>>()
