@@ -90,6 +90,7 @@
             doCheck = false;
           };
           hoprdDeps = craneLib.buildDepsOnly (commonArgs // {
+            cargoExtraArgs = "--offline";
             extraDummyScript = ''
               rm -rf $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
