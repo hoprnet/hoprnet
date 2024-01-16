@@ -88,7 +88,7 @@
             # disable running tests automatically for now
             doCheck = false;
           };
-          cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
+          hoprdDeps = craneLib.buildDepsOnly (commonArgs // {
             extraDummyScript = ''
               rm -rf $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
@@ -96,7 +96,7 @@
             '';
           });
           hoprd = craneLib.buildPackage (commonArgs // {
-            inherit cargoArtifacts;
+            cargoArtifacts = hoprdDeps;
             cargoExtraArgs = "-p hoprd";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
@@ -104,8 +104,8 @@
             '';
           });
           hopli = craneLib.buildPackage (commonArgs // {
-            inherit cargoArtifacts;
             pname = "hopli";
+            cargoArtifacts = hoprdDeps;
             cargoExtraArgs = "-p hopli";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
@@ -177,7 +177,7 @@
         in
         {
           packages = {
-            inherit hoprd hopli hoprdDocker anvilDocker hopliDocker;
+            inherit hoprdDeps hoprd hopli hoprdDocker anvilDocker hopliDocker;
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {
