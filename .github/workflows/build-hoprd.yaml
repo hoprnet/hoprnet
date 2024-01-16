@@ -71,8 +71,7 @@ jobs:
         run: nix build .#hoprdDocker
 
       - name: Push docker image
-        run: |
-          nix develop --command skopeo copy docker-archive:./result docker://${IMAGE_TARGET}
+        run: skopeo copy docker-archive:./result docker://${IMAGE_TARGET}
         env:
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ steps.update.outputs.DOCKER_TAG }}
 

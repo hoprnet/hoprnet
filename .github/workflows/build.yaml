@@ -15,6 +15,8 @@ concurrency:
 jobs:
   build_hopli:
     name: Hopli
+    needs:
+      - build_hoprd
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
