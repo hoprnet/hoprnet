@@ -1,7 +1,18 @@
 import logging
+from typing import Callable, Optional
 
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NetworkApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.api import (
+    AccountApi,
+    AliasApi,
+    ChannelsApi,
+    ChecksApi,
+    MessagesApi,
+    NetworkApi,
+    NodeApi,
+    PeersApi,
+    TicketsApi,
+)
 from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, SendMessageReq, TagQuery
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
@@ -30,10 +41,10 @@ class HoprdAPI:
         self.configuration.host = f"{url}"
         self.configuration.api_key["X-Auth-Token"] = token
 
-    def __call_api(self, obj, method, *args, **kwargs):
+    def __call_api(self, obj: Callable[..., object], method: str, *args, **kwargs) -> tuple[bool, Optional[object]]:
         try:
             with ApiClient(self.configuration) as client:
-                api_callback = obj(client).__getattribute__(method)
+                api_callback = getattr(obj(client), method)
                 kwargs["async_req"] = True
                 thread = api_callback(*args, **kwargs)
                 response = thread.get()
@@ -124,14 +135,14 @@ class HoprdAPI:
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
 
-    async def channels_fund_channel(self, channel_id: str, amount: str):
+    async def channels_fund_channel(self, channel_id: str, amount: int):
         """
         Funds a given channel.
         :param: channel_id: str
-        :param: amount: str
+        :param: amount: int
         :return: bool
         """
-        body = FundRequest(amount=amount)
+        body = FundRequest(amount=f"{amount*1e18:.0f}")
         status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
@@ -348,3 +359,16 @@ class HoprdAPI:
         """
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
+
+    async def startedz(self):
+        """
+        Checks if the node is started.
+        :return: started: int
+        """
+        self.__call_api(ChecksApi, "startedz")
+
+    async def readyz(self):
+        """
+        Checks if the node is ready to accept connections.
+        """
+        self.__call_api(ChecksApi, "readyz")

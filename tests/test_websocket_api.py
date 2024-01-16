@@ -1,13 +1,15 @@
-from tests.conftest import DEFAULT_API_TOKEN
-from contextlib import asynccontextmanager
-import random
-import websockets
-import json
-import pytest
 import asyncio
+import json
+import random
 import re
-import rlp
+from contextlib import asynccontextmanager
 
+import pytest
+import rlp
+import websockets
+
+from .conftest import API_TOKEN
+from .node import Node
 
 LOCALHOST = "127.0.0.1"
 
@@ -16,15 +18,15 @@ def url(port):
     return f"ws://{LOCALHOST}:{port}/api/v3/messages/websocket"
 
 
-EXTRA_HEADERS = [("Cookie", f"X-Auth-Token={DEFAULT_API_TOKEN}")]
+EXTRA_HEADERS = [("Cookie", f"X-Auth-Token={API_TOKEN}")]
 
 
-async def connect_to(port):
+async def connect_to(port: int):
     return await websockets.connect(url(port), extra_headers=EXTRA_HEADERS)
 
 
 @asynccontextmanager
-async def web_socket_connection(port):
+async def web_socket_connection(port: int):
     conn = await connect_to(port)
     try:
         yield conn
@@ -33,28 +35,28 @@ async def web_socket_connection(port):
 
 
 @pytest.fixture
-async def ws_connections(swarm7):
-    async with web_socket_connection(swarm7["1"]["api_port"]) as ws1, web_socket_connection(
-        swarm7["2"]["api_port"]
-    ) as ws2, web_socket_connection(swarm7["3"]["api_port"]) as ws3, web_socket_connection(
-        swarm7["4"]["api_port"]
+async def ws_connections(swarm7: list[Node]):
+    async with web_socket_connection(swarm7[0].api_port) as ws1, web_socket_connection(
+        swarm7[1].api_port
+    ) as ws2, web_socket_connection(swarm7[2].api_port) as ws3, web_socket_connection(
+        swarm7[3].api_port
     ) as ws4, web_socket_connection(
-        swarm7["5"]["api_port"]
+        swarm7[4].api_port
     ) as ws5:
         yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4, "5": ws5}
 
 
-async def test_websocket_send_receive_messages(swarm7, ws_connections):
+async def test_websocket_send_receive_messages(swarm7: list[Node], ws_connections):
     # FIXME: for some reason sending NAT-to-NAT does not work in the test setup
     # valid_node_keys = ["1", "2", "3", "4", "5"]
-    valid_node_keys = ["1", "2", "3", "4"]
+    valid_node_keys = list(range(4))
     message_target_count = 50
 
     for i in range(message_target_count):
-        [source_key, target_key] = random.sample(valid_node_keys, 2)
+        source_key, target_key = random.sample(valid_node_keys, 2)
 
-        source_peer = swarm7[source_key]["peer_id"]
-        target_peer = swarm7[target_key]["peer_id"]
+        source_peer = swarm7[source_key].peer_id
+        target_peer = swarm7[target_key].peer_id
 
         source_ws = ws_connections[source_key]
         target_ws = ws_connections[target_key]

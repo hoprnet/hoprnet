@@ -1,50 +1,110 @@
-import fnmatch
-import http.client
+import asyncio
 import json
 import logging
 import os
 import random
 import shutil
-import subprocess
+import socket
 from copy import deepcopy
 from pathlib import Path
-from time import sleep
+from subprocess import STDOUT, Popen, run
 
 import pytest
 
-from .hopr import HoprdAPI
+from .node import Node
 
-random_data = os.urandom(8)
-SEED = int.from_bytes(random_data, byteorder="big")
+SEED = int.from_bytes(os.urandom(8), byteorder="big")
 random.seed(SEED)
 
+# Global variables
 LOCALHOST = "127.0.0.1"
-OPEN_CHANNEL_FUNDING_VALUE = "1000000000000000000000"
+OPEN_CHANNEL_FUNDING_VALUE = 1000
 
 TICKET_AGGREGATION_THRESHOLD = 100
 TICKET_PRICE_PER_HOP = 100
 
-MYDIR = Path(__file__).parent
-FIXTURE_FILES_DIR = Path("/tmp/")
-
-FIXTURE_FILES_PREFIX = "hopr-smoke-test"
+FIXTURES_PREFIX = "hopr-smoke-test"
 NODE_NAME_PREFIX = "hopr-smoke-test-node"
 
-ANVIL_CFG_FILE = FIXTURE_FILES_DIR.joinpath(f"{FIXTURE_FILES_PREFIX}-anvil.cfg")
-ANVIL_LOG_FILE = FIXTURE_FILES_DIR.joinpath(f"{FIXTURE_FILES_PREFIX}-anvil.log")
-ANVIL_NETWORK1 = "anvil-localhost"
-ANVIL_NETWORK2 = "anvil-localhost2"
+NETWORK1 = "anvil-localhost"
+NETWORK2 = "anvil-localhost2"
 
-PROTOCOL_CONFIG_FILE = MYDIR.parent.joinpath("scripts/protocol-config-anvil.json")
-TEST_PROTOCOL_CONFIG_FILE = Path(f"/tmp/{NODE_NAME_PREFIX}-protocol-config.json")
-DEPLOYMENTS_SUMMARY_FILE = MYDIR.parent.joinpath("ethereum/contracts/contracts-addresses.json")
-
-PREGENERATED_IDENTITIES_DIR = MYDIR.joinpath("identities")
-
-DEFAULT_API_TOKEN = "e2e-API-token^^"
+API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 
-def pytest_addoption(parser):
+PWD = Path(__file__).parent
+FIXTURES_DIR = Path("/tmp")
+
+ANVIL_CFG_FILE = FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX}-anvil.cfg")
+ANVIL_LOG_FILE = FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX}-anvil.log")
+
+PROTOCOL_CONFIG_FILE = PWD.parent.joinpath("scripts/protocol-config-anvil.json")
+TEST_PROTOCOL_CONFIG_FILE = FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}-protocol-config.json")
+DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
+PREGENERATED_IDENTITIES_DIR = PWD.joinpath("identities")
+
+NODES = [
+    Node(
+        19091,
+        13301,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
+        "localhost",
+        NETWORK1,
+    ),
+    Node(
+        19092,
+        13302,
+        None,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_2"),
+        LOCALHOST,
+        NETWORK1,
+    ),
+    Node(
+        19093,
+        13303,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
+        "localhost",
+        NETWORK1,
+    ),
+    Node(
+        19094,
+        13304,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_4"),
+        LOCALHOST,
+        NETWORK1,
+    ),
+    Node(
+        19095,
+        13305,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5"),
+        LOCALHOST,
+        NETWORK1,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5.cfg.yaml"),
+    ),
+    Node(
+        19096,
+        13306,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_6"),
+        LOCALHOST,
+        NETWORK2,
+    ),
+    Node(
+        19097,
+        13307,
+        API_TOKEN,
+        FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
+        "localhost",
+        NETWORK1,
+    ),
+]
+
+
+def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--stress-seq-request-count",
         action="store",
@@ -57,13 +117,13 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-tested-api",
         action="store",
-        default=f"http://{LOCALHOST}:{NODES['1'].api_port}",
+        default=f"http://{LOCALHOST}:{NODES[0].api_port}",
         help="The API towards which the stress test is performed",
     )
     parser.addoption(
         "--stress-tested-api-token",
         action="store",
-        default=DEFAULT_API_TOKEN,
+        default=API_TOKEN,
         help="The token for the stress tested API",
     )
     parser.addoption(
@@ -72,7 +132,7 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture
-def cmd_line_args(request):
+def cmd_line_args(request: pytest.FixtureRequest):
     args = {
         "stress_seq_request_count": request.config.getoption("--stress-seq-request-count"),
         "stress_par_request_count": request.config.getoption("--stress-par-request-count"),
@@ -84,46 +144,8 @@ def cmd_line_args(request):
     return args
 
 
-class Node:
-    def __init__(self, api_port: int, p2p_prt: int, api_token: str, dir: Path, host_addr: str, cfg_file: Path = None, network: str = ANVIL_NETWORK1):
-        self.api_port: int = api_port
-        self.p2p_port: int = p2p_prt
-        self.dir: Path = dir
-        self.host_addr: str = host_addr
-        self.api_token: str = api_token
-
-        self.cfg_file: Path = cfg_file
-        self.network: str = network
-        
-        self.peer_id: str = None
-        self.address: str = None
-        self.safe_address: str = None
-        self.module_address: str = None
-        self.proc = None
-        self.api: HoprdAPI = None
-
-
-NODES = {
-    "1": Node(19091, 13301, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"), "localhost"),
-    "2": Node(19092, 13302, None, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_2"), "127.0.0.1"),
-    "3": Node(19093, 13303, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"), "localhost"),
-    "4": Node(19094, 13304, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_4"), "127.0.0.1"),
-    "5": Node(19095, 13305, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5"), "localhost", FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5.cfg.yaml")),
-    "6": Node(19096, 13306, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_6"), "127.0.0.1", network=ANVIL_NETWORK2),
-    "7": Node(19097, 13307, DEFAULT_API_TOKEN, FIXTURE_FILES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"), "localhost"),
-}
-
-
-def cleanup_node(node):
-    try:
-        node.proc.kill()
-    except Exception:
-        pass
-
-
 def setup_node(node: Node):
-    logging.info(f"Setting up a node with configuration: {node}")
-    log_file = open(f"{node.dir}.log", "w")
+    logging.info(f"Setting up {node}")
     api_token_param = f"--api-token={node.api_token}" if node.api_token else "--disableApiAuthentication"
     custom_env = {
         "HOPRD_HEARTBEAT_INTERVAL": "2500",
@@ -154,25 +176,19 @@ def setup_node(node: Node):
     if node.cfg_file is not None:
         cmd += [f"--configurationFilePath={node.cfg_file}"]
 
-    # remove previous databases
-    shutil.rmtree(node.dir.as_posix(), ignore_errors=True)
+    with open(f"{node.dir}.log", "w") as log_file:
+        node.proc = Popen(
+            cmd,
+            stdout=log_file,
+            stderr=STDOUT,
+            env=os.environ | custom_env,
+            cwd=PWD.parent,
+        )
 
-    proc = subprocess.Popen(
-        cmd, stdout=log_file, stderr=subprocess.STDOUT, env=os.environ | custom_env, cwd=MYDIR.parent.as_posix()
-    )
-    api = HoprdAPI(f"http://{node.host_addr}:{node.api_port}", node.api_token)
-
-    return (proc, api)
-
-
-def test_sanity():
-    assert len(NODES) == len({n.api_port for n in NODES.values()}), "All API ports must be unique"
-    assert len(NODES) == len({n.p2p_port for n in NODES.values()}), "All p2p ports must be unique"
+    return node
 
 
-def check_socket(address, port):
-    import socket
-
+def check_socket(address: str, port: str):
     s = socket.socket()
     try:
         s.connect((address, port))
@@ -183,108 +199,114 @@ def check_socket(address, port):
         s.close()
 
 
-def mirror_contract_data(dest_file_path, src_file_path, src_network, dest_network):
-    dest_data = ""
+def mirror_contract_data(dest_file_path: Path, src_file_path: Path, src_network: str, dest_network: str):
+    with open(src_file_path, "r") as file:
+        src_data = json.load(file)
 
-    with open(src_file_path, "r") as src_file, open(dest_file_path, "r") as dest_file:
-        src_data = json.load(src_file)
-        dest_data = json.load(dest_file)
-        network_data = src_data["networks"][src_network]
-        partial_network_data = {
-            "environment_type": network_data["environment_type"],
-            "indexer_start_block_number": 1,
-            "addresses": network_data["addresses"],
-        }
-        new_network_data = dest_data["networks"][dest_network] | partial_network_data
-        dest_data["networks"][dest_network] = new_network_data
+    with open(dest_file_path, "r") as file:
+        dest_data = json.load(file)
 
-    with open(dest_file_path, "w") as dest_file:
-        json.dump(dest_data, dest_file, sort_keys=True, indent=2)
+    network_data = src_data["networks"][src_network]
+    partial_network_data = {
+        "environment_type": network_data["environment_type"],
+        "indexer_start_block_number": 1,
+        "addresses": network_data["addresses"],
+    }
+    new_network_data = dest_data["networks"][dest_network] | partial_network_data
+    dest_data["networks"][dest_network] = new_network_data
+
+    with open(dest_file_path, "w") as file:
+        json.dump(dest_data, file, sort_keys=True)
 
 
-def reuse_pregenerated_identities():
-    # remove existing identity files in tmp folder, .safe.args
-    suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
+def copy_identities():
+    # Remove old identities
+    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*.id"):
+        os.remove(f)
+    logging.info(f"Removed '*.id' files in {FIXTURES_DIR}")
 
-    def is_relevant_file(f):
-        return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
+    # Remove old logs
+    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*.log"):
+        os.remove(f)
+    logging.info(f"Removed '*.log' files in {FIXTURES_DIR}")
 
-    for f in filter(is_relevant_file, os.listdir(FIXTURE_FILES_DIR)):
-        os.remove(FIXTURE_FILES_DIR.joinpath(f))
-        logging.info(f"Removed file {FIXTURE_FILES_DIR.joinpath(f)}")
+    # Remove old db
+    for f in FIXTURES_DIR.glob(f"{FIXTURES_PREFIX}-*"):
+        if not f.is_dir():
+            continue
+        shutil.rmtree(f, ignore_errors=True)
+    logging.info(f"Removed dbs in {FIXTURES_DIR}")
 
-    # we copy and rename the files according to the expected file name format and destination folder
-    node_nr = 1
-    id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
-
-    def is_relevant_file(f):
-        return fnmatch.fnmatch(f, "*.id")
-
-    for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
-        path = shutil.copyfile(
-            PREGENERATED_IDENTITIES_DIR.joinpath(f), 
-            FIXTURE_FILES_DIR.joinpath(f"{FIXTURE_FILES_PREFIX}-node_{node_nr}.id"),
+    # Copy new identity files
+    for node_id in range(len(NODES)):
+        f = f"{NODE_NAME_PREFIX}_{node_id+1}.id"
+        shutil.copy(
+            PREGENERATED_IDENTITIES_DIR.joinpath(f),
+            FIXTURES_DIR.joinpath(f),
         )
-        logging.info(f"Copied file {PREGENERATED_IDENTITIES_DIR}/{f} to {path}")
-        node_nr += 1
+    logging.info(f"Copied '*.id' files to {FIXTURES_DIR}")
+
+    # Copy new config files
+    for f in PWD.glob(f"{NODE_NAME_PREFIX}_*.cfg.yaml"):
+        shutil.copy(f, FIXTURES_DIR.joinpath(f.name))
+    logging.info(f"Copied '*.cfg.yaml' files to {FIXTURES_DIR}")
 
 
-def create_local_safes(nodes_args: dict[str, Node], private_key):
-    custom_env = {
+def create_local_safe(node: Node, private_key: str):
+    custom_env: dict = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
         "DEPLOYER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
-        "PATH": MYDIR.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
+        "PATH": PWD.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
     }
 
-    for node_id, node in nodes_args.items():
-        id_file = f"{node.dir}.id"
-        res = subprocess.run(
-            [
-                "hopli",
-                "create-safe-module",
-                "--network",
-                ANVIL_NETWORK1,
-                "--identity-from-path",
-                id_file,
-                "--contracts-root",
-                "./ethereum/contracts",
-                "--hopr-amount",
-                "20000.0",
-            ],
-            env=os.environ | custom_env,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        for el in res.stdout.split("\n"):
-            if el.startswith("safe: address 0x"):
-                node.safe_address = el.split(" ")[-1]
+    res = run(
+        [
+            "hopli",
+            "create-safe-module",
+            "--network",
+            NETWORK1,
+            "--identity-from-path",
+            f"{node.dir}.id",
+            "--contracts-root",
+            "./ethereum/contracts",
+            "--hopr-amount",
+            "20000.0",
+        ],
+        env=os.environ | custom_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
-            if el.startswith("module: address 0x"):
-                node.module_address = el.split(" ")[-1]
+    for el in res.stdout.split("\n"):
+        if el.startswith("safe: address 0x"):
+            node.safe_address = el.split()[-1]
 
-    return nodes_args
+        if el.startswith("module: address 0x"):
+            node.module_address = el.split()[-1]
+
+    return node
 
 
-def funding_nodes(private_key):
+def fund_nodes(private_key: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
         "PRIVATE_KEY": private_key,
-        "PATH": MYDIR.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
+        "PATH": PWD.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
     }
-    subprocess.run(
+    run(
         [
             "hopli",
             "faucet",
             "--network",
-            ANVIL_NETWORK1,
+            NETWORK1,
             "--identity-prefix",
-            FIXTURE_FILES_PREFIX,
+            FIXTURES_PREFIX,
             "--identity-directory",
-            FIXTURE_FILES_DIR,
+            FIXTURES_DIR,
             "--contracts-root",
             "./ethereum/contracts",
             "--hopr-amount",
@@ -296,96 +318,72 @@ def funding_nodes(private_key):
     )
 
 
-def collect_node_information(node):
-    headers = {"Accept": "application/json"}
-    if node.api_token is not None:
-        headers = headers | {"x-auth-token": node.api_token}
-    while True:
-        try:
-            conn = http.client.HTTPConnection(node.host_addr, node.api_port)
-            conn.request("GET", "/api/v3/account/addresses", headers=headers)
-            resp = conn.getresponse()
-            assert resp.status == 200
-            data = json.loads(resp.read())
-            return (data["hopr"], data["native"])
-        except Exception:
-            sleep(0.1)
+@pytest.fixture(scope="module")
+def event_loop():
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture(scope="module")
-def swarm7(request):
+async def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    for f in ["node_5.cfg.yaml"]:
-        shutil.copyfile(MYDIR.joinpath(f), FIXTURE_FILES_DIR.joinpath(f"{FIXTURE_FILES_PREFIX}-{f}"))
-
+    ## STOP OLD LOCAL ANVIL SERVER
     logging.info("Ensure local anvil server is not running")
-    subprocess.run(["make", "kill-anvil"], cwd=MYDIR.parent, check=True)
+    run("make kill-anvil".split(), cwd=PWD.parent, check=True)
 
-    logging.info("Starting local anvil server")
-    subprocess.run(
-        ["./run-local-anvil.sh", "-l", ANVIL_LOG_FILE, "-c", ANVIL_CFG_FILE],
+    ## START NEW LOCAL ANVIL SERVER
+    logging.info("Starting and waiting for local anvil server to be up")
+    run(
+        f"./run-local-anvil.sh -l {ANVIL_LOG_FILE} -c {ANVIL_CFG_FILE}".split(),
         check=True,
         capture_output=True,
-        cwd=MYDIR.parent.joinpath("scripts"),
+        cwd=PWD.parent.joinpath("scripts"),
     )
 
-    logging.info("Wait for anvil server to start up")
-
-    # read auto-generated private key from anvil configuration
-    with open(ANVIL_CFG_FILE, "r") as anvil_cfg_file:
-        data = json.load(anvil_cfg_file)
-        private_key = data["private_keys"][0]
+    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
+    with open(ANVIL_CFG_FILE, "r") as file:
+        data: dict = json.load(file)
+        private_key = data.get("private_keys", [""])[0]
 
     logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
 
-    shutil.copyfile(PROTOCOL_CONFIG_FILE, TEST_PROTOCOL_CONFIG_FILE)
-    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK1)
-    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, ANVIL_NETWORK1, ANVIL_NETWORK2)
+    shutil.copy(PROTOCOL_CONFIG_FILE, TEST_PROTOCOL_CONFIG_FILE)
+    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK1)
+    mirror_contract_data(TEST_PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, NETWORK1, NETWORK2)
 
-    logging.info("Reuse pre-generated identities")
-    reuse_pregenerated_identities()
+    # SETUP NODES USING STORED IDENTITIES
+    logging.info("Reuse pre-generated identities and configs")
+    copy_identities()
+
+    # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
+    logging.info("Create safe and modules for all the ids, store them in args files")
 
     nodes = deepcopy(NODES)
 
-    logging.info("Create safe and modules for all the ids, store them in args files")
-    nodes = create_local_safes(nodes, private_key)
+    nodes = [create_local_safe(node, private_key) for node in nodes]
+    nodes = [setup_node(node) for node in nodes]
 
-    try:
-        for node_id, node in nodes.items():
-            (proc, api) = setup_node(node)
-            node.proc = proc
-            node.api: HoprdAPI = api
+    # WAIT FOR NODES TO BE UP
+    logging.info(f"Wait for {len(nodes)} nodes to start up")
+    [await node.api.startedz() for node in nodes]
 
-        logging.info(f"Wait for {len(nodes)} nodes to start up")
+    # FUND NODES
+    logging.info("Funding nodes")
+    fund_nodes(private_key)
 
-        for node_id, node in nodes.items():
-            while True:
-                with open(f"{node.dir}.log", "r") as f:
-                    logs = f.read()
-                    if "still unfunded, " in logs or "node is funded" in logs:
-                        logging.info(f"Node {node_id} up")
-                        break
+    # FINAL WAIT FOR NODES TO BE UP
+    logging.info("Node setup finished, waiting for nodes to be up")
+    for node in nodes:
+        await node.api.readyz()
+        node.peer_id = await node.api.addresses("hopr")
+        node.address = await node.api.addresses("native")
 
-                sleep(0.1)
+    # YIELD NODES
+    yield nodes
 
-        logging.info("Funding nodes")
-        funding_nodes(private_key)
-
-        logging.info("Collect node information")
-        for node_id, node in nodes.items():
-            peer_id, address = collect_node_information(node)
-            node.peer_id = peer_id
-            node.address = address
-
-        logging.info("Node setup finished, waiting 10 seconds before proceeding")
-        sleep(10)
-
-        yield nodes
-    except Exception as e:
-        logging.error(f"Creating a 7 node cluster - FAILED: {e}")
-    finally:
-        logging.debug("Tearing down the 7 node cluster")
-        for node_id, node in nodes.items():
-            cleanup_node(node)
-        pass
+    # POST TEST CLEANUP
+    logging.debug(f"Tearing down the {len(nodes)} nodes cluster")
+    [node.clean_up() for node in nodes]

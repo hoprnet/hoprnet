@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import os
-import pytest
 import random
 
-from hopr import HoprdAPI
+import pytest
+
+from .hopr import HoprdAPI
 
 HTTP_STATUS_CODE_OK = 200
 HTTP_STATUS_CODE_SEND_MESSAGE_OK = 202
