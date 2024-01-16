@@ -11,13 +11,13 @@ use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
 use log::{info, warn};
-use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    metrics::metrics::{MultiGauge, SimpleGauge},
-    platform::time::native::current_timestamp,
+    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
+    hopr_platform::time::native::current_timestamp,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -567,8 +567,8 @@ mod tests {
     use crate::network::{
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
+    use hopr_platform::time::native::current_timestamp;
     use libp2p_identity::PeerId;
-    use platform::time::native::current_timestamp;
 
     struct DummyNetworkAction {}
 
@@ -591,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn test_network_health_should_be_ordered_numerically_for_metrics_output() {
+    fn test_network_health_should_be_ordered_numerically_for_hopr_metrics_output() {
         assert_eq!(Health::Unknown as i32, 0);
         assert_eq!(Health::Red as i32, 1);
         assert_eq!(Health::Orange as i32, 2);

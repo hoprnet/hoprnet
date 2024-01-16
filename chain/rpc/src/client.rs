@@ -8,13 +8,13 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 use validator::Validate;
 
+use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
 use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
 
-use crate::client::RetryAction::{NoRetry, RetryAfter};
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, MultiHistogram};
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -484,9 +484,9 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
     use serde_json::json;
     use std::time::Duration;
-    use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

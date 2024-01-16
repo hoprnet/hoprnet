@@ -5,7 +5,7 @@ use log::{debug, warn};
 use std::time::Duration;
 
 use async_std::task::sleep;
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 fn get_timestamp() -> Duration {
     current_timestamp()

@@ -9,6 +9,7 @@ WORKDIR /app/hoprnet
 COPY .cargo/config.toml .cargo/
 COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY chain chain/
+COPY common common/
 COPY crypto crypto/
 COPY ethereum ethereum/
 COPY hopli hopli/

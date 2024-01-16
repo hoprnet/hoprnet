@@ -23,14 +23,14 @@ pub enum DbError {
 
 pub type Result<T> = std::result::Result<T, DbError>;
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "js")]
 impl From<DbError> for wasm_bindgen::JsValue {
     fn from(value: DbError) -> Self {
         value.to_string().into()
     }
 }
 
-#[cfg(feature = "sqlite")]
+#[cfg(not(feature = "js"))]
 impl From<sqlx::Error> for DbError {
     fn from(value: sqlx::Error) -> Self {
         crate::errors::DbError::GenericError(value.to_string())

@@ -8,11 +8,11 @@ use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -201,9 +201,9 @@ pub mod tests {
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::{Address, BalanceType, U256};
     use primitive_types::H160;
     use std::time::Duration;
-    use utils_types::primitives::{Address, BalanceType, U256};
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

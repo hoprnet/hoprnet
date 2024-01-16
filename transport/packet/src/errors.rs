@@ -1,9 +1,9 @@
 use core_path::errors::PathError;
-use core_types::errors::CoreTypesError;
 use hopr_crypto::errors::CryptoError;
+use hopr_internal_types::errors::CoreTypesError;
+use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use utils_types::errors::GeneralError;
 
 #[derive(Error, Debug)]
 pub enum PacketError {

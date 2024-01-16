@@ -2,16 +2,16 @@ use crate::channel_graph::{ChannelEdge, ChannelGraph};
 use crate::errors::{PathError, Result};
 use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
-use core_types::channels::ChannelEntry;
-use core_types::protocol::INTERMEDIATE_HOPS;
 use hopr_crypto::random::random_float;
+use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_primitive_types::errors::GeneralError::InvalidInput;
+use hopr_primitive_types::primitives::{Address, U256};
 use petgraph::visit::EdgeRef;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 use std::marker::PhantomData;
 use std::ops::Add;
-use utils_types::errors::GeneralError::InvalidInput;
-use utils_types::primitives::{Address, U256};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct WeightedChannelPath(Vec<Address>, U256);
@@ -166,10 +166,10 @@ mod tests {
     use crate::path::{ChannelPath, Path};
     use crate::selectors::legacy::DfsPathSelector;
     use crate::selectors::{EdgeWeighting, PathSelector};
-    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
     use lazy_static::lazy_static;
     use std::str::FromStr;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [

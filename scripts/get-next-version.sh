@@ -43,7 +43,7 @@ if [ "${release_type}" = "Build" ] && [ -z "${build}" ]; then
   exit 1
 fi
 
-current_version="$(cat ${mydir}/../hopr/Cargo.toml | grep "^version = .*$" | cut -d' ' -f3 | tr -d '"')"
+current_version="$(cat ${mydir}/../hopr/hopr-lib/Cargo.toml | grep "^version = .*$" | cut -d' ' -f3 | tr -d '"')"
 
 # Set dash as the delimiter to read current_version to get release candidate
 IFS='-'

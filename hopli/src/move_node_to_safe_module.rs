@@ -8,9 +8,9 @@ use crate::{
 use clap::Parser;
 use hopr_crypto::keypairs::Keypair;
 use hopr_crypto::types::ToChecksum;
+use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
 use std::{env, str::FromStr};
-use utils_types::primitives::Address;
 
 /// CLI arguments for `hopli move-node-to-safe-module`
 #[derive(Parser, Default, Debug)]

@@ -1,3 +1,4 @@
+pub use core_protocol::errors::ProtocolError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -6,7 +7,7 @@ pub enum HoprTransportError {
     Api(String),
 
     #[error("General error: {0}")]
-    General(#[from] utils_types::errors::GeneralError),
+    General(#[from] hopr_primitive_types::errors::GeneralError),
 
     #[error("Db error: {0}")]
     Db(#[from] utils_db::errors::DbError),
@@ -21,7 +22,7 @@ pub enum HoprTransportError {
     Packet(#[from] core_packet::errors::PacketError),
 
     #[error("Type error: {0}")]
-    Types(#[from] core_types::errors::CoreTypesError),
+    Types(#[from] hopr_internal_types::errors::CoreTypesError),
 }
 
 pub type Result<T> = core::result::Result<T, HoprTransportError>;

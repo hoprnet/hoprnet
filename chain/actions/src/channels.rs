@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
-use core_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_crypto::types::Hash;
+use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 use log::{debug, error, info};
-use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::action_queue::PendingAction;
 use crate::errors::CoreEthereumActionsError::{
@@ -17,7 +17,7 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]
@@ -169,10 +169,14 @@ mod tests {
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
-    use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto::{random::random_bytes, types::Hash};
+    use hopr_internal_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
+    use hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::BinarySerializable,
+    };
     use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{
@@ -181,10 +185,6 @@ mod tests {
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
-    };
 
     lazy_static! {
         static ref ALICE: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));

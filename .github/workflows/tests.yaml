@@ -188,9 +188,9 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Setup Hoprd Runtime
+      - name: Setup Hoprd
         run: |
-          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+          sudo ./scripts/toolchain/install-toolchain.sh
 
       - name: Build application
         run: nix develop -c make -j build
