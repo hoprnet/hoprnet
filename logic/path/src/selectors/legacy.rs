@@ -7,14 +7,18 @@ use core_types::protocol::INTERMEDIATE_HOPS;
 use hopr_crypto::random::random_float;
 use petgraph::visit::EdgeRef;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::BinaryHeap;
 use std::marker::PhantomData;
-use std::ops::Add;
 use utils_types::errors::GeneralError::InvalidInput;
 use utils_types::primitives::{Address, U256};
 
+/// Holds a weighted channel path and auxiliary information
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct WeightedChannelPath(Vec<Address>, U256);
+struct WeightedChannelPath {
+    path: Vec<Address>,
+    weight: U256,
+    fully_explored: bool,
+}
 
 impl PartialOrd for WeightedChannelPath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -23,23 +27,48 @@ impl PartialOrd for WeightedChannelPath {
 }
 
 impl Ord for WeightedChannelPath {
+    /// Favor not expored paths over fully explored paths,
+    /// there could be better ones.
+    ///
+    /// Favor longer paths over shorter paths, longer path
+    /// means more privacy.
+    ///
+    /// If both parts are of the same length, favor paths
+    /// with higher weights.
     fn cmp(&self, other: &Self) -> Ordering {
-        self.1.cmp(&other.1)
+        if other.fully_explored == self.fully_explored {
+            match self.path.len().cmp(&other.path.len()) {
+                Ordering::Equal => self.weight.cmp(&other.weight),
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Less => Ordering::Less,
+            }
+        } else if other.fully_explored && !self.fully_explored {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
     }
 }
 
-/// Calculates the channel weight as (channel stake + 1) * (1 + R)
-/// where R is uniform random in (0,1]
+/// Assigns each channel a weight.
+/// The weight is randomized such that not always the same
+/// nodes get selected. This is necessary to achieve privacy.
+/// It also favors nodes with higher stake.
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
+    /// Multiply all channel stake with a random float in the interval (0,1].
+    /// Given that the float are uniform, nodes with higher stake have a higher
+    /// probability of reaching a higher value.
+    ///
+    /// Sorting the list of weights thus moves nodes with higher stakes more
+    /// often to the front.
     fn calculate_weight(channel: &ChannelEntry) -> U256 {
-        const PATH_RANDOMNESS: f64 = 0.1;
-
-        let r = random_float() * PATH_RANDOMNESS;
-        let base = channel.balance.value() + 1u32;
-
-        base.add(base.multiply_f64(r).unwrap())
+        channel
+            .balance
+            .value()
+            .multiply_f64(random_float())
+            .expect("Could not multiply edge weight with float")
     }
 }
 
@@ -76,12 +105,12 @@ impl<CW> DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
-    /// Determines whether a node is considered "interesting"
-    /// 
+    /// Determines whether a node is considered "interesting".
+    ///
     /// To achieve privacy, we need at least one honest node along
     /// the path. Each additional node decreases the probability of
     /// having only malicious nodes, so we can sort out many nodes.
-    /// Nodes that have shown to be unreliable are of no use, so 
+    /// Nodes that have shown to be unreliable are of no use, so
     /// drop them.
     fn filter_channel(
         &self,
@@ -135,43 +164,63 @@ where
         }
 
         let mut queue = BinaryHeap::new();
-        let mut dead_ends = HashSet::new();
 
         graph
             .open_channels_from(source)
             .filter_map(|channel| {
                 let w = channel.weight();
-                self.filter_channel(w, &source, &destination, &[], &dead_ends)
-                    .then(|| WeightedChannelPath(vec![w.channel.destination], CW::calculate_weight(&w.channel)))
+                self.filter_channel(w, &source, &destination, &[])
+                    .then(|| WeightedChannelPath {
+                        path: vec![w.channel.destination],
+                        weight: CW::calculate_weight(&w.channel),
+                        fully_explored: false,
+                    })
             })
             .for_each(|wcp| queue.push(wcp));
 
         let mut iters = 0;
         while !queue.is_empty() && iters < self.max_iterations {
-            let current_path = queue.peek().unwrap();
-            let current_path_len = current_path.0.len();
+            let current_path = queue.peek().unwrap().clone();
+            let current_path_len = current_path.path.len();
 
-            if current_path_len >= max_hops && current_path_len <= INTERMEDIATE_HOPS {
-                return Ok(ChannelPath::new_valid(queue.pop().unwrap().0));
+            if current_path_len >= max_hops {
+                return Ok(ChannelPath::new_valid(queue.pop().unwrap().path));
             }
 
-            let last_peer = *current_path.0.last().unwrap();
+            if current_path.fully_explored {
+                if current_path_len >= min_hops {
+                    return Ok(ChannelPath::new_valid(queue.pop().unwrap().path));
+                } else {
+                    return Err(PathError::PathNotFound(
+                        max_hops,
+                        source.to_string(),
+                        destination.to_string(),
+                    ));
+                }
+            }
+
+            let last_peer = *current_path.path.last().unwrap();
             let new_channels = graph
                 .open_channels_from(last_peer)
-                .filter(|channel| self.filter_channel(channel.weight(), &destination, &current_path.0, &dead_ends))
+                .filter(|channel| self.filter_channel(channel.weight(), &source, &destination, &current_path.path))
                 .collect::<Vec<_>>();
 
             if !new_channels.is_empty() {
-                let current_path_clone = current_path.clone();
+                // There exists a longer paths, so drop current path
+                queue.pop();
+
                 for new_channel in new_channels {
-                    let mut next_path_variant = current_path_clone.clone();
-                    next_path_variant.0.push(new_channel.weight().channel.destination);
-                    next_path_variant.1 += CW::calculate_weight(&new_channel.weight().channel);
+                    let mut next_path_variant = current_path.clone();
+                    next_path_variant.path.push(new_channel.weight().channel.destination);
+                    next_path_variant.weight += CW::calculate_weight(&new_channel.weight().channel);
+                    next_path_variant.fully_explored = false;
+
                     queue.push(next_path_variant);
                 }
             } else {
-                queue.pop();
-                dead_ends.insert(last_peer);
+                // Keep the current path in case we do not find anything better
+                let mut current_path = queue.peek_mut().unwrap();
+                current_path.fully_explored = true;
             }
 
             iters += 1;
@@ -346,7 +395,7 @@ mod tests {
         );
         let selector = DfsPathSelector::<TestWeights>::default();
         let path = selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)
             .expect("should find a path");
 
         check_path(&path, &star, ADDRESSES[5]);
@@ -368,7 +417,7 @@ mod tests {
 
         let selector = DfsPathSelector::<TestWeights>::default();
         let path = selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)
             .expect("should find a path");
 
         check_path(&path, &star, ADDRESSES[5]);
@@ -386,10 +435,10 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::default();
 
         selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 3)
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 3)
             .expect_err("should not find a path 1");
         selector
-            .select_path(&star, ADDRESSES[5], ADDRESSES[0], 3)
+            .select_path(&star, ADDRESSES[5], ADDRESSES[0], 1, 3)
             .expect_err("should not find a path 2");
     }
 
@@ -403,7 +452,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::default();
 
         let path = selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 1, 3)
             .expect("should find a path");
         check_path(&path, &arrow, ADDRESSES[5]);
         assert_eq!(3, path.length(), "should have 3 hops");
@@ -419,7 +468,7 @@ mod tests {
 
         let selector = DfsPathSelector::<TestWeights>::default();
         selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 1, 3)
             .expect_err("should not find a path");
     }
 }

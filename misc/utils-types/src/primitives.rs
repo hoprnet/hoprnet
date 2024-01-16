@@ -625,11 +625,29 @@ impl Add for U256 {
     }
 }
 
+impl Add<U256> for &U256 {
+    type Output = U256;
+    fn add(self, rhs: U256) -> Self::Output {
+        U256 {
+            value: self.value.add(rhs.value),
+        }
+    }
+}
+
+impl Add<&U256> for &U256 {
+    type Output = U256;
+    fn add(self, rhs: &U256) -> Self::Output {
+        U256 {
+            value: self.value.clone() + rhs.value.clone(),
+        }
+    }
+}
+
 impl Add<u32> for &U256 {
     type Output = U256;
     fn add(self, rhs: u32) -> Self::Output {
         U256 {
-            value: self.value.clone() + rhs as u128
+            value: self.value.clone() + rhs as u128,
         }
     }
 }
@@ -656,6 +674,15 @@ impl Sub for U256 {
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.sub(rhs.value),
+        }
+    }
+}
+
+impl Sub<&U256> for &U256 {
+    type Output = U256;
+    fn sub(self, rhs: &U256) -> Self::Output {
+        U256 {
+            value: self.value.clone() - rhs.value.clone(),
         }
     }
 }
