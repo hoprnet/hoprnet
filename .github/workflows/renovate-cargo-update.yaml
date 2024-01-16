@@ -6,8 +6,6 @@ name: Dependencies
 
 env:
   RUST_BACKTRACE: "1"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 on:
   push:
@@ -23,18 +21,6 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.4.0"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -46,18 +32,6 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
 
       - name: Update vendored cargo dependencies
         run: |

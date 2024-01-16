@@ -6,8 +6,6 @@ name: Lint
 
 env:
   RUST_BACKTRACE: "1"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 on:
   pull_request:
@@ -27,18 +25,6 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -50,21 +36,6 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
 
       - name: Format generated code to pass the linter
         run: nix develop -c cargo fmt -p bindings

@@ -6,8 +6,6 @@ name: Test
 
 env:
   RUST_BACKTRACE: "1"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
   FOUNDRY_PROFILE: ci
 
 on:
@@ -28,18 +26,6 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -52,24 +38,8 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
-
       - name: Build
-        run: nix develop -c make -j build
+        run: nix build
 
   unit-tests:
     name: Unit
@@ -82,18 +52,6 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -105,19 +63,6 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
 
       - name: Test
         run: nix develop -c make -j test
@@ -142,18 +87,6 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -165,32 +98,6 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
-
-      - name: Setup Hoprd
-        run: |
-          sudo ./scripts/toolchain/install-toolchain.sh
-
-      - name: Build application
-        run: nix develop -c make -j build
-
-      - name: Install
-        run: nix develop -c make -j install
 
       - name: Test with pytest
         run: nix develop -c make smoke-test-full
