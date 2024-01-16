@@ -7,7 +7,7 @@ $$ PRG : k \in \{ 0,1 \}^{32} \times start \in \mathbb{N} \times end \in \mathbb
 
 $PRG$ takes a key $k \in \{ 0,1 \}^{32}$, a natural number $start$ and a natural number $end$ with $start \le end$ and creates an output of size $end - start$. For $start$ values strictly greater than $0$, it returns the PRG output beginning with $start$.
 
-The PRG output is generated using AES with 256-bit key length in counter mode (AES-CTR-256), encrypting zeros and using $k$ as encryption key and $iv_{pre} \in \{ 0, 1 \}^{12}$ as an initiailization vector where $iv := iv_{pre} \ || \ blockNumber$ and $blockNumber \in \{ 0, \dots, 2^{32} - 1 \}$, yielding
+The PRG output is generated using AES with 256-bit key length in counter mode (AES-CTR-256), encrypting zeros and using $k$ as encryption key and $iv_{pre} \in \{ 0, 1 \}^{12}$ as an initialization vector where $iv := iv_{pre} \ || \ blockNumber$ and $blockNumber \in \{ 0, \dots, 2^{32} - 1 \}$, yielding
 
 $$ block_i = \mathsf{AES\_CTR\_256}_{k, \ iv_{pre} \ || \ i}(0) $$
 

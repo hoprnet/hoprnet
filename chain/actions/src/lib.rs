@@ -39,8 +39,8 @@
 
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
+use hopr_primitive_types::primitives::Address;
 use std::sync::Arc;
-use utils_types::primitives::Address;
 
 use crate::action_queue::ActionSender;
 
@@ -52,7 +52,7 @@ pub mod node;
 pub mod payload;
 pub mod redeem;
 
-///! Contains all actions that a node can execute on-chain.
+/// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,

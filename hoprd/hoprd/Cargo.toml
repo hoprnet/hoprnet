@@ -11,65 +11,37 @@ license = "GPL-3.0-only"
 [dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 async-lock = { workspace = true }
-async-trait = { workspace = true }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
 fern = "0.6.2"
 futures = { workspace = true }
 hex = { workspace = true }
+humantime = "2.1.0"
 lazy_static = { workspace = true, optional = true }
+log = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
-strum = "0.25"
-thiserror = "1.0"
+strum = { workspace = true }
+thiserror = { workspace = true }
 validator = { workspace = true }
 
-core-transport = { workspace = true }
-core-network = { workspace = true }
-core-strategy = { workspace = true }
-chain-db = { workspace = true }
-chain-indexer = { workspace = true }
-chain-types = { workspace = true }
 hopr-lib = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
-platform = { workspace = true }
-utils-db = { workspace = true }
-log = { workspace = true }
-metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
-utils-validation = { workspace = true }
-humantime = "2.1.0"
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3"
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "core-transport/wasm",
-    "core-network/wasm",
-    "core-strategy/wasm",
-    "chain-db/wasm",
-    "chain-indexer/wasm",
-    "chain-types/wasm",
-    "hopr-lib/wasm",
-    "hoprd-inbox/wasm",
-    "hoprd-keypair/wasm",
-    "platform/wasm-bindgen",
-    "utils-db/wasm",
-    "metrics?/wasm",
-    "utils-types/wasm",
-]
 prometheus = [
-    "dep:metrics",
+    "dep:hopr-metrics",
     "dep:lazy_static",
     "hopr-lib/prometheus",
-    "core-transport/prometheus",
-    "core-strategy/prometheus",
-    "core-network/prometheus",
-    "chain-indexer/prometheus"
+    "hoprd-api/prometheus"
 ]

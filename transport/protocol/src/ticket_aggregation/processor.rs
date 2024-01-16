@@ -4,10 +4,6 @@ use crate::errors::{
 };
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, ChannelEntry, Ticket},
-};
 use futures::{
     channel::{
         mpsc::{channel, Receiver, Sender},
@@ -18,34 +14,38 @@ use futures::{
 };
 use futures_lite::stream::{Stream, StreamExt};
 use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
+use hopr_internal_types::{
+    acknowledgement::AcknowledgedTicket,
+    channels::{generate_channel_id, ChannelEntry, Ticket},
+};
+use hopr_primitive_types::{
+    primitives::{Balance, BalanceType},
+    traits::PeerIdLike,
+};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use utils_types::{
-    primitives::{Balance, BalanceType},
-    traits::PeerIdLike,
-};
 
-use core_types::acknowledgement::AcknowledgedTicketStatus;
 use futures::stream::FuturesUnordered;
+use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus;
 
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
-use utils_types::primitives::U256;
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_AGGREGATED_TICKETS: SimpleCounter = SimpleCounter::new(
-        "core_counter_aggregated_tickets",
+        "hopr_aggregated_tickets_count",
         "Number of aggregated tickets"
     )
     .unwrap();
     static ref METRIC_AGGREGATION_COUNT: SimpleCounter = SimpleCounter::new(
-        "core_counter_aggregations",
+        "hopr_aggregations_count",
         "Number of performed ticket aggregations"
     )
     .unwrap();
@@ -725,25 +725,25 @@ where
 mod tests {
     use async_lock::RwLock;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
-    use core_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
-    };
     use futures_lite::StreamExt;
     use hex_literal::hex;
     use hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
+    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
+    use hopr_internal_types::{
+        acknowledgement::AcknowledgedTicket,
+        channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
+    };
+    use hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::{BinarySerializable, PeerIdLike},
+    };
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
 
     use super::{AggregationList, TicketAggregationProcessed};
 

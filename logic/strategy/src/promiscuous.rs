@@ -1,10 +1,10 @@
-use core_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_crypto::types::OffchainPublicKey;
+use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -13,12 +13,12 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
+use hopr_primitive_types::traits::PeerIdLike;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_types::sma::{SingleSumSMA, SMA};
-use utils_types::traits::PeerIdLike;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -27,14 +27,16 @@ use crate::strategy::SingularStrategy;
 use crate::{decision::ChannelDecision, Strategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_OPENS: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_promiscuous_opened_channels", "Count of open channel decisions").unwrap();
+        SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
     static ref METRIC_COUNT_CLOSURES: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_promiscuous_closed_channels", "Count of close channel decisions").unwrap();
+        SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
+    static ref METRIC_MAX_AUTO_CHANNELS: SimpleGauge =
+        SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
 /// Config of promiscuous strategy.
@@ -231,6 +233,9 @@ where
             .unwrap_or((current_average_network_size as f64).sqrt().ceil() as usize);
         debug!("current upper bound for maximum number of auto-channels is {max_auto_channels}");
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_MAX_AUTO_CHANNELS.set(max_auto_channels as f64);
+
         // Count all the effectively opened channels (ie. after the decision has been made)
         let occupied = outgoing_open_channels
             .len()
@@ -402,17 +407,17 @@ mod tests {
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
-    use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::Hash;
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_platform::time::native::current_timestamp;
+    use hopr_primitive_types::primitives::{Snapshot, U256};
+    use hopr_primitive_types::traits::BinarySerializable;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use platform::time::native::current_timestamp;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::primitives::{Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
 
     lazy_static! {
         static ref PEERS: Vec<(Address, PeerId)> = (0..10)

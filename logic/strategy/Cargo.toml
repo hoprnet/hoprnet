@@ -16,16 +16,14 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 async-std = { workspace = true, features = ["unstable"]}
 futures = { workspace = true }
-getrandom = { workspace = true, optional = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
 lazy_static = { workspace = true }
-strum = { version = "0.25", features = ["derive"] }
+strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-core-types = { workspace = true }
 hopr-crypto = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
@@ -33,9 +31,10 @@ chain-db = { workspace = true }
 chain-actions = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-platform = { workspace = true }
-metrics = { workspace = true, optional = true, default-features = false }
-utils-types = { workspace = true }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true, default-features = false }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
@@ -48,5 +47,4 @@ futures = "0.3.28"
 
 [features]
 default = ["prometheus"]
-wasm = ["dep:getrandom" ]
-prometheus = [ "dep:metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]
+prometheus = [ "dep:hopr-metrics", "core-network/prometheus", "core-protocol/prometheus", "chain-actions/prometheus" ]

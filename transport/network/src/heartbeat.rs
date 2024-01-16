@@ -15,20 +15,20 @@ use validator::Validate;
 use log::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::{histogram_start_measure, metrics::SimpleHistogram};
+use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TIME_TO_HEARTBEAT: SimpleHistogram =
         SimpleHistogram::new(
-            "core_histogram_heartbeat_time_seconds",
-            "Measures total time it takes to probe all other nodes (in seconds)",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+            "hopr_heartbeat_round_time_sec",
+            "Measures total time in seconds it takes to probe all other nodes",
+            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
 }
 
 use async_std::task::sleep;
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;

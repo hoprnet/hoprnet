@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PlatformError {
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     #[error("javascript error: {0}")]
     JsError(String),
 
@@ -13,7 +13,7 @@ pub enum PlatformError {
     GeneralError(String),
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "js")]
 impl From<wasm_bindgen::JsValue> for PlatformError {
     fn from(v: wasm_bindgen::JsValue) -> Self {
         crate::error::PlatformError::JsError(v.as_string().unwrap_or("unknown".into()))

@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use core_types::channels::ChannelDirection::Outgoing;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_internal_types::channels::ChannelDirection::Outgoing;
+use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -14,12 +14,12 @@ use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_COUNT_AUTO_FUNDINGS: SimpleCounter =
-        SimpleCounter::new("core_counter_strategy_auto_funding_fundings", "Count of initiated automatic fundings").unwrap();
+        SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
 }
 
 /// Configuration for `AutoFundingStrategy`
@@ -117,15 +117,15 @@ mod tests {
     use chain_actions::channels::ChannelActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use core_types::channels::ChannelChange::CurrentBalance;
-    use core_types::channels::ChannelDirection::Outgoing;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ok, FutureExt};
     use hopr_crypto::random::random_bytes;
     use hopr_crypto::types::Hash;
+    use hopr_internal_types::channels::ChannelChange::CurrentBalance;
+    use hopr_internal_types::channels::ChannelDirection::Outgoing;
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+    use hopr_primitive_types::traits::BinarySerializable;
     use mockall::mock;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::BinarySerializable;
 
     mock! {
         ChannelAct { }
@@ -136,7 +136,7 @@ mod tests {
             async fn close_channel(
                 &self,
                 counterparty: Address,
-                direction: core_types::channels::ChannelDirection,
+                direction: hopr_internal_types::channels::ChannelDirection,
                 redeem_before_close: bool,
             ) -> chain_actions::errors::Result<PendingAction>;
         }

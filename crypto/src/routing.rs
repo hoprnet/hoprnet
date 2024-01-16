@@ -8,7 +8,7 @@ use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::shared_keys::{SharedSecret, SphinxSuite};
 use crate::utils::xor_inplace;
-use utils_types::traits::BinarySerializable;
+use hopr_primitive_types::traits::BinarySerializable;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -278,8 +278,8 @@ pub mod tests {
     use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
     use crate::shared_keys::{SharedSecret, SphinxSuite};
     use crate::utils::xor_inplace;
+    use hopr_primitive_types::traits::BinarySerializable;
     use parameterized::parameterized;
-    use utils_types::traits::BinarySerializable;
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {

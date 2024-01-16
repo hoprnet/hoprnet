@@ -138,10 +138,10 @@
 //!       aggregation_threshold: 1000
 //! ```
 
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use strum::{Display, EnumString, EnumVariantNames};
-use utils_types::primitives::{Balance, BalanceType};
 
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;
@@ -161,23 +161,13 @@ pub mod promiscuous;
 
 /// Enumerates all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
+#[strum(serialize_all = "snake_case")]
 pub enum Strategy {
-    #[strum(serialize = "promiscuous")]
     Promiscuous(PromiscuousStrategyConfig),
-
-    #[strum(serialize = "aggregating")]
     Aggregating(AggregatingStrategyConfig),
-
-    #[strum(serialize = "auto_redeeming")]
     AutoRedeeming(AutoRedeemingStrategyConfig),
-
-    #[strum(serialize = "auto_funding")]
     AutoFunding(AutoFundingStrategyConfig),
-
-    #[strum(serialize = "multi")]
     Multi(MultiStrategyConfig),
-
-    #[strum(serialize = "passive")]
     Passive,
 }
 

@@ -1,14 +1,14 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use core_types::{
+use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto::types::{HalfKeyChallenge, Hash};
+use hopr_internal_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
-use hopr_crypto::types::OffchainPublicKey;
-use hopr_crypto::types::{HalfKeyChallenge, Hash};
-use utils_types::primitives::{Address, Balance, Snapshot, U256};
+use hopr_primitive_types::primitives::{Address, Balance, Snapshot, U256};
 
 #[async_trait]
 #[cfg_attr(test, mockall::automock)]

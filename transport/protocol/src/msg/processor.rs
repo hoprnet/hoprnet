@@ -16,17 +16,17 @@ use core_packet::errors::PacketError::{
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
-use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::Ticket;
-use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 use hopr_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
+use hopr_internal_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
+use hopr_internal_types::channels::Ticket;
+use hopr_internal_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 use log::{debug, error, warn};
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
-use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -34,27 +34,40 @@ use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet processing
-    static ref METRIC_FWD_MESSAGE_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages").unwrap();
-    static ref METRIC_RECV_MESSAGE_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_received_messages", "Number of received messages").unwrap();
+    static ref METRIC_PACKET_COUNT: MultiCounter =
+        MultiCounter::new(
+        "hopr_packets_count",
+        "Number of processed packets of different types (sent, received, forwarded)",
+        &["type"]
+    ).unwrap();
+    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter =
+        MultiCounter::new(
+        "hopr_packets_per_peer_count",
+        "Number of processed packets to/from distinct peers",
+        &["peer", "direction"]
+    ).unwrap();
     static ref METRIC_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
-    static ref METRIC_PACKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+        SimpleCounter::new("hopr_created_tickets_count", "Number of created tickets").unwrap();
+    static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
     // mixer
     static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "core_gauge_mixer_average_packet_delay",
+        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
+    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+        "hopr_mixer_average_packet_delay",
         "Average mixer packet delay averaged over a packet window"
     )
     .unwrap();
+    static ref METRIC_RELAYED_PACKET_IN_MIXER_TIME: SimpleHistogram = SimpleHistogram::new(
+        "hopr_relayed_packet_processing_time_with_mixing_sec",
+        "Histogram of measured processing and mixing time for a relayed packet in seconds",
+        vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+    ).unwrap();
 }
 
 lazy_static::lazy_static! {
@@ -298,6 +311,10 @@ where
                 if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
                     self.db.write().await.mark_rejected(&ticket).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_REJECTED_TICKETS_COUNT.increment();
+
                     return Err(e);
                 }
 
@@ -523,11 +540,6 @@ impl PacketActions {
             })
     }
 
-    /// Pushes a packet received from the transport designated for forwarding.
-    pub fn forward_packet(&mut self, msg: Box<[u8]>, peer: PeerId) -> Result<()> {
-        self.process(MsgToProcess::ToForward(msg, peer))
-    }
-
     /// Pushes the packet received from the transport layer into processing.
     pub fn receive_packet(&mut self, payload: Box<[u8]>, source: PeerId) -> Result<()> {
         self.process(MsgToProcess::ToReceive(payload, source))
@@ -566,6 +578,13 @@ impl PacketInteractionConfig {
     }
 }
 
+#[derive(Default)]
+pub struct PacketMetadata {
+    pub send_finalizer: Option<PacketSendFinalizer>,
+    #[cfg(all(feature = "prometheus", not(test)))]
+    pub start_time: std::time::Duration,
+}
+
 /// Sets up processing of packet interactions and returns relevant read and write mechanism.
 ///
 /// Packet processing logic:
@@ -601,24 +620,32 @@ impl PacketInteraction {
                 let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let mut send_finalizer: Option<PacketSendFinalizer> = None;
+                    let mut metadata = PacketMetadata::default();
 
                     let packet = match event {
                         MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
                             processor.from_incoming(data, &pkt_keypair, &peer).await
                         }
                         MsgToProcess::ToSend(data, path, finalizer) => {
-                            send_finalizer.replace(finalizer);
+                            metadata.send_finalizer.replace(finalizer);
 
                             processor.into_outgoing(data, &path).await
                         }
                     };
 
-                    (packet, send_finalizer)
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    match &packet {
+                        Ok(TransportPacket::Forwarded { .. }) => {
+                            metadata.start_time = hopr_platform::time::native::current_timestamp();
+                        }
+                        _ => {}
+                    }
+
+                    (packet, metadata)
                 }
             })
             // check tag replay
-            .then_concurrent(move |(packet, finalizer)| {
+            .then_concurrent(move |(packet, metadata)| {
                 let tbf = tbf.clone();
 
                 async move {
@@ -633,16 +660,16 @@ impl PacketInteraction {
                             // There is a 0.1% chance that the positive result is not a replay
                             // because a Bloom filter is used
                             if tbf.write().await.check_and_set(tag) {
-                                return (Err(TagReplay), finalizer);
+                                return (Err(TagReplay), metadata);
                             }
                         }
                     };
 
-                    (packet, finalizer)
+                    (packet, metadata)
                 }
             })
             // process packet operation
-            .then_concurrent(move |(packet, finalizer)| async move {
+            .then_concurrent(move |(packet, mut metadata)| async move {
                 match packet {
                     Err(e) => Err(e),
                     Ok(packet) => match packet {
@@ -652,12 +679,15 @@ impl PacketInteraction {
                             data,
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PACKETS_COUNT.increment();
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
+                                METRIC_PACKET_COUNT.increment(&["sent"]);
+                            }
 
-                            if let Some(finalizer) = finalizer {
+                            if let Some(finalizer) = metadata.send_finalizer.take() {
                                 finalizer.finalize(ack_challenge);
                             }
-                            Ok(MsgProcessed::Send(next_hop, data))
+                            Ok((MsgProcessed::Send(next_hop, data), metadata))
                         }
 
                         TransportPacket::Final {
@@ -668,9 +698,12 @@ impl PacketInteraction {
                         } => match ApplicationData::from_bytes(plain_text.as_ref()) {
                             Ok(app_data) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_RECV_MESSAGE_COUNT.increment();
+                                {
+                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                                    METRIC_PACKET_COUNT.increment(&["received"]);
+                                }
 
-                                Ok(MsgProcessed::Receive(previous_hop, app_data, ack))
+                                Ok((MsgProcessed::Receive(previous_hop, app_data, ack), metadata))
                             }
                             Err(e) => Err(e.into()),
                         },
@@ -683,9 +716,13 @@ impl PacketInteraction {
                             ..
                         } => {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_FWD_MESSAGE_COUNT.increment();
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &previous_hop.to_string()]);
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &next_hop.to_string()]);
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
 
-                            Ok(MsgProcessed::Forward(next_hop, data, previous_hop, ack))
+                            Ok((MsgProcessed::Forward(next_hop, data, previous_hop, ack), metadata))
                         }
                     },
                 }
@@ -693,8 +730,8 @@ impl PacketInteraction {
             // introduce random timeout to mix packets asynchrounously
             .then_concurrent(move |event| async move {
                 match event {
-                    Ok(processed) => match processed {
-                        MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => {
+                    Ok((processed, metadata)) => match processed {
+                        MsgProcessed::Send(..) | MsgProcessed::Forward(..) => {
                             let random_delay = mixer_cfg.random_delay();
                             debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
@@ -708,15 +745,15 @@ impl PacketInteraction {
                                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
                                 let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
-                                METRIC_AVERAGE_DELAY.set(
+                                METRIC_MIXER_AVERAGE_DELAY.set(
                                     (weight * random_delay.as_millis() as f64)
-                                        + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()),
+                                        + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
                                 );
                             }
 
-                            Ok(processed)
+                            Ok((processed, metadata))
                         }
-                        MsgProcessed::Receive(_, _, _) => Ok(processed),
+                        MsgProcessed::Receive(..) => Ok((processed, metadata)),
                     },
                     Err(e) => Err(e),
                 }
@@ -727,7 +764,16 @@ impl PacketInteraction {
 
                 async move {
                     match processed {
-                        Ok(processed_msg) => {
+                        Ok((processed_msg, metadata)) => {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
+                                METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
+                                    hopr_platform::time::native::current_timestamp()
+                                        .saturating_sub(metadata.start_time)
+                                        .as_secs_f64(),
+                                )
+                            };
+
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
                                     Ok(_) => {}
@@ -782,12 +828,6 @@ mod tests {
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
-    use core_types::protocol::PeerAddressResolver;
-    use core_types::{
-        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
-        channels::{ChannelEntry, ChannelStatus},
-        protocol::{Tag, TagBloomFilter},
-    };
     use futures::{
         future::{select, Either},
         pin_mut, StreamExt,
@@ -801,16 +841,22 @@ mod tests {
         shared_keys::SharedSecret,
         types::{HalfKeyChallenge, Hash},
     };
+    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_internal_types::{
+        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
+        channels::{ChannelEntry, ChannelStatus},
+        protocol::{Tag, TagBloomFilter},
+    };
+    use hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::PeerIdLike,
+    };
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::PeerIdLike,
-    };
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![

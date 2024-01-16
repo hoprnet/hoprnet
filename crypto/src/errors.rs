@@ -1,5 +1,5 @@
+use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_types::errors::GeneralError;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
@@ -23,7 +23,6 @@ pub enum CryptoError {
 
     #[error("signature verification failed")]
     SignatureVerification,
-
     #[error("ethereum challenge on the ticket is invalid")]
     InvalidChallenge,
 

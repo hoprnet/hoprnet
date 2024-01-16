@@ -11,6 +11,18 @@ use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleGauge;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_RPC_CHAIN_HEAD: SimpleGauge =
+        SimpleGauge::new(
+            "hopr_chain_head_block_number",
+            "Current block number of chain head",
+    ).unwrap();
+}
+
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
@@ -41,6 +53,9 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         // This is a hard-failure on subsequent iterations which is unrecoverable
                         // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
                         assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
                         // Range is inclusive
                         let range_filter = ethers::types::Filter::from(filter.clone())
@@ -100,8 +115,8 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
     use log::debug;
-    use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -136,10 +151,13 @@ mod test {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
 
-        let rpc = RpcOperations::new(client, &chain_key_0, Default::default(), SimpleJsonRpcRetryPolicy)
-            .expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, Default::default()).expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
         async_std::task::sleep(Duration::from_secs(2)).await;
@@ -178,10 +196,13 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -280,10 +301,13 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],

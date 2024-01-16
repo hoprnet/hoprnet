@@ -7,43 +7,26 @@ use std::{collections::VecDeque, sync::Arc};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
-use utils_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::primitives::{Snapshot, U256};
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, MultiGauge, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::SimpleGauge;
 
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_ERROR_COUNT: MultiCounter =
-        MultiCounter::new(
-            "hopr_indexer_errors_count",
-            "Multicounter for provider errors in Indexer",
-            &["type"]
-    ).unwrap();
-    static ref METRIC_INDEXER_UNCONFIRMED_BLOCK_COUNT: SimpleCounter =
-        SimpleCounter::new(
-            "hopr_indexer_processed_unconfirmed_blocks_count",
-            "Number of processed unconfirmed blocks",
-    ).unwrap();
-    static ref METRIC_INDEXER_ANNOUNCEMENTS_COUNT: SimpleCounter =
-        SimpleCounter::new(
-            "hopr_indexer_processed_announcements_count",
-            "Number of processed announcements",
-    ).unwrap();
-    static ref METRIC_INDEXER_OBSERVED_CHANNEL_STATUS: MultiGauge =
-        MultiGauge::new(
-            "core_indexer_channel_statuses",
-            "Status of different channels",
-            &["channel"]
-        ).unwrap();
     static ref METRIC_INDEXER_CURRENT_BLOCK: SimpleGauge =
         SimpleGauge::new(
-            "chain_gauge_indexer_block_number",
-            "Current block number",
+            "hopr_indexer_block_number",
+            "Current last processed block number by the indexer",
+    ).unwrap();
+    static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
+        SimpleGauge::new(
+            "hopr_indexer_sync_progress",
+            " Sync progress of the historical data by the indexer",
     ).unwrap();
 }
 
@@ -219,14 +202,18 @@ where
 
                 if tx.is_some() {
                     let indexing_scope = chain_head - latest_block_in_db;
-                    info!(
-                        "Sync progress {:.2}% @ block {}",
-                        (1f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64))) * 100f64,
-                        current_block
-                    );
+                    let progress = 1_f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64));
+                    info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
                     if current_block + finalization >= chain_head {
                         info!("Indexer sync successfully completed");
+
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_INDEXER_SYNC_PROGRESS.set(1.00);
+
                         let _ = tx.take().expect("tx should be present").send(());
                     }
                 }
@@ -321,11 +308,11 @@ pub mod tests {
     };
     use futures::{join, Stream};
     use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_primitive_types::traits::PeerIdLike;
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::traits::PeerIdLike;
-    use utils_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
 

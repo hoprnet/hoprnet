@@ -1,11 +1,12 @@
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::announcement::AnnouncementData;
-use core_types::channels::{ChannelDirection, ChannelEntry};
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::announcement::AnnouncementData;
+use hopr_internal_types::channels::{ChannelDirection, ChannelEntry};
+use hopr_primitive_types::primitives::{Address, Balance};
 use std::fmt::{Display, Formatter};
-use utils_types::primitives::{Address, Balance};
 
 /// Enumerates all possible on-chain state change requests
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum Action {
     /// Redeem the given acknowledged ticket
     RedeemTicket(AcknowledgedTicket),

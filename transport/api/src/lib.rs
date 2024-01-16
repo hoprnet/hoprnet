@@ -21,11 +21,11 @@ pub use {
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
-    core_types::protocol::ApplicationData,
     hopr_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
+    hopr_internal_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::execute_on_tick,
@@ -41,40 +41,33 @@ use core_protocol::{
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
-use core_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{ChannelEntry, Ticket},
-    protocol::TagBloomFilter,
-};
 use futures::{
     channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
+use hopr_internal_types::{
+    acknowledgement::AcknowledgedTicket,
+    channels::{ChannelEntry, Ticket},
+    protocol::TagBloomFilter,
+};
+use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
-use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    core_path::path::Path,
-    metrics::metrics::{SimpleCounter, SimpleHistogram},
-};
+use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_FAIL_COUNT: SimpleCounter = SimpleCounter::new(
-        "core_counter_failed_send_messages",
-        "Number of sent messages failures"
-    ).unwrap();
     static ref METRIC_PATH_LENGTH: SimpleHistogram = SimpleHistogram::new(
-        "core_histogram_path_length",
+        "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
 }
 
-use {async_std::task::sleep, platform::time::native::current_timestamp};
+use {async_std::task::sleep, hopr_platform::time::native::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,
@@ -222,13 +215,13 @@ pub struct TicketStatistics {
     pub losing: u64,
     pub win_proportion: f64,
     pub unredeemed: u64,
-    pub unredeemed_value: utils_types::primitives::Balance,
+    pub unredeemed_value: hopr_primitive_types::primitives::Balance,
     pub redeemed: u64,
-    pub redeemed_value: utils_types::primitives::Balance,
+    pub redeemed_value: hopr_primitive_types::primitives::Balance,
     pub neglected: u64,
-    pub neglected_value: utils_types::primitives::Balance,
+    pub neglected_value: hopr_primitive_types::primitives::Balance,
     pub rejected: u64,
-    pub rejected_value: utils_types::primitives::Balance,
+    pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
 pub struct PublicNodesResult {
@@ -243,11 +236,11 @@ use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
-use core_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use utils_types::primitives::{Balance, BalanceType};
-use utils_types::traits::PeerIdLike;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::traits::PeerIdLike;
 
 #[derive(Debug, Clone)]
 pub struct HoprTransport {

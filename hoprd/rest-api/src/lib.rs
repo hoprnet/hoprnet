@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_std::sync::RwLock;
 use libp2p_identity::PeerId;
 use serde_json::json;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
 use tide::http::mime;
 use tide::utils::async_trait;
@@ -20,11 +20,33 @@ use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
 use crate::config::Auth;
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{Address, Balance, BalanceType, Hopr};
+use hopr_lib::{
+    errors::HoprLibError,
+    {Address, Balance, BalanceType, Hopr},
+};
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
+        "hopr_http_api_call_count",
+        "Number of different REST API calls and their statuses",
+        &["endpoint", "method", "status"]
+    )
+    .unwrap();
+    static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+        "hopr_http_api_call_timing_sec",
+        "Timing of different REST API calls in seconds",
+        vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
+        &["endpoint", "method"]
+    )
+    .unwrap();
+}
 
 #[derive(Clone)]
 pub struct State<'a> {
@@ -91,7 +113,7 @@ pub struct InternalState {
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery,
+            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -189,17 +211,28 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
         let peer_addr = req.peer_addr().map(String::from);
         let path = req.url().path().to_owned();
         let method = req.method().to_string();
+
+        let start = std::time::Instant::now();
         let response = next.run(req).await;
+        let response_duration = start.elapsed();
+
         let status = response.status();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+        }
 
         log::log!(
             self.0,
-            r#"{} "{method} {path}" {status} {}"#,
+            r#"{} "{method} {path}" {status} {} {}ms"#,
             peer_addr.as_deref().unwrap_or("-"),
             response
                 .len()
                 .map(|l| l.to_string())
                 .unwrap_or_else(|| String::from("-")),
+            response_duration.as_millis()
         );
         Ok(response)
     }
@@ -693,9 +726,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
-    use core_transport::errors::HoprTransportError;
-    use hopr_lib::Multiaddr;
+    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -703,12 +734,12 @@ mod peers {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "announced": [
-            "/ip4/10.0.2.100/tcp/19093"
-          ],
-          "observed": [
-            "/ip4/10.0.2.100/tcp/19093"
-          ]
+        "announced": [
+        "/ip4/10.0.2.100/tcp/19093"
+        ],
+        "observed": [
+        "/ip4/10.0.2.100/tcp/19093"
+        ]
     }))]
     pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -794,9 +825,9 @@ mod peers {
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
-                Err(HoprLibError::TransportError(HoprTransportError::Protocol(
-                    core_protocol::errors::ProtocolError::Timeout,
-                ))) => Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build()),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+                    Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build())
+                }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build()),
@@ -806,11 +837,9 @@ mod peers {
 
 mod channels {
     use super::*;
-    use chain_actions::errors::CoreEthereumActionsError;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
     use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -842,16 +871,16 @@ mod channels {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "balance": "10000000000000000000",
-      "channelEpoch": 1,
-      "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-      "closureTime": 0,
-      "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-      "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
-      "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
-      "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
-      "status": "Open",
-      "ticketIndex": 0
+        "balance": "10000000000000000000",
+        "channelEpoch": 1,
+        "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+        "closureTime": 0,
+        "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+        "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+        "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+        "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "status": "Open",
+        "ticketIndex": 0
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTopologyChannel {
@@ -881,16 +910,16 @@ mod channels {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "all": [],
-          "incoming": [],
-          "outgoing": [
-            {
-              "balance": "10000000000000000010",
-              "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-              "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-              "status": "Open"
-            }
-          ]
+        "all": [],
+        "incoming": [],
+        "outgoing": [
+        {
+            "balance": "10000000000000000010",
+            "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+            "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+            "status": "Open"
+        }
+        ]
     }))]
     pub(crate) struct NodeChannels {
         pub incoming: Vec<NodeChannel>,
@@ -1280,6 +1309,23 @@ mod messages {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
+        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
+        pub timestamp: std::time::Duration,
+    }
+
+    #[serde_as]
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+    pub(crate) struct GetMessageReq {
+        /// The message tag used to filter messages based on application
+        #[schema(required = false)]
+        #[serde(default)]
+        pub tag: Option<u16>,
+        /// Timestamp to filter messages received after this timestamp
+        #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
+        #[schema(required = false, value_type = u64)]
+        #[serde(default)]
+        pub timestamp: Option<std::time::Duration>,
     }
 
     /// Send a message to another peer using a given path.
@@ -1325,11 +1371,17 @@ mod messages {
             }
         }
 
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
         match hopr
             .send_message(msg_body, args.peer_id, args.path, args.hops, Some(args.tag))
             .await
         {
-            Ok(challenge) => Ok(Response::builder(202).body(json!(SendMessageRes { challenge })).build()),
+            Ok(challenge) => Ok(Response::builder(202)
+                .body(json!(SendMessageRes { challenge, timestamp }))
+                .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
@@ -1379,6 +1431,7 @@ mod messages {
         Ok(Response::builder(200).body(json!(Size { size })).build())
     }
 
+    #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
           "body": "Test message 1",
@@ -1389,16 +1442,18 @@ mod messages {
     pub(crate) struct MessagePopRes {
         tag: u16,
         body: String,
-        received_at: u128,
+        #[serde_as(as = "DurationMilliSeconds<u64>")]
+        #[schema(value_type = u64)]
+        received_at: std::time::Duration,
     }
 
-    fn to_api_message(data: hopr_lib::ApplicationData, ts: Duration) -> Result<MessagePopRes, String> {
+    fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopRes, String> {
         if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
                 Ok(data_str) => Ok(MessagePopRes {
                     tag,
                     body: data_str.into(),
-                    received_at: ts.as_millis(),
+                    received_at,
                 }),
                 Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
             }
@@ -1476,7 +1531,7 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        let messages = inbox
+        let messages: Vec<MessagePopRes> = inbox
             .pop_all(tag.tag)
             .await
             .into_iter()
@@ -1525,15 +1580,15 @@ mod messages {
         }
     }
 
-    /// Peek the list of messages currently present in the nodes message inbox.
-    ///
+    /// Peek the list of messages currently present in the nodes message inbox, filtered by tag,
+    /// and optionally by timestamp (epoch in milliseconds).
     /// The messages are not removed from the inbox.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
-            content = TagQuery,
-            description = "Tag of message queue to peek from",
+            content = GetMessageReq,
+            description = "Tag of message queue and optionally a timestamp since from to start peeking",
             content_type = "application/json"
         ),
         responses(
@@ -1547,13 +1602,14 @@ mod messages {
         ),
         tag = "Messages"
     )]
+
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.body_json().await?;
+        let args: GetMessageReq = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
         let messages = inbox
-            .peek_all(tag.tag)
+            .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
             .filter_map(|(data, ts)| to_api_message(data, ts).ok())
@@ -1607,12 +1663,8 @@ mod network {
 }
 mod tickets {
     use super::*;
-    use core_protocol::errors::ProtocolError;
-    use core_transport::errors::HoprTransportError;
-    use core_transport::TicketStatistics;
-    use core_types::channels::Ticket;
     use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_lib::{HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1624,7 +1676,7 @@ mod tickets {
         "indexOffset": 1,
         "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
         "winProb": "1"
-      }))]
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
@@ -2034,10 +2086,10 @@ mod node {
     }
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    use metrics::metrics::gather_all_metrics as collect_metrics;
+    use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
 
     #[cfg(any(not(feature = "prometheus"), test))]
-    fn collect_metrics() -> Result<String, ApiErrorStatus> {
+    fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
         Err(ApiErrorStatus::UnknownFailure("BUILT WITHOUT METRICS SUPPORT".into()))
     }
 
@@ -2056,7 +2108,7 @@ mod node {
         tag = "Node"
     )]
     pub(crate) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
-        match collect_metrics() {
+        match collect_hopr_metrics() {
             Ok(metrics) => Ok(Response::builder(200)
                 .body(Body::from_string(metrics))
                 .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))
@@ -2068,23 +2120,23 @@ mod node {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "announcedAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "chain": "anvil-localhost",
-      "channelClosurePeriod": 15,
-      "connectivityStatus": "Green",
-      "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-      "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
-      "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
-      "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
-      "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
-      "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
-      "isEligible": true,
-      "listeningAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "network": "anvil-localhost"
+        "announcedAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "chain": "anvil-localhost",
+        "channelClosurePeriod": 15,
+        "connectivityStatus": "Green",
+        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+        "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+        "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
+        "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+        "isEligible": true,
+        "listeningAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "network": "anvil-localhost"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoRes {

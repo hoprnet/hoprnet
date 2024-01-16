@@ -4,43 +4,37 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
 use core_packet::errors::Result;
-use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
 use hopr_crypto::keypairs::ChainKeypair;
 use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
+use hopr_internal_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
+use hopr_primitive_types::traits::{PeerIdLike, ToHex};
 use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use std::pin::Pin;
 use std::sync::Arc;
-use utils_types::traits::{PeerIdLike, ToHex};
 
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
-        "core_counter_received_successful_acks",
-        "Number of received successful acknowledgements"
-    )
-    .unwrap();
-    static ref METRIC_RECEIVED_FAILED_ACKS: SimpleCounter = SimpleCounter::new(
-        "core_counter_received_failed_acks",
-        "Number of received failed acknowledgements"
+    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
+        "hopr_received_ack_count",
+        "Number of received acknowledgements",
+        &["valid"]
     )
     .unwrap();
     static ref METRIC_SENT_ACKS: SimpleCounter =
-        SimpleCounter::new("core_counter_sent_acks", "Number of sent message acknowledgements").unwrap();
-    static ref METRIC_ACKED_TICKETS: SimpleCounter =
-        SimpleCounter::new("core_counter_acked_tickets", "Number of acknowledged tickets").unwrap();
+        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
     static ref METRIC_WINNING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_winning_tickets", "Number of winning tickets").unwrap();
+        SimpleCounter::new("hopr_winning_tickets_count", "Number of winning tickets").unwrap();
     static ref METRIC_LOSING_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("core_counter_losing_tickets", "Number of losing tickets").unwrap();
+        SimpleCounter::new("hopr_losing_tickets_count", "Number of losing tickets").unwrap();
 }
 
 // Default sizes of the acknowledgement queues
@@ -108,7 +102,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
             .await?
             .ok_or_else(|| {
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_FAILED_ACKS.increment();
+                METRIC_RECEIVED_ACKS.increment(&["false"]);
 
                 AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
@@ -123,7 +117,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 debug!("received acknowledgement as sender: first relayer has processed the packet.");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
+                METRIC_RECEIVED_ACKS.increment(&["false"]);
 
                 Ok(Reply::Sender(ack.ack_challenge()))
             }
@@ -132,7 +126,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 // Try to unlock our incentive
                 unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RECEIVED_FAILED_ACKS.increment();
+                    METRIC_RECEIVED_ACKS.increment(&["false"]);
 
                     AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
@@ -146,7 +140,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     || from_channel.is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
                 {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RECEIVED_FAILED_ACKS.increment();
+                    METRIC_RECEIVED_ACKS.increment(&["false"]);
 
                     return Err(AcknowledgementValidation(
                         "acknowledgement received for channel that does not exist or has a newer epoch".into(),
@@ -172,7 +166,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .await?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACKED_TICKETS.increment();
+                METRIC_RECEIVED_ACKS.increment(&["true"]);
 
                 // Check if ticket is a win
                 if ack_ticket.is_winning_ticket(&domain_separator) {

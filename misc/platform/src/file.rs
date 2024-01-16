@@ -62,7 +62,7 @@ pub mod native {
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "js")]
 pub mod wasm {
     use crate::error::{PlatformError, Result};
     use bitflags::bitflags;

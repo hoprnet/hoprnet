@@ -13,7 +13,7 @@ from hoprd_sdk.api import (
     PeersApi,
     TicketsApi,
 )
-from hoprd_sdk.models import AliasPeerId, FundRequest, OpenChannelRequest, SendMessageReq, TagQuery
+from hoprd_sdk.models import AliasPeerId, FundRequest, GetMessageReq, OpenChannelRequest, SendMessageReq, TagQuery
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
 
@@ -308,8 +308,8 @@ class HoprdAPI:
         :return: bool
         """
         body = SendMessageReq(message, None, hops, destination, tag)
-        status, _ = self.__call_api(MessagesApi, "send_message", body=body)
-        return status
+        _, response = self.__call_api(MessagesApi, "send_message", body=body)
+        return response
 
     async def messages_pop(self, tag: int = MESSAGE_TAG) -> bool:
         """
@@ -333,14 +333,17 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG) -> dict:
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = None) -> dict:
         """
         Peek all messages from the inbox
         :param: tag = 0x0320
         :return: dict
         """
+        if not isinstance(timestamp, int):
+            body = GetMessageReq(tag=tag)
+        else:
+            body = GetMessageReq(tag=tag, timestamp=timestamp)
 
-        body = TagQuery(tag=tag)
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response
 

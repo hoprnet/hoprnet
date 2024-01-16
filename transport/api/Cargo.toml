@@ -11,14 +11,9 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "chain-db/wasm", "hopr-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
-    "core-protocol/wasm", "core-types/wasm",
-    "utils-db/wasm", "platform/wasm-bindgen", "metrics?/wasm", "utils-types/wasm",
-]
 prometheus = [
-    "dep:lazy_static", "dep:metrics",
-    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus", "chain-rpc/prometheus"
+    "dep:lazy_static", "dep:hopr-metrics",
+    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
 ]
 
 [dependencies]
@@ -29,6 +24,7 @@ futures = { workspace = true }
 futures-concurrency = "7.3.0"
 libp2p = { workspace = true, features = ["request-response"] }
 multiaddr = { workspace = true }
+proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
@@ -37,17 +33,15 @@ lazy_static = { workspace = true, optional = true }
 core-network = { workspace = true }
 hopr-crypto = { workspace = true }
 chain-db = { workspace = true }
-chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
 core-p2p = { workspace = true }
 core-packet = { workspace = true }
 core-protocol = { workspace = true }
-core-types = { workspace = true }
 utils-db = { workspace = true}
 log = { workspace = true }
-platform = { workspace = true }
-metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
-utils-validation = { workspace = true }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 /// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M: std::marker::Send> {
@@ -146,13 +146,25 @@ where
             .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
     }
 
-    async fn peek_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
+    async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)> {
+        let timestamp = timestamp.unwrap_or(Duration::from_millis(0));
+
         match tag {
             Some(specific_tag) => {
                 // Peek only all messages of a specific tag
                 self.buffers
                     .get_mut(&specific_tag)
-                    .map(|buf| buf.iter().map(|w| (w.payload.clone(), w.ts)).collect::<Vec<_>>())
+                    .map(|buf| {
+                        buf.iter()
+                            .filter_map(|w| {
+                                if w.ts >= timestamp {
+                                    Some((w.payload.clone(), w.ts))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default()
             }
             None => {
@@ -386,11 +398,19 @@ mod test {
 
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+            rb.peek_all(None, None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
         );
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+            rb.peek_all(None, None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
         );
         assert_eq!(3, rb.count(Some(1)).await);
 
@@ -412,7 +432,7 @@ mod test {
 
         assert_eq!(
             vec![0, 2, 1],
-            rb.peek_all(Some(1))
+            rb.peek_all(Some(1), None)
                 .await
                 .into_iter()
                 .map(|(d, _)| d)
@@ -421,6 +441,58 @@ mod test {
         assert_eq!(3, rb.count(Some(1)).await);
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(6, rb.count(None).await);
+
+        rb.pop_all(None).await;
+    }
+
+    #[async_std::test]
+    async fn test_peek_all_with_timestamp() {
+        let mut rb = make_backend(8);
+
+        rb.push(Some(2), 0).await;
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 2).await;
+        rb.push(Some(1), 3).await;
+        rb.push(Some(1), 4).await;
+        rb.push(Some(1), 5).await;
+
+        // sleep for 10ms to ensure a break between timestamps
+        async_std::task::sleep(Duration::from_millis(10)).await;
+        let close_past = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
+        rb.push(Some(1), 6).await;
+        rb.push(Some(1), 7).await;
+        rb.push(Some(2), 1).await;
+
+        assert_eq!(
+            vec![6, 7],
+            rb.peek_all(Some(1), Some(close_past))
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![1],
+            rb.peek_all(Some(2), Some(close_past))
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![0, 1, 2, 3, 4, 5, 6, 7],
+            rb.peek_all(Some(1), None)
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
+
+        rb.pop_all(None).await;
     }
 
     #[async_std::test]

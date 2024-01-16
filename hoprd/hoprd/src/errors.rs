@@ -13,9 +13,6 @@ pub enum HoprdError {
 
     #[error("validation failed: '{0}'")]
     ValidationError(String),
-
-    #[error("db failed: '{0}'")]
-    DbError(#[from] utils_db::errors::DbError),
 }
 
 pub type Result<T> = std::result::Result<T, HoprdError>;

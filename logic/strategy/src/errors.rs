@@ -1,7 +1,7 @@
 use chain_actions::errors::CoreEthereumActionsError;
+use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {

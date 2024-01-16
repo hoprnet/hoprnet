@@ -2,19 +2,19 @@ use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-use core_types::channels::ChannelStatus;
-use core_types::protocol::PeerAddressResolver;
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
 use hopr_crypto::types::OffchainPublicKey;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_internal_types::protocol::PeerAddressResolver;
+use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::traits::{PeerIdLike, ToHex};
 use libp2p_identity::PeerId;
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use utils_types::primitives::Address;
-use utils_types::traits::{PeerIdLike, ToHex};
 
 /// Base implementation of an abstract path.
 /// Must contain always at least a single entry.
@@ -245,13 +245,13 @@ mod tests {
     use crate::channel_graph::ChannelGraph;
     use crate::path::{ChannelPath, Path, TransportPath};
     use async_trait::async_trait;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
-    use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;
     use hopr_crypto::types::{OffchainPublicKey, PublicKey};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+    use hopr_primitive_types::traits::PeerIdLike;
     use libp2p_identity::PeerId;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::PeerIdLike;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),

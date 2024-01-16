@@ -11,29 +11,28 @@ use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
+use hopr_primitive_types::sma::{SingleSumSMA, SMA};
 use log::{info, warn};
-use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram},
-    platform::time::native::current_timestamp,
+    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
+    hopr_platform::time::native::current_timestamp,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_NETWORK_HEALTH: SimpleGauge =
-        SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").unwrap();
+        SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
     static ref METRIC_PEERS_BY_QUALITY: MultiGauge =
-        MultiGauge::new("core_mgauge_peers_by_quality", "Number different peer types by quality",
+        MultiGauge::new("hopr_peers_by_quality", "Number different peer types by quality",
             &["type", "quality"],
         ).unwrap();
     static ref METRIC_PEER_COUNT: SimpleGauge =
-        SimpleGauge::new("core_gauge_num_peers", "Number of all peers").unwrap();
-    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleHistogram = SimpleHistogram::new(
-        "hoprd_histogram_time_to_green_seconds",
-        "Time it takes for a node to transition to the GREEN network state",
-        vec![30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0]
+        SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
+    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleGauge = SimpleGauge::new(
+        "hopr_time_to_green_sec",
+        "Time it takes for a node to transition to the GREEN network state"
     ).unwrap();
 }
 
@@ -265,6 +264,9 @@ impl<T: NetworkExternalActions> Network<T> {
         let mut excluded = HashSet::new();
         excluded.insert(my_peer_id);
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_NETWORK_HEALTH.set(0.0);
+
         Network {
             me: my_peer_id,
             cfg,
@@ -458,7 +460,7 @@ impl<T: NetworkExternalActions> Network<T> {
             #[cfg(all(feature = "prometheus", not(test)))]
             if self.started_at.is_some() {
                 if let Some(ts) = current_timestamp().checked_sub(self.started_at.take().unwrap()) {
-                    METRIC_NETWORK_HEALTH_TIME_TO_GREEN.observe(ts.as_secs() as f64);
+                    METRIC_NETWORK_HEALTH_TIME_TO_GREEN.set(ts.as_secs_f64());
                 }
             }
 
@@ -565,8 +567,8 @@ mod tests {
     use crate::network::{
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
+    use hopr_platform::time::native::current_timestamp;
     use libp2p_identity::PeerId;
-    use platform::time::native::current_timestamp;
 
     struct DummyNetworkAction {}
 
@@ -589,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn test_network_health_should_be_ordered_numerically_for_metrics_output() {
+    fn test_network_health_should_be_ordered_numerically_for_hopr_metrics_output() {
         assert_eq!(Health::Unknown as i32, 0);
         assert_eq!(Health::Red as i32, 1);
         assert_eq!(Health::Orange as i32, 2);

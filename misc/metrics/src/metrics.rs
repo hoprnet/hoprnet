@@ -266,7 +266,7 @@ impl MultiGauge {
     }
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
+#[cfg(any(not(feature = "js"), test))]
 #[macro_export]
 macro_rules! histogram_start_measure {
     // SimpleHistogram case
@@ -281,7 +281,7 @@ macro_rules! histogram_start_measure {
 
 enum TimerVariant {
     Native(HistogramTimer),
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     Wasm {
         start_ts: f64,
         new_ts: fn() -> f64,
@@ -311,7 +311,7 @@ impl SimpleHistogram {
     pub fn record_measure(&self, timer: SimpleTimer) {
         match timer.inner {
             TimerVariant::Native(timer) => timer.observe_duration(),
-            #[cfg(feature = "wasm")]
+            #[cfg(feature = "js")]
             TimerVariant::Wasm { start_ts, new_ts, .. } => self.hh.observe(new_ts() - start_ts),
         }
     }
@@ -320,7 +320,7 @@ impl SimpleHistogram {
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
-            #[cfg(feature = "wasm")]
+            #[cfg(feature = "js")]
             TimerVariant::Wasm { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
@@ -382,7 +382,7 @@ impl MultiHistogram {
     pub fn record_measure(&self, timer: SimpleTimer) {
         match timer.inner {
             TimerVariant::Native(timer) => timer.observe_duration(),
-            #[cfg(feature = "wasm")]
+            #[cfg(feature = "js")]
             TimerVariant::Wasm {
                 start_ts,
                 new_ts,
@@ -402,7 +402,7 @@ impl MultiHistogram {
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
-            #[cfg(feature = "wasm")]
+            #[cfg(feature = "js")]
             TimerVariant::Wasm { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
