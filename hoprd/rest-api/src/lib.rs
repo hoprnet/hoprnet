@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use futures::StreamExt;
 use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
 use serde_json::json;
@@ -15,6 +16,7 @@ use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
 use tide::{Middleware, Next, StatusCode};
+use tide_websockets::{Message, WebSocket};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
@@ -257,6 +259,8 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
+enum WebSocket
+
 pub async fn run_hopr_api(
     host: &str,
     cfg: &crate::config::Api,
@@ -345,7 +349,23 @@ pub async fn run_hopr_api(
         api.at("/messages/peek").post(messages::peek);
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
-        api.at("/messages/websocket").get(messages::websocket);
+        api.at("/messages/websocket")
+            .get(WebSocket::new(|_request, mut ws_con| async move {
+                let mut ws_con_sender = ws_con.clone();
+
+                let websocket_rx = websocket_rx.activate_cloned();
+                while let Some() = futures_lite::stream::race(ws_con, websocket_rx).next().await;
+
+                while let Some(Ok(Message::Text(input))) = ws_con.next().await {
+                    let output: String = input.chars().rev().collect();
+
+                    ws_con
+                        .send_string(format!("{} | {}", &input, &output))
+                        .await?;
+                }
+
+                Ok(())
+            }));
 
         api.at("/network/price").get(network::price);
 
@@ -676,9 +696,9 @@ mod account {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-      "amount": 20000,
-      "currency": "HOPR"
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "amount": 20000,
+        "currency": "HOPR"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct WithdrawRequest {
@@ -1278,13 +1298,13 @@ mod messages {
     #[derive(Debug, Clone, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     #[schema(example = json!({
-      "body": "Test message",
-      "hops": 1,
-      "path": [
-        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
-      ],
-      "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-      "tag": 20
+        "body": "Test message",
+        "hops": 1,
+        "path": [
+            "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+        ],
+        "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+        "tag": 20
     }))]
     pub(crate) struct SendMessageReq {
         /// The message tag used to filter messages based on application
@@ -1306,7 +1326,7 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-         "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+        "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct SendMessageRes {
@@ -1437,7 +1457,6 @@ mod messages {
         get,
         path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
         responses(
-            (status = 101, description = "Switching protocols."),
             (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1447,7 +1466,8 @@ mod messages {
         ),
         tag = "Messages",
     )]
-    pub async fn websocket(mut req: Request<InternalState>) -> tide::Result<Response> {
+    pub async fn websocket(_req: Request<InternalState>) -> tide::Result<Response> {
+        // Dummy implementation for utoipa, the websocket is created in place inside the tide server
         return Ok(Response::builder(422)
             .body(ApiErrorStatus::UnknownFailure(
                 "unimplemented".into(),
@@ -1834,16 +1854,16 @@ mod tickets {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "losingTickets": 0,
-      "neglected": 0,
-      "neglectedValue": "0",
-      "redeemed": 1,
-      "redeemedValue": "100",
-      "rejected": 0,
-      "rejectedValue": "0",
-      "unredeemed": 2,
-      "unredeemedValue": "200",
-      "winProportion": 1
+        "losingTickets": 0,
+        "neglected": 0,
+        "neglectedValue": "0",
+        "redeemed": 1,
+        "redeemedValue": "100",
+        "rejected": 0,
+        "rejectedValue": "0",
+        "unredeemed": 2,
+        "unredeemedValue": "200",
+        "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTicketStatistics {

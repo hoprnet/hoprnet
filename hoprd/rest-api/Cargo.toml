@@ -20,6 +20,7 @@ async-broadcast = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 const_format = "0.2.32"
 futures = { workspace = true }
+futures-lite = { workspace = true }
 lazy_static = { workspace = true, optional = true}
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
 log = { workspace = true }
@@ -28,6 +29,7 @@ serde_with = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
+tide-websockets = "0.4"
 utoipa = { version = "4.1" }
 utoipa-swagger-ui = { version = "5.0.0" }
 validator = { workspace = true }
