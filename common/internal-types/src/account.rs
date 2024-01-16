@@ -1,13 +1,13 @@
 use crate::account::AccountType::{Announced, NotAnnounced};
 use hopr_crypto_types::types::OffchainPublicKey;
-use multiaddr::Multiaddr;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use utils_types::{
+use hopr_primitive_types::{
     errors::GeneralError::ParseError,
     primitives::Address,
     traits::{BinarySerializable, PeerIdLike, ToHex},
 };
+use multiaddr::Multiaddr;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,7 +136,7 @@ impl BinarySerializable for AccountEntry {
     const SIZE: usize =
         OffchainPublicKey::SIZE + Address::SIZE + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
             let public_key = OffchainPublicKey::from_bytes(buf.drain(..OffchainPublicKey::SIZE).as_ref())?;
@@ -201,8 +201,8 @@ mod test {
     };
     use hex_literal::hex;
     use hopr_crypto_types::types::OffchainPublicKey;
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use multiaddr::Multiaddr;
-    use utils_types::{primitives::Address, traits::BinarySerializable};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const CHAIN_ADDR: [u8; 20] = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E");

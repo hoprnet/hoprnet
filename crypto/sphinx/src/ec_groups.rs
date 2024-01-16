@@ -7,7 +7,7 @@ use hopr_crypto_types::errors::Result;
 use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
 use hopr_crypto_types::types::CurvePoint;
 use hopr_crypto_types::utils::{k256_scalar_from_bytes, x25519_scalar_from_bytes};
-use utils_types::traits::BinarySerializable;
+use hopr_primitive_types::traits::BinarySerializable;
 
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 

@@ -16,17 +16,17 @@ use core_packet::errors::PacketError::{
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
-use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::Ticket;
-use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
+use hopr_internal_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
+use hopr_internal_types::channels::Ticket;
+use hopr_internal_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 use log::{debug, error, warn};
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
-use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -34,7 +34,7 @@ use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -636,7 +636,7 @@ impl PacketInteraction {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     match &packet {
                         Ok(TransportPacket::Forwarded { .. }) => {
-                            metadata.start_time = platform::time::native::current_timestamp();
+                            metadata.start_time = hopr_platform::time::native::current_timestamp();
                         }
                         _ => {}
                     }
@@ -768,7 +768,7 @@ impl PacketInteraction {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    platform::time::native::current_timestamp()
+                                    hopr_platform::time::native::current_timestamp()
                                         .saturating_sub(metadata.start_time)
                                         .as_secs_f64(),
                                 )
@@ -828,12 +828,6 @@ mod tests {
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
-    use core_types::protocol::PeerAddressResolver;
-    use core_types::{
-        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
-        channels::{ChannelEntry, ChannelStatus},
-        protocol::{Tag, TagBloomFilter},
-    };
     use futures::{
         future::{select, Either},
         pin_mut, StreamExt,
@@ -845,16 +839,22 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     };
+    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_internal_types::{
+        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
+        channels::{ChannelEntry, ChannelStatus},
+        protocol::{Tag, TagBloomFilter},
+    };
+    use hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::PeerIdLike,
+    };
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::PeerIdLike,
-    };
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![

@@ -5,12 +5,12 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_crypto_types::types::PacketTag;
+use hopr_primitive_types::errors::GeneralError::ParseError;
+use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::traits::{AutoBinarySerializable, BinarySerializable};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -138,7 +138,7 @@ impl Display for ApplicationData {
 impl BinarySerializable for ApplicationData {
     const SIZE: usize = 2; // minimum size
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
             let mut tag = [0u8; 2];
             tag.copy_from_slice(&data[0..2]);
@@ -169,7 +169,7 @@ impl BinarySerializable for ApplicationData {
 mod tests {
     use crate::protocol::{ApplicationData, TagBloomFilter};
     use hopr_crypto_random::random_bytes;
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_application_data() {

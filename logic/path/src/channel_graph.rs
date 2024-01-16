@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use hopr_primitive_types::primitives::Address;
 use log::{debug, info};
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
@@ -8,10 +9,12 @@ use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {core_types::channels::ChannelDirection, metrics::metrics::MultiGauge, utils_types::traits::ToHex};
+use {
+    hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
+    hopr_primitive_types::traits::ToHex,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -211,12 +214,12 @@ mod tests {
     use crate::channel_graph::ChannelGraph;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
-    use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, Snapshot};
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [

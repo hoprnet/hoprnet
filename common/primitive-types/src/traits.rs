@@ -4,11 +4,6 @@ use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-// NOTE on wasm_bindgen: since #[wasm_bindgen] attributes cannot be used
-// on trait impl blocks, the trait inherited methods need to be re-implemented
-// in a #[wasm_bindgen] annotated blocks if they need to be exposed to TypeScript.
-// Therefore, use the traits reasonably for now to avoid too much code duplication.
-
 /// A generic type that can be converted to a hexadecimal string.
 pub trait ToHex {
     /// Hexadecimal representation of this type.

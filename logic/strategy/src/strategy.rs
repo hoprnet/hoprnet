@@ -11,21 +11,21 @@ use chain_actions::CoreEthereumActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use validator::Validate;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
-    metrics::metrics::{MultiGauge, SimpleCounter},
+    hopr_metrics::metrics::{MultiGauge, SimpleCounter},
     strum::VariantNames,
 };
 

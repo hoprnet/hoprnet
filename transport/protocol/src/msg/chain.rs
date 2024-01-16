@@ -4,16 +4,16 @@ use core_packet::{
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
 use core_path::path::{Path, TransportPath};
-use core_types::channels::Ticket;
-use core_types::protocol::INTERMEDIATE_HOPS;
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, OffchainKeypair},
     types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PacketTag},
 };
+use hopr_internal_types::channels::Ticket;
+use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
-use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 /// Indicates the packet type.
 #[derive(Debug, Clone)]
@@ -226,19 +226,19 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
-    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use core_types::protocol::PeerAddressResolver;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, OffchainPublicKey, PublicKey},
     };
-    use libp2p_identity::PeerId;
-    use parameterized::parameterized;
-    use utils_types::primitives::Address;
-    use utils_types::{
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_primitive_types::primitives::Address;
+    use hopr_primitive_types::{
         primitives::{Balance, BalanceType, EthereumChallenge, U256},
         traits::PeerIdLike,
     };
+    use libp2p_identity::PeerId;
+    use parameterized::parameterized;
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);

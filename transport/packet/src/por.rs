@@ -3,10 +3,10 @@ use hopr_crypto_sphinx::{
     shared_keys::SharedSecret,
 };
 use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use hopr_primitive_types::errors::GeneralError::ParseError;
+use hopr_primitive_types::primitives::EthereumChallenge;
+use hopr_primitive_types::traits::BinarySerializable;
 use log::error;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::EthereumChallenge;
-use utils_types::traits::BinarySerializable;
 
 use crate::errors::{PacketError, Result};
 
@@ -71,7 +71,7 @@ impl ProofOfRelayString {
 impl BinarySerializable for ProofOfRelayString {
     const SIZE: usize = POR_SECRET_LENGTH;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == POR_SECRET_LENGTH {
             let (next_ticket_challenge, hint) = data.split_at(POR_SECRET_LENGTH / 2);
             Ok(Self {
@@ -168,7 +168,7 @@ mod tests {
     use hopr_crypto_sphinx::derivation::derive_ack_key_share;
     use hopr_crypto_sphinx::shared_keys::SharedSecret;
     use hopr_crypto_types::types::Response;
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_por_preverify_validate() {

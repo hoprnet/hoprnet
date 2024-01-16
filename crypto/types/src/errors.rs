@@ -1,6 +1,6 @@
 use k256::elliptic_curve;
+use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_types::errors::GeneralError;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {

@@ -73,22 +73,22 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl utils_types::traits::AutoBinarySerializable for PingMessage {}
+impl hopr_primitive_types::traits::AutoBinarySerializable for PingMessage {}
 
 #[cfg(feature = "compat-ping")]
-impl utils_types::traits::BinarySerializable for PingMessage {
+impl hopr_primitive_types::traits::BinarySerializable for PingMessage {
     const SIZE: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
 
     // This implementation is backwards compatible with older HOPR versions
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() >= Self::SIZE {
             let mut ret = PingMessage::default();
             let mut buf = data.to_vec();
             ret.nonce.copy_from_slice(buf.drain(0..Self::SIZE).as_ref());
             Ok(ret)
         } else {
-            Err(utils_types::errors::GeneralError::ParseError)
+            Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
     }
 
@@ -103,7 +103,7 @@ impl utils_types::traits::BinarySerializable for PingMessage {
 mod tests {
     use crate::messaging::ControlMessage::{Ping, Pong};
     use crate::messaging::{ControlMessage, PingMessage};
-    use utils_types::traits::BinarySerializable;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_ping_pong_roundtrip() {

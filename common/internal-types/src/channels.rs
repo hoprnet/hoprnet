@@ -8,6 +8,7 @@ use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair},
     types::{Hash, PublicKey, Signature},
 };
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -17,9 +18,8 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
 };
-use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
-use utils_types::traits::{BinarySerializable, ToHex};
+use hopr_primitive_types::traits::{BinarySerializable, ToHex};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -182,7 +182,7 @@ impl Display for ChannelEntry {
 impl BinarySerializable for ChannelEntry {
     const SIZE: usize = Address::SIZE + Address::SIZE + Balance::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
             let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
@@ -190,7 +190,7 @@ impl BinarySerializable for ChannelEntry {
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0])
-                .ok_or(utils_types::errors::GeneralError::ParseError)?;
+                .ok_or(hopr_primitive_types::errors::GeneralError::ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             Ok(Self::new(
@@ -203,7 +203,7 @@ impl BinarySerializable for ChannelEntry {
                 closure_time,
             ))
         } else {
-            Err(utils_types::errors::GeneralError::ParseError)
+            Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
     }
 
@@ -729,7 +729,7 @@ impl BinarySerializable for Ticket {
     /// Tickets get sent next to packets, hence they need to be as small as possible.
     /// Transmitting tickets to the next downstream share the same binary representation
     /// as used in the smart contract.
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // TODO: not necessary to transmit over the wire
             let channel_id = Hash::from_bytes(&data[0..32])?;
@@ -769,7 +769,7 @@ impl BinarySerializable for Ticket {
             })
         } else {
             // TODO: make Error a generic
-            Err(utils_types::errors::GeneralError::ParseError)
+            Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
     }
 
@@ -841,7 +841,7 @@ pub mod tests {
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
     };
-    use utils_types::{
+    use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
         traits::BinarySerializable,
     };

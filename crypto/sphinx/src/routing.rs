@@ -10,6 +10,8 @@ use crate::derivation::derive_mac_key;
 use crate::prg::{PRGParameters, PRG};
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::shared_keys::{SharedSecret, SphinxSuite};
+use crate::utils::xor_inplace;
+use hopr_primitive_types::traits::BinarySerializable;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 

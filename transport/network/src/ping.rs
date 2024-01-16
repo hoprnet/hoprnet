@@ -7,12 +7,12 @@ use libp2p_identity::PeerId;
 
 use log::{debug, error, info};
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, SimpleHistogram};
+use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

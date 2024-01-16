@@ -24,20 +24,19 @@ hex = { workspace = true }
 hkdf = "0.12"
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
+log = { workspace = true }
 primitive-types = "0.12"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"
-zeroize = "1.7"
+thiserror = { workspace = true }
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
-
-platform = { workspace = true }
-log = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"

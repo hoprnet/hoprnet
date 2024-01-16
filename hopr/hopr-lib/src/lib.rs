@@ -9,8 +9,23 @@ mod helpers;
 
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
-    core_transport::{config::HostConfig, ApplicationData, HalfKeyChallenge, Health, Multiaddr, TransportOutput},
-    utils_types::primitives::{Address, Balance, BalanceType},
+    chain_actions::errors::CoreEthereumActionsError,
+    core_strategy::{Strategy, Strategy::AutoRedeeming},
+    core_transport::{
+        config::{looks_like_domain, HostConfig, HostType},
+        constants::PEER_METADATA_PROTOCOL_VERSION,
+        errors::{HoprTransportError, ProtocolError},
+        ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
+    },
+    hopr_internal_types::{
+        channels::{ChannelEntry, ChannelStatus, Ticket},
+        protocol::{Tag, DEFAULT_APPLICATION_TAG},
+    },
+    hopr_primitive_types::{
+        primitives::{Address, Balance, BalanceType},
+        rlp,
+        traits::{PeerIdLike, ToHex},
+    },
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -25,24 +40,18 @@ use futures::{
 use chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
-    errors::CoreEthereumActionsError,
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use chain_api::{can_register_with_safe, wait_for_funds, ChannelEntry, SignificantChainEvent};
+use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_types::chain_events::ChainEventType;
-use core_transport::TicketStatistics;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use core_types::protocol::TagBloomFilter;
-use core_types::{
-    account::AccountEntry,
-    acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, ChannelStatus, Ticket},
-};
+use hopr_internal_types::protocol::TagBloomFilter;
+use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 
+use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use utils_db::db::DB;
-use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex as _};
 
 use chain_api::HoprChain;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -54,11 +63,11 @@ use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
-use core_transport::{ChainKeypair, Hash, HoprTransport, Keypair, OffchainKeypair};
+use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
+use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
+use hopr_primitive_types::primitives::{Snapshot, U256};
 use log::{error, info};
-use platform::file::native::{join, read_file, remove_dir_all, write};
 use utils_db::CurrentDbShim;
-use utils_types::primitives::{Snapshot, U256};
 
 use crate::chain::ChainNetworkConfig;
 use crate::chain::SmartContractConfig;
@@ -67,10 +76,10 @@ use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -110,7 +119,7 @@ pub struct OpenChannelResult {
 
 pub struct CloseChannelResult {
     pub tx_hash: Hash,
-    pub status: core_types::channels::ChannelStatus,
+    pub status: hopr_internal_types::channels::ChannelStatus,
 }
 
 /// Enum differentiator for loop component futures.
@@ -234,15 +243,15 @@ where
                                 )
                                 .await;
                             }
-                        } else if channel.status == core_types::channels::ChannelStatus::Open {
+                        } else if channel.status == hopr_internal_types::channels::ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
                             let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                 &*multi_strategy,
                                 &channel,
                                 own_channel_direction,
-                                core_types::channels::ChannelChange::Status {
-                                    left: core_types::channels::ChannelStatus::Closed,
-                                    right: core_types::channels::ChannelStatus::Open,
+                                hopr_internal_types::channels::ChannelChange::Status {
+                                    left: hopr_internal_types::channels::ChannelStatus::Closed,
+                                    right: hopr_internal_types::channels::ChannelStatus::Open,
                                 },
                             )
                             .await;
@@ -606,7 +615,7 @@ impl Hopr {
         let tbf = read_file(&tbf_path)
             .and_then(|data| {
                 TagBloomFilter::from_bytes(&data)
-                    .map_err(|e| platform::error::PlatformError::GeneralError(e.to_string()))
+                    .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
                 debug!("No tag Bloom filter found, using empty");
@@ -1111,7 +1120,7 @@ impl Hopr {
     pub async fn close_channel(
         &self,
         counterparty: &Address,
-        direction: core_types::channels::ChannelDirection,
+        direction: hopr_internal_types::channels::ChannelDirection,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
         if self.status() != State::Running {

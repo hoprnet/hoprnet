@@ -1,9 +1,9 @@
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::ChannelEntry;
 use hopr_crypto_types::types::Hash;
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::channels::ChannelEntry;
+use hopr_primitive_types::primitives::{Address, Balance};
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use utils_types::primitives::{Address, Balance};
 
 /// Contains TX hash along with the Chain Event data.
 /// This could be used to pair up some events with `Action`

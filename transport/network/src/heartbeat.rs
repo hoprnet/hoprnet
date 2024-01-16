@@ -15,7 +15,7 @@ use validator::Validate;
 use log::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::{histogram_start_measure, metrics::SimpleHistogram};
+use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
 }
 
 use async_std::task::sleep;
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;

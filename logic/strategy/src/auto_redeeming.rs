@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use core_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -11,7 +11,7 @@ use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -88,16 +88,16 @@ mod tests {
     use chain_actions::redeem::TicketRedeemActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
+    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+    use hopr_primitive_types::traits::BinarySerializable;
     use mockall::mock;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use utils_types::traits::BinarySerializable;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();

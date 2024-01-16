@@ -11,21 +11,13 @@ crate-type = ["rlib"]
 
 [features]
 default = ["prometheus"]
-wasm = [
-    "chain-db/wasm", "chain-actions/wasm", "chain-rpc/wasm", "chain-indexer/wasm",
-    "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "metrics?/wasm", "utils-types/wasm"
-]
-prometheus = ["dep:metrics", "chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
+prometheus = ["chain-rpc/prometheus", "chain-actions/prometheus", "chain-indexer/prometheus"]
 
 [dependencies]
 async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
-primitive-types = "0.12"
-hex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
@@ -36,9 +28,8 @@ chain-indexer = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
-core-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
