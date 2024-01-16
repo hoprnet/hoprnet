@@ -65,7 +65,7 @@
               ./Cargo.lock
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
-              ./hopr/data
+              ./hopr/hopr-lib/data
             ];
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
