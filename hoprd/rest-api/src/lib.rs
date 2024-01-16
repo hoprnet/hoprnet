@@ -9,6 +9,7 @@ use async_std::sync::RwLock;
 use futures::StreamExt;
 use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
+use log::{error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
@@ -259,7 +260,10 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
-enum WebSocket
+enum WebSocketInput {
+    Network(TransportOutput),
+    WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
+}
 
 pub async fn run_hopr_api(
     host: &str,
@@ -350,21 +354,58 @@ pub async fn run_hopr_api(
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
         api.at("/messages/websocket")
-            .get(WebSocket::new(|_request, mut ws_con| async move {
-                let mut ws_con_sender = ws_con.clone();
+            .get(WebSocket::new(|request: Request<InternalState>, ws_con| {
+                let ws_rx = request.state().websocket_rx.activate_cloned();
 
-                let websocket_rx = websocket_rx.activate_cloned();
-                while let Some() = futures_lite::stream::race(ws_con, websocket_rx).next().await;
+                async move {
+                    while let Some(v) = futures_lite::stream::race(
+                        ws_con.clone().map(|v| WebSocketInput::WsInput(v)),
+                        ws_rx.clone().map(|v| WebSocketInput::Network(v)),
+                    )
+                    .next()
+                    .await
+                    {
+                        match v {
+                            WebSocketInput::Network(net_in) => match net_in {
+                                TransportOutput::Received(data) => {
+                                    ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
+                                }
+                                TransportOutput::Sent(hkc) => {
+                                    ws_con
+                                        .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
+                                        .await?;
+                                }
+                            },
+                            WebSocketInput::WsInput(ws_in) => match ws_in {
+                                Ok(Message::Text(input)) => {
+                                    let data: messages::WebSocketSendMsg = serde_json::from_str(&input)?;
 
-                while let Some(Ok(Message::Text(input))) = ws_con.next().await {
-                    let output: String = input.chars().rev().collect();
+                                    let hopr = request.state().hopr.clone();
 
-                    ws_con
-                        .send_string(format!("{} | {}", &input, &output))
-                        .await?;
+                                    let hkc = hopr
+                                        .send_message(
+                                            data.args.body.into_bytes().into_boxed_slice(),
+                                            data.args.peer_id,
+                                            data.args.path,
+                                            data.args.hops,
+                                            Some(data.args.tag),
+                                        )
+                                        .await?;
+
+                                    ws_con
+                                        .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
+                                        .await?;
+                                }
+                                Ok(_) => {
+                                    warn!("encountered an unsupported websocket input type")
+                                }
+                                Err(e) => error!("failed to get a valid websocket message: {e}"),
+                            },
+                        }
+                    }
+
+                    Ok(())
                 }
-
-                Ok(())
             }));
 
         api.at("/network/price").get(network::price);
@@ -1411,21 +1452,73 @@ mod messages {
     }
 
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
-    #[schema(value_type = String)]//, format = Binary)]
+    #[schema(value_type = String)] //, format = Binary)]
     pub struct Text(String);
+
+    #[derive(Debug, Clone, serde::Deserialize)]
+    pub(crate) struct WebSocketSendMsg {
+        pub cmd: String,
+        pub args: SendMessageReq,
+    }
+
+    #[derive(Debug, Clone, serde::Serialize)]
+    pub(crate) struct WebSocketReadMsg {
+        #[serde(rename = "type")]
+        type_: String,
+        pub tag: u16,
+        pub body: String,
+    }
+
+    impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
+        fn from(value: hopr_lib::ApplicationData) -> Self {
+            Self {
+                type_: "message".into(),
+                tag: value.application_tag.unwrap_or(0),
+                // TODO: Byte order structures should be used instead of the String object
+                body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
+            }
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    pub(crate) struct WebSocketReadAck {
+        #[serde(rename = "type")]
+        type_: String,
+        #[serde_as(as = "DisplayFromStr")]
+        pub id: HalfKeyChallenge,
+    }
+
+    impl WebSocketReadAck {
+        pub fn from_ack(value: HalfKeyChallenge) -> Self {
+            Self {
+                type_: "message-ack".into(),
+                id: value,
+            }
+        }
+
+        pub fn from_ack_challenge(value: HalfKeyChallenge) -> Self {
+            Self {
+                type_: "message-ack-challenge".into(),
+                id: value,
+            }
+        }
+    }
 
     /// Websocket endpoint exposing a subset of message functions.
     ///
     /// Incoming messages from other nodes are sent to the websocket client.
     ///
     /// The following message can be set to the server by the client:
-    /// ```
+    /// ```json
     /// {
     ///     cmd: "sendmsg",
     ///     args: {
     ///         peerId: "SOME_PEER_ID",
     ///         path: [],
-    ///         hops: 1
+    ///         hops: 1,
+    ///         body: "asdasd",
+    ///         tag: 2
     ///     }
     /// }
     /// ```
@@ -1433,7 +1526,7 @@ mod messages {
     /// The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
     ///
     /// The following messages may be sent by the server over the Websocket connection:
-    /// ````
+    /// ````json
     /// {
     ///   type: "message",
     ///   tag: 12,
@@ -1450,7 +1543,7 @@ mod messages {
     ///   id: "some challenge id"
     /// }
     ///
-    /// Authentication (if enabled) is done by cookie `X-Auth-Token`. 
+    /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
     ///
     /// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
     #[utoipa::path(
@@ -1469,9 +1562,7 @@ mod messages {
     pub async fn websocket(_req: Request<InternalState>) -> tide::Result<Response> {
         // Dummy implementation for utoipa, the websocket is created in place inside the tide server
         return Ok(Response::builder(422)
-            .body(ApiErrorStatus::UnknownFailure(
-                "unimplemented".into(),
-            ))
+            .body(ApiErrorStatus::UnknownFailure("unimplemented".into()))
             .build());
     }
 
