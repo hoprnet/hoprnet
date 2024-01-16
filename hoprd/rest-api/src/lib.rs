@@ -7,9 +7,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
 use futures::StreamExt;
+use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
-use log::{error, warn};
+use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
@@ -358,19 +359,21 @@ pub async fn run_hopr_api(
                 let ws_rx = request.state().websocket_rx.activate_cloned();
 
                 async move {
-                    while let Some(v) = futures_lite::stream::race(
+                    let mut queue = (
                         ws_con.clone().map(|v| WebSocketInput::WsInput(v)),
-                        ws_rx.clone().map(|v| WebSocketInput::Network(v)),
+                        ws_rx.map(|v| WebSocketInput::Network(v)),
                     )
-                    .next()
-                    .await
-                    {
+                        .merge();
+
+                    while let Some(v) = queue.next().await {
                         match v {
                             WebSocketInput::Network(net_in) => match net_in {
                                 TransportOutput::Received(data) => {
+                                    debug!("websocket notifying client with received msg {data}");
                                     ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
                                 }
                                 TransportOutput::Sent(hkc) => {
+                                    debug!("websocket notifying client with received ack {hkc}");
                                     ws_con
                                         .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
                                         .await?;
@@ -379,25 +382,39 @@ pub async fn run_hopr_api(
                             WebSocketInput::WsInput(ws_in) => match ws_in {
                                 Ok(Message::Text(input)) => {
                                     let data: messages::WebSocketSendMsg = serde_json::from_str(&input)?;
+                                    if data.cmd == "sendmsg" {
+                                        let hopr = request.state().hopr.clone();
 
-                                    let hopr = request.state().hopr.clone();
+                                        // Use the message encoder, if any
+                                        // TODO: remove RLP in 3.0
+                                        let msg_body = request
+                                            .state()
+                                            .msg_encoder
+                                            .as_ref()
+                                            .map(|enc| enc(data.args.body.as_bytes()))
+                                            .unwrap_or_else(|| Box::from(data.args.body.as_bytes()));
 
-                                    let hkc = hopr
-                                        .send_message(
-                                            data.args.body.into_bytes().into_boxed_slice(),
-                                            data.args.peer_id,
-                                            data.args.path,
-                                            data.args.hops,
-                                            Some(data.args.tag),
-                                        )
-                                        .await?;
+                                        let hkc = hopr
+                                            .send_message(
+                                                // data.args.body.into_bytes().into_boxed_slice(),
+                                                msg_body,
+                                                data.args.peer_id,
+                                                data.args.path,
+                                                data.args.hops,
+                                                Some(data.args.tag),
+                                            )
+                                            .await?;
 
-                                    ws_con
-                                        .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
-                                        .await?;
+                                        debug!("websocket notifying client with sent ack {hkc}");
+                                        ws_con
+                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
+                                            .await?;
+                                    } else {
+                                        warn!("skipping an unsupported websocket command '{}'", data.cmd);
+                                    }
                                 }
                                 Ok(_) => {
-                                    warn!("encountered an unsupported websocket input type")
+                                    warn!("encountered an unsupported websocket input type");
                                 }
                                 Err(e) => error!("failed to get a valid websocket message: {e}"),
                             },

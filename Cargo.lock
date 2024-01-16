@@ -3358,7 +3358,7 @@ dependencies = [
  "async-std",
  "const_format",
  "futures",
- "futures-lite 1.13.0",
+ "futures-concurrency",
  "hopr-crypto-types",
  "hopr-lib",
  "hopr-metrics",

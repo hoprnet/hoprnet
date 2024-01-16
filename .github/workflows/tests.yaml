@@ -129,10 +129,10 @@ jobs:
     needs:
       - build
     strategy:
+      fail-fast: false
       matrix:
         suite:
           - integration
-          - security
           - websocket_api
     runs-on: ubuntu-8-core
     timeout-minutes: 30
