@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use chain_db::traits::HoprCoreEthereumDbActions;
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use hopr_primitive_types::primitives::{Address, Balance};
 use log::{debug, info};
@@ -110,13 +110,8 @@ mod tests {
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use hex_literal::hex;
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::HalfKey;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair},
-        types::{HalfKeyChallenge, Hash},
-    };
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
     use hopr_internal_types::channels::{f64_to_win_prob, ChannelStatus};
     use hopr_internal_types::{

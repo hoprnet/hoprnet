@@ -6,7 +6,7 @@ use chain_types::chain_events::ChainEventType;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus;
 use hopr_internal_types::announcement::AnnouncementData;
 use hopr_internal_types::{

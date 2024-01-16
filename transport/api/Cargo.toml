@@ -31,7 +31,7 @@ validator = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
 core-network = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }

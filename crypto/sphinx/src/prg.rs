@@ -1,8 +1,8 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
+use hopr_crypto_types::primitives::SecretKey;
 use zeroize::ZeroizeOnDrop;
 
 use crate::derivation::generate_key_iv;
-use crate::primitives::SecretKey;
 
 // Module-specific constants
 const AES_BLOCK_SIZE: usize = 16;
@@ -41,16 +41,6 @@ impl PRGParameters {
         generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true);
         ret
     }
-
-    /// Raw key material for the underlying block cipher
-    pub fn key(&self) -> &[u8] {
-        &self.key
-    }
-
-    /// Initialization vector for the underlying block cipher
-    pub fn iv(&self) -> &[u8] {
-        &self.iv
-    }
 }
 
 /// Pseudo-Random Generator (PRG) function that is instantiated
@@ -63,13 +53,6 @@ pub struct PRG {
 }
 
 impl PRG {
-    /// Creates a PRG instance  using the raw key and IV for the underlying block cipher.
-    pub fn new(key: [u8; PRG_KEY_LENGTH], iv: [u8; PRG_IV_LENGTH]) -> Self {
-        Self {
-            params: PRGParameters { key, iv },
-        }
-    }
-
     /// Creates a new PRG instance using the given parameters
     pub fn from_parameters(params: PRGParameters) -> Self {
         Self { params }
@@ -117,26 +100,37 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::prg::{PRGParameters, AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
-    use crate::primitives::SecretKey;
+    use super::*;
     use hex_literal::hex;
 
     #[test]
     fn test_prg_single_block() {
-        let out = PRG::new([0u8; 16], [0u8; 12]).digest(5, 10);
+        let out = PRG::from_parameters(PRGParameters {
+            key: [0u8; 16],
+            iv: [0u8; 12],
+        })
+        .digest(5, 10);
         assert_eq!(5, out.len());
     }
 
     #[test]
     fn test_prg_more_blocks() {
-        let out = PRG::new([0u8; 16], [0u8; 12]).digest(0, AES_BLOCK_SIZE * 2);
+        let out = PRG::from_parameters(PRGParameters {
+            key: [0u8; 16],
+            iv: [0u8; 12],
+        })
+        .digest(0, AES_BLOCK_SIZE * 2);
 
         assert_eq!(32, out.len());
     }
 
     #[test]
     fn test_prg_across_blocks() {
-        let out = PRG::new([0u8; 16], [0u8; 12]).digest(5, AES_KEY_SIZE * 2 + 10);
+        let out = PRG::from_parameters(PRGParameters {
+            key: [0u8; 16],
+            iv: [0u8; 12],
+        })
+        .digest(5, AES_KEY_SIZE * 2 + 10);
 
         assert_eq!(AES_BLOCK_SIZE * 2 + 5, out.len());
     }

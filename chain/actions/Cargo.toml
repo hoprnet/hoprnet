@@ -24,7 +24,7 @@ serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
@@ -40,6 +40,7 @@ async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
+hopr-crypto-random = { workspace = true }
 
 [features]
 default = ["prometheus"]

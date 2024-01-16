@@ -23,7 +23,7 @@ primitive-types = "0.12.1"
 thiserror = { workspace = true }
 
 bindings = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true}

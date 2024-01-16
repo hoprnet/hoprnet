@@ -1,14 +1,15 @@
+use hopr_crypto_random::random_fill;
+use hopr_crypto_types::errors::CryptoError::TagMismatch;
+use hopr_crypto_types::errors::Result;
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleMac};
+use hopr_crypto_types::utils::xor_inplace;
+use hopr_primitive_types::traits::BinarySerializable;
+
 use crate::derivation::derive_mac_key;
-use crate::errors::CryptoError::TagMismatch;
-use crate::errors::Result;
-use crate::keypairs::Keypair;
 use crate::prg::{PRGParameters, PRG};
-use crate::primitives::{DigestLike, SecretKey, SimpleMac};
-use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::shared_keys::{SharedSecret, SphinxSuite};
-use crate::utils::xor_inplace;
-use hopr_primitive_types::traits::BinarySerializable;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -271,14 +272,9 @@ pub fn forward_header<S: SphinxSuite>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use crate::prg::{PRGParameters, PRG};
-    use crate::primitives::{DigestLike, SimpleMac};
-    use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
-    use crate::shared_keys::{SharedSecret, SphinxSuite};
-    use crate::utils::xor_inplace;
-    use hopr_primitive_types::traits::BinarySerializable;
+    use super::*;
+    use crate::ec_groups::Secp256k1Suite;
+    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use parameterized::parameterized;
 
     #[parameterized(hops = { 3, 4 })]
@@ -381,27 +377,23 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test() {
-        generic_test_generate_routing_info_and_forward::<X25519Suite>(
-            (0..3).map(|_| OffchainKeypair::random()).collect(),
-        )
-    }
-
+    #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<Ed25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
 
+    #[cfg(feature = "x25519")]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_x25519_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<X25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
 
+    #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
         generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(

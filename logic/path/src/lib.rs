@@ -10,7 +10,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::PeerAddressResolver;
 use hopr_primitive_types::primitives::Address;
 use log::error;
@@ -24,22 +24,26 @@ pub struct DbPeerAddressResolver(pub Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>)
 #[async_trait]
 impl PeerAddressResolver for DbPeerAddressResolver {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-        match self.0.read().await.get_packet_key(onchain_key).await {
-            Ok(k) => k,
-            Err(e) => {
+        self.0
+            .read()
+            .await
+            .get_packet_key(onchain_key)
+            .await
+            .unwrap_or_else(|e| {
                 error!("failed to resolve packet key for {onchain_key}: {e}");
                 None
-            }
-        }
+            })
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-        match self.0.read().await.get_chain_key(offchain_key).await {
-            Ok(k) => k,
-            Err(e) => {
+        self.0
+            .read()
+            .await
+            .get_chain_key(offchain_key)
+            .await
+            .unwrap_or_else(|e| {
                 error!("failed to resolve chain key for {offchain_key}: {e}");
                 None
-            }
-        }
+            })
     }
 }

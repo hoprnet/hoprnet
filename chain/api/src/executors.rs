@@ -6,7 +6,7 @@ use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::announcement::AnnouncementData;
 use hopr_primitive_types::primitives::{Address, Balance};

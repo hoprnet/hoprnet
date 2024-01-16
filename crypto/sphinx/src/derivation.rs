@@ -1,18 +1,12 @@
-use crate::errors::CryptoError::{CalculationError, InvalidParameterSize};
-use crate::keypairs::{ChainKeypair, Keypair};
 use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-use elliptic_curve::sec1::ToEncodedPoint;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
-use hopr_primitive_types::traits::BinarySerializable;
-use k256::{Scalar, Secp256k1};
-
-use crate::errors::Result;
-use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE};
-use crate::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
-use crate::random::{random_bytes, random_fill};
-use crate::types::{HalfKey, VrfParameters};
+use hopr_crypto_random::random_fill;
+use hopr_crypto_types::errors::CryptoError::{CalculationError, InvalidParameterSize};
+use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
+use hopr_crypto_types::types::{HalfKey, PacketTag};
+use k256::Secp256k1;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
@@ -20,6 +14,18 @@ const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
+
+/// Size of the nonce in the Ping sub protocol
+pub const PING_PONG_NONCE_SIZE: usize = 16;
+
+/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
+/// The given `secret` is first transformed using HKDF before the MAC calculation is performed.
+/// Based on `SimpleMac`
+pub fn create_tagged_mac(secret: &SecretKey, data: &[u8]) -> [u8; SimpleMac::SIZE] {
+    let mut mac = SimpleMac::new(&derive_mac_key(secret));
+    mac.update(data);
+    mac.finalize().into()
+}
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function
 /// The size of the secret must be at least the size of the output of the underlying hash function, which in this
@@ -64,9 +70,6 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> [u8; S
     mac.finalize().into()
 }
 
-/// Represents a fixed size packet verification tag
-pub type PacketTag = [u8; PACKET_TAG_LENGTH];
-
 /// Derives the packet tag used during packet construction by expanding the given secret.
 pub fn derive_packet_tag(secret: &SecretKey) -> PacketTag {
     hkdf_expand_from_prk::<typenum::U16>(secret, HASH_KEY_PACKET_TAG.as_bytes()).into()
@@ -102,7 +105,7 @@ pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], i
 /// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
 /// The `secret` must be at least `SecretKey::LENGTH` long.
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
-pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
+pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> hopr_crypto_types::errors::Result<HalfKey> {
     if secret.len() >= SecretKey::LENGTH {
         let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
             &[secret],
@@ -130,62 +133,16 @@ pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
     sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
 }
 
-/// Takes a private key, the corresponding Ethereum address and a payload
-/// and creates all parameters that are required by the smart contract
-/// to prove that a ticket is a win.
-pub fn derive_vrf_parameters<const T: usize>(
-    msg: &[u8; T],
-    chain_keypair: &ChainKeypair,
-    dst: &[u8],
-) -> Result<VrfParameters> {
-    let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.to_bytes(), msg], &[dst])?;
-
-    let a: Scalar = chain_keypair.into();
-
-    if a.is_zero().into() {
-        return Err(crate::errors::CryptoError::InvalidSecretScalar);
-    }
-
-    let v = b * a;
-
-    let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
-        &[
-            &a.to_bytes(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            &random_bytes::<64>(),
-        ],
-        &[dst],
-    )?;
-
-    let r_v = b * r;
-
-    let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
-        &[
-            &chain_addr.to_bytes(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            msg,
-        ],
-        &[dst],
-    )?;
-    let s = r + h * a;
-
-    Ok(VrfParameters {
-        v: v.to_affine().into(),
-        h,
-        s,
-        h_v: (v * h).to_affine().into(),
-        s_b: (b * s).to_affine().into(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::PublicKey;
     use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
     use hex_literal::hex;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::types::PublicKey;
+    use hopr_crypto_types::vrf::derive_vrf_parameters;
+    use hopr_primitive_types::traits::BinarySerializable;
+    use k256::Scalar;
 
     #[test]
     fn test_derive_commitment_seed() {
@@ -257,5 +214,16 @@ mod tests {
         .unwrap();
 
         assert_eq!(h_check, params.h);
+    }
+
+    #[test]
+    fn test_mac() {
+        let key = GenericArray::from([1u8; SecretKey::LENGTH]);
+        let data = [2u8; 64];
+        let mac = create_tagged_mac(&key.into(), &data);
+
+        let expected = hex!("77264e8ea3052b621dbb8b1904403a64b1064c884cf7629c266edd7e237f2799");
+        assert_eq!(SimpleMac::SIZE, mac.len());
+        assert_eq!(expected, mac);
     }
 }

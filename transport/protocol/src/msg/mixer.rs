@@ -38,11 +38,10 @@ impl MixerConfig {
     /// Get a random delay duration from the specified minimum and maximum delay available
     /// inside the configuration.
     pub fn random_delay(&self) -> Duration {
-        let random_delay = hopr_crypto::random::random_integer(
+        let random_delay = hopr_crypto_random::random_integer(
             self.min_delay.as_millis() as u64,
             Some(self.max_delay.as_millis() as u64),
-        )
-        .unwrap_or(self.max_delay.as_millis() as u64);
+        );
 
         Duration::from_millis(random_delay)
     }

@@ -1,5 +1,5 @@
 use crate::account::AccountType::{Announced, NotAnnounced};
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_primitive_types::{
     errors::GeneralError::ParseError,
     primitives::Address,
@@ -200,7 +200,7 @@ mod test {
         AccountType::{Announced, NotAnnounced},
     };
     use hex_literal::hex;
-    use hopr_crypto::types::OffchainPublicKey;
+    use hopr_crypto_types::types::OffchainPublicKey;
     use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use multiaddr::Multiaddr;
 

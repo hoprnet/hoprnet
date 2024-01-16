@@ -16,7 +16,7 @@ use core_packet::errors::PacketError::{
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
-use hopr_crypto::{
+use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, OffchainPublicKey},
 };
@@ -833,13 +833,11 @@ mod tests {
         pin_mut, StreamExt,
     };
     use hex_literal::hex;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
-        derivation::derive_ack_key_share,
+    use hopr_crypto_random::{random_bytes, random_integer};
+    use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        random::{random_bytes, random_integer},
-        shared_keys::SharedSecret,
-        types::{HalfKeyChallenge, Hash},
+        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     };
     use hopr_internal_types::protocol::PeerAddressResolver;
     use hopr_internal_types::{
@@ -1283,7 +1281,7 @@ mod tests {
 
         let test_msgs = (0..pending_packets)
             .map(|i| ApplicationData {
-                application_tag: (i == 0).then(|| random_integer(1, Some(65535)).unwrap() as Tag),
+                application_tag: (i == 0).then(|| random_integer(1, Some(65535)) as Tag),
                 plain_text: random_bytes::<300>().into(),
             })
             .collect::<Vec<_>>();

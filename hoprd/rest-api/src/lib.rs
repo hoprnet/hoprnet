@@ -838,7 +838,7 @@ mod peers {
 mod channels {
     use super::*;
     use futures::TryFutureExt;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_types::types::Hash;
     use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
@@ -1663,7 +1663,7 @@ mod network {
 }
 mod tickets {
     use super::*;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_types::types::Hash;
     use hopr_lib::{HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
 
     #[serde_as]

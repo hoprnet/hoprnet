@@ -3,11 +3,7 @@ use bindings::hopr_channels::RedeemTicketCall;
 use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
 use hex_literal::hex;
-use hopr_crypto::{
-    errors::CryptoError::SignatureVerification,
-    keypairs::{ChainKeypair, Keypair},
-    types::{Hash, PublicKey, Signature},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 use serde::{
     de::{self, Deserializer, Visitor},
@@ -699,7 +695,7 @@ impl Ticket {
 
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto::errors::Result<PublicKey> {
+    pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<PublicKey> {
         PublicKey::from_signature_hash(
             &self.get_hash(domain_separator).to_bytes(),
             self.signature.as_ref().expect("ticket not signed"),
@@ -708,13 +704,13 @@ impl Ticket {
 
     /// Verifies the signature of this ticket.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> hopr_crypto::errors::Result<()> {
+    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
         let recovered = self.recover_signer(domain_separator)?;
         recovered
             .to_address()
             .eq(address)
             .then_some(())
-            .ok_or(SignatureVerification)
+            .ok_or(CryptoError::SignatureVerification)
     }
 
     pub fn is_aggregated(&self) -> bool {
@@ -837,7 +833,7 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
 pub mod tests {
     use crate::channels::{f64_to_win_prob, ChannelEntry, ChannelStatus, Ticket};
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
     };

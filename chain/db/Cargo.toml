@@ -16,7 +16,7 @@ async-trait = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
 hopr-internal-types = { workspace = true }

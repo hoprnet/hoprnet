@@ -1,14 +1,12 @@
 use blake2::Blake2s256;
 use generic_array::{ArrayLength, GenericArray};
+use hkdf::SimpleHkdf;
+use hopr_crypto_types::errors::CryptoError::CalculationError;
+use hopr_crypto_types::errors::Result;
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::utils::SecretValue;
 use std::marker::PhantomData;
 use std::ops::Mul;
-
-use crate::errors::CryptoError::CalculationError;
-use hkdf::SimpleHkdf;
-
-use crate::errors::Result;
-use crate::keypairs::Keypair;
-use crate::utils::SecretValue;
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;

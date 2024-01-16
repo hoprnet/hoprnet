@@ -14,7 +14,6 @@ crate-type = ["rlib"]
 [dependencies]
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-async-std = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
@@ -23,7 +22,8 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 chain-db = { workspace = true }
-hopr-crypto = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
 log = { workspace = true }
 utils-db = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 
 use core_network::{network::Network, ping::PingExternalAPI, types::Result, PeerId};
 use core_path::channel_graph::ChannelGraph;

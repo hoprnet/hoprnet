@@ -1,4 +1,3 @@
-use crate::derivation::derive_mac_key;
 use blake2::{Blake2s256, Blake2sMac256};
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
@@ -139,19 +138,9 @@ impl SimpleStreamCipher {
     }
 }
 
-/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
-/// The given `secret` is first transformed using HKDF before the MAC calculation is performed.
-/// Based on `SimpleMac`
-pub fn create_tagged_mac(secret: &SecretKey, data: &[u8]) -> [u8; SimpleMac::SIZE] {
-    let mut mac = SimpleMac::new(&derive_mac_key(secret));
-    mac.update(data);
-    mac.finalize().into()
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::primitives::{create_tagged_mac, DigestLike, SecretKey, SimpleMac, SimpleStreamCipher};
-    use generic_array::GenericArray;
+    use super::*;
     use hex_literal::hex;
 
     #[test]
@@ -187,12 +176,13 @@ mod tests {
 
     #[test]
     fn test_mac() {
-        let key = GenericArray::from([1u8; SecretKey::LENGTH]);
-        let data = [2u8; 64];
-        let mac = create_tagged_mac(&key.into(), &data);
+        let data = [0u8; 60];
 
-        let expected = hex!("77264e8ea3052b621dbb8b1904403a64b1064c884cf7629c266edd7e237f2799");
-        assert_eq!(SimpleMac::SIZE, mac.len());
-        assert_eq!(expected, mac);
+        let mut mac = SimpleMac::new(&Default::default());
+        mac.update(&data);
+
+        let out = mac.finalize();
+        let expected_out = hex!("29a11c3c01d102143a020fb562410902ba39966ec81b706945b8ed6d83498bb7");
+        assert_eq!(expected_out, out.as_slice());
     }
 }

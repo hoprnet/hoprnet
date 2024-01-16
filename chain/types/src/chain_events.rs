@@ -1,4 +1,4 @@
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::channels::ChannelEntry;
 use hopr_primitive_types::primitives::{Address, Balance};

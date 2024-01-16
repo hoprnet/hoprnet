@@ -4,11 +4,10 @@ use core_packet::{
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
 use core_path::path::{Path, TransportPath};
-use hopr_crypto::{
-    derivation::{derive_ack_key_share, PacketTag},
+use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
+use hopr_crypto_types::{
     keypairs::{ChainKeypair, OffchainKeypair},
-    shared_keys::SphinxSuite,
-    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
+    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PacketTag},
 };
 use hopr_internal_types::channels::Ticket;
 use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
@@ -111,7 +110,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let mp: MetaPacket<hopr_crypto::ec_groups::X25519Suite> =
+            let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
@@ -227,10 +226,9 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, PublicKey},
+        types::{Hash, OffchainPublicKey, PublicKey},
     };
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use hopr_internal_types::protocol::PeerAddressResolver;

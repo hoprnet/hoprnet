@@ -21,7 +21,7 @@ use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
-use hopr_crypto::{keypairs::ChainKeypair, types::VrfParameters};
+use hopr_crypto_types::{keypairs::ChainKeypair, vrf::VrfParameters};
 use hopr_internal_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use hopr_primitive_types::{
     primitives::{Address, Balance, BalanceType},
@@ -569,7 +569,7 @@ pub mod tests {
         types::{Bytes, Eip1559TransactionRequest, H160, U256},
     };
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

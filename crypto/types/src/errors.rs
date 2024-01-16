@@ -1,4 +1,5 @@
 use hopr_primitive_types::errors::GeneralError;
+use k256::elliptic_curve;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -23,6 +24,7 @@ pub enum CryptoError {
 
     #[error("signature verification failed")]
     SignatureVerification,
+
     #[error("ethereum challenge on the ticket is invalid")]
     InvalidChallenge,
 

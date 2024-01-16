@@ -22,7 +22,9 @@ serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-sphinx = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }
 log = { workspace = true }
 hopr-metrics = { workspace = true, optional = true}

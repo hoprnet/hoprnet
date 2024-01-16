@@ -24,7 +24,7 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 chain-db = { workspace = true }
@@ -42,6 +42,7 @@ chain-types = { workspace = true }
 env_logger = "0.10.0"
 mockall = "0.11.4"
 hex-literal = "0.4.1"
+hopr-crypto-random = { workspace = true }
 futures = "0.3.28"
 
 

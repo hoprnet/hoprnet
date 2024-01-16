@@ -5,7 +5,7 @@ use crate::errors::Result;
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_internal_types::protocol::PeerAddressResolver;
 use hopr_primitive_types::primitives::Address;
@@ -246,7 +246,7 @@ mod tests {
     use crate::path::{ChannelPath, Path, TransportPath};
     use async_trait::async_trait;
     use hex_literal::hex;
-    use hopr_crypto::types::{OffchainPublicKey, PublicKey};
+    use hopr_crypto_types::types::{OffchainPublicKey, PublicKey};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use hopr_internal_types::protocol::PeerAddressResolver;
     use hopr_primitive_types::primitives::{Address, Balance, BalanceType};

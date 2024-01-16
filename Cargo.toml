@@ -9,7 +9,9 @@ resolver = "2"
 members = [
     "common/internal-types",
     "common/primitive-types",
-    "crypto",
+    "crypto/sphinx",
+    "crypto/random",
+    "crypto/types",
     "chain/actions",
     "chain/api",
     "chain/db",
@@ -70,7 +72,9 @@ chain-db = { path = "chain/db", default-features = false }
 chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
-hopr-crypto = { path = "crypto", default-features = false }
+hopr-crypto-random = { path = "crypto/random", default-features = false }
+hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
+hopr-crypto-types = { path = "crypto/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-packet = { path = "transport/packet", default-features = false }
 core-path = { path = "logic/path", default-features = false }

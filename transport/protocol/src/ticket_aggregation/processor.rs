@@ -13,7 +13,7 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use hopr_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
+use hopr_crypto_types::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use hopr_internal_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, ChannelEntry, Ticket},
@@ -727,7 +727,7 @@ mod tests {
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use futures_lite::StreamExt;
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };

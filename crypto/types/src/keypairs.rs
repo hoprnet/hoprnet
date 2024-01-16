@@ -7,12 +7,12 @@ use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::ZeroizeOnDrop;
 
+use hopr_crypto_random::random_bytes;
+
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
-use crate::random::{random_bytes, random_group_element};
-use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-use crate::utils::SecretValue;
+use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue};
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
@@ -98,7 +98,7 @@ impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
 
         let mut ret = [0u8; ed25519_dalek::SECRET_KEY_LENGTH];
         ret.copy_from_slice(&hash[..32]);
-        curve25519_dalek::scalar::Scalar::from_bytes(&ret).unwrap()
+        x25519_scalar_from_bytes(&ret).unwrap() // cannot happen, secret always represents a valid scalar
     }
 }
 
@@ -161,7 +161,7 @@ impl ConstantTimeEq for ChainKeypair {
 
 impl From<&ChainKeypair> for k256::Scalar {
     fn from(value: &ChainKeypair) -> Self {
-        k256::Scalar::from_bytes(value.0.as_ref()).unwrap()
+        k256_scalar_from_bytes(value.0.as_ref()).unwrap() // cannot happen, secret always represents a valid scalar
     }
 }
 

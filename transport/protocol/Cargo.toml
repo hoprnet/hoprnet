@@ -29,7 +29,9 @@ serde_with = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-sphinx = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }

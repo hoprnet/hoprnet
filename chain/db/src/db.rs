@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use hopr_crypto_types::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use hopr_internal_types::channels::ChannelDirection;
 use hopr_internal_types::{
     account::AccountEntry,
@@ -1344,10 +1344,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey, Response},
-    };
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::{
         primitives::{Address, EthereumChallenge},

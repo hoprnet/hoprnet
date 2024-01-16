@@ -1,4 +1,4 @@
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 use log::{debug, error, info, warn};
@@ -408,9 +408,9 @@ mod tests {
         PeerId,
     };
     use futures::{future::ok, FutureExt};
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::types::Hash;
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
     use hopr_platform::time::native::current_timestamp;
     use hopr_primitive_types::primitives::{Snapshot, U256};

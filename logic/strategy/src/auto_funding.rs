@@ -118,8 +118,8 @@ mod tests {
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::Hash;
     use hopr_internal_types::channels::ChannelChange::CurrentBalance;
     use hopr_internal_types::channels::ChannelDirection::Outgoing;
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};

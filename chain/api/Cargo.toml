@@ -21,7 +21,7 @@ futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-actions = { workspace = true }
 chain-db = { workspace = true }
 chain-indexer = { workspace = true }

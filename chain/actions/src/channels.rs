@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
 use log::{debug, error, info};
@@ -171,7 +171,8 @@ mod tests {
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_crypto::{random::random_bytes, types::Hash};
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::Hash;
     use hopr_internal_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},

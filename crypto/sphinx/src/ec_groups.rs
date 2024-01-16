@@ -1,34 +1,20 @@
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::errors::Result;
-use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
-use crate::types::CurvePoint;
 use curve25519_dalek::traits::IsIdentity;
-use elliptic_curve::{Group, PrimeField};
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_crypto_types::errors::Result;
 
-use crate::keypairs::{ChainKeypair, OffchainKeypair};
-use crate::random::{random_bytes, random_fill};
-use elliptic_curve::ops::MulByGenerator;
+#[cfg(feature = "secp256k1")]
+use elliptic_curve::{ops::MulByGenerator, Group};
 
+use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
+
+#[cfg(any(feature = "x25519", feature = "ed25519"))]
 impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
-        let bytes = random_bytes::<32>();
+        let bytes = hopr_crypto_random::random_bytes::<32>();
         Self::from_bytes(&bytes).unwrap()
     }
 
-    fn from_bytes(sk: &[u8]) -> Result<Self> {
-        if sk.len() == 32 {
-            // Representation of the scalar is little-endian
-            let mut clamped = [0u8; 32];
-            clamped.copy_from_slice(&sk[..32]);
-            clamped[00] &= 0b1111_1000; // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
-            clamped[31] &= 0b0111_1111; // clear the 256-th bit
-            clamped[31] |= 0b0100_0000; // make it 255-bit number
-
-            Ok(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(clamped))
-        } else {
-            Err(InvalidInputValue)
-        }
+    fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        hopr_crypto_types::utils::x25519_scalar_from_bytes(bytes)
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -36,12 +22,13 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
     }
 }
 
+#[cfg(feature = "secp256k1")]
 impl Scalar for k256::Scalar {
     fn random() -> Self {
         // Beware this is not constant time
         let mut bytes = k256::FieldBytes::default();
         loop {
-            random_fill(&mut bytes);
+            hopr_crypto_random::random_fill(&mut bytes);
             if let Ok(scalar) = Self::from_bytes(&bytes) {
                 return scalar;
             }
@@ -49,7 +36,7 @@ impl Scalar for k256::Scalar {
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(k256::Scalar::from_repr(*k256::FieldBytes::from_slice(bytes)).unwrap())
+        hopr_crypto_types::utils::k256_scalar_from_bytes(bytes)
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -58,6 +45,7 @@ impl Scalar for k256::Scalar {
     }
 }
 
+#[cfg(feature = "x25519")]
 impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
     type AlphaLen = typenum::U32;
 
@@ -78,6 +66,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgo
     }
 }
 
+#[cfg(feature = "ed25519")]
 impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
     type AlphaLen = typenum::U32;
 
@@ -88,7 +77,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
-            .ok_or(InvalidInputValue)
+            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -100,19 +89,25 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     }
 }
 
+#[cfg(feature = "secp256k1")]
 impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
     type AlphaLen = typenum::U33;
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
-        ret.copy_from_slice(CurvePoint::from(self.to_affine()).serialize_compressed().as_ref());
+        ret.copy_from_slice(
+            hopr_crypto_types::types::CurvePoint::from(self.to_affine())
+                .serialize_compressed()
+                .as_ref(),
+        );
         ret
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        CurvePoint::from_bytes(&alpha)
+        use hopr_primitive_types::traits::BinarySerializable;
+        hopr_crypto_types::types::CurvePoint::from_bytes(&alpha)
             .map(|c| c.to_projective_point())
-            .map_err(|_| InvalidInputValue)
+            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
@@ -125,35 +120,40 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 }
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
+#[cfg(feature = "secp256k1")]
 pub struct Secp256k1Suite;
 
+#[cfg(feature = "secp256k1")]
 impl SphinxSuite for Secp256k1Suite {
-    type P = ChainKeypair;
+    type P = hopr_crypto_types::keypairs::ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
+#[cfg(feature = "ed25519")]
 pub struct Ed25519Suite;
 
+#[cfg(feature = "ed25519")]
 impl SphinxSuite for Ed25519Suite {
-    type P = OffchainKeypair;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
+#[cfg(feature = "x25519")]
 pub struct X25519Suite;
 
+#[cfg(feature = "x25519")]
 impl SphinxSuite for X25519Suite {
-    type P = OffchainKeypair;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use crate::shared_keys::tests::generic_sphinx_suite_test;
     use crate::shared_keys::GroupElement;
     use hex_literal::hex;
@@ -181,18 +181,21 @@ mod tests {
         assert_eq!(res, key.as_ref());
     }
 
+    #[cfg(feature = "secp256k1")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_secp256k1_suite(nodes: usize) {
-        generic_sphinx_suite_test::<Secp256k1Suite>(nodes)
+        generic_sphinx_suite_test::<crate::ec_groups::Secp256k1Suite>(nodes)
     }
 
+    #[cfg(feature = "ed25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_ed25519_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<Ed25519Suite>(nodes)
+        generic_sphinx_suite_test::<crate::ec_groups::Ed25519Suite>(nodes)
     }
 
+    #[cfg(feature = "x25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_montgomery_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<X25519Suite>(nodes)
+        generic_sphinx_suite_test::<crate::ec_groups::X25519Suite>(nodes)
     }
 }

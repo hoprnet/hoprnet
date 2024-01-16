@@ -11,7 +11,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use hopr_crypto::types::OffchainSignature;
+use hopr_crypto_types::types::OffchainSignature;
 use hopr_internal_types::{
     account::{AccountEntry, AccountType},
     announcement::KeyBinding,
@@ -626,7 +626,7 @@ pub mod tests {
         types::U256 as EthU256,
     };
     use hex_literal::hex;
-    use hopr_crypto::{
+    use hopr_crypto_types::{
         keypairs::{Keypair, OffchainKeypair},
         types::Hash,
     };
