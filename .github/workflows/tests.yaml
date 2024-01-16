@@ -64,6 +64,9 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
+      - name: Build bindings
+        run: nix develop -c make build-solidity-types
+
       - name: Test
         run: nix develop -c make -j test
         env:
@@ -98,6 +101,9 @@ jobs:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
+
+      - name: Build bindings
+        run: nix develop -c make build-solidity-types
 
       - name: Test with pytest
         run: nix develop -c make smoke-test-full
