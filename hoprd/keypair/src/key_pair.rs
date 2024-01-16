@@ -7,8 +7,8 @@ use aes::{
     Aes128,
 };
 use hex;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_crypto_random::random_bytes;
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_primitive_types::traits::{PeerIdLike, ToHex};
 use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};

@@ -25,7 +25,7 @@ typenum = "1.17.0"
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
 hopr-crypto-random = { workspace = true }
-utils-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"

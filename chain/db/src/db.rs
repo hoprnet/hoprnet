@@ -1344,10 +1344,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey, Response},
-    };
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::{
         primitives::{Address, EthereumChallenge},

@@ -1,3 +1,11 @@
+//! This Rust crate contains implementation common random number generation functions.
+//! All functions and types from this crate supply cryptographically secure random numbers.
+//!
+//! Instead of relying on external crates, all HOPR crates in this monorepo should
+//! exclusively rely on randomness functions only from this crate.
+//! Besided that, the `OsRng` type exported from this crate can be used, if a type implementing
+//! random traits is needed.
+
 use generic_array::{ArrayLength, GenericArray};
 use rand::{Rng, RngCore};
 
@@ -19,7 +27,10 @@ pub fn random_float() -> f64 {
 pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
 
-    assert!(real_end > start && real_end <= MAX_RANDOM_INTEGER, "invalid bounds");
+    assert!(
+        real_end > start && real_end <= MAX_RANDOM_INTEGER,
+        "bounds must be 0 < {start} < {real_end} <= {MAX_RANDOM_INTEGER}"
+    );
 
     let bound = real_end - start;
     start + OsRng.gen_range(0..bound)

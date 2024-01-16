@@ -5,13 +5,13 @@ use hopr_crypto_sphinx::{
     routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
-use hopr_internal_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
-use hopr_primitive_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
 use hopr_crypto_types::{
     keypairs::Keypair,
     primitives::{DigestLike, SimpleMac},
     types::PacketTag,
 };
+use hopr_internal_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
+use hopr_primitive_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
 use typenum::Unsigned;
 
 use crate::{

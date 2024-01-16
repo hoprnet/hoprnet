@@ -24,7 +24,6 @@ hopr-platform = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
-tempfile = "3"
 
 
 [features]

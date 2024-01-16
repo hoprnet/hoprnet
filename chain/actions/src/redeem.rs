@@ -248,8 +248,7 @@ mod tests {
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};

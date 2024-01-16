@@ -3,11 +3,7 @@ use bindings::hopr_channels::RedeemTicketCall;
 use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
 use hex_literal::hex;
-use hopr_crypto_types::{
-    errors::CryptoError::SignatureVerification,
-    keypairs::{ChainKeypair, Keypair},
-    types::{Hash, PublicKey, Signature},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 use serde::{
     de::{self, Deserializer, Visitor},
@@ -714,7 +710,7 @@ impl Ticket {
             .to_address()
             .eq(address)
             .then_some(())
-            .ok_or(SignatureVerification)
+            .ok_or(CryptoError::SignatureVerification)
     }
 
     pub fn is_aggregated(&self) -> bool {

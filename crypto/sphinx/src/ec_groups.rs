@@ -1,25 +1,20 @@
 use curve25519_dalek::traits::IsIdentity;
-use elliptic_curve::ops::MulByGenerator;
-use elliptic_curve::Group;
-use hopr_crypto_random::{random_bytes, random_fill};
-use hopr_crypto_types::errors::CryptoError::InvalidInputValue;
 use hopr_crypto_types::errors::Result;
-use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
-use hopr_crypto_types::types::CurvePoint;
-use hopr_crypto_types::utils::{k256_scalar_from_bytes, x25519_scalar_from_bytes};
-use hopr_primitive_types::traits::BinarySerializable;
+
+#[cfg(feature = "secp256k1")]
+use elliptic_curve::{ops::MulByGenerator, Group};
 
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
 impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
-        let bytes = random_bytes::<32>();
+        let bytes = hopr_crypto_random::random_bytes::<32>();
         Self::from_bytes(&bytes).unwrap()
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        x25519_scalar_from_bytes(bytes)
+        hopr_crypto_types::utils::x25519_scalar_from_bytes(bytes)
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -33,7 +28,7 @@ impl Scalar for k256::Scalar {
         // Beware this is not constant time
         let mut bytes = k256::FieldBytes::default();
         loop {
-            random_fill(&mut bytes);
+            hopr_crypto_random::random_fill(&mut bytes);
             if let Ok(scalar) = Self::from_bytes(&bytes) {
                 return scalar;
             }
@@ -41,7 +36,7 @@ impl Scalar for k256::Scalar {
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        k256_scalar_from_bytes(bytes)
+        hopr_crypto_types::utils::k256_scalar_from_bytes(bytes)
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -82,7 +77,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
-            .ok_or(InvalidInputValue)
+            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -100,14 +95,19 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
-        ret.copy_from_slice(CurvePoint::from(self.to_affine()).serialize_compressed().as_ref());
+        ret.copy_from_slice(
+            hopr_crypto_types::types::CurvePoint::from(self.to_affine())
+                .serialize_compressed()
+                .as_ref(),
+        );
         ret
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        CurvePoint::from_bytes(&alpha)
+        use hopr_primitive_types::traits::BinarySerializable;
+        hopr_crypto_types::types::CurvePoint::from_bytes(&alpha)
             .map(|c| c.to_projective_point())
-            .map_err(|_| InvalidInputValue)
+            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
@@ -125,7 +125,7 @@ pub struct Secp256k1Suite;
 
 #[cfg(feature = "secp256k1")]
 impl SphinxSuite for Secp256k1Suite {
-    type P = ChainKeypair;
+    type P = hopr_crypto_types::keypairs::ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
 }
@@ -136,7 +136,7 @@ pub struct Ed25519Suite;
 
 #[cfg(feature = "ed25519")]
 impl SphinxSuite for Ed25519Suite {
-    type P = OffchainKeypair;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
 }
@@ -147,7 +147,7 @@ pub struct X25519Suite;
 
 #[cfg(feature = "x25519")]
 impl SphinxSuite for X25519Suite {
-    type P = OffchainKeypair;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
 }

@@ -3,14 +3,14 @@ use crate::keypairs::{ChainKeypair, Keypair};
 use crate::types::CurvePoint;
 use crate::utils::k256_scalar_from_bytes;
 use hopr_crypto_random::random_bytes;
+use hopr_primitive_types::errors::GeneralError::ParseError;
+use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::traits::BinarySerializable;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::elliptic_curve::ProjectivePoint;
 use k256::{Scalar, Secp256k1};
 use serde::{Deserialize, Serialize};
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::BinarySerializable;
 
 /// Bundles values given to the smart contract to prove that a ticket is a win.
 ///
@@ -67,7 +67,7 @@ impl std::fmt::Debug for VrfParameters {
 impl BinarySerializable for VrfParameters {
     const SIZE: usize = CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(VrfParameters {
                 v: CurvePoint::from_bytes(&data[0..CurvePoint::SIZE]).unwrap(),

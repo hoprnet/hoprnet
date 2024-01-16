@@ -16,13 +16,6 @@ pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
     }
 }
 
-/// Convenience function to efficiently copy slices of unequal sizes.
-#[allow(dead_code)]
-pub fn copy_nonequal(target: &mut [u8], source: &[u8]) {
-    let sz = target.len().min(source.len());
-    target[0..sz].copy_from_slice(&source[0..sz]);
-}
-
 /// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], crate::types::CurvePoint) {

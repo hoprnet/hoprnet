@@ -91,8 +91,7 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};

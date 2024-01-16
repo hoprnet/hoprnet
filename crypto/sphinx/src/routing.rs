@@ -4,14 +4,12 @@ use hopr_crypto_types::errors::Result;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleMac};
 use hopr_crypto_types::utils::xor_inplace;
-use utils_types::traits::BinarySerializable;
+use hopr_primitive_types::traits::BinarySerializable;
 
 use crate::derivation::derive_mac_key;
 use crate::prg::{PRGParameters, PRG};
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::shared_keys::{SharedSecret, SphinxSuite};
-use crate::utils::xor_inplace;
-use hopr_primitive_types::traits::BinarySerializable;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 

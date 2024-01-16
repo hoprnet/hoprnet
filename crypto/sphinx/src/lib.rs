@@ -26,7 +26,7 @@
 
 pub mod derivation;
 pub mod ec_groups;
-pub mod prg;
+mod prg;
 pub mod prp;
 pub mod routing;
 pub mod shared_keys;

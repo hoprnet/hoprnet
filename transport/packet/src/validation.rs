@@ -111,12 +111,7 @@ mod tests {
     use chain_db::traits::HoprCoreEthereumDbActions;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::types::HalfKey;
-    use hopr_crypto_types::types::OffchainPublicKey;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair},
-        types::{HalfKeyChallenge, Hash},
-    };
+    use hopr_crypto_types::prelude::*;
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
     use hopr_internal_types::channels::{f64_to_win_prob, ChannelStatus};
     use hopr_internal_types::{
