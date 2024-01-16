@@ -16,7 +16,7 @@ use hopr_internal_types::{
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

@@ -52,7 +52,7 @@ mod tests {
     use super::*;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
-    use rand::Rng;
+    use hopr_crypto_random::Rng;
     use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;
@@ -60,7 +60,7 @@ mod tests {
     const TINY_CONSTANT_DELAY: Duration = Duration::from_millis(10);
 
     fn random_packets(count: usize) -> Vec<Packet> {
-        let mut rng = rand::thread_rng();
+        let mut rng = hopr_crypto_random::OsRng;
         let mut packets: Vec<Packet> = Vec::new();
 
         for _ in 0..count {

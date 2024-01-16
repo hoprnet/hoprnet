@@ -24,7 +24,7 @@ pub use {
     hopr_primitive_types::{
         primitives::{Address, Balance, BalanceType},
         rlp,
-        traits::{PeerIdLike, ToHex},
+        traits::ToHex,
     },
 };
 
@@ -48,11 +48,9 @@ use chain_types::chain_events::ChainEventType;
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
-
 use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use utils_db::db::DB;
-
 use chain_api::HoprChain;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use chain_types::ContractAddresses;
@@ -65,7 +63,7 @@ use core_transport::{
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use hopr_primitive_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::prelude::*;
 use log::{error, info};
 use utils_db::CurrentDbShim;
 
@@ -262,7 +260,7 @@ where
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {
-                                let peer_id = pk.to_peerid();
+                                let peer_id = pk.into();
 
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
@@ -366,7 +364,7 @@ where
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
 
     let indexer_refreshing_loop = to_chain_events_refresh_process(
-        me.public().to_peerid(),
+        (*me.public()).into(),
         core_transport::Keypair::public(&me_onchain).to_address(),
         db.clone(),
         multi_strategy.clone(),
@@ -861,7 +859,7 @@ impl Hopr {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
             &[
-                &self.me.public().to_peerid().to_string(),
+                &self.me.public().to_peerid_str(),
                 &self.me_onchain().to_string(),
                 &self.safe_module_cfg.safe_address.to_string(),
                 &self.safe_module_cfg.module_address.to_string(),
@@ -875,7 +873,7 @@ impl Hopr {
     // p2p transport =========
     /// Own PeerId used in the libp2p transport layer
     pub fn me_peer_id(&self) -> PeerId {
-        self.me.public().to_peerid()
+        (*self.me.public()).into()
     }
 
     /// Get the list of all announced public nodes in the network
@@ -1252,7 +1250,7 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = core_transport::OffchainPublicKey::from_peerid(peer_id)?;
+        let pk = core_transport::OffchainPublicKey::try_from(*peer_id)?;
         Ok(self.chain_api.db().read().await.get_chain_key(&pk).await?)
     }
 
@@ -1264,6 +1262,6 @@ impl Hopr {
             .await
             .get_packet_key(address)
             .await
-            .map(|pk| pk.map(|v| v.to_peerid()))?)
+            .map(|pk| pk.map(|v| v.into()))?)
     }
 }

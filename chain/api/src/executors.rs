@@ -9,7 +9,7 @@ use futures::{pin_mut, FutureExt};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::announcement::AnnouncementData;
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;

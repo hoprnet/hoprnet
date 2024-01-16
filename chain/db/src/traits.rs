@@ -8,7 +8,7 @@ use hopr_internal_types::{
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
-use hopr_primitive_types::primitives::{Address, Balance, Snapshot, U256};
+use hopr_primitive_types::prelude::*;
 
 #[async_trait]
 #[cfg_attr(test, mockall::automock)]

@@ -1346,10 +1346,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::channels::ChannelEntry;
-    use hopr_primitive_types::{
-        primitives::{Address, EthereumChallenge},
-        traits::BinarySerializable,
-    };
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};

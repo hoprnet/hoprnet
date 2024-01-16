@@ -7,9 +7,9 @@
 //! random traits is needed.
 
 use generic_array::{ArrayLength, GenericArray};
-use rand::{Rng, RngCore};
 
 pub use rand::rngs::OsRng;
+pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.

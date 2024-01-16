@@ -16,7 +16,7 @@ pub mod types;
 pub mod utils;
 pub mod vrf;
 pub mod prelude {
-    pub use super::errors::*;
+    pub use super::errors::CryptoError;
     pub use super::keypairs::*;
     pub use super::primitives::*;
     pub use super::types::*;

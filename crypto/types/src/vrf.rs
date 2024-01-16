@@ -1,7 +1,5 @@
 use hopr_crypto_random::random_bytes;
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_primitive_types::prelude::*;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::elliptic_curve::ProjectivePoint;
@@ -85,7 +83,7 @@ impl BinarySerializable for VrfParameters {
                 .unwrap(),
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 

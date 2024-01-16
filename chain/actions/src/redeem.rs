@@ -7,7 +7,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use hopr_internal_types::channels::{generate_channel_id, ChannelEntry};
-use hopr_primitive_types::primitives::{Address, U256};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
@@ -252,8 +252,7 @@ mod tests {
     use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_primitive_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;

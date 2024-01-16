@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use hopr_internal_types::channels::ChannelDirection::Outgoing;
 use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::prelude::*;
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -123,8 +123,7 @@ mod tests {
     use hopr_internal_types::channels::ChannelChange::CurrentBalance;
     use hopr_internal_types::channels::ChannelDirection::Outgoing;
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
 
     mock! {

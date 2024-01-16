@@ -1,6 +1,5 @@
 //! This crate contains basic types used throughout the entire HOPR codebase.
-
-extern crate core;
+//! Types from this crate are not necessarily specific only to HOPR.
 
 pub mod errors;
 pub mod primitives;
@@ -40,12 +39,17 @@ pub mod rlp {
     }
 }
 
+pub mod prelude {
+    pub use super::errors::GeneralError;
+    pub use super::primitives::*;
+    pub use super::sma::*;
+    pub use super::traits::*;
+}
+
 #[allow(deprecated)]
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use rand::rngs::OsRng;
-    use rand::RngCore;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -53,7 +57,7 @@ mod tests {
         let mut b_1 = [0u8; 100];
         let ts_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-        OsRng.fill_bytes(&mut b_1);
+        hopr_crypto_random::random_fill(&mut b_1);
 
         let (b_2, ts_2) = crate::rlp::decode(crate::rlp::encode(&b_1, ts_1).as_ref()).expect("must decode");
 

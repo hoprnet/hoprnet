@@ -6,7 +6,7 @@ use hopr_crypto_types::{
 use hopr_primitive_types::{
     errors::GeneralError::{self, InvalidInput, NonSpecificError},
     primitives::Address,
-    traits::{BinarySerializable, PeerIdLike},
+    traits::BinarySerializable,
 };
 use log::debug;
 use multiaddr::Multiaddr;
@@ -154,7 +154,7 @@ mod tests {
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_primitive_types::{
         primitives::Address,
-        traits::{BinarySerializable, PeerIdLike},
+        traits::BinarySerializable,
     };
     use multiaddr::Multiaddr;
 
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_announcement() {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let peer_id = KEY_PAIR.public().to_peerid();
+        let peer_id = KEY_PAIR.public().to_peerid_str();
 
         for (ma_str, decapsulated_ma_str) in vec![
             (
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn test_announcement_wrong_peerid() {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let peer_id = SECOND_KEY_PAIR.public().to_peerid();
+        let peer_id = SECOND_KEY_PAIR.public().to_peerid_str();
         let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
 
         assert!(AnnouncementData::new(&maddr, Some(key_binding.clone())).is_err());

@@ -3,7 +3,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
 
 use crate::action_queue::PendingAction;
@@ -174,10 +174,7 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{

@@ -20,7 +20,7 @@ use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_internal_types::account::AccountEntry;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
 

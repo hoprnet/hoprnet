@@ -18,10 +18,7 @@ use hopr_internal_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, ChannelEntry, Ticket},
 };
-use hopr_primitive_types::{
-    primitives::{Balance, BalanceType},
-    traits::PeerIdLike,
-};
+use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
@@ -35,6 +32,7 @@ use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
+
 use hopr_primitive_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -252,7 +250,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .read()
             .await
             .get_chain_key(
-                &OffchainPublicKey::from_peerid(&destination)
+                &OffchainPublicKey::try_from(destination)
                     .expect("Invalid PeerId. Could not convert to OffchainPublicKey"),
             )
             .await?
@@ -485,7 +483,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             ))
         })?;
 
-        Ok((source_peer_id.to_peerid(), tickets_to_aggregate))
+        Ok((source_peer_id.into(), tickets_to_aggregate))
     }
 }
 
@@ -736,10 +734,7 @@ mod tests {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
     };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
@@ -866,8 +861,8 @@ mod tests {
         let alice_addr: Address = (&PEERS_CHAIN[0]).into();
         let bob_addr: Address = (&PEERS_CHAIN[1]).into();
 
-        let alice_packet_key = PEERS[0].public().to_peerid();
-        let bob_packet_key = PEERS[1].public().to_peerid();
+        let alice_packet_key = PEERS[0].public().into();
+        let bob_packet_key = PEERS[1].public().into();
 
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 

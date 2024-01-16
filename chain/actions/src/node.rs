@@ -6,7 +6,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_internal_types::announcement::{AnnouncementData, KeyBinding};
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;
 
@@ -61,8 +61,7 @@ mod tests {
     use chain_types::actions::Action;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;

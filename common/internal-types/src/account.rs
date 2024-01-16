@@ -3,7 +3,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_primitive_types::{
     errors::GeneralError::ParseError,
     primitives::Address,
-    traits::{BinarySerializable, PeerIdLike, ToHex},
+    traits::{BinarySerializable, ToHex},
 };
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
@@ -201,7 +201,7 @@ mod test {
     };
     use hex_literal::hex;
     use hopr_crypto_types::types::OffchainPublicKey;
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");

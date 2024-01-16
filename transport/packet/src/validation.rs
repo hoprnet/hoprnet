@@ -5,7 +5,7 @@ use crate::errors::{
 use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 
 /// Performs validations of the given unacknowledged ticket and channel.
@@ -118,8 +118,7 @@ mod tests {
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
     };
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::db::DB;

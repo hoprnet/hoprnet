@@ -11,7 +11,7 @@ use hopr_crypto_types::{
     types::PacketTag,
 };
 use hopr_internal_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
-use hopr_primitive_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
+use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
 
 use crate::{
@@ -233,7 +233,7 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
                 .copy_from_slice(&data[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
             Ok(ret)
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 

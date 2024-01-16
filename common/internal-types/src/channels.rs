@@ -4,7 +4,7 @@ use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+use hopr_primitive_types::prelude::*;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,

@@ -17,10 +17,7 @@ use hopr_internal_types::{
     announcement::KeyBinding,
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
-use hopr_primitive_types::{
-    primitives::{Address, Balance, BalanceType, Snapshot, U256},
-    traits::PeerIdLike,
-};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error};
 use multiaddr::Multiaddr;
 use std::{str::FromStr, sync::Arc};
@@ -80,7 +77,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                     if let Some(ma) = account.get_multiaddr() {
                         return Ok(Some(ChainEventType::Announcement {
-                            peer: account.public_key.to_peerid(),
+                            peer: account.public_key.into(),
                             address: account.chain_addr,
                             multiaddresses: vec![ma],
                         }));
@@ -622,9 +619,9 @@ pub mod tests {
     use chain_types::ContractAddresses;
     use ethers::{
         abi::{encode, Address as EthereumAddress, RawLog, Token},
-        prelude::*,
         types::U256 as EthU256,
     };
+    use ethers::contract::EthEvent;
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{Keypair, OffchainKeypair},
@@ -635,10 +632,7 @@ pub mod tests {
         announcement::KeyBinding,
         channels::{generate_channel_id, ChannelEntry, ChannelStatus},
     };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
     use utils_db::{db::DB, CurrentDbShim};

@@ -94,8 +94,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
 
     lazy_static::lazy_static! {

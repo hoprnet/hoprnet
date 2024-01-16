@@ -5,9 +5,7 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_crypto_types::types::PacketTag;
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::{AutoBinarySerializable, BinarySerializable};
+use hopr_primitive_types::prelude::*;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -152,7 +150,7 @@ impl BinarySerializable for ApplicationData {
                 plain_text: (&data[2..]).into(),
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 

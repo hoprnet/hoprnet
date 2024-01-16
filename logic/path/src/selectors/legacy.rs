@@ -5,8 +5,7 @@ use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
 use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
-use hopr_primitive_types::errors::GeneralError::InvalidInput;
-use hopr_primitive_types::primitives::{Address, U256};
+use hopr_primitive_types::prelude::*;
 use petgraph::visit::EdgeRef;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
@@ -102,7 +101,7 @@ where
         max_hops: usize,
     ) -> Result<ChannelPath> {
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
-            return Err(InvalidInput.into());
+            return Err(GeneralError::InvalidInput.into());
         }
 
         let mut queue = BinaryHeap::new();
@@ -167,7 +166,7 @@ mod tests {
     use crate::selectors::legacy::DfsPathSelector;
     use crate::selectors::{EdgeWeighting, PathSelector};
     use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::str::FromStr;
 

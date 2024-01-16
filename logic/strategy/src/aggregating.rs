@@ -346,10 +346,7 @@ mod tests {
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::pin::pin;
@@ -516,7 +513,7 @@ mod tests {
                     let _ = finalizer.insert(request_finalizer);
                     alice
                         .writer()
-                        .receive_aggregation_request(PEERS[1].public().to_peerid(), acked_tickets, ())
+                        .receive_aggregation_request(PEERS[1].public().into(), acked_tickets, ())
                         .unwrap();
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -526,7 +523,7 @@ mod tests {
             match alice.next().await {
                 Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
                     .writer()
-                    .receive_ticket(PEERS[0].public().to_peerid(), aggregated_ticket, ())
+                    .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
                     .unwrap(),
                 _ => panic!("unexpected action happened"),
             };

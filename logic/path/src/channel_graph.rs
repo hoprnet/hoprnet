@@ -215,7 +215,7 @@ mod tests {
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, Snapshot};
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::db::DB;
