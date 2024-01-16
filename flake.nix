@@ -102,24 +102,55 @@
             '';
           });
           # FIXME: the docker image built is not working on macOS arm platforms
-          # and will simply be a no-op. Likely, some form of cross-compilation
-          # or distributed build is required.
-          hoprdDocker = pkgs.dockerTools.buildImage {
+          # and will simply lead to a non-working image. Likely, some form of
+          # cross-compilation or distributed build is required.
+          hoprdDocker = pkgs.dockerTools.buildLayeredImage {
             name = "hoprd";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
-            created = builtins.substring 0 8 self.lastModifiedDate;
-            copyToRoot = [ hoprd ];
+            created = "now";
+            contents = [ hoprd ];
             config = {
-              Cmd = [
-                "${hoprd}/bin/hoprd"
+              Entrypoint = [
+                "/bin/hoprd"
               ];
             };
           };
+          anvilSrc = lib.fileset.toSource {
+              root = ./.;
+              fileset = fs.unions [
+                (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+                ./ethereum/contracts
+                ./scripts/run-local-anvil.sh
+              ];
+            };
+          anvilDocker = pkgs.dockerTools.buildLayeredImage {
+            name = "hopr-anvil";
+            tag = "latest";
+            # breaks binary reproducibility, but makes usage easier
+            created = "now";
+            contents = [pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
+            enableFakechroot = true;
+            fakeRootCommands = ''
+              #!${pkgs.runtimeShell}
+              /scripts/run-local-anvil.sh
+              sleep 2
+              lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+              rm -rf /ethereum/contracts/broadcast/
+              rm -f /tmp/*.log
+              rm -f /.anvil.state.json
+            '';
+            config = {
+              Cmd = [
+                "/bin/tini" "--" "/scripts/run-local-anvil.sh" "-s" "-f"
+              ];
+            };
+          };
+
         in
         {
           packages = {
-            inherit hoprd hoprdDocker;
+            inherit hoprd hoprdDocker anvilDocker;
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {
