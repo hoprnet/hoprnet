@@ -321,7 +321,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: int, dest: int, swarm7: list[Node]
 ):
-    hopr_amount = OPEN_CHANNEL_FUNDING_VALUE
+    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE*1e18:.0f}" # convert HOPR (int) to weiHOPR (str)
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()
