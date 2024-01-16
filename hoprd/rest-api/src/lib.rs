@@ -1150,8 +1150,8 @@ mod channels {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "channelStatus": "PendingToClose",
-      "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
+        "channelStatus": "PendingToClose",
+        "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelReceipt {
@@ -1503,9 +1503,9 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "body": "Test message 1",
-          "receivedAt": 1704453953073i64,
-          "tag": 20
+        "body": "Test message 1",
+        "receivedAt": 1704453953073i64,
+        "tag": 20
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MessagePopRes {

@@ -36,4 +36,3 @@ hopr-lib = { workspace = true }
 hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-
