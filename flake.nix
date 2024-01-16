@@ -42,6 +42,7 @@
               fileset = fs.unions [
                 (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+                ./ethereum/bindings/Cargo.toml
                 ./ethereum/contracts/foundry.toml
                 ./ethereum/contracts/remappings.txt
               ];
