@@ -3321,6 +3321,7 @@ version = "0.2.0"
 dependencies = [
  "async-std",
  "const_format",
+ "crossbeam-queue",
  "futures",
  "hopr-crypto-types",
  "hopr-lib",
