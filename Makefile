@@ -11,29 +11,16 @@ SOLIDITY_TEST_FILES := $(shell find ./ethereum/contracts/test -type f -name "*.s
 SOLIDITY_SCRIPT_FILES := $(shell find ./ethereum/contracts/script -type f -name "*.sol")
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
 
-# Set local foundry directory (for binaries) and versions
-# note: $(mydir) ends with '/'
-FOUNDRY_DIR ?= $(mydir).foundry
-# Use custom pinned version of foundry from
-# https://github.com/hoprnet/foundry/tree/hopr-release
-# TODO: even more advanced working version is used and distributed by Q
-FOUNDRY_REPO := hoprnet/foundry
-FOUNDRY_VSN := v0.0.4
-FOUNDRYUP_VSN := fc64e18
-
 # Set local cargo directory (for binaries)
 # note: $(mydir) ends with '/'
 CARGO_DIR := $(mydir).cargo
-
-# use custom foundryup to ensure the local directory is used
-foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
 
 # add local Cargo install path (only once)
 PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 # add users home Cargo install path (only once)
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
-# add local Foundry install path (only once)
-PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
+# add nix build result path (only once)
+PATH := $(subst :$(mydir)/result/bin,,$(PATH)):$(mydir)/result//bin
 # use custom PATH in all shell processes
 # escape spaces
 SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
@@ -49,63 +36,15 @@ init: ## initialize repository (idempotent operation)
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
 
-.PHONY: deps-ci
-deps-ci: ## Installs dependencies when running in CI
-# install foundry (cast + forge + anvil)
-	$(MAKE) install-foundry
-	$(MAKE) build-solidity-types
-# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
-	$(MAKE) cargo-update
-
-.PHONY: deps-docker
-deps-docker: ## Installs dependencies when building Docker images
-# Toolchain dependencies are already installed using scripts/install-toolchain.sh script
-	$(MAKE) build-solidity-types
-ifeq ($(origin PRODUCTION),undefined)
-# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
-	$(MAKE) cargo-update
-endif
-
 .PHONY: deps
 deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
-# install foundry (cast + forge + anvil)
-	$(MAKE) install-foundry
 	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	# $(MAKE) cargo-update
-
-.PHONY: install-foundry
-install-foundry: ## install foundry
-	mkdir -p "${FOUNDRY_DIR}/bin"
-	mkdir -p "${FOUNDRY_DIR}/share/man/man1"
-	@if [ -f "${FOUNDRY_DIR}/bin/foundryup" ]; then \
-		echo "foundryup already installed under "${FOUNDRY_DIR}/bin", skipping"; \
-	else \
-		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
-		curl -L "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
-	    chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
-	fi
-	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
-		echo "missing foundry binaries, installing via foundryup"; \
-		$(foundryup) --repo ${FOUNDRY_REPO} --version ${FOUNDRY_VSN}; \
-	else \
-	    echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
-	fi
-	@if [[ "${name}" =~ nix-shell* ]]; then \
-		echo "Patching foundry binaries"; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/anvil || :; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/cast || :; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/forge || :; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/chisel || :; \
-	fi
-	@forge --version
-	@anvil --version
-	@chisel --version
-	@cast --version
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies

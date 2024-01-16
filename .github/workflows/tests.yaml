@@ -105,6 +105,9 @@ jobs:
       - name: Build bindings
         run: nix develop -c make build-solidity-types
 
+      - name: Build hopli
+        run: nix build .#hopli
+
       - name: Test with pytest
         run: nix develop -c make smoke-test-full
         timeout-minutes: 30
