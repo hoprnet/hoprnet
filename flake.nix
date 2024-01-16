@@ -181,7 +181,8 @@
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
+            nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ] ++
+              lib.optionals stdenv.isLinux [ autoPatchelfHook ];
             buildInputs = with pkgs; [
               # testing utilities
               jq
@@ -204,7 +205,6 @@
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
-              autoPatchelfHook
             ];
             inputsFrom = [ hoprd ];
             venvDir = "./.venv";
@@ -212,6 +212,7 @@
               unset SOURCE_DATE_EPOCH
               pip install -U pip setuptools wheel
               pip install -r tests/requirements.txt
+            '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               autoPatchelf ./.venv
             '';
           };
