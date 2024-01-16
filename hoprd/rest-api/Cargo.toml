@@ -16,9 +16,9 @@ default = ["prometheus"]
 prometheus = ["hopr-lib/prometheus", "dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
+async-broadcast = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 const_format = "0.2.32"
-crossbeam-queue = "0.3"
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true}
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }

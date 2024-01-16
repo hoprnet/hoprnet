@@ -9,6 +9,7 @@ mod p2p;
 mod processes;
 mod timer;
 
+#[derive(Clone)]
 pub enum TransportOutput {
     Received(ApplicationData),
     Sent(HalfKeyChallenge),

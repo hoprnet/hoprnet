@@ -67,10 +67,10 @@ use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_platform::time::native::current_timestamp;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use {
+    hopr_platform::time::native::current_timestamp,
+    hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge}
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
@@ -61,6 +62,7 @@ pub struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
+    pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -260,6 +262,7 @@ pub async fn run_hopr_api(
     cfg: &crate::config::Api,
     hopr: hopr_lib::Hopr,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
 ) {
     // Prepare alias part of the state
@@ -290,6 +293,7 @@ pub async fn run_hopr_api(
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,
+            websocket_rx,
             aliases,
         });
 
