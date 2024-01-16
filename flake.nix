@@ -96,6 +96,16 @@
           });
           hoprd = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
+            cargoExtraArgs = "-p hoprd";
+            preBuild = ''
+              cp -r ${ethereumBindings}/src ./ethereum/bindings/
+              cp .cargo/config.toml vendor/cargo/
+            '';
+          });
+          hopli = craneLib.buildPackage (commonArgs // {
+            inherit cargoArtifacts;
+            pname = "hopli";
+            cargoExtraArgs = "-p hopli";
             preBuild = ''
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
               cp .cargo/config.toml vendor/cargo/
@@ -113,6 +123,18 @@
             config = {
               Entrypoint = [
                 "/bin/hoprd"
+              ];
+            };
+          };
+          hopliDocker = pkgs.dockerTools.buildLayeredImage {
+            name = "hopli";
+            tag = "latest";
+            # breaks binary reproducibility, but makes usage easier
+            created = "now";
+            contents = [ hopli ];
+            config = {
+              Entrypoint = [
+                "/bin/hopli"
               ];
             };
           };
@@ -150,7 +172,7 @@
         in
         {
           packages = {
-            inherit hoprd hoprdDocker anvilDocker;
+            inherit hoprd hopli hoprdDocker anvilDocker hopliDocker;
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {

@@ -44,6 +44,18 @@ jobs:
         with:
           driver: kubernetes
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v14
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
       - name: "Update version"
         id: update
         run: |
@@ -57,13 +69,11 @@ jobs:
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and push docker image
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          file: hopli/Dockerfile
-          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}-cache
-          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}-cache,mode=max
-          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}
-          build-args: |
-            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ steps.update.outputs.DOCKER_TAG }}
+      - name: Build docker image
+        run: nix build .#hopliDocker
+
+      - name: Push docker image
+        run: |
+          nix develop --command skopeo copy docker-archive:./result docker://${IMAGE_TARGET}
+        env:
+          IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}
