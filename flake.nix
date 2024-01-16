@@ -92,23 +92,24 @@
             extraDummyScript = ''
               rm -rf $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
+              echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
           hoprd = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
             cargoExtraArgs = "-p hoprd";
-            preBuild = ''
+            preConfigure = ''
+              echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
-              cp .cargo/config.toml vendor/cargo/
             '';
           });
           hopli = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
             pname = "hopli";
             cargoExtraArgs = "-p hopli";
-            preBuild = ''
+            preConfigure = ''
+              echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
-              cp .cargo/config.toml vendor/cargo/
             '';
           });
           # FIXME: the docker image built is not working on macOS arm platforms
@@ -139,19 +140,19 @@
             };
           };
           anvilSrc = lib.fileset.toSource {
-              root = ./.;
-              fileset = fs.unions [
-                (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-                ./ethereum/contracts
-                ./scripts/run-local-anvil.sh
-              ];
-            };
+            root = ./.;
+            fileset = fs.unions [
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              ./ethereum/contracts
+              ./scripts/run-local-anvil.sh
+            ];
+          };
           anvilDocker = pkgs.dockerTools.buildLayeredImage {
             name = "hopr-anvil";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
+            contents = [ pkgs.foundry-bin anvilSrc pkgs.tini pkgs.runtimeShellPackage ];
             enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
@@ -164,7 +165,11 @@
             '';
             config = {
               Cmd = [
-                "/bin/tini" "--" "/scripts/run-local-anvil.sh" "-s" "-f"
+                "/bin/tini"
+                "--"
+                "/scripts/run-local-anvil.sh"
+                "-s"
+                "-f"
               ];
             };
           };
