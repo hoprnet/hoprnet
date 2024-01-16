@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 /// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M: std::marker::Send> {

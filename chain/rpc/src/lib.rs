@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
@@ -7,13 +8,15 @@ use async_trait::async_trait;
 use futures::{FutureExt, Stream};
 use primitive_types::H256;
 
-use hopr_crypto::types::Hash;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_crypto_types::types::Hash;
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
+use crate::RetryAction::NoRetry;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
+use serde::Serialize;
 
 /// Extended `JsonRpcClient` abstraction
 /// This module contains custom implementation of `ethers::providers::JsonRpcClient`
@@ -126,13 +129,43 @@ impl From<LogFilter> for ethers::types::Filter {
     }
 }
 
-/// Abstraction for HTTP client that perform HTTP POST with JSON data.
+/// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
+pub enum RetryAction {
+    /// Request should not be retried
+    NoRetry,
+    /// Request should be retried after the given duration has elapsed.
+    RetryAfter(Duration),
+}
+
+/// Simple retry policy trait
+pub trait RetryPolicy<E> {
+    /// Indicates whether a client should retry the request given the last error, current number of retries
+    /// of this request and the number of other requests being retried by the client at this time.
+    fn is_retryable_error(&self, _err: &E, _retry_number: u32, _retry_queue_size: u32) -> RetryAction {
+        NoRetry
+    }
+}
+
+/// Performs no retries.
+#[derive(Clone, Debug)]
+pub struct ZeroRetryPolicy<E>(PhantomData<E>);
+
+impl<E> Default for ZeroRetryPolicy<E> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
+
+/// Abstraction for HTTP client that perform HTTP POST with serializable request data.
 #[async_trait]
-#[cfg_attr(test, mockall::automock)]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
     /// and obtains the JSON response.
-    async fn http_post(&self, url: &str, json_data: &str) -> std::result::Result<String, HttpRequestError>;
+    async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync;
 }
 
 /// Short-hand for creating new EIP1559 transaction object.

@@ -6,7 +6,7 @@ pub mod native {
             .unwrap_or(std::time::Duration::from_secs(0)) // system time is positive after unix epoch
     }
 }
-#[cfg(feature = "wasm-bindgen")]
+#[cfg(feature = "js")]
 pub mod wasm {
     pub fn current_timestamp() -> std::time::Duration {
         Ok(std::time::Duration::from_millis(js_sys::Date::now() as u128))

@@ -17,15 +17,15 @@ use core_protocol::{
         TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
     },
 };
-use core_types::{
-    acknowledgement::{AcknowledgedTicket, Acknowledgement},
-    channels::Ticket,
-};
 use futures::{
     channel::mpsc::{Receiver, UnboundedSender},
     select, StreamExt,
 };
 use futures_concurrency::stream::Merge;
+use hopr_internal_types::{
+    acknowledgement::{AcknowledgedTicket, Acknowledgement},
+    channels::Ticket,
+};
 use libp2p::request_response::RequestId;
 use log::{debug, error, info};
 use std::collections::{HashMap, HashSet};

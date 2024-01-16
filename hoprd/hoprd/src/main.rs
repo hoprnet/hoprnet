@@ -5,15 +5,14 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use futures::Stream;
-use hopr_lib::{ApplicationData, TransportOutput};
+use hopr_lib::{ApplicationData, PeerIdLike, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use log::{error, info, warn};
-use utils_types::traits::{PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleHistogram;
+use hopr_metrics::metrics::SimpleHistogram;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -91,12 +90,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(
         "This node has packet key '{}' and uses a blockchain address '{}'",
-        core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        core_transport::Keypair::public(&hopr_keys.chain_key).to_hex()
+        hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
+        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex()
     );
 
     // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
-    if core_transport::Keypair::public(&hopr_keys.packet_key)
+    if hopr_lib::Keypair::public(&hopr_keys.packet_key)
         .to_string()
         .starts_with("0xff")
     {
@@ -114,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the message inbox
     let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
         hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            platform::time::native::current_timestamp()
+            hopr_platform::time::native::current_timestamp()
         }),
     ));
 
@@ -126,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let recv_at = SystemTime::now();
 
                     // TODO: remove RLP in 3.0
-                    match utils_types::rlp::decode(&data.plain_text) {
+                    match hopr_lib::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
                             let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
 
@@ -167,8 +166,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wait_til_end_of_time = node.run().await?;
 
     // Show onboarding information
-    let my_address = core_transport::Keypair::public(&hopr_keys.chain_key).to_hex();
-    let my_peer_id = core_transport::Keypair::public(&hopr_keys.packet_key).to_peerid();
+    let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
+    let my_peer_id = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid();
     let version = hopr_lib::constants::APP_VERSION;
 
     while !node.is_allowed_to_access_network(&my_peer_id).await {
@@ -194,10 +193,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Running HOPRd with the API...");
 
         // TODO: remove RLP in 3.0
-        let msg_encoder = |data: &[u8]| utils_types::rlp::encode(data, platform::time::native::current_timestamp());
+        let msg_encoder = |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_timestamp());
 
         let host_listen = match &cfg.api.host.address {
-            core_transport::config::HostType::IPv4(a) | core_transport::config::HostType::Domain(a) => {
+            hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {
                 format!("{a}:{}", cfg.api.host.port)
             }
         };

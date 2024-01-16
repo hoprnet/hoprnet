@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::{Validate, ValidationError};
 
-use core_types::protocol::{Tag, DEFAULT_APPLICATION_TAG};
+use hopr_internal_types::protocol::{Tag, DEFAULT_APPLICATION_TAG};
 
 pub fn validate_is_power_of_two(value: u32) -> Result<(), ValidationError> {
     if (value & (value - 1)) != 0 {

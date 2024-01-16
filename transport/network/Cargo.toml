@@ -13,34 +13,28 @@ async-std = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-getrandom = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
-rand = { version = "0.8.5", features = ["std_rng"] }
+# rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
 
-hopr-crypto = { workspace = true }
-platform = { workspace = true }
+hopr-crypto-sphinx = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-platform = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true}
-utils-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true}
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.11.3"
 more-asserts = "0.3.1"
 
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--enable-reference-types']
-
 [features]
 default = ["prometheus", "compat-ping"]
-wasm = ["dep:getrandom", "hopr-crypto/wasm", "platform/wasm-bindgen", "metrics/wasm", "utils-types/wasm"]
 compat-ping = []
-prometheus = ["dep:metrics"]
+prometheus = ["dep:hopr-metrics"]

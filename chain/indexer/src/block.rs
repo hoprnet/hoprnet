@@ -1,18 +1,18 @@
 use async_lock::RwLock;
 use futures::{pin_mut, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use log::{debug, error, info};
 use std::{collections::VecDeque, sync::Arc};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
-use utils_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::primitives::{Snapshot, U256};
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleGauge;
+use hopr_metrics::metrics::SimpleGauge;
 
 use async_std::task::spawn;
 
@@ -307,12 +307,12 @@ pub mod tests {
         contract::EthEvent,
     };
     use futures::{join, Stream};
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_primitive_types::traits::PeerIdLike;
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::traits::PeerIdLike;
-    use utils_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
 

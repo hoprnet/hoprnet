@@ -5,7 +5,7 @@ use core_network::{
 use futures::channel::mpsc::Sender;
 use log::error;
 
-use platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_timestamp;
 
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {

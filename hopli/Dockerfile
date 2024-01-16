@@ -16,6 +16,7 @@ ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
 COPY Makefile Cargo.toml Cargo.lock ./
 COPY chain chain/
+COPY common common/
 COPY crypto crypto/
 COPY ethereum ethereum/
 COPY hopli hopli/

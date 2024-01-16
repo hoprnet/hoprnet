@@ -1,9 +1,9 @@
 [package]
-name = "platform"
-version = "0.1.1"
+name = "hopr-platform"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust implementation of wrappers for different platforms, including WASM"
+description = "Rust implementation of wrappers for different hopr-platforms, including WASM"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-wasm-bindgen = [ "dep:wasm-bindgen", "dep:bitflags", "dep:js-sys" ]
+js = ["dep:wasm-bindgen", "dep:bitflags", "dep:js-sys"]
 
 [dependencies]
 bitflags = { version = "2.4", optional = true }

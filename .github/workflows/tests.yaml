@@ -41,11 +41,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -95,11 +95,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -161,11 +161,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -188,9 +188,9 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Setup Hoprd Runtime
+      - name: Setup Hoprd
         run: |
-          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+          sudo ./scripts/toolchain/install-toolchain.sh
 
       - name: Build application
         run: nix develop -c make -j build
