@@ -173,4 +173,16 @@ mod tests {
         let expected_ct = hex!("abe088c198cb0a7b2591f1472fb1d0bd529a697a58a45d4ac5dc426ba6bf207deec4a5331149f93c6629d514ece8b0f49b4bc3eda74e07b78df5ac7d7f69fa75f611c926");
         assert_eq!(expected_ct, data);
     }
+
+    #[test]
+    fn test_mac() {
+        let data = [0u8; 60];
+
+        let mut mac = SimpleMac::new(&Default::default());
+        mac.update(&data);
+
+        let out = mac.finalize();
+        let expected_out = hex!("29a11c3c01d102143a020fb562410902ba39966ec81b706945b8ed6d83498bb7");
+        assert_eq!(expected_out, out.as_slice());
+    }
 }

@@ -65,8 +65,7 @@ mod tests {
         assert!(random_integer(10, None) > 10);
 
         let bounded = random_integer(10, Some(20));
-        assert!(bounded >= 10);
-        assert!(bounded < 20)
+        assert!((10..20).contains(&bounded));
     }
 
     #[test]

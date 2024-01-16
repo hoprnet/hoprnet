@@ -1,7 +1,3 @@
-use crate::errors::CryptoError::CalculationError;
-use crate::keypairs::{ChainKeypair, Keypair};
-use crate::types::CurvePoint;
-use crate::utils::k256_scalar_from_bytes;
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::primitives::Address;
@@ -11,6 +7,11 @@ use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::elliptic_curve::ProjectivePoint;
 use k256::{Scalar, Secp256k1};
 use serde::{Deserialize, Serialize};
+
+use crate::errors::CryptoError::CalculationError;
+use crate::keypairs::{ChainKeypair, Keypair};
+use crate::types::CurvePoint;
+use crate::utils::k256_scalar_from_bytes;
 
 /// Bundles values given to the smart contract to prove that a ticket is a win.
 ///
