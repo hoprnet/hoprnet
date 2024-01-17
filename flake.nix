@@ -192,7 +192,7 @@
             set -eu
             OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
             ${pkgs.skopeo}/bin/skopeo copy \
-              --dest-creds="_json_key:$GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY" \
+              --dest-creds="_json_key:$GOOGLE_GHA_CREDS_PATH" \
               "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
           '';
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
