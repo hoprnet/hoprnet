@@ -546,10 +546,10 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
     }
 }
 
-impl TryFrom<PeerId> for OffchainPublicKey {
+impl TryFrom<&PeerId> for OffchainPublicKey {
     type Error = GeneralError;
 
-    fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &PeerId) -> std::result::Result<Self, Self::Error> {
         let mh = value.as_ref();
         if mh.code() == 0 {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
@@ -564,6 +564,14 @@ impl TryFrom<PeerId> for OffchainPublicKey {
         } else {
             Err(GeneralError::ParseError)
         }
+    }
+}
+
+impl TryFrom<PeerId> for OffchainPublicKey {
+    type Error = GeneralError;
+
+    fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 

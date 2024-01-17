@@ -1216,7 +1216,7 @@ mod tests {
     async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
         let peers_addrs = peers
             .iter()
-            .map(|p| (OffchainPublicKey::try_from(*p).unwrap(), Address::random()))
+            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
             .collect::<Vec<_>>();
         let mut cg = ChannelGraph::new(Address::random());
         let mut last_addr = cg.my_address();

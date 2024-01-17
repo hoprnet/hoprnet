@@ -442,7 +442,7 @@ impl HoprTransport {
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
         let db = self.db.read().await;
 
-        if let Ok(pk) = OffchainPublicKey::try_from(*peer) {
+        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
             if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
                 return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
             }

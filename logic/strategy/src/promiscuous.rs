@@ -147,7 +147,7 @@ where
             .await
             .all_peers_with_avg_quality()
             .iter()
-            .filter_map(|(peer, q)| match OffchainPublicKey::try_from(*peer) {
+            .filter_map(|(peer, q)| match OffchainPublicKey::try_from(peer) {
                 Ok(offchain_key) => Some((offchain_key, q)),
                 Err(_) => {
                     error!("encountered invalid peer id: {peer}");

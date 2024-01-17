@@ -1243,7 +1243,7 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = core_transport::OffchainPublicKey::try_from(*peer_id)?;
+        let pk = core_transport::OffchainPublicKey::try_from(peer_id)?;
         Ok(self.chain_api.db().read().await.get_chain_key(&pk).await?)
     }
 

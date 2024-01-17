@@ -59,7 +59,7 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
                 status.get_quality(),
                 status.get_average_quality()
             );
-            if let Ok(pk) = OffchainPublicKey::try_from(*peer) {
+            if let Ok(pk) = OffchainPublicKey::try_from(peer) {
                 let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                 if let Some(chain_key) = maybe_chain_key {
                     let mut g = self.channel_graph.write().await;

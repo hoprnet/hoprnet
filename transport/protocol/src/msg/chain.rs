@@ -104,7 +104,7 @@ impl ChainPacketComponents {
     pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
-            let previous_hop = OffchainPublicKey::try_from(*sender)?;
+            let previous_hop = OffchainPublicKey::try_from(sender)?;
 
             let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
@@ -256,7 +256,7 @@ mod tests {
     async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
         let peers_addrs = peers
             .iter()
-            .map(|p| (OffchainPublicKey::try_from(*p).unwrap(), Address::random()))
+            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
             .collect::<Vec<_>>();
         let mut cg = ChannelGraph::new(Address::random());
         let mut last_addr = cg.my_address();
