@@ -1,5 +1,6 @@
 import fnmatch
 import http.client
+import itertools
 import json
 import logging
 import os
@@ -134,6 +135,20 @@ NODES = {
         "host_addr": "localhost",
     },
 }
+
+
+def default_nodes():
+    """All nodes within the same network as specified in the swarm7 fixture"""
+    return list(NODES.keys())[:4]
+
+
+def default_nodes_with_auth():
+    """All nodes within the same network as specified in the swarm7 fixture"""
+    return ["1", "3", "4"]
+
+
+def random_distinct_pairs_from(values: list, count: int):
+    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
 
 def cleanup_node(args):

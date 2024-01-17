@@ -1,86 +1,116 @@
-from tests.conftest import DEFAULT_API_TOKEN
-from contextlib import asynccontextmanager
 import random
-import websockets
 import json
 import pytest
+import time
 import asyncio
 import re
 import rlp
+from contextlib import asynccontextmanager
+
+import websocket
+import websockets
+from tests.conftest import DEFAULT_API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
 
 
-LOCALHOST = "127.0.0.1"
+def url(host, port):
+    return f"ws://{host}:{port}/api/v3/messages/websocket"
 
 
-def url(port):
-    return f"ws://{LOCALHOST}:{port}/api/v3/messages/websocket"
+EXTRA_HEADERS = [("X-Auth-Token", DEFAULT_API_TOKEN)]
 
 
-EXTRA_HEADERS = [("Cookie", f"X-Auth-Token={DEFAULT_API_TOKEN}")]
-
-
-async def connect_to(port):
-    return await websockets.connect(url(port), extra_headers=EXTRA_HEADERS)
-
-
-@asynccontextmanager
-async def web_socket_connection(port):
-    conn = await connect_to(port)
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer, swarm7):
+    ws = websocket.WebSocket()
     try:
-        yield conn
-    finally:
-        await conn.close()
+        ws.connect(url(swarm7[peer]["host_addr"], swarm7[peer]["api_port"]))
+    except websocket.WebSocketBadStatusException as e:
+        assert "401 Unauthorized" in str(e)
+    else:
+        assert False
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(peer, swarm7):
+    ws = websocket.WebSocket()
+    try:
+        ws.connect(
+            url(swarm7[peer]["host_addr"], swarm7[peer]["api_port"]),
+            header={"X-Auth-Token": "InvAliD_toKeN"},
+        )
+    except websocket.WebSocketBadStatusException as e:
+        assert "401 Unauthorized" in str(e)
+    else:
+        assert False, "Failed to raise 401 on invalid token"
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer, swarm7):
+    ws = websocket.WebSocket()
+    ws.connect(
+        url(swarm7[peer]["host_addr"], swarm7[peer]["api_port"]),
+        header={"X-Auth-Token": DEFAULT_API_TOKEN},
+    )
+
+    time.sleep(0.5)
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer, swarm7):
+    ws = websocket.WebSocket()
+    try:
+        ws.connect(
+            f"{url(swarm7[peer]['host_addr'], swarm7[peer]['api_port'])}/defIniteLY_InVAliD_paTh",
+            header={"X-Auth-Token": DEFAULT_API_TOKEN},
+        )
+    except websocket.WebSocketBadStatusException as e:
+        assert "404 Not Found" in str(e)
+    else:
+        assert False, "Failed to raise 404 on invalid path"
 
 
 @pytest.fixture
 async def ws_connections(swarm7):
-    async with web_socket_connection(swarm7["1"]["api_port"]) as ws1, web_socket_connection(
-        swarm7["2"]["api_port"]
-    ) as ws2, web_socket_connection(swarm7["3"]["api_port"]) as ws3, web_socket_connection(
-        swarm7["4"]["api_port"]
-    ) as ws4, web_socket_connection(
-        swarm7["5"]["api_port"]
-    ) as ws5:
-        yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4, "5": ws5}
+    async with websockets.connect(
+        url(swarm7["1"]["host_addr"], swarm7["1"]["api_port"]), extra_headers=EXTRA_HEADERS
+    ) as ws1, websockets.connect(
+        url(swarm7["2"]["host_addr"], swarm7["2"]["api_port"]), extra_headers=EXTRA_HEADERS
+    ) as ws2, websockets.connect(
+        url(swarm7["3"]["host_addr"], swarm7["3"]["api_port"]), extra_headers=EXTRA_HEADERS
+    ) as ws3, websockets.connect(
+        url(swarm7["4"]["host_addr"], swarm7["4"]["api_port"]), extra_headers=EXTRA_HEADERS
+    ) as ws4:
+        yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}
 
 
-async def test_websocket_send_receive_messages(swarm7, ws_connections):
-    # FIXME: for some reason sending NAT-to-NAT does not work in the test setup
-    # valid_node_keys = ["1", "2", "3", "4", "5"]
-    valid_node_keys = ["1", "2", "3", "4"]
-    message_target_count = 50
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes_with_auth(), count=1))
+async def test_websocket_send_receive_messages(src, dest, swarm7, ws_connections):
+    tag = random.randint(30000, 60000)
+    message_target_count = 10
 
     for i in range(message_target_count):
-        [source_key, target_key] = random.sample(valid_node_keys, 2)
-
-        source_peer = swarm7[source_key]["peer_id"]
-        target_peer = swarm7[target_key]["peer_id"]
-
-        source_ws = ws_connections[source_key]
-        target_ws = ws_connections[target_key]
-
-        body = f"hello msg {i} from peer {source_peer} to peer {target_peer}"
+        body = f"hello msg {i} from peer {swarm7[src]['peer_id']} to peer {swarm7[dest]['peer_id']}"
 
         # we test direct messaging only
-        msg = {"cmd": "sendmsg", "args": {"body": body, "recipient": target_peer, "path": []}}
+        msg = {"cmd": "sendmsg", "args": {"body": body, "peerId": swarm7[dest]["peer_id"], "path": [], "tag": tag}}
 
-        await source_ws.send(json.dumps(msg))
-
-        try:
-            ack_challenge_msg = await asyncio.wait_for(source_ws.recv(), timeout=5)
-        except Exception:
-            pytest.fail(f"Timeout when receiving ack-challenge of msg {i} from {source_key} to {target_key}")
-        assert re.match(r"^ack-challenge:.*$", ack_challenge_msg)
+        await ws_connections[src].send(json.dumps(msg))
 
         try:
-            inc_msg_rlp = await asyncio.wait_for(target_ws.recv(), timeout=5)
+            ack_challenge_msg = await asyncio.wait_for(ws_connections[src].recv(), timeout=5)
         except Exception:
-            pytest.fail(f"Timeout when receiving msg {i} from {source_key} to {target_key}")
-        [inc_msg_str, _] = rlp.decode(bytearray([int(c) for c in inc_msg_rlp.split(",")]))
-        assert inc_msg_str.decode("unicode_escape") == body
+            pytest.fail(f"Timeout when receiving ack-challenge of msg {i} from {src} to {dest}")
+        assert re.match(r"^.*\"message-ack-challenge\".*$", ack_challenge_msg)
 
         try:
-            ack_msg = await asyncio.wait_for(source_ws.recv(), timeout=5)
+            msg = await asyncio.wait_for(ws_connections[dest].recv(), timeout=5)
         except Exception:
-            pytest.fail(f"Timeout when receiving ack of msg {i} from {source_key} to {target_key}")
-        assert re.match(r"^ack:.*$", ack_msg)
+            pytest.fail(f"Timeout when receiving msg {i} from {src} to {dest}")
+        assert re.match(f".*{body}.*$", msg)
+
+        try:
+            ack_msg = await asyncio.wait_for(ws_connections[src].recv(), timeout=5)
+        except Exception:
+            pytest.fail(f"Timeout when receiving ack of msg {i} from {src} to {dest}")
+        assert re.match(r"^.*\"message-ack\".*$", ack_msg)

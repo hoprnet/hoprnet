@@ -9,8 +9,9 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [dependencies]
-async-std = { workspace = true, features = ["attributes"] }
+async-broadcast = { workspace = true }
 async-lock = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 chrono = "0.4.26"
 fern = "0.6.2"
