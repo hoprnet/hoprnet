@@ -94,3 +94,4 @@ jobs:
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        working-directory: ./hoprd-sdk-python
