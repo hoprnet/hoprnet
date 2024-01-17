@@ -22,10 +22,7 @@ use futures::{
     select, StreamExt,
 };
 use futures_concurrency::stream::Merge;
-use hopr_internal_types::{
-    acknowledgement::{AcknowledgedTicket, Acknowledgement},
-    channels::Ticket,
-};
+use hopr_internal_types::prelude::*;
 use libp2p::request_response::RequestId;
 use log::{debug, error, info};
 use std::collections::{HashMap, HashSet};

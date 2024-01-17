@@ -4,15 +4,10 @@ use core_packet::{
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
 use core_path::path::{Path, TransportPath};
-use hopr_crypto::{
-    derivation::{derive_ack_key_share, PacketTag},
-    keypairs::{ChainKeypair, OffchainKeypair},
-    shared_keys::SphinxSuite,
-    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
-};
-use hopr_internal_types::channels::Ticket;
-use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
-use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
+use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::traits::BinarySerializable;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 
@@ -99,7 +94,7 @@ impl ChainPacketComponents {
             )
             .to_bytes(),
             ticket,
-            next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
+            next_hop: OffchainPublicKey::try_from(path.hops()[0])?,
             ack_challenge: por_values.ack_challenge,
         })
     }
@@ -109,9 +104,9 @@ impl ChainPacketComponents {
     pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
-            let previous_hop = OffchainPublicKey::from_peerid(sender)?;
+            let previous_hop = OffchainPublicKey::try_from(sender)?;
 
-            let mp: MetaPacket<hopr_crypto::ec_groups::X25519Suite> =
+            let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
@@ -227,18 +222,9 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, PublicKey},
-    };
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_internal_types::protocol::PeerAddressResolver;
-    use hopr_primitive_types::primitives::Address;
-    use hopr_primitive_types::{
-        primitives::{Balance, BalanceType, EthereumChallenge, U256},
-        traits::PeerIdLike,
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
 
@@ -251,7 +237,7 @@ mod tests {
             Ticket::new(
                 &next_peer_channel_key.to_address(),
                 &Balance::new(
-                    price_per_packet.divide_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
+                    price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
                     BalanceType::HOPR,
                 ),
                 1u64.into(),
@@ -270,7 +256,7 @@ mod tests {
     async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
         let peers_addrs = peers
             .iter()
-            .map(|p| (OffchainPublicKey::from_peerid(p).unwrap(), Address::random()))
+            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
             .collect::<Vec<_>>();
         let mut cg = ChannelGraph::new(Address::random());
         let mut last_addr = cg.my_address();
@@ -278,7 +264,7 @@ mod tests {
             let c = ChannelEntry::new(
                 last_addr,
                 *addr,
-                Balance::new(1000u32.into(), BalanceType::HOPR),
+                Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
                 0u32.into(),
@@ -326,7 +312,7 @@ mod tests {
 
         let test_message = b"some testing message";
         let path = async_std::task::block_on(resolve_mock_path(
-            keypairs.iter().map(|kp| kp.public().to_peerid()).collect(),
+            keypairs.iter().map(|kp| kp.public().into()).collect(),
         ));
 
         let mut packet =
@@ -340,8 +326,8 @@ mod tests {
 
         for (i, path_element) in keypairs.iter().enumerate() {
             let sender = (i == 0)
-                .then_some(own_packet_kp.public().to_peerid())
-                .unwrap_or_else(|| keypairs.get(i - 1).map(|kp| kp.public().to_peerid()).unwrap());
+                .then_some(own_packet_kp.public().into())
+                .unwrap_or_else(|| keypairs.get(i - 1).map(|kp| kp.public().into()).unwrap());
 
             packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, &sender)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));

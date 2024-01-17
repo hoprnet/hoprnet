@@ -2,7 +2,7 @@ use core_path::path::TransportPath;
 use libp2p_identity::PeerId;
 
 use core_packet::errors::Result;
-use hopr_crypto::{derivation::PacketTag, keypairs::OffchainKeypair, types::HalfKeyChallenge};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::acknowledgement::Acknowledgement;
 
 pub enum TransportPacket {

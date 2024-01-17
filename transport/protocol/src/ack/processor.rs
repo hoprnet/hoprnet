@@ -7,10 +7,9 @@ use core_packet::errors::Result;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
-use hopr_crypto::keypairs::ChainKeypair;
-use hopr_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
-use hopr_internal_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
-use hopr_primitive_types::traits::{PeerIdLike, ToHex};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use std::pin::Pin;
@@ -254,7 +253,7 @@ impl AcknowledgementInteraction {
             async move {
                 let processed: Option<AckProcessed> = match event {
                     AckToProcess::ToReceive(peer, mut ack) => {
-                        if let Ok(remote_pk) = OffchainPublicKey::from_peerid(&peer) {
+                        if let Ok(remote_pk) = OffchainPublicKey::try_from(peer) {
                             debug!("validating incoming acknowledgement from {}", peer);
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {

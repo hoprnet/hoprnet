@@ -4,8 +4,7 @@ use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError::ChannelNotOpened;
 use crate::errors::{PathError::MissingChannel, Result};
 use crate::path::{ChannelPath, Path};
-use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
-use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
 use std::ops::Add;
 

@@ -138,7 +138,7 @@
 //!       aggregation_threshold: 1000
 //! ```
 
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use strum::{Display, EnumString, EnumVariantNames};

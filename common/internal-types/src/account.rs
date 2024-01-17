@@ -1,10 +1,5 @@
-use crate::account::AccountType::{Announced, NotAnnounced};
-use hopr_crypto::types::OffchainPublicKey;
-use hopr_primitive_types::{
-    errors::GeneralError::ParseError,
-    primitives::Address,
-    traits::{BinarySerializable, PeerIdLike, ToHex},
-};
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -21,10 +16,10 @@ pub enum AccountType {
 impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            NotAnnounced => {
+            Self::NotAnnounced => {
                 write!(f, "Not announced")
             }
-            Announced {
+            Self::Announced {
                 multiaddr,
                 updated_block,
             } => f
@@ -46,40 +41,6 @@ pub struct AccountEntry {
 }
 
 impl AccountEntry {
-    /// Gets multiaddress as string if this peer ID has been announced.
-    pub fn get_multiaddr_str(&self) -> Option<String> {
-        self.get_multiaddr().map(|m| m.to_string())
-    }
-
-    /// Gets the block number of the announcement if this peer ID has been announced.
-    pub fn updated_at(&self) -> Option<u32> {
-        match &self.entry_type {
-            NotAnnounced => None,
-            Announced { updated_block, .. } => Some(*updated_block),
-        }
-    }
-
-    /// Is the node announced?
-    pub fn has_announced(&self) -> bool {
-        match &self.entry_type {
-            NotAnnounced => false,
-            Announced { .. } => true,
-        }
-    }
-
-    /// If the node has announced, did it announce with routing information ?
-    pub fn contains_routing_info(&self) -> bool {
-        match &self.entry_type {
-            NotAnnounced => false,
-            Announced { multiaddr, .. } => {
-                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4")
-                    && multiaddr.protocol_stack().any(|p| p == "tcp")
-            }
-        }
-    }
-}
-
-impl AccountEntry {
     const MAX_MULTI_ADDR_LENGTH: usize = 200;
     const MA_LENGTH_PREFIX: usize = std::mem::size_of::<u32>();
 
@@ -91,10 +52,37 @@ impl AccountEntry {
         }
     }
 
+    /// Gets the block number of the announcement if this peer ID has been announced.
+    pub fn updated_at(&self) -> Option<u32> {
+        match &self.entry_type {
+            AccountType::NotAnnounced => None,
+            AccountType::Announced { updated_block, .. } => Some(*updated_block),
+        }
+    }
+
+    /// Is the node announced?
+    pub fn has_announced(&self) -> bool {
+        match &self.entry_type {
+            AccountType::NotAnnounced => false,
+            AccountType::Announced { .. } => true,
+        }
+    }
+
+    /// If the node has announced, did it announce with routing information ?
+    pub fn contains_routing_info(&self) -> bool {
+        match &self.entry_type {
+            AccountType::NotAnnounced => false,
+            AccountType::Announced { multiaddr, .. } => {
+                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4")
+                    && multiaddr.protocol_stack().any(|p| p == "tcp")
+            }
+        }
+    }
+
     pub fn get_multiaddr(&self) -> Option<Multiaddr> {
         match &self.entry_type {
-            NotAnnounced => None,
-            Announced { multiaddr, .. } => Some(multiaddr.clone()),
+            AccountType::NotAnnounced => None,
+            AccountType::Announced { multiaddr, .. } => Some(multiaddr.clone()),
         }
     }
 
@@ -114,12 +102,12 @@ impl Display for AccountEntry {
         write!(f, "AccountEntry {}:", self.public_key.to_peerid_str())?;
         write!(f, " PublicKey: {}", self.public_key.to_hex())?;
         match &self.entry_type {
-            NotAnnounced => {
+            AccountType::NotAnnounced => {
                 write!(f, " Multiaddr: not announced")?;
                 write!(f, " UpdatedAt: not announced")?;
                 write!(f, " RoutingInfo: false")?;
             }
-            Announced {
+            AccountType::Announced {
                 multiaddr,
                 updated_block,
             } => {
@@ -143,17 +131,17 @@ impl BinarySerializable for AccountEntry {
             let chain_addr = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
-                let multiaddr =
-                    Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>()).map_err(|_| ParseError)?;
+                let multiaddr = Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>())
+                    .map_err(|_| GeneralError::ParseError)?;
                 buf.drain(..Self::MAX_MULTI_ADDR_LENGTH - ma_len);
-                Announced {
+                AccountType::Announced {
                     multiaddr,
                     updated_block: u32::from_be_bytes(
                         buf.drain(..std::mem::size_of::<u32>()).as_ref().try_into().unwrap(),
                     ),
                 }
             } else {
-                NotAnnounced
+                AccountType::NotAnnounced
             };
             Ok(Self {
                 public_key,
@@ -161,7 +149,7 @@ impl BinarySerializable for AccountEntry {
                 entry_type,
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -171,12 +159,12 @@ impl BinarySerializable for AccountEntry {
         ret.extend_from_slice(&self.chain_addr.to_bytes());
 
         match &self.entry_type {
-            NotAnnounced => {
+            AccountType::NotAnnounced => {
                 ret.extend_from_slice(&(0_u32).to_be_bytes());
                 ret.extend_from_slice(&[0u8; Self::MAX_MULTI_ADDR_LENGTH]);
                 ret.extend_from_slice(&(0_u32).to_be_bytes());
             }
-            Announced {
+            AccountType::Announced {
                 multiaddr,
                 updated_block,
             } => {
@@ -200,8 +188,8 @@ mod test {
         AccountType::{Announced, NotAnnounced},
     };
     use hex_literal::hex;
-    use hopr_crypto::types::OffchainPublicKey;
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_crypto_types::types::OffchainPublicKey;
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");

@@ -368,10 +368,12 @@ class HoprdAPI:
         Checks if the node is started.
         :return: started: int
         """
-        self.__call_api(ChecksApi, "startedz")
+        status, _ = self.__call_api(ChecksApi, "startedz")
+        return status
 
     async def readyz(self):
         """
         Checks if the node is ready to accept connections.
         """
-        self.__call_api(ChecksApi, "readyz")
+        status, _ = self.__call_api(ChecksApi, "readyz")
+        return status

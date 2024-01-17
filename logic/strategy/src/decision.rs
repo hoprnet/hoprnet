@@ -1,5 +1,5 @@
 use hopr_internal_types::channels::ChannelEntry;
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
 /// A decision made by a strategy on each tick,

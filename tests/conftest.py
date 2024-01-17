@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 import logging
 import os
@@ -142,6 +143,25 @@ def cmd_line_args(request: pytest.FixtureRequest):
     }
 
     return args
+
+
+def default_nodes():
+    """All nodes within the same network as specified in the swarm7 fixture"""
+    return list(range(4))
+
+
+def default_nodes_with_auth():
+    """All nodes within the same network as specified in the swarm7 fixture"""
+    return [0, 2, 3]
+
+
+def passive_node():
+    """A node that uses no strategy"""
+    return 5
+
+
+def random_distinct_pairs_from(values: list, count: int):
+    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
 
 def setup_node(node: Node):
@@ -368,7 +388,10 @@ async def swarm7(request):
 
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
-    [await node.api.startedz() for node in nodes]
+    for id, node in enumerate(nodes):
+        while not await node.api.startedz():
+            asyncio.sleep(0.1)
+        logging.info(f"Node {id} is up")
 
     # FUND NODES
     logging.info("Funding nodes")
@@ -377,7 +400,9 @@ async def swarm7(request):
     # FINAL WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be up")
     for node in nodes:
-        await node.api.readyz()
+        while not await node.api.readyz():
+            asyncio.sleep(0.1)
+
         node.peer_id = await node.api.addresses("hopr")
         node.address = await node.api.addresses("native")
 

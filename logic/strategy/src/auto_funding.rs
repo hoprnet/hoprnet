@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use hopr_internal_types::channels::ChannelDirection::Outgoing;
-use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -80,7 +79,7 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
         // Can only auto-fund outgoing channels
-        if direction != Outgoing {
+        if direction != ChannelDirection::Outgoing {
             return Ok(());
         }
 
@@ -118,13 +117,10 @@ mod tests {
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
-    use hopr_internal_types::channels::ChannelChange::CurrentBalance;
-    use hopr_internal_types::channels::ChannelDirection::Outgoing;
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::Hash;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
 
     mock! {
@@ -136,7 +132,7 @@ mod tests {
             async fn close_channel(
                 &self,
                 counterparty: Address,
-                direction: hopr_internal_types::channels::ChannelDirection,
+                direction: ChannelDirection,
                 redeem_before_close: bool,
             ) -> chain_actions::errors::Result<PendingAction>;
         }
@@ -153,13 +149,13 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_funding_strategy() {
-        let stake_limit = Balance::new(7_u32.into(), BalanceType::HOPR);
-        let fund_amount = Balance::new(5_u32.into(), BalanceType::HOPR);
+        let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
+        let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
 
         let c1 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(10_u32.into(), BalanceType::HOPR),
+            Balance::new(10_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -169,7 +165,7 @@ mod tests {
         let c2 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(5_u32.into(), BalanceType::HOPR),
+            Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -179,7 +175,7 @@ mod tests {
         let c3 = ChannelEntry::new(
             Address::random(),
             Address::random(),
-            Balance::new(5_u32.into(), BalanceType::HOPR),
+            Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::PendingToClose,
             0_u32.into(),
@@ -202,8 +198,8 @@ mod tests {
         let afs = AutoFundingStrategy::new(cfg, actions);
         afs.on_own_channel_changed(
             &c1,
-            Outgoing,
-            CurrentBalance {
+            ChannelDirection::Outgoing,
+            ChannelChange::CurrentBalance {
                 left: Balance::zero(BalanceType::HOPR),
                 right: c1.balance,
             },
@@ -213,8 +209,8 @@ mod tests {
 
         afs.on_own_channel_changed(
             &c2,
-            Outgoing,
-            CurrentBalance {
+            ChannelDirection::Outgoing,
+            ChannelChange::CurrentBalance {
                 left: Balance::zero(BalanceType::HOPR),
                 right: c2.balance,
             },
@@ -224,8 +220,8 @@ mod tests {
 
         afs.on_own_channel_changed(
             &c3,
-            Outgoing,
-            CurrentBalance {
+            ChannelDirection::Outgoing,
+            ChannelChange::CurrentBalance {
                 left: Balance::zero(BalanceType::HOPR),
                 right: c3.balance,
             },

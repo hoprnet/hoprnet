@@ -1,3 +1,5 @@
+// TODO: docs for crate missing
+
 pub mod adaptors;
 pub mod config;
 pub mod constants;
@@ -7,11 +9,14 @@ mod p2p;
 mod processes;
 mod timer;
 
+/// Object representing different types of output from the transport layer
+#[derive(Clone)]
 pub enum TransportOutput {
     Received(ApplicationData),
     Sent(HalfKeyChallenge),
 }
 
+use std::ops::Add;
 pub use {
     crate::{
         adaptors::network::ExternalNetworkInteractions,
@@ -21,7 +26,7 @@ pub use {
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
-    hopr_crypto::{
+    hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
@@ -45,11 +50,7 @@ use futures::{
     channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
-use hopr_internal_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{ChannelEntry, Ticket},
-    protocol::TagBloomFilter,
-};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};
@@ -239,8 +240,7 @@ use core_protocol::ticket_aggregation::processor::AggregationList;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_internal_types::channels::ChannelStatus;
-use hopr_primitive_types::primitives::{Balance, BalanceType};
-use hopr_primitive_types::traits::PeerIdLike;
+use hopr_primitive_types::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct HoprTransport {
@@ -351,7 +351,7 @@ impl HoprTransport {
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
-            let pk = OffchainPublicKey::from_peerid(&destination)?;
+            let pk = OffchainPublicKey::try_from(destination)?;
 
             if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {
                 let selector = LegacyPathSelector::default();
@@ -427,7 +427,7 @@ impl HoprTransport {
         for node in db.get_public_node_accounts().await?.into_iter() {
             if let Ok(Some(v)) = db.get_packet_key(&node.chain_addr).await {
                 public_nodes.push((
-                    v.to_peerid(),
+                    v.into(),
                     node.chain_addr,
                     if let Some(ma) = node.get_multiaddr() {
                         vec![ma]
@@ -444,7 +444,7 @@ impl HoprTransport {
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
         let db = self.db.read().await;
 
-        if let Ok(pk) = OffchainPublicKey::from_peerid(peer) {
+        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
             if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
                 return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
             }

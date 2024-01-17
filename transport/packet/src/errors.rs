@@ -1,5 +1,5 @@
 use core_path::errors::PathError;
-use hopr_crypto::errors::CryptoError;
+use hopr_crypto_types::errors::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;

@@ -22,14 +22,15 @@ hex-literal = "0.4"
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
-rand = "0.8.5"
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-hopr-crypto = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-sphinx = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
@@ -42,7 +43,6 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10.0"
-hex-literal = "0.4.1"
 more-asserts = "0.3.1"
 parameterized = "1.0"
 serial_test = "2.0"

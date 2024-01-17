@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use log::{debug, info};
 use petgraph::algo::has_path_connecting;
@@ -215,7 +215,7 @@ mod tests {
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, Snapshot};
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::str::FromStr;
     use utils_db::db::DB;
@@ -326,7 +326,7 @@ mod tests {
                 }
                 ChannelChange::CurrentBalance { left, right } => {
                     assert_eq!(
-                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        Balance::new(1_u32, BalanceType::HOPR),
                         left,
                         "previous balance does not match"
                     );
@@ -369,7 +369,7 @@ mod tests {
                 }
                 ChannelChange::CurrentBalance { left, right } => {
                     assert_eq!(
-                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        Balance::new(1_u32, BalanceType::HOPR),
                         left,
                         "previous balance does not match"
                     );

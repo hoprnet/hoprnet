@@ -1,8 +1,6 @@
-use thiserror::Error;
-
+use hopr_crypto_types::errors::CryptoError;
 use multiaddr::Error as MultiaddrError;
-
-use hopr_crypto::errors::CryptoError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CoreTypesError {

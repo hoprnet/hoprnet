@@ -7,8 +7,8 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use ethers_providers::{JsonRpcClient, Middleware, Provider};
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::prelude::*;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -130,12 +130,12 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                     .get_balance(NameOrAddress::Address(address.into()), None)
                     .await?;
 
-                Ok(Balance::new(native.into(), BalanceType::Native))
+                Ok(Balance::new(native, BalanceType::Native))
             }
             BalanceType::HOPR => {
                 let token_balance = self.contract_instances.token.balance_of(address.into()).call().await?;
 
-                Ok(Balance::new(token_balance.into(), BalanceType::HOPR))
+                Ok(Balance::new(token_balance, BalanceType::HOPR))
             }
         }
     }
@@ -200,8 +200,8 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::{Address, BalanceType, U256};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::prelude::*;
     use primitive_types::H160;
     use std::time::Duration;
 
@@ -281,7 +281,7 @@ pub mod tests {
             .get_balance((&chain_key_0).into(), BalanceType::Native)
             .await
             .unwrap();
-        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
+        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
@@ -318,7 +318,7 @@ pub mod tests {
             .get_balance((&chain_key_0).into(), BalanceType::Native)
             .await
             .unwrap();
-        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
+        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         let txs_count = 5_u64;
         let send_amount = 1000000_u64;
@@ -339,7 +339,7 @@ pub mod tests {
             .unwrap();
 
         assert!(
-            balance_2.value().as_u64() <= balance_1.value().as_u64() - txs_count * send_amount,
+            balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
             "balance must be less"
         );
     }
@@ -369,7 +369,7 @@ pub mod tests {
             .get_balance((&chain_key_0).into(), BalanceType::Native)
             .await
             .unwrap();
-        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
+        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
@@ -424,6 +424,6 @@ pub mod tests {
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
-        assert_eq!(amount, balance.value().as_u64(), "invalid balance");
+        assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
     }
 }

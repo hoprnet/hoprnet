@@ -2,12 +2,11 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
 
 use core_network::{network::Network, ping::PingExternalAPI, types::Result, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
-use hopr_primitive_types::traits::PeerIdLike;
 use log::{debug, error};
 
 use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_METADATA_PROTOCOL_VERSION};
@@ -60,7 +59,7 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
                 status.get_quality(),
                 status.get_average_quality()
             );
-            if let Ok(pk) = OffchainPublicKey::from_peerid(peer) {
+            if let Ok(pk) = OffchainPublicKey::try_from(peer) {
                 let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                 if let Some(chain_key) = maybe_chain_key {
                     let mut g = self.channel_graph.write().await;
