@@ -24,7 +24,7 @@ TICKET_AGGREGATION_THRESHOLD = 100
 TICKET_PRICE_PER_HOP = 100
 
 FIXTURES_PREFIX = "hopr-smoke-test"
-NODE_NAME_PREFIX = "hopr-smoke-test-node"
+NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
 NETWORK2 = "anvil-localhost2"
@@ -332,7 +332,7 @@ async def swarm7(request):
 
     ## STOP OLD LOCAL ANVIL SERVER
     logging.info("Ensure local anvil server is not running")
-    run("make kill-anvil".split(), cwd=PWD.parent, check=True)
+    run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
 
     ## START NEW LOCAL ANVIL SERVER
     logging.info("Starting and waiting for local anvil server to be up")
