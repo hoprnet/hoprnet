@@ -35,56 +35,6 @@ function ensure_port_is_free() {
   fi
 }
 
-# $1 = port to wait for
-# $2 = host to check port on
-# $3 = optional: file to tail for debug info
-# $4 = optional: delay between checks in seconds, defaults to 2s
-# $5 = optional: max number of checks, defaults to 1000
-function wait_for_http_port() {
-  local port host log_file delay max_wait cmd
-
-  port=${1}
-  host=${2}
-  log_file=${3:-}
-  delay=${4:-2}
-  max_wait=${5:-1000}
-  cmd="curl --silent "${host}:${port}""
-
-  wait_for_port "${port}" "${host}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
-}
-
-# $1 = port to wait for
-# $2 = optional: host to check port on, defaults to 127.0.0.1
-# $3 = optional: file to tail for debug info
-# $4 = optional: delay between checks in seconds, defaults to 2s
-# $5 = optional: max number of checks, defaults to 1000
-# $6 = optional: command to check
-function wait_for_port() {
-  local port host log_file delay max_wait cmd
-
-  port=${1}
-  host=${2:-127.0.0.1}
-  log_file=${3:-}
-  delay=${4:-10}
-  max_wait=${5:-1000}
-  # by default we do a basic listen check
-  cmd=${6:-nc -z -w 1 ${host} ${port}}
-
-  i=0
-  until ${cmd}; do
-    log "Waiting ${delay} seconds for port to be reachable ${host}:${port}"
-    if [ -s "${log_file}" ]; then
-      log "Last 5 logs from ${log_file}:"
-      tail -n 5 "${log_file}" | sed "s/^/\\t/"
-    fi
-    sleep "${delay}"
-    ((i=i+1))
-    if [ $i -gt "${max_wait}" ]; then
-      exit 1
-    fi
-  done
-}
-
 setup_colors() {
   if [[ -t 2 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
     # shellcheck disable=SC2034
@@ -177,25 +127,6 @@ function wait_for_regex {
   done
 
   echo "${res}"
-}
-
-# $1 = filename
-# $2 = expected content
-function expect_file_content() {
-  local filename expected actual
-
-  filename="${1}"
-  expected="${2}"
-  actual="$(cat "${filename}")"
-
-  if [[ "${expected}" != "${actual}" ]]; then
-    log "⛔️ bad content for ${filename}"
-    log "expected: "
-    log "${expected}"
-    log "actual: "
-    log "${actual}"
-    exit 1
-  fi
 }
 
 function find_tmp_dir() {
@@ -333,9 +264,7 @@ get_authenticated_curl_cmd() {
 
   # add auth info if token was found previously
   if [ -n "${api_token}" ]; then
-    local api_token_encoded
-    api_token_encoded="$(encode_api_token "${api_token}")"
-    cmd+=" --header \"Authorization: Basic ${api_token_encoded}\""
+    cmd+=" --header \"X-Auth-Token: ${api_token}\""
   fi
 
   # return full command

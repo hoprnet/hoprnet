@@ -39,27 +39,36 @@ rustdoc-args = [
     "docsrs",
 ]
 
-[dependencies]
-bytes = "1"
-futures = "0.3"
-log = "0.4"
-pin-project = "1.1.3"
-smallvec = "1.11.0"
-unsigned-varint = "0.7"
+[dependencies.bytes]
+version = "1"
 
-[dev-dependencies]
-env_logger = "0.10"
-futures_ringbuf = "0.4.0"
-rand = "0.8"
+[dependencies.futures]
+version = "0.3"
+
+[dependencies.log]
+version = "0.4"
+
+[dependencies.pin-project]
+version = "1.1.0"
+
+[dependencies.smallvec]
+version = "1.6.1"
+
+[dependencies.unsigned-varint]
+version = "0.7"
 
 [dev-dependencies.async-std]
 version = "1.6.2"
 features = ["attributes"]
 
-[dev-dependencies.quickcheck]
-path = "../quickcheck-ext"
-package = "quickcheck-ext"
+[dev-dependencies.env_logger]
+version = "0.10"
+
+[dev-dependencies.futures_ringbuf]
+version = "0.4.0"
+
+[dev-dependencies.rand]
+version = "0.8"
 
 [dev-dependencies.rw-stream-sink]
 version = "0.4.0"
-path = "../rw-stream-sink"

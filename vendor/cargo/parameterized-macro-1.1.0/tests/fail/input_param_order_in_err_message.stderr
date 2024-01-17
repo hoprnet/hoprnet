@@ -1,0 +1,8 @@
+error: custom attribute panicked
+ --> $DIR/input_param_order_in_err_message.rs:3:1
+  |
+3 | #[parameterized(zzz = { "a", "b" }, aaa = { 1, 2, 3 })]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: [parameterized-macro] error: Each test-case parameter should have an equal amount of values passed to it.
+          Expected 2 arguments for 'aaa', but got: 3

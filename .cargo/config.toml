@@ -6,3 +6,8 @@ directory = "vendor/cargo"
 
 [install]
 root = ".cargo"
+
+[build]
+rustflags = ["-Wunused-crate-dependencies"]
+# Nightly only
+#rustflags = [ "-Zlocation-detail=none" ]

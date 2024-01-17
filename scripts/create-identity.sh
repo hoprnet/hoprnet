@@ -18,7 +18,7 @@ workspace_dir="${script_dir}/.."
 
 
 if ! command -v hopli; then
-    export PATH="${PATH}:${workspace_dir}/packages/hopli/.cargo/bin"
+    export PATH="${PATH}:${workspace_dir}/hopli/.cargo/bin"
 fi
 
 network=${1}
@@ -39,7 +39,7 @@ for (( i=1; i<=${number}; i++ )) do
     hopli identity --action read --identity-directory "${identity_directory}" | tee "${identity_directory}/hoprd.json"
 
     echo "Generate safes"
-    hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/packages/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount "${hopr_amount}" --native-amount "${native_amount}" | tee "${identity_directory}/safe.log"
+    hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount "${hopr_amount}" --native-amount "${native_amount}" | tee "${identity_directory}/safe.log"
 
     declare -a safe_address
     safe_address=$(grep "Logs" -A 3 "${identity_directory}/safe.log" | grep safeAddress | cut -d ' ' -f 4)

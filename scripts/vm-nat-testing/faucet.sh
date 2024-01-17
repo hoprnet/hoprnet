@@ -6,4 +6,4 @@ IDENTITY_PASSWORD=switzerland PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bac
 	hopli faucet \
 	--environment-name anvil-localhost \
 	--identity-prefix "local" --identity-directory "/var/hopr/identities/" \
-	--contracts-root "./packages/ethereum/contracts"
+	--contracts-root "./ethereum/contracts"

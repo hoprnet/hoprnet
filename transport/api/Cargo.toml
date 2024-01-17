@@ -1,0 +1,47 @@
+[package]
+name = "core-transport"
+version = "0.4.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implements the main HOPR interface for the core library"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["prometheus"]
+prometheus = [
+    "dep:lazy_static", "dep:hopr-metrics",
+    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
+]
+
+[dependencies]
+async-std = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+futures = { workspace = true }
+futures-concurrency = "7.3.0"
+libp2p = { workspace = true, features = ["request-response"] }
+multiaddr = { workspace = true }
+proc-macro-regex = "~1.1.0"
+serde = { workspace = true }
+thiserror = { workspace = true }
+validator = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+
+core-network = { workspace = true }
+hopr-crypto-types = { workspace = true }
+chain-db = { workspace = true }
+chain-types = { workspace = true }
+core-path = { workspace = true }
+core-p2p = { workspace = true }
+core-packet = { workspace = true }
+core-protocol = { workspace = true }
+utils-db = { workspace = true}
+log = { workspace = true }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+

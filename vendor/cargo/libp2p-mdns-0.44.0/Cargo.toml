@@ -47,36 +47,43 @@ required-features = ["async-io"]
 name = "use-tokio"
 required-features = ["tokio"]
 
-[dependencies]
-data-encoding = "2.4.0"
-futures = "0.3.28"
-if-watch = "3.0.1"
-log = "0.4.20"
-rand = "0.8.3"
-smallvec = "1.11.0"
-void = "1.0.2"
-
 [dependencies.async-io]
 version = "1.13.0"
 optional = true
 
+[dependencies.data-encoding]
+version = "2.4.0"
+
+[dependencies.futures]
+version = "0.3.28"
+
+[dependencies.if-watch]
+version = "3.0.1"
+
 [dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.3"
+version = "0.2.0"
 
 [dependencies.libp2p-swarm]
-version = "0.43.3"
-path = "../../swarm"
+version = "0.43.0"
+
+[dependencies.log]
+version = "0.4.19"
+
+[dependencies.rand]
+version = "0.8.3"
+
+[dependencies.smallvec]
+version = "1.6.1"
 
 [dependencies.socket2]
 version = "0.5.3"
 features = ["all"]
 
 [dependencies.tokio]
-version = "1.32"
+version = "1.28"
 features = [
     "net",
     "time",
@@ -92,42 +99,41 @@ features = [
 ]
 default-features = false
 
-[dev-dependencies]
-env_logger = "0.10.0"
+[dependencies.void]
+version = "1.0.2"
 
 [dev-dependencies.async-std]
 version = "1.9.0"
 features = ["attributes"]
 
+[dev-dependencies.env_logger]
+version = "0.10.0"
+
 [dev-dependencies.libp2p-noise]
-version = "0.43.1"
-path = "../../transports/noise"
+version = "0.43.0"
 
 [dev-dependencies.libp2p-swarm]
-version = "0.43.3"
-path = "../../swarm"
+version = "0.43.0"
 features = [
     "tokio",
     "async-std",
 ]
 
 [dev-dependencies.libp2p-swarm-test]
-path = "../../swarm-test"
+version = "0.2.0"
 
 [dev-dependencies.libp2p-tcp]
 version = "0.40.0"
-path = "../../transports/tcp"
 features = [
     "tokio",
     "async-io",
 ]
 
 [dev-dependencies.libp2p-yamux]
-version = "0.44.1"
-path = "../../muxers/yamux"
+version = "0.44.0"
 
 [dev-dependencies.tokio]
-version = "1.32"
+version = "1.28"
 features = [
     "macros",
     "rt",

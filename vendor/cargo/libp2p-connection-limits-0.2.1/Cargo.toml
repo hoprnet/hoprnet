@@ -27,23 +27,18 @@ categories = [
 license = "MIT"
 repository = "https://github.com/libp2p/rust-libp2p"
 
-[dependencies]
-void = "1"
-
 [dependencies.libp2p-core]
 version = "0.40.0"
-path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.3"
+version = "0.2.2"
 features = ["peerid"]
 
 [dependencies.libp2p-swarm]
-version = "0.43.3"
-path = "../../swarm"
+version = "0.43.2"
 
-[dev-dependencies]
-rand = "0.8.5"
+[dependencies.void]
+version = "1"
 
 [dev-dependencies.async-std]
 version = "1.12.0"
@@ -51,18 +46,9 @@ features = ["attributes"]
 
 [dev-dependencies.libp2p-identify]
 version = "0.43.0"
-path = "../../protocols/identify"
 
 [dev-dependencies.libp2p-ping]
 version = "0.43.0"
-path = "../../protocols/ping"
 
-[dev-dependencies.libp2p-swarm-derive]
-path = "../../swarm-derive"
-
-[dev-dependencies.libp2p-swarm-test]
-path = "../../swarm-test"
-
-[dev-dependencies.quickcheck]
-path = "../quickcheck-ext"
-package = "quickcheck-ext"
+[dev-dependencies.rand]
+version = "0.8.5"

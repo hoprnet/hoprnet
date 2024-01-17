@@ -4,33 +4,19 @@
 space := $(subst ,, )
 mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
-# Gets all packages that include a Rust crates
-# Disable automatic compilation of SC bindings. Can still be done manually.
-WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
-
-# Gets all individual crates such that they can get built
-CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
-
-# base names of all crates
-CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
-
-# No need to lint Foundry-generated Rust bindings
-LINTABLE_CRATES_NAMES := $(filter-out bindings,$(CRATES_NAMES))
 
 # Gets all solidity files which can be modified
-SOLIDITY_SRC_FILES := $(shell find ./packages/ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
-SOLIDITY_TEST_FILES := $(shell find ./packages/ethereum/contracts/test -type f -name "*.sol")
-SOLIDITY_SCRIPT_FILES := $(shell find ./packages/ethereum/contracts/script -type f -name "*.sol")
+SOLIDITY_SRC_FILES := $(shell find ./ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
+SOLIDITY_TEST_FILES := $(shell find ./ethereum/contracts/test -type f -name "*.sol")
+SOLIDITY_SCRIPT_FILES := $(shell find ./ethereum/contracts/script -type f -name "*.sol")
 SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
-
-# define specific crate for hopli which is a native helper
-HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
 # note: $(mydir) ends with '/'
 FOUNDRY_DIR ?= $(mydir).foundry
 # Use custom pinned version of foundry from
 # https://github.com/hoprnet/foundry/tree/hopr-release
+# TODO: even more advanced working version is used and distributed by Q
 FOUNDRY_REPO := hoprnet/foundry
 FOUNDRY_VSN := v0.0.4
 FOUNDRYUP_VSN := fc64e18
@@ -55,21 +41,6 @@ SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
 
-# use custom flags for installing dependencies
-YARNFLAGS :=
-
-# Build specific package
-ifeq ($(package),)
-	YARNFLAGS := ${YARNFLAGS} -A
-else
-	YARNFLAGS := ${YARNFLAGS} @hoprnet/${package}
-endif
-
-# Don't install devDependencies in production
-ifneq ($(origin PRODUCTION),undefined)
-	YARNFLAGS := ${YARNFLAGS} --production
-endif
-
 all: help
 
 .PHONY: init
@@ -78,16 +49,6 @@ init: ## initialize repository (idempotent operation)
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
 
-.PHONY: $(HOPLI_CRATE)
-$(HOPLI_CRATE): ## builds hopli Rust crates with cargo
-	echo "use cargo build"
-# install the package
-	cargo install --path $@ --force
-
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES)
-$(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
-	$(MAKE) -C $@ install
-
 .PHONY: deps-ci
 deps-ci: ## Installs dependencies when running in CI
 # install foundry (cast + forge + anvil)
@@ -95,7 +56,6 @@ deps-ci: ## Installs dependencies when running in CI
 	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-	CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps-docker
 deps-docker: ## Installs dependencies when building Docker images
@@ -105,12 +65,10 @@ ifeq ($(origin PRODUCTION),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 endif
-	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps
 deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
-		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
 # install foundry (cast + forge + anvil)
@@ -119,9 +77,6 @@ deps: ## Installs dependencies for local setup
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
-	command -v wasm-opt || $(cargo) install wasm-opt
-	command -v wasm-pack || $(cargo) install wasm-pack
-	yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: install-foundry
 install-foundry: ## install foundry
@@ -132,13 +87,13 @@ install-foundry: ## install foundry
 	else \
 		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
 		curl -L "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
-	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
+	    chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
 		$(foundryup) --repo ${FOUNDRY_REPO} --version ${FOUNDRY_VSN}; \
 	else \
-	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
+	    echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
 	@if [[ "${name}" =~ nix-shell* ]]; then \
 		echo "Patching foundry binaries"; \
@@ -161,47 +116,15 @@ cargo-download: ## download vendored Cargo dependencies
 	$(cargo) vendor --versioned-dirs vendor/cargo
 	$(cargo) fetch
 
-.PHONY: build
-build: ## build all packages
-build: build-yarn
-
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
-	$(MAKE) -C packages/ethereum/contracts/ ../crates/bindings/src
-# add [lib] as rlib is necessary to run integration tests
-# note: $(mydir) ends with '/'
-	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
-		echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
+	$(MAKE) -C ethereum/contracts/ generate-bindings
 
-.PHONY: build-yarn
-build-yarn: ## build yarn packages
-build-yarn: build-cargo
-ifeq ($(package),)
-	npx tsc --build tsconfig.build.json
-else
-	npx tsc --build packages/${package}/tsconfig.json
-endif
-
-.PHONY: build-yarn-watch
-build-yarn-watch: ## build yarn packages (in watch mode)
-build-yarn-watch: build-cargo
-	npx tsc --build tsconfig.build.json -w
-
-.PHONY: build-cargo
-build-cargo: ## build cargo packages and create boilerplate JS code
-build-cargo: build-solidity-types
-# build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
-# Skip building Rust crates
-ifeq ($(origin NO_CARGO),undefined)
-# Build crates and copy bindings to their destination
-	wasm-pack build --weak-refs --reference-types --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
-	$(MAKE) -C packages/hoprd/crates install-hoprd
-ifeq ($(origin NO_HOPLI),undefined)
-# build hopli
-	$(MAKE) $(HOPLI_CRATE)
-endif
-endif
+.PHONY: build
+build: ## build all packages
+build: build-solidity-types
+	$(cargo) build
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
@@ -209,99 +132,69 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs
-build-docs: | build-docs-typescript build-docs-api
+	echo "Deprecated"
 
-.PHONY: build-docs-typescript
-build-docs-typescript: ## build typedocs
-build-docs-typescript: build
-	yarn workspaces foreach -pv run docs:generate
-
-.PHONY: build-docs-api
-build-docs-api: ## build Rest API docs
-build-docs-api: build
-	./scripts/build-rest-api-spec.sh
+.PHONY: install
+install:
+	$(cargo) install --path hopli
+	$(cargo) install --path hoprd/hoprd
 
 .PHONY: clean
-clean: # Cleanup build directories (lib,build, ...etc.)
+clean: # Cleanup build directories
 	cargo clean
-	yarn clean
-	find packages -type f -name "*.js" -path "packages/*/src/*" ! -path "packages/*/crates/*" -delete
-	find packages/ethereum/crates/bindings/src -delete
-
-.PHONY: reset
-reset: # Performs cleanup & also deletes all "node_modules" directories
-reset: clean
-	yarn reset
+	find ethereum/bindings/src -delete
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
-ifeq ($(package),)
-	yarn workspaces foreach -pv run test
-	cargo test --no-default-features
-# disabled until `wasm-bindgen-test-runner` supports ESM
-# cargo test --target wasm32-unknown-unknow
-else
-	yarn workspace @hoprnet/${package} run test
-	yarn workspace @hoprnet/${package} run test:wasm
-endif
+	$(cargo) test
 
 .PHONY: smoke-test
-smoke-test: ## run smoke tests
-	echo "Only run parts of the tests which we know are working. "
-	source .venv/bin/activate && (python3 -m pytest tests/test_integration.py || (cat /tmp/hopr-smoke-test_integration.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_security.py || (cat /tmp/hopr-smoke-test_security.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_websocket_api.py || (cat /tmp/hopr-smoke-test_websocket_api.log && false))
-	#source .venv/bin/activate && (python3 -m pytest tests/test_stress.py || (cat /tmp/hopr-smoke-test_stress.log && false))
+smoke-test: suite=integration
+smoke-test: ## run smoke test suite defained via parameter suite=
+	echo "Only run suite=$(suite)"
+	source .venv/bin/activate && python3 -m pytest tests/test_$(suite).py
 
 .PHONY: smoke-test-full
 smoke-test-full: ## run smoke tests
-	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/hopr-smoke-test_integration.log && false))
+	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
-	$(MAKE) -C packages/ethereum/contracts/ sc-test
+	$(MAKE) -C ethereum/contracts/ sc-test
 
 .PHONY: lint
-lint: lint-ts lint-rust lint-python lint-sol
+lint: lint-rust lint-python lint-sol
 lint: ## run linter for TS, Rust, Python, Solidity
 
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
+		forge fmt --root ./ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
 	# npx solhint $${f} || exit 1; \
 
-.PHONY: lint-ts
-lint-ts: ## run linter for TS
-	npx prettier --check .
-
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
-	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+	cargo fmt --check
 
 .PHONY: lint-python
 lint-python: ## run linter for Python
 	source .venv/bin/activate && ruff --fix . && black --check tests/
 
 .PHONY: fmt
-fmt: fmt-ts fmt-rust fmt-python fmt-sol
+fmt: fmt-rust fmt-python fmt-sol
 fmt: ## run code formatter for TS, Rust, Python, Solidity
 
 .PHONY: fmt-sol
 fmt-sol: ## run code formatter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f} --root ./packages/ethereum/contracts; \
+		forge fmt $${f} --root ./ethereum/contracts; \
 	done
-
-.PHONY: fmt-ts
-fmt-ts: ## run code formatter for TS
-	npx prettier --write .
 
 .PHONY: fmt-rust
 fmt-rust: ## run code formatter for Rust
-	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
+	cargo fmt
 
 .PHONY: fmt-python
 fmt-python: ## run code formatter for Python
@@ -341,12 +234,12 @@ run-local: id_path=$$(pwd)/.identity-local.id
 run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
-	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		packages/hoprd/lib/main.cjs --init --api \
+	target/debug/hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
+		--protocolConfig $(mydir)scripts/protocol-config-anvil.json \
 		--data /tmp/ \
 		$(args)
 
@@ -379,7 +272,7 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
@@ -391,7 +284,7 @@ create-safe-module-all: ## create a safe and a module and add all the nodes from
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: create-safe-module
 create-safe-module: id_password=local
@@ -404,7 +297,7 @@ create-safe-module: ## create a safe and a module, and add a node to the module
 		--network anvil-localhost \
 		--identity-from-path "${id_path}" \
 		--hopr-amount ${hopr_amount} --native-amount ${native_amount} \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: deploy-safe-module
 deploy-safe-module: id_password=local
@@ -418,7 +311,7 @@ endif
 		hopli create-safe-module \
 		--network "${network}" \
 		--identity-from-path "${id_path}" \
-		--contracts-root "./packages/ethereum/contracts"
+		--contracts-root "./ethereum/contracts"
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -437,7 +330,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-funds network=$(network) environment-type=$(environment_type) recipient=$(recipient)
+	make -C ethereum/contracts request-funds network=$(network) environment-type=$(environment_type) recipient=$(recipient)
 
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-and-network-are-set
@@ -451,7 +344,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-nrnft network=$(network) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
+	make -C ethereum/contracts request-nrnft network=$(network) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
 
 .PHONY: stake-funds
 stake-funds: ensure-environment-and-network-are-set
@@ -459,7 +352,7 @@ stake-funds: ## stake funds (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-funds network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts stake-funds network=$(network) environment-type=$(environment_type)
 
 .PHONY: stake-nrnft
 stake-nrnft: ensure-environment-and-network-are-set
@@ -467,22 +360,22 @@ stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
+	make -C ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
 
 enable-network-registry: ensure-environment-and-network-are-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	make -C packages/ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
 
 disable-network-registry: ensure-environment-and-network-are-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	make -C packages/ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
+	make -C ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
 
 sync-eligibility: ensure-environment-and-network-are-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(staking_addresses),)
 	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts sync-eligibility \
+	make -C ethereum/contracts sync-eligibility \
 		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(staking_addresses)"
 
@@ -494,7 +387,7 @@ endif
 ifeq ($(node_addresses),)
 	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts register-nodes \
+	make -C ethereum/contracts register-nodes \
 		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(staking_addresses)" node_addresses="$(node_addresses)"
 
@@ -503,7 +396,7 @@ deregister-nodes: ## owner de-register given nodes in network registry contract
 ifeq ($(node_addresses),)
 	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts deregister-nodes \
+	make -C ethereum/contracts deregister-nodes \
 		network=$(network) environment-type=$(environment_type) \
 		node_addresses="$(node_addresses)"
 
@@ -555,12 +448,12 @@ ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
-environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
+environment_type != jq '.networks."$(network)".environment_type // empty' ethereum/contracts/contracts-addresses.json
 endif
 
 ensure-environment-is-set:
 ifeq ($(environment_type),)
-	echo "could not read environment info from packages/ethereum/contracts/contracts-addresses.json" >&2 && exit 1
+	echo "could not read environment info from ethereum/contracts/contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev
@@ -585,13 +478,19 @@ endif
 	bash "${script}"
 
 .PHONY: generate-python-sdk
-generate-python-sdk: ## generate Python SDK via Swagger Codegen
-generate-python-sdk: build-docs-api			# not using the official swagger-codegen-cli as it does not offer a multiplatform image
+generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
+generate-python-sdk:
+	$(cargo) build -p hoprd-api
+
+	target/debug/hoprd-api-schema >| openapi.spec.json
+
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
-		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
+		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
 		-c /local/scripts/python-sdk-config.json
+
+	rm openapi.spec.json
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

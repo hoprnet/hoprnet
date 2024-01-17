@@ -2,24 +2,25 @@
 
 The purpose of this document is to streamline the releases of hoprd.
 
-- [Release Types](#types-of-release)
-  - [Internal release](#internal-release)
-  - [Public release](#public-release)
-  - [Deadline based releases](#deadline-based-releases)
-- [Testing phases](#testing-phases)
-  - [Pre-release testing](#pre-release-testing)
-  - [Release testing](#release-testing)
-  - [Promotion testing](#promotion-testing)
-  - [User acceptance testing](#user-acceptance-testing)
-- [Release promotion](#release-promotion)
-- [On a new chain](#on-a-new-chain)
-- [On a new release](#on-a-new-release)
-  - [Release Cycle](#release-cycle)
-  - [Close Release](#close-release)
-  - [Publish dappNode](#publish-dappnode)
-  - [Promote release](#promote-release)
-  - [Create Patch](#create-patch)
-  - [Merge Back](#merge-back)
+- [Release Processs](#release-processs)
+  - [Release Types](#release-types)
+    - [Internal release](#internal-release)
+    - [Public release](#public-release)
+    - [Deadline based releases](#deadline-based-releases)
+  - [Testing phases](#testing-phases)
+    - [Pre-release testing](#pre-release-testing)
+    - [Release testing](#release-testing)
+    - [Promotion testing](#promotion-testing)
+    - [User acceptance testing](#user-acceptance-testing)
+  - [Release promotion](#release-promotion)
+  - [On a new chain](#on-a-new-chain)
+  - [On a new release](#on-a-new-release)
+    - [Release Cycle](#release-cycle)
+    - [Close release](#close-release)
+    - [Publish DappNode](#publish-dappnode)
+      - [Prerequisites](#prerequisites)
+    - [Promote release](#promote-release)
+    - [Merge Back](#merge-back)
 
 ## Release Types
 
@@ -152,7 +153,7 @@ particular branch to deploy on every change.
 
 The process of closing a release consists of building, tagging and publishing the given release of the branch.
 
-1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all close. Do not start the next step until all the issues and PR are closed.
+1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all closed. Do not start the next step until all the issues and PR are closed.
 2. Execute the manual workflow named [Close Release](https://github.com/hoprnet/hoprnet/actions/workflows/close-release.yaml) selecting the branch where you want to close it.
 3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly

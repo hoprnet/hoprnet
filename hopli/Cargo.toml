@@ -1,0 +1,23 @@
+[package]
+name = "hopli"
+version = "0.4.0"
+edition = "2021"
+license = "GPL-3.0-only"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# using own fork until the PR was merged
+clap = { version = "4.4", features = ["derive", "env", "string"] }
+ethers = { workspace = true }
+serde = "1.0"
+serde_json = "1.0"
+hopr-crypto-types = { workspace = true }
+hoprd-keypair = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+thiserror = "1.0"
+log = "0.4.17"
+
+[dev-dependencies]
+tempfile = "3"

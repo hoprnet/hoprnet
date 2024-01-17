@@ -1,0 +1,122 @@
+{
+  "type": "object",
+  "properties": {
+    "networks": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string"
+            },
+            "environment_type": {
+              "type": "string",
+              "enum": ["production", "staging", "development", "local"]
+            },
+            "version_range": {
+              "type": "string",
+              "description": "The version range in the Rust semver string format as specified in https://docs.rs/semver/latest/semver/)."
+            },
+            "indexer_start_block_number": {
+              "type": "string",
+              "description": "Block number the indexer should begin indexing on-chain events"
+            },
+            "token_contract_address": {
+              "type": "string"
+            },
+            "channels_contract_address": {
+              "type": "string"
+            },
+            "xhopr_contract_address": {
+              "type": "string"
+            },
+            "boost_contract_address": {
+              "type": "string"
+            },
+            "stake_contract_address": {
+              "type": "string"
+            },
+            "network_registry_proxy_contract_address": {
+              "type": "string"
+            },
+            "network_registry_contract_address": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "chain",
+            "environment_type",
+            "version_range",
+            "indexer_start_block_number",
+            "token_contract_address",
+            "channels_contract_address",
+            "stake_contract_address",
+            "network_registry_contract_address",
+            "tags"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "chains": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9]+$": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "chain_id": {
+              "type": "integer"
+            },
+            "max_fee_per_gas": {
+              "type": "string",
+              "description": "Max fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
+            },
+            "max_priority_fee_per_gas": {
+              "type": "string",
+              "description": "Max priority fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
+            },
+            "default_provider": {
+              "type": "string"
+            },
+            "etherscan_api_url": {
+              "type": "string"
+            },
+            "native_token_name": {
+              "type": "string",
+              "description": "API for contract verification through etherscan"
+            },
+            "hopr_token_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chain_id",
+            "default_provider",
+            "description",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
+            "hopr_token_name",
+            "native_token_name"
+          ],
+          "additionalProperties": false
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["networks", "chains"]
+}

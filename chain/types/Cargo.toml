@@ -1,0 +1,35 @@
+[package]
+name = "chain-types"
+version = "0.8.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Core-Ethereum-specific interaction with the backend database"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
+ethers = { workspace = true }
+hex-literal = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+
+bindings = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+mockall = "0.11.4"
+hex-literal = "0.4"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+hex = { workspace = true }
+
+[features]
+default = []

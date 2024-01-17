@@ -1,0 +1,48 @@
+[package]
+name = "hoprd"
+version = "2.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Contains the main entry point of HOPR daemon application"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[dependencies]
+async-broadcast = { workspace = true }
+async-lock = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
+clap = { version = "4.4", features = ["derive", "env", "string"] }
+chrono = "0.4.26"
+fern = "0.6.2"
+futures = { workspace = true }
+hex = { workspace = true }
+humantime = "2.1.0"
+lazy_static = { workspace = true, optional = true }
+log = { workspace = true }
+proc-macro-regex = "~1.1.0"
+serde = { workspace = true }
+serde_yaml = "0.9"
+serde_json = "1.0"
+strum = { workspace = true }
+thiserror = { workspace = true }
+validator = { workspace = true }
+
+hopr-lib = { workspace = true }
+hoprd-api = { workspace = true }
+hoprd-inbox = { workspace = true }
+hoprd-keypair = { workspace = true }
+hopr-platform = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["prometheus"]
+prometheus = [
+    "dep:hopr-metrics",
+    "dep:lazy_static",
+    "hopr-lib/prometheus",
+    "hoprd-api/prometheus"
+]

@@ -28,7 +28,7 @@ WORKDIR /app/hoprnet
 
 COPY --from=hoprd /app/hoprnet/ ./
 
-COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY ethereum/contracts ethereum/contracts
 COPY scripts/ scripts
 COPY Makefile .
 
@@ -57,6 +57,5 @@ EXPOSE 18085
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 ENV HOPRD_HOST="0.0.0.0"
-ENV NODE_OPTIONS="--experimental-wasm-modules"
 HEALTHCHECK --interval=30s --timeout=4s --start-period=4m --retries=10 CMD grep -q running /tmp/cluster.status
 ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p --api-token "${HOPRD_API_TOKEN}" --listen-host "${HOPRD_HOST}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh
