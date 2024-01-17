@@ -3,7 +3,7 @@
 //!
 //! Instead of relying on external crates, all HOPR crates in this monorepo should
 //! exclusively rely on randomness functions only from this crate.
-//! Besided that, the `OsRng` type exported from this crate can be used, if a type implementing
+//! Besides that, the `OsRng` type exported from this crate can be used, if a type implementing
 //! random traits is needed.
 
 use generic_array::{ArrayLength, GenericArray};

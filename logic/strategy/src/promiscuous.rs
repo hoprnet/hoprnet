@@ -1,5 +1,5 @@
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
@@ -409,9 +409,8 @@ mod tests {
     };
     use futures::{future::ok, FutureExt};
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_platform::time::native::current_timestamp;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;

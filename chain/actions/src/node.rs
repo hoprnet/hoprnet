@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_internal_types::announcement::{AnnouncementData, KeyBinding};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;

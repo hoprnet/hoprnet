@@ -12,11 +12,7 @@ use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use hopr_crypto_types::types::OffchainSignature;
-use hopr_internal_types::{
-    account::{AccountEntry, AccountType},
-    announcement::KeyBinding,
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
-};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error};
 use multiaddr::Multiaddr;
@@ -624,15 +620,8 @@ pub mod tests {
         types::U256 as EthU256,
     };
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::Hash,
-    };
-    use hopr_internal_types::{
-        account::{AccountEntry, AccountType},
-        announcement::KeyBinding,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;

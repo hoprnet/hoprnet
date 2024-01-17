@@ -5,12 +5,8 @@ use core_packet::{
 };
 use core_path::path::{Path, TransportPath};
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
-use hopr_crypto_types::{
-    keypairs::{ChainKeypair, OffchainKeypair},
-    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PacketTag},
-};
-use hopr_internal_types::channels::Ticket;
-use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::BinarySerializable;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
@@ -226,12 +222,8 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, OffchainPublicKey, PublicKey},
-    };
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_internal_types::protocol::PeerAddressResolver;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;

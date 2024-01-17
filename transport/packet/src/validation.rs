@@ -4,7 +4,7 @@ use crate::errors::{
 };
 use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::Hash;
-use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 
@@ -112,12 +112,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{f64_to_win_prob, ChannelStatus};
-    use hopr_internal_types::{
-        account::AccountEntry,
-        channels::{ChannelEntry, Ticket},
-    };
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;

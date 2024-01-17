@@ -13,11 +13,8 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use hopr_crypto_types::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
-use hopr_internal_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, ChannelEntry, Ticket},
-};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
@@ -730,11 +727,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
-    };
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
@@ -845,7 +838,7 @@ mod tests {
 
             // Mark the first ticket as redeemed, so it does not enter the aggregation
             if i == 1 {
-                ack_ticket.status = BeingRedeemed {
+                ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed {
                     tx_hash: Hash::default(),
                 };
             } else {
@@ -940,7 +933,7 @@ mod tests {
         );
 
         assert_eq!(
-            BeingRedeemed {
+            AcknowledgedTicketStatus::BeingRedeemed {
                 tx_hash: Hash::default()
             },
             stored_acked_tickets[0].status,
@@ -951,7 +944,8 @@ mod tests {
             "aggregated balance invalid"
         );
         assert_eq!(
-            Untouched, stored_acked_tickets[1].status,
+            AcknowledgedTicketStatus::Untouched,
+            stored_acked_tickets[1].status,
             "second ticket must be untouched"
         );
         assert_eq!(

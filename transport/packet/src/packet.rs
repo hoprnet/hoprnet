@@ -10,7 +10,7 @@ use hopr_crypto_types::{
     primitives::{DigestLike, SimpleMac},
     types::PacketTag,
 };
-use hopr_internal_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
 

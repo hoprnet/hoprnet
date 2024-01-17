@@ -1,12 +1,9 @@
-use crate::CoreEthereumActions;
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_internal_types::acknowledgement::AcknowledgedTicket;
-use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
-use hopr_internal_types::channels::{generate_channel_id, ChannelEntry};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use std::ops::DerefMut;
@@ -19,6 +16,7 @@ use crate::errors::{
     CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
+use crate::CoreEthereumActions;
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -55,7 +53,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     match ack_ticket.status {
-        Untouched => {
+        AcknowledgedTicketStatus::Untouched => {
             let dst = db
                 .get_channels_domain_separator()
                 .await
@@ -66,8 +64,8 @@ where
                 return Err(NotAWinningTicket);
             }
         }
-        BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
-        BeingRedeemed { tx_hash: txh } => {
+        AcknowledgedTicketStatus::BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
+        AcknowledgedTicketStatus::BeingRedeemed { tx_hash: txh } => {
             // If there's already some hash set for this ticket, do not allow unsetting it
             if txh != Hash::default() && tx_hash == Hash::default() {
                 return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
@@ -75,7 +73,7 @@ where
         }
     }
 
-    ack_ticket.status = BeingRedeemed { tx_hash };
+    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed { tx_hash };
     debug!(
         "setting a winning {} as being redeemed with TX hash {tx_hash}",
         ack_ticket.ticket
@@ -155,7 +153,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
             .await?
             .iter()
             .filter(|t| {
-                t.status == Untouched
+                t.status == AcknowledgedTicketStatus::Untouched
                     && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
                     && (!only_aggregated || t.ticket.is_aggregated())
             })
@@ -179,7 +177,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
                 .await?
                 .into_iter()
                 .filter(|t| {
-                    Untouched == t.status
+                    AcknowledgedTicketStatus::Untouched == t.status
                         && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
                         && (!only_aggregated || t.ticket.is_aggregated())
                 });
@@ -223,7 +221,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {
-            if ack_ticket.status == Untouched && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch) {
+            if ack_ticket.status == AcknowledgedTicketStatus::Untouched
+                && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
+            {
                 unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
@@ -236,11 +236,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
 #[cfg(test)]
 mod tests {
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
-    use crate::redeem::TicketRedeemActions;
-    use crate::CoreEthereumActions;
-    use async_lock::RwLock;
+    use super::*;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
@@ -249,14 +245,12 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_primitive_types::prelude::*;
-    use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
+
+    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
+    use crate::action_state::MockActionState;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -567,11 +561,11 @@ mod tests {
         )));
 
         // Make the first ticket unredeemable
-        tickets[0].status = BeingAggregated { start: 0, end: 1 };
+        tickets[0].status = AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 1 };
         db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
 
         // Make the second ticket unredeemable
-        tickets[1].status = BeingRedeemed {
+        tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed {
             tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
         };
         db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();

@@ -165,7 +165,7 @@ mod tests {
     use crate::path::{ChannelPath, Path};
     use crate::selectors::legacy::DfsPathSelector;
     use crate::selectors::{EdgeWeighting, PathSelector};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::str::FromStr;

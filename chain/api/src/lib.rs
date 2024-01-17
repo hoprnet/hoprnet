@@ -18,7 +18,7 @@ use chain_indexer::handlers::ContractEventHandlers;
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};

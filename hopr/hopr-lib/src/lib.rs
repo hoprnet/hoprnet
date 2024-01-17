@@ -17,15 +17,9 @@ pub use {
         errors::{HoprTransportError, ProtocolError},
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
     },
-    hopr_internal_types::{
-        channels::{ChannelEntry, ChannelStatus, Ticket},
-        protocol::{Tag, DEFAULT_APPLICATION_TAG},
-    },
-    hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType},
-        rlp,
-        traits::ToHex,
-    },
+    hopr_internal_types::prelude::*,
+    hopr_primitive_types::prelude::*,
+    hopr_primitive_types::rlp,
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -57,8 +51,7 @@ use core_transport::{
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use hopr_internal_types::protocol::TagBloomFilter;
-use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
+use hopr_internal_types::prelude::*;
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use hopr_primitive_types::prelude::*;
 use hopr_primitive_types::traits::BinarySerializable;
@@ -117,7 +110,7 @@ pub struct OpenChannelResult {
 
 pub struct CloseChannelResult {
     pub tx_hash: Hash,
-    pub status: hopr_internal_types::channels::ChannelStatus,
+    pub status: ChannelStatus,
 }
 
 /// Enum differentiator for loop component futures.
@@ -241,15 +234,15 @@ where
                                 )
                                 .await;
                             }
-                        } else if channel.status == hopr_internal_types::channels::ChannelStatus::Open {
+                        } else if channel.status == ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
                             let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                 &*multi_strategy,
                                 &channel,
                                 own_channel_direction,
-                                hopr_internal_types::channels::ChannelChange::Status {
-                                    left: hopr_internal_types::channels::ChannelStatus::Closed,
-                                    right: hopr_internal_types::channels::ChannelStatus::Open,
+                                ChannelChange::Status {
+                                    left: ChannelStatus::Closed,
+                                    right: ChannelStatus::Open,
                                 },
                             )
                             .await;
@@ -1118,7 +1111,7 @@ impl Hopr {
     pub async fn close_channel(
         &self,
         counterparty: &Address,
-        direction: hopr_internal_types::channels::ChannelDirection,
+        direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
         if self.status() != State::Running {

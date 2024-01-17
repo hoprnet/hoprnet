@@ -1,3 +1,5 @@
+// TODO: docs for crate missing
+
 pub mod adaptors;
 pub mod config;
 pub mod constants;
@@ -46,11 +48,7 @@ use futures::{
     channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
-use hopr_internal_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{ChannelEntry, Ticket},
-    protocol::TagBloomFilter,
-};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};

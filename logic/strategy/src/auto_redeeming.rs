@@ -92,8 +92,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
 

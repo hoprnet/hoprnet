@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use log::{debug, info};
 use petgraph::algo::has_path_connecting;

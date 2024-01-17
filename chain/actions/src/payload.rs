@@ -21,12 +21,9 @@ use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
-use hopr_crypto_types::{keypairs::ChainKeypair, vrf::VrfParameters};
-use hopr_internal_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
-use hopr_primitive_types::{
-    primitives::{Address, Balance, BalanceType},
-    traits::BinarySerializable,
-};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -569,20 +566,9 @@ pub mod tests {
         types::{Bytes, Eip1559TransactionRequest, H160, U256},
     };
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        announcement::{AnnouncementData, KeyBinding},
-        channels::Ticket,
-    };
-    use hopr_primitive_types::primitives::Address;
-    use hopr_primitive_types::{
-        primitives::{Address as HoprAddress, Balance, BalanceType, U256 as HoprU256},
-        traits::BinarySerializable,
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::{str::FromStr, sync::Arc};
 
@@ -605,7 +591,7 @@ pub mod tests {
     }
 
     async fn fund_node<M: Middleware>(
-        node: &HoprAddress,
+        node: &Address,
         native_token: &U256,
         hopr_token: &U256,
         hopr_token_contract: HoprToken<M>,
@@ -745,11 +731,11 @@ pub mod tests {
         // Alice issues a ticket to Bob
         let ticket = Ticket::new(
             &(&chain_key_bob).into(),
-            &Balance::new(HoprU256::one(), BalanceType::HOPR),
-            HoprU256::one(),
-            HoprU256::one(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
+            U256::one(),
+            U256::one(),
             1.0_f64,
-            HoprU256::one(),
+            U256::one(),
             response.to_challenge().to_ethereum_challenge(),
             &chain_key_alice,
             &domain_separator,

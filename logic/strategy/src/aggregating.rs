@@ -4,10 +4,8 @@ use chain_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
-use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use hopr_internal_types::channels::ChannelDirection::Incoming;
-use hopr_internal_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -284,7 +282,7 @@ where
         direction: ChannelDirection,
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
-        if !self.cfg.aggregate_on_channel_close || direction != Incoming {
+        if !self.cfg.aggregate_on_channel_close || direction != ChannelDirection::Incoming {
             return Ok(());
         }
 
@@ -338,16 +336,8 @@ mod tests {
     use futures::channel::oneshot::Receiver;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
-    use hopr_internal_types::channels::ChannelDirection::Incoming;
-    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, Ticket},
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
@@ -794,7 +784,7 @@ mod tests {
         aggregation_strategy
             .on_own_channel_changed(
                 &channel,
-                Incoming,
+                ChannelDirection::Incoming,
                 ChannelChange::Status {
                     left: ChannelStatus::Open,
                     right: ChannelStatus::PendingToClose,

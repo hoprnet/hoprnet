@@ -1,3 +1,4 @@
+// TODO: docs missing
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
