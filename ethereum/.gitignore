@@ -25,4 +25,4 @@ contracts/lcov.info
 contracts/report
 
 # Ignore generated bindings source files
-bindings/src
+bindings/src/codegen/
