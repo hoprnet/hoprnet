@@ -69,13 +69,7 @@ jobs:
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build docker image
-        run: nix build .#hopliDocker
-
-      - name: Push docker image
-        run: |
-          docker load <./result
-          docker image tag hoprd:latest ${IMAGE_TARGET}
-          docker image push ${IMAGE_TARGET}
+      - name: Build and push docker image
+        run: nix run .#hopli-docker-build-and-upload
         env:
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}

@@ -20,7 +20,7 @@
   inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
   inputs.solc.inputs.flake-utils.follows = "flake-utils";
 
-  outputs = { self, nixpkgs, flake-parts, rust-overlay, crane, foundry, solc, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, rust-overlay, crane, foundry, solc, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       perSystem = { config, lib, self', inputs', system, ... }:
         let
@@ -130,7 +130,7 @@
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
-          hoprdDocker = pkgs.dockerTools.buildLayeredImage {
+          hoprd-docker = pkgs.dockerTools.buildLayeredImage {
             name = "hoprd";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
@@ -142,7 +142,7 @@
               ];
             };
           };
-          hopliDocker = pkgs.dockerTools.buildLayeredImage {
+          hopli-docker = pkgs.dockerTools.buildLayeredImage {
             name = "hopli";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
@@ -162,7 +162,7 @@
               ./scripts/run-local-anvil.sh
             ];
           };
-          anvilDocker = pkgs.dockerTools.buildLayeredImage {
+          anvil-docker = pkgs.dockerTools.buildLayeredImage {
             name = "hopr-anvil";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
@@ -188,11 +188,26 @@
               ];
             };
           };
-
+          dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
+            set -eu
+            OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
+            ${pkgs.skopeo}/bin/skopeo copy \
+              --dest-creds="_json_key:$GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY" \
+              "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
+          '';
+          hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hoprd-docker;
+          };
+          hopli-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hopli-docker;
+          };
         in
         {
+          apps = {
+            inherit hoprd-docker-build-and-upload hopli-docker-build-and-upload;
+          };
           packages = {
-            inherit hoprd hopli hoprdDocker anvilDocker hopliDocker;
+            inherit hoprd hopli hoprd-docker anvil-docker hopli-docker;
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {
