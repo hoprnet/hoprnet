@@ -1,13 +1,5 @@
-use hopr_crypto_types::{
-    errors::CryptoError,
-    keypairs::{Keypair, OffchainKeypair},
-    types::{OffchainPublicKey, OffchainSignature},
-};
-use hopr_primitive_types::{
-    errors::GeneralError::{self, InvalidInput, NonSpecificError},
-    primitives::Address,
-    traits::BinarySerializable,
-};
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::debug;
 use multiaddr::Multiaddr;
 use std::{
@@ -100,7 +92,8 @@ impl AnnouncementData {
                     // We got a keybinding and we get a multiaddress with trailing PeerId, so
                     // fail if they don't match
                     if multiaddress.ends_with(
-                        &Multiaddr::from_str(expected.as_str()).map_err(|e| NonSpecificError(e.to_string()))?,
+                        &Multiaddr::from_str(expected.as_str())
+                            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))?,
                     ) {
                         let mut decapsulated = multiaddress.clone();
                         decapsulated.pop();
@@ -109,7 +102,7 @@ impl AnnouncementData {
                             key_binding,
                         })
                     } else {
-                        Err(NonSpecificError(format!(
+                        Err(GeneralError::NonSpecificError(format!(
                             "Received a multiaddr with a PeerId that doesn't match the keybinding, got {} but expected {}",
                             multiaddress, expected
                         )))
@@ -128,7 +121,7 @@ impl AnnouncementData {
             }
         } else {
             debug!("Received empty multiaddr");
-            Err(InvalidInput)
+            Err(GeneralError::InvalidInput)
         }
     }
 

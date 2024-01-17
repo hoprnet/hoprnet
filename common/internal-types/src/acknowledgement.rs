@@ -1,3 +1,9 @@
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
+use log::debug;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
     channels::{generate_channel_id, Ticket},
@@ -6,20 +12,6 @@ use crate::{
         Result as CoreTypesResult,
     },
 };
-use hopr_crypto_types::{
-    errors::CryptoError::{InvalidChallenge, InvalidVrfValues, SignatureVerification},
-    keypairs::{ChainKeypair, OffchainKeypair},
-    types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response},
-    vrf::{derive_vrf_parameters, VrfParameters},
-};
-use hopr_primitive_types::{
-    errors::{GeneralError::ParseError, Result},
-    primitives::Address,
-    traits::{BinarySerializable, ToHex},
-};
-use log::debug;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -58,7 +50,7 @@ impl Acknowledgement {
 impl BinarySerializable for Acknowledgement {
     const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = OffchainSignature::from_bytes(buf.drain(..OffchainSignature::SIZE).as_ref())?;
@@ -69,7 +61,7 @@ impl BinarySerializable for Acknowledgement {
                 validated: false,
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -186,11 +178,11 @@ impl AcknowledgedTicket {
         domain_separator: &Hash,
     ) -> hopr_crypto_types::errors::Result<()> {
         if self.ticket.verify(issuer, domain_separator).is_err() {
-            return Err(SignatureVerification);
+            return Err(CryptoError::SignatureVerification);
         }
 
         if !self.ticket.challenge.eq(&self.response.to_challenge().into()) {
-            return Err(InvalidChallenge);
+            return Err(CryptoError::InvalidChallenge);
         }
 
         if self
@@ -202,7 +194,7 @@ impl AcknowledgedTicket {
             )
             .is_err()
         {
-            return Err(InvalidVrfValues);
+            return Err(CryptoError::InvalidVrfValues);
         }
 
         Ok(())
@@ -251,7 +243,7 @@ impl Display for AcknowledgedTicket {
 impl BinarySerializable for AcknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
             let response = Response::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
@@ -273,7 +265,7 @@ impl BinarySerializable for AcknowledgedTicket {
                 signer,
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -293,16 +285,6 @@ pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
     pub own_key: HalfKey,
     pub signer: Address,
-}
-
-impl std::fmt::Display for UnacknowledgedTicket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AcknowledgedTicket")
-            .field("ticket", &self.ticket)
-            .field("own_key", &self.own_key)
-            .field("signer", &self.signer)
-            .finish()
-    }
 }
 
 impl UnacknowledgedTicket {
@@ -333,7 +315,7 @@ impl UnacknowledgedTicket {
         {
             Ok(())
         } else {
-            Err(InvalidChallenge)
+            Err(CryptoError::InvalidChallenge)
         }
     }
 
@@ -359,7 +341,7 @@ impl UnacknowledgedTicket {
 impl BinarySerializable for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + Address::SIZE;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
             let own_key = HalfKey::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
@@ -371,7 +353,7 @@ impl BinarySerializable for UnacknowledgedTicket {
                 signer,
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -402,15 +384,15 @@ impl PendingAcknowledgement {
 impl BinarySerializable for PendingAcknowledgement {
     const SIZE: usize = 1;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() >= Self::SIZE {
             match data[0] {
                 Self::SENDER_PREFIX => Ok(WaitingAsSender),
                 Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::from_bytes(&data[1..])?)),
-                _ => Err(ParseError),
+                _ => Err(GeneralError::ParseError),
             }
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -433,7 +415,6 @@ pub mod test {
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket},
         channels::Ticket,
     };
-    use bincode::{deserialize, serialize};
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -605,7 +586,8 @@ pub mod test {
         let acked_ticket =
             AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
 
-        let mut deserialized_ticket = deserialize(&serialize(&acked_ticket).unwrap()).unwrap();
+        let mut deserialized_ticket =
+            bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket).unwrap()).unwrap();
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket
@@ -620,7 +602,7 @@ pub mod test {
 
         assert_eq!(
             deserialized_ticket,
-            deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap()
+            bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
         );
     }
 
