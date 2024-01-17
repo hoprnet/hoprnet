@@ -6,13 +6,13 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use ethers_providers::{JsonRpcClient, Middleware, Provider};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -30,9 +30,6 @@ pub struct RpcOperationsConfig {
     /// Address of the node's module.
     /// Defaults to null address.
     pub module_address: Address,
-    /// Number of HTTP retries on retry-able failures
-    /// Defaults to 5
-    pub max_http_retries: u32,
     /// Expected block time of the blockchain
     /// Defaults to 5 seconds
     pub expected_block_time: Duration,
@@ -56,7 +53,6 @@ impl Default for RpcOperationsConfig {
             chain_id: 100,
             contract_addrs: Default::default(),
             module_address: Default::default(),
-            max_http_retries: 5,
             logs_page_size: 2500,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
@@ -65,8 +61,7 @@ impl Default for RpcOperationsConfig {
     }
 }
 
-pub(crate) type HoprMiddleware<P> =
-    NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -90,20 +85,11 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
-    pub fn new<R>(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig, retry_policy: R) -> Result<Self>
-    where
-        R: RetryPolicy<<P as JsonRpcClient>::Error> + 'static,
-    {
-        let provider_client = RetryClientBuilder::default()
-            .rate_limit_retries(cfg.max_http_retries)
-            .timeout_retries(cfg.max_http_retries) // Note that this does not take effect when using SimpleJsonRetryPolicy
-            .initial_backoff(Duration::from_millis(500))
-            .build(json_rpc, Box::new(retry_policy));
-
+    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
 
         let provider = Arc::new(
-            Provider::new(provider_client)
+            Provider::new(json_rpc)
                 .interval(cfg.tx_polling_interval)
                 .with_signer(wallet)
                 .nonce_manager(chain_key.public().to_address().into()),
@@ -214,10 +200,10 @@ pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::Middleware;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::{Address, BalanceType, U256};
     use primitive_types::H160;
     use std::time::Duration;
-    use utils_types::primitives::{Address, BalanceType, U256};
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -283,10 +269,13 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -317,10 +306,13 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
 
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -366,9 +358,12 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
             .get_balance((&chain_key_0).into(), BalanceType::Native)
@@ -421,9 +416,12 @@ pub mod tests {
         )
         .await;
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), SurfRequestor::default());
-        let rpc =
-            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
         assert_eq!(amount, balance.value().as_u64(), "invalid balance");

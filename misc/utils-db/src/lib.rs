@@ -3,18 +3,16 @@
 pub mod constants;
 pub mod db;
 pub mod errors;
-#[cfg(feature = "hashmap")]
-pub mod hashmap;
-#[cfg(feature = "leveldb")]
+
+#[cfg(feature = "js")]
 pub mod rusty;
-#[cfg(feature = "sqlite")]
+#[cfg(not(feature = "js"))]
 pub mod sqlite;
 pub mod traits;
-pub mod types;
 pub use traits::KVStorage;
 
-#[cfg(feature = "sqlite")]
+#[cfg(not(feature = "js"))]
 pub type CurrentDbShim = sqlite::SqliteShim<'static>;
 
-#[cfg(feature = "leveldb")]
+#[cfg(feature = "js")]
 pub type CurrentDbShim = rusty::RustyLevelDbShim;

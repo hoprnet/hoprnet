@@ -2,13 +2,11 @@ use std::str::FromStr;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{ArgAction, Parser};
-use core_strategy::Strategy;
-use core_transport::config::HostConfig;
 use hex;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-use utils_validation::network::looks_like_domain;
+use hopr_lib::{looks_like_domain, HostConfig, Strategy};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -27,7 +25,6 @@ fn parse_host(s: &str) -> Result<HostConfig, String> {
 }
 
 /// Parse a hex string private key to a boxed u8 slice
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
         let mut decoded = [0u8; 64];

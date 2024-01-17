@@ -4,15 +4,15 @@ use chain_actions::payload::PayloadGenerator;
 use chain_rpc::errors::RpcError;
 use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::announcement::AnnouncementData;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::announcement::AnnouncementData;
+use hopr_primitive_types::primitives::{Address, Balance};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
-use utils_types::primitives::{Address, Balance};
 
 use async_std::task::sleep;
 

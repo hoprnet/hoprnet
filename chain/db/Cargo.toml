@@ -13,18 +13,14 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-lock = { workspace = true, optional = true }
-hex = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
-serde = { version = "1.0", features = ["derive"] }
 
-hopr-crypto = { workspace = true }
-core-types = { workspace = true }
-platform = { workspace = true }
+hopr-crypto-types = { workspace = true }
 utils-db = { workspace = true }
 log = { workspace = true }
-utils-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -34,4 +30,4 @@ env_logger = "0.10.0"
 
 [features]
 default = []
-wasm = [ "hopr-crypto/wasm", "dep:async-lock",  "core-types/wasm", "utils-db/wasm", "platform/wasm-bindgen", "utils-types/wasm" ]
+js = ["utils-db/js"]

@@ -61,6 +61,7 @@ scrape_configs:
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
 - `hopr_rpc_call_count`: Number of Ethereum RPC calls over HTTP and their result, key: `call`, `result`
 - `hopr_rpc_call_time_sec`: Timing of RPC calls over HTTP in seconds, keys: `call`, buckets: 0.1, 0.5, 1.0, 2.0, 5.0, 7.0, 10.0
+- `hopr_retries_per_rpc_call`: Number of retries per RPC call, keys: `call`, buckets: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 - `hopr_chain_head_block_number`: Current block number of chain head
 - `hopr_indexer_block_number`: Current last processed block number by the indexer
 - `hopr_indexer_sync_progress`: Sync progress of the historical data by the indexer

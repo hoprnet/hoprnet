@@ -7,7 +7,11 @@ exclude = [
 resolver = "2"
 
 members = [
-    "crypto",
+    "common/internal-types",
+    "common/primitive-types",
+    "crypto/sphinx",
+    "crypto/random",
+    "crypto/types",
     "chain/actions",
     "chain/api",
     "chain/db",
@@ -16,7 +20,7 @@ members = [
     "chain/rpc",
     "ethereum/bindings",
     "hopli",
-    "hopr",
+    "hopr/hopr-lib",
     "hoprd/rest-api",
     "hoprd/hoprd",
     "hoprd/inbox",
@@ -26,14 +30,11 @@ members = [
     "misc/metrics",
     "misc/platform",
     "misc/utils-db",
-    "misc/utils-types",
-    "misc/utils-validation",
     "transport/network",
     "transport/packet",
     "transport/protocol",
     "transport/p2p",
     "transport/api",
-    "transport/types",
 ]
 
 [workspace.dependencies]
@@ -57,6 +58,7 @@ log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
 rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11"
 serde_json = "1.0"
 serde_with = { version = "3.3" }
 strum = { version = "0.25.0", features = ["derive"] }
@@ -70,7 +72,9 @@ chain-db = { path = "chain/db", default-features = false }
 chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
-hopr-crypto = { path = "crypto", default-features = false }
+hopr-crypto-random = { path = "crypto/random", default-features = false }
+hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = ["x25519"] }
+hopr-crypto-types = { path = "crypto/types", default-features = false }
 core-network = { path = "transport/network", default-features = false }
 core-packet = { path = "transport/packet", default-features = false }
 core-path = { path = "logic/path", default-features = false }
@@ -78,16 +82,15 @@ core-protocol = { path = "transport/protocol", default-features = false }
 core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
-core-types = { path = "transport/types", default-features = false }
-hopr-lib = { path = "hopr", default-features = false }
+hopr-internal-types = { path = "common/internal-types", default-features = false }
+hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
-metrics = { path = "misc/metrics", default-features = false }
-platform = { path = "misc/platform" }
+hopr-metrics = { path = "misc/metrics", default-features = false }
+hopr-platform = { path = "misc/platform" }
 utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
-utils-types = { path = "misc/utils-types", default-features = false }
-utils-validation = { path = "misc/utils-validation", default-features = false }
+hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 
 # [build]
 # rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package

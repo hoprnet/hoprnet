@@ -74,7 +74,10 @@ pub enum HttpRequestError {
     Timeout,
 
     #[error("http error - status {0}")]
-    HttpError(u16),
+    HttpError(http_types::StatusCode),
+
+    #[error("io error when performing http request: {0}")]
+    TransportError(String),
 
     #[error("unrecognized error: {0}")]
     UnknownError(String),
