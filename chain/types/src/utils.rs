@@ -3,9 +3,9 @@
 
 use crate::{ContractAddresses, ContractInstances, TypedTransaction};
 use bindings::hopr_channels::HoprChannels;
-use bindings::hopr_node_stake_factory::{NewHoprNodeStakeModuleFilter, NewHoprNodeStakeSafeFilter};
+use bindings::hopr_node_stake_factory::{NewHoprNodeStakeModuleFilter};
 use bindings::hopr_token::HoprToken;
-use ethers::abi::{encode_packed, Token};
+use ethers::abi::{encode_packed, Token, RawLog};
 use ethers::prelude::*;
 use ethers::utils::keccak256;
 use hex_literal::hex;
