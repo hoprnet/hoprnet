@@ -41,7 +41,6 @@ deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
-
 	# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	# $(MAKE) cargo-update
