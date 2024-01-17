@@ -35,7 +35,7 @@
           };
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           ethereumBindings = pkgs.stdenv.mkDerivation {
-            pname = "${crateNameFromCargoToml.pname}-ethereum-bindings";
+            pname = "hopr-ethereum-bindings";
             version = crateNameFromCargoToml.version;
             src = lib.fileset.toSource {
               root = ./.;
@@ -82,7 +82,6 @@
             ]
           );
           commonArgs = {
-            inherit (crateNameFromCargoToml) pname version;
             inherit src buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
             cargoVendorDir = "./vendor/cargo";
@@ -90,7 +89,8 @@
             doCheck = false;
           };
           hoprdDeps = craneLib.buildDepsOnly (commonArgs // {
-            cargoExtraArgs = "--offline";
+            inherit (crateNameFromCargoToml) pname version;
+            cargoExtraArgs = "--offline -p hoprd";
             extraDummyScript = ''
               rm -rf $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
@@ -98,17 +98,30 @@
             '';
           });
           hoprd = craneLib.buildPackage (commonArgs // {
+            inherit (crateNameFromCargoToml) pname version;
             cargoArtifacts = hoprdDeps;
-            cargoExtraArgs = "-p hoprd";
+            cargoExtraArgs = "--offline -p hoprd";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
             '';
           });
+          hopliCrateNameFromCargoToml = craneLib.crateNameFromCargoToml {
+            cargoToml = ./hopli/Cargo.toml;
+          };
+          hopliDeps = craneLib.buildDepsOnly (commonArgs // {
+            inherit (hopliCrateNameFromCargoToml) pname version;
+            cargoExtraArgs = "--offline -p hopli";
+            extraDummyScript = ''
+              rm -rf $out/vendor/cargo
+              cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
+              echo "# placeholder" > $out/vendor/cargo/config.toml
+            '';
+          });
           hopli = craneLib.buildPackage (commonArgs // {
-            pname = "hopli";
-            cargoArtifacts = hoprdDeps;
-            cargoExtraArgs = "-p hopli";
+            inherit (hopliCrateNameFromCargoToml) pname version;
+            cargoArtifacts = hopliDeps;
+            cargoExtraArgs = "--offline -p hopli";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
@@ -179,7 +192,7 @@
         in
         {
           packages = {
-            inherit hoprdDeps hoprd hopli hoprdDocker anvilDocker hopliDocker;
+            inherit hoprd hopli hoprdDocker anvilDocker hopliDocker;
             default = hoprd;
           };
           devShells.default = pkgs.mkShell {
