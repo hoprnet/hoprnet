@@ -6,7 +6,8 @@ from contextlib import AsyncExitStack, asynccontextmanager
 import pytest
 import requests
 from conftest import (
-    default_nodes, default_nodes_with_auth,
+    default_nodes,
+    default_nodes_with_auth,
     random_distinct_pairs_from,
     OPEN_CHANNEL_FUNDING_VALUE,
     TICKET_AGGREGATION_THRESHOLD,

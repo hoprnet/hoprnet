@@ -9,6 +9,7 @@ mod p2p;
 mod processes;
 mod timer;
 
+/// Object representing different types of output from the transport layer
 #[derive(Clone)]
 pub enum TransportOutput {
     Received(ApplicationData),
