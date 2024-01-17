@@ -72,7 +72,9 @@ jobs:
 
       - name: Push docker image
         run: |
-          podman run docker://quay.io/skopeo/stable:latest copy docker-archive:./result docker://${IMAGE_TARGET}
+          sudo apt-get update -y
+          sudo apt-get install -y skopeo
+          skopeo copy docker-archive:./result docker://${IMAGE_TARGET}
         env:
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ steps.update.outputs.DOCKER_TAG }}
 
