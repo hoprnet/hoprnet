@@ -54,7 +54,6 @@ use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, Pee
 use hopr_internal_types::prelude::*;
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use hopr_primitive_types::prelude::*;
-use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use log::{error, info};
 use utils_db::db::DB;

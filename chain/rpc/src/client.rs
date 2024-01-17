@@ -481,7 +481,8 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;

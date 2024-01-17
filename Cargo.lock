@@ -1179,7 +1179,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
  "libp2p-identity",
- "mockall",
+ "log",
  "multiaddr",
  "serde",
  "strum 0.25.0",

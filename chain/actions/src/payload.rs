@@ -566,7 +566,7 @@ pub mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
@@ -577,7 +577,7 @@ pub mod tests {
     async fn test_announce() {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
 
-        let anvil = core_ethereum_types::utils::create_anvil(None);
+        let anvil = chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
@@ -623,7 +623,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn redeem_ticket() {
-        let anvil = core_ethereum_types::utils::create_anvil(None);
+        let anvil = chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
@@ -634,7 +634,7 @@ pub mod tests {
             .expect("could not deploy contracts");
 
         // Mint 1000 HOPR to Alice
-        core_ethereum_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
 
         let domain_separator: Hash = contract_instances
             .channels
@@ -645,7 +645,7 @@ pub mod tests {
             .into();
 
         // Open channel Alice -> Bob
-        core_ethereum_types::utils::fund_channel(
+        chain_types::utils::fund_channel(
             (&chain_key_bob).into(),
             contract_instances.token.clone(),
             contract_instances.channels.clone(),
@@ -654,7 +654,7 @@ pub mod tests {
         .await;
 
         // Fund Bob's node
-        core_ethereum_types::utils::fund_node(
+        chain_types::utils::fund_node(
             (&chain_key_bob).into(),
             1000000000000000000_u128.into(),
             10_u128.into(),
