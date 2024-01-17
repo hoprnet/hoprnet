@@ -1,7 +1,6 @@
 use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
-use hopr_primitive_types::traits::PeerIdLike;
-use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+use hopr_primitive_types::prelude::*;
 use sha2::Sha512;
 use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
@@ -111,7 +110,7 @@ impl From<&OffchainKeypair> for libp2p_identity::Keypair {
 
 impl From<&OffchainKeypair> for libp2p_identity::PeerId {
     fn from(value: &OffchainKeypair) -> Self {
-        value.1.to_peerid()
+        value.1.into()
     }
 }
 
@@ -173,9 +172,8 @@ impl From<&ChainKeypair> for Address {
 
 #[cfg(test)]
 mod tests {
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-    use hopr_primitive_types::traits::PeerIdLike;
+    use super::*;
+    use libp2p_identity::PeerId;
     use subtle::ConstantTimeEq;
 
     #[test]
@@ -206,11 +204,10 @@ mod tests {
         let kp_1 = OffchainKeypair::random();
 
         let p2p_kp: libp2p_identity::Keypair = (&kp_1).into();
-        assert_eq!(
-            kp_1.public().to_peerid(),
-            p2p_kp.public().to_peer_id(),
-            "peer ids must be equal"
-        );
+
+        let p1: PeerId = (*kp_1.public()).into();
+        let p2: PeerId = p2p_kp.public().into();
+        assert_eq!(p1, p2, "peer ids must be equal");
     }
 
     #[test]

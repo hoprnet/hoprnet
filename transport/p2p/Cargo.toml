@@ -27,6 +27,3 @@ hopr-internal-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
-more-asserts = "0.3.1"
-env_logger = "0.10.0"
-

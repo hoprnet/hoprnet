@@ -5,7 +5,7 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use futures::Stream;
-use hopr_lib::{ApplicationData, PeerIdLike, ToHex, TransportOutput};
+use hopr_lib::{ApplicationData, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
@@ -167,7 +167,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Show onboarding information
     let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
-    let my_peer_id = hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid();
+    let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
     let version = hopr_lib::constants::APP_VERSION;
 
     while !node.is_allowed_to_access_network(&my_peer_id).await {

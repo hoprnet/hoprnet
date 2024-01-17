@@ -1,5 +1,4 @@
 //! REST API for the HOPRd node.
-
 pub mod config;
 
 use std::error::Error;
@@ -714,7 +713,7 @@ mod account {
             .hopr
             .withdraw(
                 withdraw_req_data.address,
-                Balance::new(withdraw_req_data.amount.into(), withdraw_req_data.currency),
+                Balance::new(withdraw_req_data.amount, withdraw_req_data.currency),
             )
             .await
         {

@@ -1,16 +1,14 @@
-use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_crypto_types::types::PacketTag;
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::{AutoBinarySerializable, BinarySerializable};
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+
+use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -28,7 +26,7 @@ pub type Tag = u16;
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
 /// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
+#[async_trait] // TODO: the resolver should not be async once detached from the DB ?
 pub trait PeerAddressResolver {
     /// Tries to resolve off-chain public key given the on-chain address
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
@@ -152,7 +150,7 @@ impl BinarySerializable for ApplicationData {
                 plain_text: (&data[2..]).into(),
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 

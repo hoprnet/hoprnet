@@ -1,3 +1,4 @@
+// TODO: docs missing
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
@@ -9,7 +10,7 @@ use futures::{FutureExt, Stream};
 use primitive_types::H256;
 
 use hopr_crypto_types::types::Hash;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::{HttpRequestError, Result};
 

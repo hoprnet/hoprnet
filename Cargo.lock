@@ -1096,7 +1096,6 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
- "env_logger",
  "ethers",
  "futures",
  "hex-literal",
@@ -1147,9 +1146,7 @@ dependencies = [
 name = "chain-types"
 version = "0.8.0"
 dependencies = [
- "async-std",
  "bindings",
- "env_logger",
  "ethers",
  "hex",
  "hex-literal",
@@ -1466,14 +1463,12 @@ dependencies = [
  "async-std",
  "core-network",
  "core-protocol",
- "env_logger",
  "futures",
  "futures-lite 1.13.0",
  "hopr-internal-types",
  "libp2p",
  "libp2p-mplex",
  "log",
- "more-asserts",
  "serde",
  "thiserror",
  "void",
@@ -1483,13 +1478,10 @@ dependencies = [
 name = "core-packet"
 version = "0.7.0"
 dependencies = [
- "async-process",
  "async-std",
  "async-trait",
  "chain-db",
- "chain-types",
  "core-path",
- "env_logger",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -1501,7 +1493,6 @@ dependencies = [
  "log",
  "mockall",
  "parameterized",
- "serial_test",
  "thiserror",
  "typenum",
  "utils-db",
@@ -1525,10 +1516,8 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "log",
- "mockall",
  "petgraph",
  "serde",
- "tempfile",
  "thiserror",
  "utils-db",
 ]
@@ -1560,7 +1549,6 @@ dependencies = [
  "log",
  "more-asserts",
  "parameterized",
- "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
@@ -2217,26 +2205,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enum-iterator"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7add3873b5dd076766ee79c8e406ad1a472c385476b9e38849f8eec24f1be689"
-dependencies = [
- "enum-iterator-derive",
-]
-
-[[package]]
-name = "enum-iterator-derive"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eecf8589574ce9b895052fa12d69af7a233f99e6107f5cb8dd1044f2a17bfdcb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.48",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2547,15 +2515,6 @@ dependencies = [
  "sha2 0.10.8",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "ethnum"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -3240,7 +3199,6 @@ dependencies = [
  "bincode",
  "bindings",
  "bloomfilter",
- "enum-iterator",
  "ethers",
  "hex-literal",
  "hopr-crypto-random",
@@ -3252,6 +3210,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_repr",
+ "strum 0.25.0",
  "thiserror",
 ]
 
@@ -3313,16 +3272,15 @@ name = "hopr-primitive-types"
 version = "0.3.2"
 dependencies = [
  "bincode",
- "ethnum",
  "hex",
  "hex-literal",
- "libp2p-identity",
+ "hopr-crypto-random",
  "primitive-types",
- "rand 0.8.5",
  "regex",
  "ringbuffer",
  "rlp",
  "serde",
+ "strum 0.25.0",
  "thiserror",
 ]
 

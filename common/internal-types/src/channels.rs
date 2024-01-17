@@ -1,10 +1,9 @@
 use crate::errors::{CoreTypesError, Result};
 use bindings::hopr_channels::RedeemTicketCall;
-use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+use hopr_primitive_types::prelude::*;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -15,8 +14,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use hopr_primitive_types::traits::{BinarySerializable, ToHex};
-
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
 const ENCODED_TICKET_LENGTH: usize = 64;
@@ -25,7 +22,10 @@ pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
+#[derive(
+    Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, strum::Display, strum::EnumString,
+)]
+#[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     #[default]
     Closed = 0,
@@ -33,22 +33,15 @@ pub enum ChannelStatus {
     PendingToClose = 2,
 }
 
-impl ChannelStatus {
-    pub fn from_byte(byte: u8) -> Option<Self> {
-        all::<ChannelStatus>().find(|v| v.to_byte() == byte)
-    }
+impl TryFrom<u8> for ChannelStatus {
+    type Error = GeneralError;
 
-    pub fn to_byte(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl Display for ChannelStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChannelStatus::Closed => write!(f, "Closed"),
-            ChannelStatus::Open => write!(f, "Open"),
-            ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Closed),
+            1 => Ok(Self::Open),
+            2 => Ok(Self::PendingToClose),
+            _ => Err(GeneralError::ParseError),
         }
     }
 }
@@ -56,21 +49,13 @@ impl Display for ChannelStatus {
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum ChannelDirection {
     /// The other party is initiator of the channel.
     Incoming = 0,
     /// Our own node is the initiator of the channel.
     Outgoing = 1,
-}
-
-impl Display for ChannelDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChannelDirection::Incoming => write!(f, "incoming"),
-            ChannelDirection::Outgoing => write!(f, "outgoing"),
-        }
-    }
 }
 
 /// Overall description of a channel
@@ -176,17 +161,16 @@ impl Display for ChannelEntry {
 }
 
 impl BinarySerializable for ChannelEntry {
-    const SIZE: usize = Address::SIZE + Address::SIZE + Balance::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
+    const SIZE: usize = Address::SIZE + Address::SIZE + U256::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
 
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
             let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
-            let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
+            let balance = Balance::new(U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?, BalanceType::HOPR);
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0])
-                .ok_or(hopr_primitive_types::errors::GeneralError::ParseError)?;
+            let status = ChannelStatus::try_from(b.drain(0..1).as_ref()[0])?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             Ok(Self::new(
@@ -207,7 +191,7 @@ impl BinarySerializable for ChannelEntry {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(self.source.to_bytes().as_ref());
         ret.extend_from_slice(self.destination.to_bytes().as_ref());
-        ret.extend_from_slice(self.balance.serialize_value().as_ref());
+        ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(self.status as u8);
         ret.extend_from_slice(self.channel_epoch.to_bytes().as_ref());
@@ -552,7 +536,7 @@ impl Ticket {
             ));
         }
 
-        if amount.value().ge(&10u128.pow(25).into()) {
+        if amount.amount().ge(&10u128.pow(25).into()) {
             return Err(CoreTypesError::InvalidInputData(
                 "Tickets may not have more than 1% of total supply".into(),
             ));
@@ -615,7 +599,7 @@ impl Ticket {
         });
 
         ret.extend_from_slice(&self.channel_id.to_bytes());
-        ret.extend_from_slice(&self.amount.serialize_value()[20..32]);
+        ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
         ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
@@ -655,7 +639,7 @@ impl Ticket {
     pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Result<Self> {
         Self::new(
             destination,
-            &Balance::new(0u32.into(), BalanceType::HOPR),
+            &Balance::new(0_u32, BalanceType::HOPR),
             U256::zero(),
             U256::zero(),
             0.0,
@@ -690,7 +674,7 @@ impl Ticket {
         // Add + 1 to "round to next integer"
         let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
 
-        (*self.amount.value() * U256::from(win_prob)) >> U256::from(52u64)
+        (self.amount.amount() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
     /// Recovers the signer public key from the embedded ticket signature.
@@ -855,7 +839,7 @@ pub mod tests {
         let ce1 = ChannelEntry::new(
             *ADDRESS_1,
             *ADDRESS_2,
-            Balance::new(10u64.into(), BalanceType::HOPR),
+            Balance::new(10_u64, BalanceType::HOPR),
             23u64.into(),
             ChannelStatus::PendingToClose,
             3u64.into(),
@@ -869,9 +853,9 @@ pub mod tests {
     #[test]
     pub fn channel_status_test() {
         let cs1 = ChannelStatus::Open;
-        let cs2 = ChannelStatus::from_byte(cs1.to_byte()).unwrap();
+        let cs2 = ChannelStatus::try_from(cs1 as u8).unwrap();
 
-        assert!(ChannelStatus::from_byte(231).is_none());
+        assert!(ChannelStatus::try_from(231_u8).is_err());
         assert_eq!(cs1, cs2, "channel status does not match");
     }
 
@@ -880,7 +864,7 @@ pub mod tests {
         let mut ce = ChannelEntry::new(
             *ADDRESS_1,
             *ADDRESS_2,
-            Balance::new(10u64.into(), BalanceType::HOPR),
+            Balance::new(10_u64, BalanceType::HOPR),
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),
@@ -1023,7 +1007,7 @@ pub mod tests {
         ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
         assert_eq!(U256::zero(), ticket.get_expected_payout());
 
-        ticket.amount = Balance::new(100000000000u64.into(), BalanceType::HOPR);
+        ticket.amount = Balance::new(100000000000_u64, BalanceType::HOPR);
         ticket.encoded_win_prob = f64_to_win_prob(0.00000000001f64).unwrap();
 
         assert_eq!(U256::one(), ticket.get_expected_payout());
@@ -1064,7 +1048,7 @@ pub mod tests {
         let ticket = Ticket::new_partial(
             &ALICE.public().to_address(),
             &BOB.public().to_address(),
-            &Balance::new(256u64.into(), BalanceType::HOPR),
+            &Balance::new(256_u64, BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,

@@ -7,7 +7,7 @@ use std::{collections::VecDeque, sync::Arc};
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
-use hopr_primitive_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::prelude::*;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
@@ -308,8 +308,7 @@ pub mod tests {
     };
     use futures::{join, Stream};
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_primitive_types::traits::PeerIdLike;
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};
@@ -520,7 +519,7 @@ pub mod tests {
 
     fn random_announcement_chain_event() -> ChainEventType {
         ChainEventType::Announcement {
-            peer: OffchainKeypair::random().public().to_peerid(),
+            peer: (*OffchainKeypair::random().public()).into(),
             address: Address::random(),
             multiaddresses: vec![Multiaddr::empty()],
         }

@@ -6,7 +6,7 @@ use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
 pub use core_transport::config::{HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig};
-use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+use hopr_primitive_types::prelude::*;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
