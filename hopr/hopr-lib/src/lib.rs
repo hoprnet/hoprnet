@@ -17,15 +17,9 @@ pub use {
         errors::{HoprTransportError, ProtocolError},
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
     },
-    hopr_internal_types::{
-        channels::{ChannelEntry, ChannelStatus, Ticket},
-        protocol::{Tag, DEFAULT_APPLICATION_TAG},
-    },
-    hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType},
-        rlp,
-        traits::{PeerIdLike, ToHex},
-    },
+    hopr_internal_types::prelude::*,
+    hopr_primitive_types::prelude::*,
+    hopr_primitive_types::rlp,
 };
 
 use std::{collections::HashMap, future::poll_fn, pin::Pin, str::FromStr, sync::Arc, time::Duration};
@@ -43,18 +37,10 @@ use chain_actions::{
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
-use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
-use chain_types::chain_events::ChainEventType;
-use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use hopr_internal_types::protocol::TagBloomFilter;
-use hopr_internal_types::{account::AccountEntry, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
-
-use hopr_primitive_types::traits::BinarySerializable;
-use log::debug;
-use utils_db::db::DB;
-
 use chain_api::HoprChain;
+use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
@@ -64,9 +50,14 @@ use core_transport::{
     build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
+use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
+use hopr_internal_types::prelude::*;
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use hopr_primitive_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::prelude::*;
+use hopr_primitive_types::traits::BinarySerializable;
+use log::debug;
 use log::{error, info};
+use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 
 use crate::chain::ChainNetworkConfig;
@@ -76,10 +67,10 @@ use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_platform::time::native::current_timestamp;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge};
+use {
+    hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
+    hopr_platform::time::native::current_timestamp,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -119,7 +110,7 @@ pub struct OpenChannelResult {
 
 pub struct CloseChannelResult {
     pub tx_hash: Hash,
-    pub status: hopr_internal_types::channels::ChannelStatus,
+    pub status: ChannelStatus,
 }
 
 /// Enum differentiator for loop component futures.
@@ -243,15 +234,15 @@ where
                                 )
                                 .await;
                             }
-                        } else if channel.status == hopr_internal_types::channels::ChannelStatus::Open {
+                        } else if channel.status == ChannelStatus::Open {
                             // Emit Opening event if the channel did not exist before in the graph
                             let _ = core_strategy::strategy::SingularStrategy::on_own_channel_changed(
                                 &*multi_strategy,
                                 &channel,
                                 own_channel_direction,
-                                hopr_internal_types::channels::ChannelChange::Status {
-                                    left: hopr_internal_types::channels::ChannelStatus::Closed,
-                                    right: hopr_internal_types::channels::ChannelStatus::Open,
+                                ChannelChange::Status {
+                                    left: ChannelStatus::Closed,
+                                    right: ChannelStatus::Open,
                                 },
                             )
                             .await;
@@ -262,7 +253,7 @@ where
                     match db.read().await.get_packet_key(&address).await {
                         Ok(pk) => {
                             if let Some(pk) = pk {
-                                let peer_id = pk.to_peerid();
+                                let peer_id = pk.into();
 
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
@@ -366,7 +357,7 @@ where
     let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
 
     let indexer_refreshing_loop = to_chain_events_refresh_process(
-        me.public().to_peerid(),
+        (*me.public()).into(),
         core_transport::Keypair::public(&me_onchain).to_address(),
         db.clone(),
         multi_strategy.clone(),
@@ -739,7 +730,7 @@ impl Hopr {
 
         let balance = self.get_balance(BalanceType::Native).await?;
 
-        let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
+        let minimum_balance = Balance::new_from_str(constants::MIN_NATIVE_BALANCE, BalanceType::Native);
 
         info!(
             "Ethereum account {} has {}. Minimum balance is {}",
@@ -748,7 +739,7 @@ impl Hopr {
             minimum_balance.to_formatted_string()
         );
 
-        if balance.lte(&minimum_balance) {
+        if balance.le(&minimum_balance) {
             return Err(errors::HoprLibError::GeneralError(
                 "Cannot start the node without a sufficiently funded wallet".to_string(),
             ));
@@ -861,7 +852,7 @@ impl Hopr {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_HOPR_NODE_INFO.set(
             &[
-                &self.me.public().to_peerid().to_string(),
+                &self.me.public().to_peerid_str(),
                 &self.me_onchain().to_string(),
                 &self.safe_module_cfg.safe_address.to_string(),
                 &self.safe_module_cfg.module_address.to_string(),
@@ -875,7 +866,7 @@ impl Hopr {
     // p2p transport =========
     /// Own PeerId used in the libp2p transport layer
     pub fn me_peer_id(&self) -> PeerId {
-        self.me.public().to_peerid()
+        (*self.me.public()).into()
     }
 
     /// Get the list of all announced public nodes in the network
@@ -1120,7 +1111,7 @@ impl Hopr {
     pub async fn close_channel(
         &self,
         counterparty: &Address,
-        direction: hopr_internal_types::channels::ChannelDirection,
+        direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
         if self.status() != State::Running {
@@ -1252,7 +1243,7 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = core_transport::OffchainPublicKey::from_peerid(peer_id)?;
+        let pk = core_transport::OffchainPublicKey::try_from(peer_id)?;
         Ok(self.chain_api.db().read().await.get_chain_key(&pk).await?)
     }
 
@@ -1264,6 +1255,6 @@ impl Hopr {
             .await
             .get_packet_key(address)
             .await
-            .map(|pk| pk.map(|v| v.to_peerid()))?)
+            .map(|pk| pk.map(|v| v.into()))?)
     }
 }

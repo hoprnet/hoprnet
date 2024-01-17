@@ -153,8 +153,7 @@ mod tests {
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
-    use hopr_primitive_types::primitives::Address;
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
 

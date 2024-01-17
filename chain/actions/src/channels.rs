@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
 
 use crate::action_queue::PendingAction;
@@ -173,11 +173,8 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{
@@ -196,7 +193,7 @@ mod tests {
     async fn test_open_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -205,16 +202,13 @@ mod tests {
         )));
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(5_000_000_u64, BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -283,7 +277,7 @@ mod tests {
     #[async_std::test]
     async fn test_should_not_open_channel_again() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
@@ -309,16 +303,13 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(5_000_000_u64, BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -349,7 +340,7 @@ mod tests {
     async fn test_should_not_open_channel_to_self() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
@@ -364,10 +355,7 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
@@ -402,15 +390,12 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
-        let stake = Balance::new(10_u32.into(), BalanceType::Native);
+        let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
@@ -419,7 +404,7 @@ mod tests {
             "should not allow invalid balance"
         );
 
-        let stake = Balance::new(0_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(0_u32, BalanceType::HOPR);
 
         assert!(
             matches!(
@@ -436,7 +421,7 @@ mod tests {
 
         let self_addr = Address::random();
         let bob = Address::random();
-        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
@@ -451,7 +436,7 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(&Balance::new(1000_u64.into(), BalanceType::HOPR), &Snapshot::default())
+            .set_staking_safe_allowance(&Balance::new(1000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
@@ -472,7 +457,7 @@ mod tests {
 
         let self_addr = Address::random();
         let bob = Address::random();
-        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
@@ -488,16 +473,13 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(1_000_000_u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(1_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(1_u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(1_u64, BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -518,7 +500,7 @@ mod tests {
 
         let self_addr = Address::random();
         let bob = Address::random();
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -527,16 +509,13 @@ mod tests {
         )));
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(5_000_000u64, BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -621,21 +600,18 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(5_000_000u64, BalanceType::HOPR))
             .await
             .unwrap();
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
@@ -666,15 +642,12 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
-        let stake = Balance::new(10_u32.into(), BalanceType::Native);
+        let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
@@ -683,7 +656,7 @@ mod tests {
             "should not allow invalid balance"
         );
 
-        let stake = Balance::new(0_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(0_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
@@ -714,12 +687,12 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(&Balance::new(1000_u64.into(), BalanceType::HOPR), &Snapshot::default())
+            .set_staking_safe_allowance(&Balance::new(1000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
-        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
@@ -750,21 +723,18 @@ mod tests {
 
         db.write()
             .await
-            .set_staking_safe_allowance(
-                &Balance::new(1_000_000_u64.into(), BalanceType::HOPR),
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&Balance::new(1_000_000_u64, BalanceType::HOPR), &Snapshot::default())
             .await
             .unwrap();
 
         db.write()
             .await
-            .set_hopr_balance(&Balance::new(1u64.into(), BalanceType::HOPR))
+            .set_hopr_balance(&Balance::new(1_u64, BalanceType::HOPR))
             .await
             .unwrap();
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
-        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
@@ -778,7 +748,7 @@ mod tests {
     async fn test_close_channel_outgoing() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -904,7 +874,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_close_channel_incoming() {
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -976,7 +946,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_close_when_closure_time_did_not_elapse() {
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
@@ -1059,7 +1029,7 @@ mod tests {
     async fn test_should_not_close_closed_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),

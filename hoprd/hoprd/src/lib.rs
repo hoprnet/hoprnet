@@ -1,4 +1,4 @@
-//! HOPRdaemon application providing a higher level interface for creating a HOPRd with or without
+//! HOPR daemon application providing a higher level interface for creating a HOPRd with or without
 //! a dedicated REST API.
 //!
 //! When the Rest API is enabled, the node serves a Swagger UI to inspect and test

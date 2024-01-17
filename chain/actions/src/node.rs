@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_internal_types::announcement::{AnnouncementData, KeyBinding};
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;
 
@@ -61,8 +61,7 @@ mod tests {
     use chain_types::actions::Action;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
@@ -73,7 +72,7 @@ mod tests {
 
         let self_addr = Address::random();
         let bob = Address::random();
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(

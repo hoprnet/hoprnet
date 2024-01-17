@@ -1,16 +1,20 @@
 import asyncio
-import itertools
 import random
 import re
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
+import requests
 from conftest import (
-    NODES,
+    default_nodes,
+    default_nodes_with_auth,
+    random_distinct_pairs_from,
     OPEN_CHANNEL_FUNDING_VALUE,
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
+    DEFAULT_API_TOKEN,
 )
+
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
@@ -21,11 +25,6 @@ CHECK_RETRY_INTERVAL = 0.5
 def shuffled(coll):
     random.shuffle(coll)
     return coll
-
-
-def default_nodes():
-    """All nodes within the same network as specified in the swarm7 fixture"""
-    return list(NODES.keys())[:4]
 
 
 def passive_node():
@@ -180,10 +179,6 @@ async def send_and_receive_packets_with_peek(packets, src, dest, path, timeout=M
     return random_tag
 
 
-def random_distinct_pairs_from(values: list, count: int):
-    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
-
-
 def balance_str_to_int(balance: str):
     return int(balance.split(" ", 1)[0])
 
@@ -218,6 +213,35 @@ async def test_hoprd_swarm_connectivity(swarm7):
         AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
     else:
         print("Could not get ticket price from API, using default value")
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7, peer):
+    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+
+    r = requests.get(url)
+
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer, swarm7):
+    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+    headers = {"X-Auth-Token": "DefiNItEly_A_baD_TokEn"}
+
+    r = requests.get(url, headers=headers)
+
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer, swarm7):
+    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+    headers = {"X-Auth-Token": f"{DEFAULT_API_TOKEN}"}
+
+    r = requests.get(url, headers=headers)
+
+    assert r.status_code == 200
 
 
 @pytest.mark.asyncio
