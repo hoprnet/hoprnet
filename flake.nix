@@ -114,7 +114,7 @@
             inherit (hopliCrateNameFromCargoToml) pname version;
             cargoExtraArgs = "--offline -p hopli";
             extraDummyScript = ''
-              rm -rf $out/vendor/cargo
+              mkdir -p $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
