@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 import pytest
 import requests
 from conftest import (
-    default_nodes,
+    default_nodes, default_nodes_with_auth,
     random_distinct_pairs_from,
     OPEN_CHANNEL_FUNDING_VALUE,
     TICKET_AGGREGATION_THRESHOLD,
@@ -214,7 +214,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
         print("Could not get ticket price from API, using default value")
 
 
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7, peer):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
 
@@ -223,7 +223,7 @@ def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7, peer):
     assert r.status_code == 401
 
 
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer, swarm7):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
     headers = {"X-Auth-Token": "DefiNItEly_A_baD_TokEn"}
@@ -233,7 +233,7 @@ def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer, swarm7
     assert r.status_code == 401
 
 
-@pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer, swarm7):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
     headers = {"X-Auth-Token": f"{DEFAULT_API_TOKEN}"}
