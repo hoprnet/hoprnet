@@ -8,7 +8,8 @@
   # using bugfix for macos libcurl:
   # https://github.com/oxalica/rust-overlay/pull/149
   inputs.rust-overlay.url = github:oxalica/rust-overlay/647bff9f5e10d7f1756d86eee09831e6b1b06430;
-  inputs.crane.url = github:ipetkov/crane;
+  # using a fork with an added source filter
+  inputs.crane.url = github:hoprnet/crane/tb/20240117-find-filter;
   inputs.foundry.url = github:shazow/foundry.nix/monthly;
   inputs.solc.url = github:hellwolf/solc.nix;
 
@@ -84,7 +85,7 @@
           commonArgs = {
             inherit src buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
-            cargoVendorDir = "./vendor/cargo";
+            cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
           };
@@ -92,7 +93,7 @@
             inherit (crateNameFromCargoToml) pname version;
             cargoExtraArgs = "--offline -p hoprd";
             extraDummyScript = ''
-              rm -rf $out/vendor/cargo
+              mkdir -p $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
@@ -191,7 +192,7 @@
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
             set -eu
             OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
-            ${pkgs.skopeo}/bin/skopeo copy \
+            ${pkgs.skopeo}/bin/skopeo copy --insecure-policy \
               --dest-creds="_json_key:$GOOGLE_GHA_CREDS_PATH" \
               "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
           '';
