@@ -33,13 +33,8 @@ forked-local-anvil:
 
 generate-bindings: ${SOLIDITY_FILES}
 generate-bindings: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ../bindings --crate-name bindings \
+	$(forge-bind) --bindings-path ../bindings/src/codegen --module --cache-path /tmp/forge-cache \
 		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
-
-.PHONY: check-sc-bindings
-check-sc-bindings: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ./bindings --root ./contracts \
-		--crate-name bindings --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820: ensure-environment-and-network-are-set
