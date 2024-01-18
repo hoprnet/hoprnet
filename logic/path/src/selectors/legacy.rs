@@ -193,22 +193,22 @@ where
         }));
 
         let mut iters = 0;
-        while let Some(mut current_path) = queue.pop() {
+        while let Some(mut current) = queue.pop() {
             // This should not happen. Retrying can help here.
             if iters > self.max_iterations {
                 warn!("Could not find a path from {} to {} with at least {} hops and at most {} hops within {} iterations", source, destination, min_hops, max_hops, self.max_iterations);
                 break;
             }
 
-            let current_path_len = current_path.path.len();
+            let current_len = current.path.len();
 
-            if current_path_len >= max_hops {
-                return Ok(ChannelPath::new_valid(current_path.path));
+            if current_len >= max_hops {
+                return Ok(ChannelPath::new_valid(current.path));
             }
 
-            if current_path.fully_explored {
-                if current_path_len >= min_hops {
-                    return Ok(ChannelPath::new_valid(current_path.path));
+            if current.fully_explored {
+                if current_len >= min_hops {
+                    return Ok(ChannelPath::new_valid(current.path));
                 } else {
                     return Err(PathError::PathNotFound(
                         max_hops,
@@ -218,28 +218,28 @@ where
                 }
             }
 
-            let last_peer = *current_path.path.last().unwrap();
+            let last_peer = *current.path.last().unwrap();
             let mut new_channels = graph
                 .open_channels_from(last_peer)
-                .filter(|channel| self.filter_channel(channel.weight(), &source, &destination, &current_path.path))
+                .filter(|channel| self.filter_channel(channel.weight(), &source, &destination, &current.path))
                 .peekable();
 
             if new_channels.peek().is_some() {
                 queue.extend(new_channels.map(|new_channel| {
                     let mut next_path_variant = WeightedChannelPath {
-                        path: Vec::with_capacity(current_path_len + 1),
-                        weight: current_path.weight + CW::calculate_weight(&new_channel.weight().channel),
+                        path: Vec::with_capacity(current_len + 1),
+                        weight: current.weight + CW::calculate_weight(&new_channel.weight().channel),
                         fully_explored: false,
                     };
-                    next_path_variant.path.extend(&current_path.path);
+                    next_path_variant.path.extend(&current.path);
                     next_path_variant.path.push(new_channel.weight().channel.destination);
 
                     next_path_variant
                 }));
             } else {
-                current_path.fully_explored = true;
+                current.fully_explored = true;
                 // Keep the current path in case we do not find anything better
-                queue.push(current_path);
+                queue.push(current);
             }
 
             iters += 1;
