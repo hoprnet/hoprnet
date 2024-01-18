@@ -3,8 +3,7 @@ use clap::{Parser, ValueHint};
 use std::{env, fs::read_to_string, path::PathBuf};
 
 /// Verification provider arguments
-#[derive(Debug, Clone, Parser)]
-#[derive(Default)]
+#[derive(Debug, Clone, Parser, Default)]
 pub struct PasswordArgs {
     #[clap(
         long,
@@ -16,8 +15,6 @@ pub struct PasswordArgs {
     )]
     password_path: Option<PathBuf>,
 }
-
-
 
 impl PasswordArgs {
     pub fn read_password(self) -> Result<String, HelperErrors> {

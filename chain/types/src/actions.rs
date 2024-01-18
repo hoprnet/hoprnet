@@ -3,7 +3,7 @@ use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
 /// Enumerates all possible on-chain state change requests
-#[allow(clippy::large_enum_variant)]     // TODO: Refactor the large enum variant
+#[allow(clippy::large_enum_variant)] // TODO: Refactor the large enum variant
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {

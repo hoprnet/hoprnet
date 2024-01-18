@@ -40,7 +40,7 @@ lazy_static::lazy_static! {
 pub const ACK_TX_QUEUE_SIZE: usize = 2048;
 pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 
-#[allow(clippy::large_enum_variant)]     // TODO: Uses too large objects
+#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
 pub enum Reply {
     Sender(HalfKeyChallenge),
@@ -54,7 +54,7 @@ pub enum AckToProcess {
     ToSend(PeerId, Acknowledgement),
 }
 
-#[allow(clippy::large_enum_variant)]     // TODO: Uses too large objects
+#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
 pub enum AckProcessed {
     Receive(PeerId, Result<Reply>),

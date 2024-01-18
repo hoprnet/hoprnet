@@ -82,7 +82,10 @@ impl IdentityArgs {
                 let id_dir = local_id.identity_directory.unwrap();
                 for index in 0..=number - 1 {
                     // build file name
-                    let file_prefix = local_id.identity_prefix.as_ref().map(|provided_name| provided_name.to_owned() + &index.to_string());
+                    let file_prefix = local_id
+                        .identity_prefix
+                        .as_ref()
+                        .map(|provided_name| provided_name.to_owned() + &index.to_string());
 
                     match create_identity(&id_dir, &pwd, &file_prefix) {
                         Ok((id_filename, identity)) => _ = node_identities.insert(id_filename, identity),

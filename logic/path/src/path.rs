@@ -107,10 +107,9 @@ impl ChannelPath {
             .hops
             .iter()
             .map(|addr| {
-                resolver.resolve_packet_key(addr).map(move |opt| {
-                    opt.map(PeerId::from)
-                        .ok_or(InvalidPeer(addr.to_string()))
-                })
+                resolver
+                    .resolve_packet_key(addr)
+                    .map(move |opt| opt.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
             })
             .collect::<FuturesOrdered<_>>()
             .try_collect::<Vec<PeerId>>()
@@ -397,10 +396,7 @@ mod tests {
     #[async_trait]
     impl PeerAddressResolver for TestResolver {
         async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-            self.0
-                .iter()
-                .find(|(_, addr)| addr.eq(onchain_key))
-                .map(|(pk, _)| *pk)
+            self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
         }
 
         async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {

@@ -16,7 +16,7 @@ use futures_lite::stream::{Stream, StreamExt};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -181,7 +181,7 @@ impl AggregationList {
 }
 
 /// The input to the processor background pipeline
-#[allow(clippy::type_complexity)]       // TODO: The type needs to be significantly refactored to easily move around
+#[allow(clippy::type_complexity)] // TODO: The type needs to be significantly refactored to easily move around
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
@@ -190,7 +190,7 @@ pub enum TicketAggregationToProcess<T, U> {
 }
 
 /// Emitted by the processor background pipeline once processed
-#[allow(clippy::large_enum_variant)]        // TODO: refactor the large types used in the enum
+#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
@@ -544,7 +544,7 @@ pub struct TicketAggregationActions<T, U> {
     pub queue: Sender<TicketAggregationToProcess<T, U>>,
 }
 
-pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, RequestId>;
+pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, OutboundRequestId>;
 
 impl<T, U> Clone for TicketAggregationActions<T, U> {
     /// Generic type requires handwritten clone function
@@ -742,13 +742,17 @@ mod tests {
     use super::{AggregationList, TicketAggregationProcessed};
 
     lazy_static! {
-        static ref PEERS: Vec<OffchainKeypair> = [hex!("b91a28ff9840e9c93e5fafd581131f0b9f33f3e61b02bf5dd83458aa0221f572"),
-            hex!("82283757872f99541ce33a47b90c2ce9f64875abf08b5119a8a434b2fa83ea98")]
+        static ref PEERS: Vec<OffchainKeypair> = [
+            hex!("b91a28ff9840e9c93e5fafd581131f0b9f33f3e61b02bf5dd83458aa0221f572"),
+            hex!("82283757872f99541ce33a47b90c2ce9f64875abf08b5119a8a434b2fa83ea98")
+        ]
         .iter()
         .map(|private| OffchainKeypair::from_secret(private).unwrap())
         .collect();
-        static ref PEERS_CHAIN: Vec<ChainKeypair> = [hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a"),
-            hex!("e1f89073a01831d0eed9fe2c67e7d65c144b9d9945320f6d325b1cccc2d124e9")]
+        static ref PEERS_CHAIN: Vec<ChainKeypair> = [
+            hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a"),
+            hex!("e1f89073a01831d0eed9fe2c67e7d65c144b9d9945320f6d325b1cccc2d124e9")
+        ]
         .iter()
         .map(|private| ChainKeypair::from_secret(private).unwrap())
         .collect();

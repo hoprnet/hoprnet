@@ -1337,9 +1337,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 mod tests {
     use super::*;
     use hex_literal::hex;
-    
+
     use hopr_internal_types::channels::ChannelEntry;
-    
+
     use lazy_static::lazy_static;
     use std::ops::Mul;
     use std::str::FromStr;

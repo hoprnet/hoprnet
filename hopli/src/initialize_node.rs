@@ -85,7 +85,7 @@ impl InitializeNodeArgs {
             .values()
             .map(|ni| ni.chain_key.public().0.to_address().to_string())
             .collect();
-        
+
         log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables

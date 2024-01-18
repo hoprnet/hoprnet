@@ -67,7 +67,7 @@ impl MigrateSafeModuleArgs {
             .values()
             .map(|ni| ni.chain_key.public().to_address().to_string())
             .collect();
-        
+
         log!(target: "migrate_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // 3. parse safe and module address

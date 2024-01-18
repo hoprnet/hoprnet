@@ -111,7 +111,7 @@ pub struct HoprChain {
 }
 
 impl HoprChain {
-    #[allow(clippy::too_many_arguments)]        // TODO: refactor this function into a reasonable group of components once fully rearchitected
+    #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,
         db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
