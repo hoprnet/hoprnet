@@ -41,7 +41,7 @@ impl Ord for WeightedChannelPath {
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Less => Ordering::Less,
             }
-        } else if other.fully_explored && !self.fully_explored {
+        } else if other.fully_explored {
             Ordering::Less
         } else {
             Ordering::Greater
