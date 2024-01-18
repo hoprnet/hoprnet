@@ -1,6 +1,14 @@
-use crate::action_queue::PendingAction;
-use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
-use crate::CoreEthereumActions;
+//! This module contains on-chain actions in the `NodeActions` trait, which related to HOPR node itself.
+//! An implementation of this trait is added to [CoreEthereumActions] which realizes the redemption
+//! operations via [ActionQueue].
+//!
+//! There are 3 functions that can be used to redeem tickets in the `NodeActions` trait:
+//! - [withdraw](NodeActions::withdraw)
+//! - [announce](NodeActions::announce)
+//! - [register_safe_by_node](NodeActions::register_safe_by_node)
+//!
+//! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
+//! to the [ActionQueue].
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -9,6 +17,10 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;
+
+use crate::action_queue::PendingAction;
+use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
+use crate::CoreEthereumActions;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]

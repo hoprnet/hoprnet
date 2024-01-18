@@ -5,7 +5,8 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 
 /// Contains TX hash along with the Chain Event data.
-/// This could be used to pair up some events with `Action`
+/// This could be used to pair up some events with [Action].
+/// Each [Action] is typically concluded by a significant chain event.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SignificantChainEvent {
     /// TX hash

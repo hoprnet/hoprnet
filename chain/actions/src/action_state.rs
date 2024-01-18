@@ -1,3 +1,15 @@
+//! This module contains implementation of types necessary to perform tracking the
+//! on-chain state of [Actions](chain_types::actions::Action).
+//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation]
+//! can be created and registered in an object implementing the [ActionState] trait.
+//! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType]
+//! that must match on any chain event log in a block containing the given transaction hash.
+//!
+//! ### Example
+//! Once the [RegisterSafe(`0x0123..ef`)](Action) action that has been submitted via [ActionQueue] in a transaction with hash `0xabcd...00`.
+//! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
+//! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
+//! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
@@ -17,8 +29,8 @@ use crate::errors::{CoreEthereumActionsError, Result};
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an `Action` via registering `IndexerExpectation`s on
-/// `SignificantChainEvents` coming from the Indexer and resolving them as they are
+/// Allows tracking state of an [Action] via registering [IndexerExpectations](IndexeExpectation) on
+/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
 /// matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -27,7 +39,7 @@ pub trait ActionState {
     /// Each matched expectation is resolved, unregistered and returned.
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation>;
 
-    /// Registers new `IndexerExpectation`
+    /// Registers new [IndexerExpectation].
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver>;
 
     /// Manually unregisters `IndexerExpectation` given its TX hash.
@@ -69,6 +81,8 @@ impl IndexerExpectation {
 
 type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sender<SignificantChainEvent>)>;
 
+/// Implements [action state](ActionState) tracking using a non-persistent in-memory hash table of
+/// assumed [IndexerExpectations](IndexerExpectation).
 #[derive(Debug)]
 pub struct IndexerActionTracker {
     expectations: Arc<RwLock<ExpectationTable>>,

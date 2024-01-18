@@ -1,3 +1,18 @@
+//! This module defines the [ChannelActions] trait which allows to perform operations regarding
+//! HOPR channels.
+//! An implementation of this trait is added to [CoreEthereumActions] which realizes the redemption
+//! operations via [ActionQueue].
+//! There are 4 basic high-level on-chain functions in the `ChannelActions` trait:
+//! - `open_channel`
+//! - `fund_channel`
+//! - `close_channel`
+//!
+//! All the functions do the necessary validations using the DB and then post the corresponding action
+//! into the `ActionQueue`.
+//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
+//! confirmation of the corresponding operation.
+//! See the details in [ActionQueue] on how the confirmation is realized by awaiting the respective [SignificantChainEvent]
+//! by the Indexer.
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;

@@ -2,7 +2,10 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
-/// Enumerates all possible on-chain state change requests
+/// Enumerates all possible on-chain state change requests.
+/// An `Action` is an operation done by the HOPR node that leads
+/// to an on-chain transaction or a contract call. An `Action` is considered complete
+/// until the corresponding [SignificantChainEvent] is registered by the Indexer or a timeout.
 #[allow(clippy::large_enum_variant)]     // TODO: Refactor the large enum variant
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
