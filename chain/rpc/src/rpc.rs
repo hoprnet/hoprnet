@@ -143,7 +143,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
         let (exists, target) = self.node_module.try_get_target(target.into()).call().await?;
 
-        Ok(exists.then_some(target.into()))
+        Ok(exists.then_some(target))
     }
 
     async fn get_safe_from_node_safe_registry(&self, node_address: Address) -> Result<Address> {
@@ -243,17 +243,16 @@ pub mod tests {
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
         tx.set_to(H160::from(to));
-        tx.set_value(ethers::types::U256(primitive_types::U256::from(amount).0));
+        tx.set_value(ethers::types::U256(amount.0));
         tx
     }
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
         sleep(timeout).await;
-        pending.await.expect(&format!(
-            "timeout awaiting tx hash {tx_hash} after {} seconds",
-            timeout.as_secs()
-        ));
+        pending
+            .await
+            .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
     }
 
     #[async_std::test]
@@ -325,7 +324,7 @@ pub mod tests {
         let send_amount = 1000000_u64;
 
         // Send 1 ETH to some random address
-        futures::future::join_all((0..txs_count).into_iter().map(|_| async {
+        futures::future::join_all((0..txs_count).map(|_| async {
             rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
                 .await
                 .expect("tx should be sent")

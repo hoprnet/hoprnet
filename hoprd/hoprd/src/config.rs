@@ -302,13 +302,13 @@ impl HoprdConfig {
         // additional updates
         let home_symbol = '~';
         if cfg.hopr.db.data.starts_with(home_symbol) {
-            cfg.hopr.db.data = std::env::home_dir()
+            cfg.hopr.db.data = home::home_dir()
                 .map(|h| h.as_path().display().to_string())
                 .expect("home dir for a user must be specified")
                 + &cfg.hopr.db.data[1..];
         }
         if cfg.identity.file.starts_with(home_symbol) {
-            cfg.identity.file = std::env::home_dir()
+            cfg.identity.file = home::home_dir()
                 .map(|h| h.as_path().display().to_string())
                 .expect("home dir for a user must be specified")
                 + &cfg.identity.file[1..];

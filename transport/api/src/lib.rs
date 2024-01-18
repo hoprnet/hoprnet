@@ -25,7 +25,7 @@ pub use {
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
-    core_p2p::libp2p_identity,
+    core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -52,7 +52,7 @@ use futures::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
 
@@ -92,23 +92,25 @@ pub fn build_network(
 pub fn build_ticket_aggregation<Db>(
     db: Arc<RwLock<Db>>,
     chain_keypair: &ChainKeypair,
-) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
+) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
 
+type HoprPingComponents = (
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    UnboundedReceiver<(PeerId, ControlMessage)>,
+    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
+);
+
 pub fn build_manual_ping(
     cfg: core_protocol::config::ProtocolConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> (
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-    UnboundedReceiver<(PeerId, ControlMessage)>,
-    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
-) {
+) -> HoprPingComponents {
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
@@ -158,23 +160,27 @@ where
     )
 }
 
+type HoprHearbeat = Heartbeat<
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    adaptors::heartbeat::HeartbeatExternalInteractions,
+>;
+
+type HoprHeartbeatComponents = (
+    HoprHearbeat,
+    UnboundedReceiver<(PeerId, ControlMessage)>,
+    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
+);
+
 pub fn build_heartbeat(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> (
-    Heartbeat<
-        Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-        adaptors::heartbeat::HeartbeatExternalInteractions,
-    >,
-    UnboundedReceiver<(PeerId, ControlMessage)>,
-    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
-) {
+) -> HoprHeartbeatComponents {
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-        libp2p_identity::PeerId,
+        libp2p::identity::PeerId,
         std::result::Result<(ControlMessage, String), ()>,
     )>();
 
@@ -252,14 +258,15 @@ pub struct HoprTransport {
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
-    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
 }
 
 impl HoprTransport {
+    #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
-        identity: libp2p_identity::Keypair,
+        identity: libp2p::identity::Keypair,
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
@@ -267,7 +274,7 @@ impl HoprTransport {
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
-        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {

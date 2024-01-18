@@ -628,11 +628,8 @@ impl PacketInteraction {
                     };
 
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    match &packet {
-                        Ok(TransportPacket::Forwarded { .. }) => {
-                            metadata.start_time = hopr_platform::time::native::current_timestamp();
-                        }
-                        _ => {}
+                    if let Ok(TransportPacket::Forwarded { .. }) = &packet {
+                        metadata.start_time = hopr_platform::time::native::current_timestamp();
                     }
 
                     (packet, metadata)
@@ -840,12 +837,12 @@ mod tests {
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref PEERS: Vec<OffchainKeypair> = vec![
+        static ref PEERS: Vec<OffchainKeypair> = [
             hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
             hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
             hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
             hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
-            hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
+            hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc")
         ]
         .iter()
         .map(|private| OffchainKeypair::from_secret(private).unwrap())
@@ -853,12 +850,12 @@ mod tests {
     }
 
     lazy_static! {
-        static ref PEERS_CHAIN: Vec<ChainKeypair> = vec![
+        static ref PEERS_CHAIN: Vec<ChainKeypair> = [
             hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
             hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
             hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
             hex!("62b362fd3295caf8657b8cf4f65d6e2cbb1ef81754f7bdff65e510220611afc2"),
-            hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f"),
+            hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f")
         ]
         .iter()
         .map(|private| ChainKeypair::from_secret(private).unwrap())
@@ -923,18 +920,14 @@ mod tests {
                     .await,
                 );
 
-                db.update_channel_and_snapshot(
-                    &channel.clone().unwrap().get_id(),
-                    &channel.clone().unwrap(),
-                    &testing_snapshot,
-                )
-                .await?;
+                db.update_channel_and_snapshot(&channel.unwrap().get_id(), &channel.unwrap(), &testing_snapshot)
+                    .await?;
             }
 
             if index > 0 {
                 db.update_channel_and_snapshot(
-                    &previous_channel.clone().unwrap().get_id(),
-                    &previous_channel.clone().unwrap(),
+                    &previous_channel.unwrap().get_id(),
+                    &previous_channel.unwrap(),
                     &testing_snapshot,
                 )
                 .await?;
@@ -954,7 +947,7 @@ mod tests {
         let challenge = HalfKeyChallenge::default();
         let mut awaiter: super::PacketSendAwaiter = rx.into();
 
-        finalizer.finalize(challenge.clone());
+        finalizer.finalize(challenge);
 
         let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
 
@@ -984,14 +977,14 @@ mod tests {
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
         for _ in 0..PENDING_ACKS {
-            let secrets = (0..2).into_iter().map(|_| SharedSecret::random()).collect::<Vec<_>>();
+            let secrets = (0..2).map(|_| SharedSecret::random()).collect::<Vec<_>>();
             let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
             core_dbs[0]
                 .write()
                 .await
-                .store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
+                .store_pending_acknowledgment(porv.ack_challenge, PendingAcknowledgement::WaitingAsSender)
                 .await
                 .expect("failed to store pending ack");
 
@@ -1034,7 +1027,7 @@ mod tests {
                         AckProcessed::Receive(_, Ok(Reply::Sender(ack))) => {
                             debug!("sender has received acknowledgement {i}: {ack}");
                             assert!(
-                                sent_challenges.iter().find(|(_, c)| ack.eq(c)).is_some(),
+                                sent_challenges.iter().any(|(_, c)| ack.eq(c)),
                                 "received invalid challenge {ack}"
                             );
                         }
@@ -1239,10 +1232,7 @@ mod tests {
         #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-                self.0
-                    .iter()
-                    .find(|(_, addr)| addr.eq(onchain_key))
-                    .map(|(pk, _)| pk.clone())
+                self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
             }
 
             async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {

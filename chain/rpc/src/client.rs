@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -453,18 +453,20 @@ pub mod native {
     }
 }
 
+type AnvilRpcClient<R> = std::sync::Arc<
+    ethers::middleware::SignerMiddleware<
+        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+    >,
+>;
+
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
-) -> std::sync::Arc<
-    ethers::middleware::SignerMiddleware<
-        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
-    >,
-> {
+) -> AnvilRpcClient<R> {
     use ethers::signers::Signer;
     use hopr_crypto_types::keypairs::Keypair;
 
