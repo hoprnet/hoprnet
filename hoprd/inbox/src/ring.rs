@@ -142,27 +142,21 @@ where
         let specific_tag = self.tag_resolution(tag).unwrap();
 
         self.buffers
-            .get_mut(&specific_tag)
+            .get(&specific_tag)
             .and_then(|buf| buf.peek().map(|w| (w.payload.clone(), w.ts)))
     }
 
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)> {
-        let timestamp = timestamp.unwrap_or(Duration::from_millis(0));
+        let timestamp = timestamp.unwrap_or_default().as_millis();
 
         match tag {
             Some(specific_tag) => {
                 // Peek only all messages of a specific tag
                 self.buffers
-                    .get_mut(&specific_tag)
+                    .get(&specific_tag)
                     .map(|buf| {
                         buf.iter()
-                            .filter_map(|w| {
-                                if w.ts.as_secs() >= timestamp.as_secs() {
-                                    Some((w.payload.clone(), w.ts))
-                                } else {
-                                    None
-                                }
-                            })
+                            .filter_map(|w| (w.ts.as_millis() >= timestamp).then(|| (w.payload.clone(), w.ts)))
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default()
@@ -172,7 +166,10 @@ where
                 let mut all = self
                     .buffers
                     .iter()
-                    .flat_map(|(_, buf)| buf.into_iter())
+                    .flat_map(|(_, buf)| {
+                        buf.iter()
+                            .filter(|w| w.ts.as_millis() >= timestamp)
+                    })
                     .collect::<Vec<_>>();
 
                 // NOTE: this approach is due to the requirement of considering
@@ -180,7 +177,9 @@ where
                 // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
                 all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
-                all.into_iter().map(|w| (w.payload.clone(), w.ts)).collect()
+                all.into_iter()
+                    .map(|w| (w.payload.clone(), w.ts))
+                    .collect()
             }
         }
     }
@@ -458,7 +457,7 @@ mod test {
         rb.push(Some(1), 5).await;
 
         // sleep for 10ms to ensure a break between timestamps
-        async_std::task::sleep(Duration::from_secs(2)).await;
+        async_std::task::sleep(Duration::from_millis(10)).await;
         let close_past = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();

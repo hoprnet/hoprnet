@@ -36,6 +36,7 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
 
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     /// If the optional parameter `timestamp` is provided, only entries more recent than this are returned.
+    /// NOTE: the timestamp comparison precision should be at most up to milliseconds.
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)>;
 
     /// Purges all entries strictly older than the given timestamp.
