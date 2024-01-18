@@ -6,7 +6,7 @@ use hopr_crypto_random::random_float;
 use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
 use hopr_primitive_types::prelude::*;
-use hopr_primitive_types::traits::UnitaryFloatOps;
+use log::warn;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
@@ -177,6 +177,10 @@ where
             return Err(GeneralError::InvalidInput.into());
         }
 
+        if min_hops > max_hops || min_hops == 0 {
+            return Err(GeneralError::InvalidInput.into());
+        }
+
         let mut queue = BinaryHeap::new();
 
         queue.extend(graph.open_channels_from(source).filter_map(|channel| {
@@ -191,7 +195,9 @@ where
 
         let mut iters = 0;
         while let Some(mut current_path) = queue.pop() {
+            // This should not happen. Retrying can help here.
             if iters > self.max_iterations {
+                warn!("Could not find a path from {} to {} with at least {} hops and at most {} hops within {} iterations", source, destination, min_hops, max_hops, self.max_iterations);
                 break;
             }
 
@@ -288,7 +294,7 @@ mod tests {
         assert!(!path.hops().contains(&dst), "path must not contain destination");
     }
 
-    /// Quickly define a graph with edge weight.
+    /// Quickly define a graph with edge weights.
     /// Syntax:
     /// `0 [1] -> 1` => edge from `0` to `1` with edge weight `1`
     /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
@@ -323,7 +329,11 @@ mod tests {
                 src,
                 dest,
                 ChannelStatus::Open,
-                Balance::new(U256::from_str(stake_caps.get(1).unwrap().as_str()).expect("failed to create U256 from given stake"), BalanceType::HOPR),
+                Balance::new(
+                    U256::from_str(stake_caps.get(1).unwrap().as_str())
+                        .expect("failed to create U256 from given stake"),
+                    BalanceType::HOPR,
+                ),
             ));
 
             graph.update_channel_quality(src, dest, quality(src, dest));
