@@ -1,6 +1,6 @@
 [package]
 name = "core-path"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path selection logic"
@@ -32,7 +32,7 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["unstable", "attributes"] }
-regex = { version = "1.9.3" }
+regex = { workspace = true }
 lazy_static = "1.4.0"
 hex-literal = "0.4"
 
