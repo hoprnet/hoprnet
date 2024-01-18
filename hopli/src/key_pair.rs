@@ -14,7 +14,7 @@ use std::{
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
+pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
     let mut results = HashMap::with_capacity(files.len());
 
     for file in files.iter() {

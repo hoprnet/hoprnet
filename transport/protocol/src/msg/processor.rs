@@ -628,11 +628,8 @@ impl PacketInteraction {
                     };
 
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    match &packet {
-                        Ok(TransportPacket::Forwarded { .. }) => {
-                            metadata.start_time = hopr_platform::time::native::current_timestamp();
-                        }
-                        _ => {}
+                    if let Ok(TransportPacket::Forwarded { .. }) = &packet {
+                        metadata.start_time = hopr_platform::time::native::current_timestamp();
                     }
 
                     (packet, metadata)

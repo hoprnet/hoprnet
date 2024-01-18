@@ -395,6 +395,7 @@ impl std::fmt::Debug for Ticket {
 
 impl Ticket {
     /// Creates a new Ticket given the raw Challenge and signs it using the given chain keypair.
+    #[allow(clippy::too_many_arguments)]        // TODO: Refactor to use less inputs
     pub fn new(
         counterparty: &Address,
         amount: &Balance,
@@ -436,6 +437,7 @@ impl Ticket {
     }
 
     /// Creates a ticket with signature attached.
+    #[warn(clippy::too_many_arguments)]         // TODO: Refactor the function to take either less arguments or is more straigtforward
     pub fn new_with_signature(
         own_address: &Address,
         counterparty: &Address,

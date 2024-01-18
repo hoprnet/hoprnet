@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, path::PathBuf};
+use std::{collections::HashMap, fmt, path::Path};
 
 /// Type of environment that HOPR node is running in
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
@@ -71,7 +71,7 @@ pub struct NetworkConfig {
 /// ensures that the network and environment_type exist
 /// in `contracts-addresses.json` and are matched
 pub fn ensure_environment_and_network_are_set(
-    make_root_dir_path: &PathBuf,
+    make_root_dir_path: &Path,
     network: &str,
     environment_type: &str,
 ) -> Result<bool, String> {
@@ -98,7 +98,7 @@ pub fn ensure_environment_and_network_are_set(
 
 /// Returns the environment type from the network name
 /// according to `contracts-addresses.json`
-pub fn get_environment_type_from_name(make_root_dir_path: &PathBuf, network: &str) -> Result<EnvironmentType, String> {
+pub fn get_environment_type_from_name(make_root_dir_path: &Path, network: &str) -> Result<EnvironmentType, String> {
     // read `contracts-addresses.json` at make_root_dir_path
     let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
 

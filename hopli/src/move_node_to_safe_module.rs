@@ -61,28 +61,15 @@ impl MoveNodeToSafeModuleArgs {
         }
 
         // 2. Calculate addresses from the identity file
-        // collect all the peer ids
-        let all_node_addresses: Vec<String>;
-        // check if password is provided
-        let pwd = match password.read_password() {
-            Ok(read_pwd) => read_pwd,
-            Err(e) => return Err(e),
-        };
+        let pwd = password.read_password()?;
 
         // read all the identities from the directory
         let files = local_identity.get_files();
-        match read_identities(files, &pwd) {
-            Ok(node_identities) => {
-                all_node_addresses = node_identities
-                    .values()
-                    .map(|ni| ni.chain_key.public().to_address().to_string())
-                    .collect();
-            }
-            Err(e) => {
-                println!("error {:?}", e);
-                return Err(e);
-            }
-        }
+        let all_node_addresses: Vec<String> = read_identities(files, &pwd)?
+            .values()
+            .map(|ni| ni.chain_key.public().to_address().to_string())
+            .collect();
+
         log!(target: "move_node_to_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // 3. parse safe and module address

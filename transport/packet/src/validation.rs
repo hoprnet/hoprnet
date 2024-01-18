@@ -9,6 +9,7 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 
 /// Performs validations of the given unacknowledged ticket and channel.
+#[allow(clippy::too_many_arguments)]        // TODO: The number of arguments and the logic needs to be refactored
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     db: &T,
     ticket: &Ticket,

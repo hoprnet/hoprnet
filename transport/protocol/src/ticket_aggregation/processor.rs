@@ -181,6 +181,7 @@ impl AggregationList {
 }
 
 /// The input to the processor background pipeline
+#[allow(clippy::type_complexity)]       // TODO: The type needs to be significantly refactored to easily move around
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
@@ -189,6 +190,7 @@ pub enum TicketAggregationToProcess<T, U> {
 }
 
 /// Emitted by the processor background pipeline once processed
+#[allow(clippy::large_enum_variant)]        // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
@@ -599,16 +601,18 @@ impl<T, U> TicketAggregationActions<T, U> {
     }
 }
 
+type AckEventQueue<T, U> = (
+    Sender<TicketAggregationToProcess<T, U>>,
+    Receiver<TicketAggregationProcessed<T, U>>,
+);
+
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
 pub struct TicketAggregationInteraction<T, U>
 where
     T: Send,
     U: Send,
 {
-    ack_event_queue: (
-        Sender<TicketAggregationToProcess<T, U>>,
-        Receiver<TicketAggregationProcessed<T, U>>,
-    ),
+    ack_event_queue: AckEventQueue<T, U>,
 }
 
 impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>

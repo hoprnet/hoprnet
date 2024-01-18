@@ -10,7 +10,7 @@ use std::{
 };
 
 pub struct Batch {
-    #[warn(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
 }
 
