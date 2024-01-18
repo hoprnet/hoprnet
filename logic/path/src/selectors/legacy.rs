@@ -27,8 +27,8 @@ impl PartialOrd for WeightedChannelPath {
 }
 
 impl Ord for WeightedChannelPath {
-    /// Favors not expored paths over fully explored paths,
-    /// there could be better ones.
+    /// Favors unexplored paths over fully explored paths even when a better
+    /// alternative exists.
     ///
     /// Favors longer paths over shorter paths, longer path
     /// means more privacy.
