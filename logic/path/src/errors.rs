@@ -16,6 +16,9 @@ pub enum PathError {
     #[error("channel between {0} and {1} is not opened")]
     ChannelNotOpened(String, String),
 
+    #[error("arithmetic error: {0}")]
+    ArithmeticError(String),
+
     #[error("path contains loop on {0}")]
     LoopsNotAllowed(String),
 

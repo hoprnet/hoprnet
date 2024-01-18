@@ -62,15 +62,14 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
     ///
     /// Sorting the list of weights thus moves nodes with higher stakes more
     /// often to the front.
-    fn calculate_weight(channel: &ChannelEntry) -> U256 {
-        max(
-            U256::one(),
-            channel
-                .balance
-                .amount()
-                .mul_f64(random_float())
-                .expect("Could not multiply edge weight with float"),
-        )
+    fn calculate_weight(channel: &ChannelEntry) -> Result<U256> {
+        let randomized_weight = channel
+            .balance
+            .amount()
+            .mul_f64(random_float())
+            .map_err(|e| PathError::ArithmeticError(e.to_string()))?;
+
+        Ok(max(U256::one(), randomized_weight))
     }
 }
 
@@ -86,6 +85,10 @@ where
     /// Peer quality threshold for a channel to be taken into account.
     /// Default is 0.5
     pub quality_threshold: f64,
+    /// If true, include paths with payment channels, which have no
+    /// funds in it. By default, that option is set to `false` to
+    /// prevent from tickets being dropped immediately.
+    pub allow_zero_edge_weight: bool,
     cw: PhantomData<CW>,
 }
 
@@ -97,6 +100,7 @@ where
         Self {
             max_iterations: 100,
             quality_threshold: 0.5_f64,
+            allow_zero_edge_weight: false,
             cw: PhantomData,
         }
     }
@@ -144,7 +148,7 @@ where
             return false;
         }
 
-        if U256::zero().eq(&channel.channel.balance.amount()) {
+        if !self.allow_zero_edge_weight && U256::zero().eq(&channel.channel.balance.amount()) {
             // We cannot use channels with zero stake
             return false;
         }
@@ -184,25 +188,40 @@ where
 
         queue.extend(graph.open_channels_from(source).filter_map(|channel| {
             let w = channel.weight();
-            self.filter_channel(w, &source, &destination, &[])
-                .then(|| WeightedChannelPath {
-                    path: vec![w.channel.destination],
-                    weight: CW::calculate_weight(&w.channel),
-                    fully_explored: false,
-                })
+
+            match CW::calculate_weight(&w.channel) {
+                Ok(weight) => self
+                    .filter_channel(w, &source, &destination, &[])
+                    .then(|| WeightedChannelPath {
+                        path: vec![w.channel.destination],
+                        weight,
+                        fully_explored: false,
+                    }),
+                Err(e) => {
+                    warn!(
+                        "Unable to calculate path weight for {} due to {}",
+                        w.channel.destination, e
+                    );
+                    None
+                }
+            }
         }));
 
         let mut iters = 0;
         while let Some(mut current) = queue.pop() {
-            // This should not happen. Retrying can help here.
+            let current_len = current.path.len();
+
+            // In case we run out of iterations, check if we can
+            // already use the result, otherwise abort.
             if iters > self.max_iterations {
                 warn!("Could not find a path from {} to {} with at least {} hops and at most {} hops within {} iterations", source, destination, min_hops, max_hops, self.max_iterations);
+                if current_len >= max_hops {
+                    return Ok(ChannelPath::new_valid(current.path));
+                }
                 break;
             }
 
-            let current_len = current.path.len();
-
-            if current_len >= max_hops {
+            if current_len == max_hops {
                 return Ok(ChannelPath::new_valid(current.path));
             }
 
@@ -225,16 +244,28 @@ where
                 .peekable();
 
             if new_channels.peek().is_some() {
-                queue.extend(new_channels.map(|new_channel| {
-                    let mut next_path_variant = WeightedChannelPath {
-                        path: Vec::with_capacity(current_len + 1),
-                        weight: current.weight + CW::calculate_weight(&new_channel.weight().channel),
-                        fully_explored: false,
-                    };
-                    next_path_variant.path.extend(&current.path);
-                    next_path_variant.path.push(new_channel.weight().channel.destination);
+                queue.extend(new_channels.filter_map(|new_channel| {
+                    match CW::calculate_weight(&new_channel.weight().channel) {
+                        Ok(new_weight) => {
+                            let mut next_path_variant = WeightedChannelPath {
+                                path: Vec::with_capacity(current_len + 1),
+                                weight: current.weight + new_weight,
+                                fully_explored: false,
+                            };
+                            next_path_variant.path.extend(&current.path);
+                            next_path_variant.path.push(new_channel.weight().channel.destination);
 
-                    next_path_variant
+                            Some(next_path_variant)
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Unable to calculate path weight for {} due to {}",
+                                new_channel.weight().channel.destination,
+                                e
+                            );
+                            None
+                        }
+                    }
                 }));
             } else {
                 current.fully_explored = true;
@@ -260,6 +291,7 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
+    use crate::errors::Result;
     use crate::path::{ChannelPath, Path};
     use crate::selectors::legacy::DfsPathSelector;
     use crate::selectors::legacy::RandomizedEdgeWeighting;
@@ -393,8 +425,8 @@ mod tests {
 
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
-        fn calculate_weight(channel: &ChannelEntry) -> U256 {
-            channel.balance.amount() + 1u32
+        fn calculate_weight(channel: &ChannelEntry) -> Result<U256> {
+            Ok(channel.balance.amount() + 1u32)
         }
     }
 

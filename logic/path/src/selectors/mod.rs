@@ -14,7 +14,7 @@ where
     W: Default + Add<W, Output = W>,
 {
     /// Edge weighting function.
-    fn calculate_weight(channel: &ChannelEntry) -> W;
+    fn calculate_weight(channel: &ChannelEntry) -> Result<W>;
 
     /// Calculates the total weight of the given outgoing channel path.
     fn total_path_weight(graph: &ChannelGraph, path: ChannelPath) -> Result<W> {
@@ -30,7 +30,7 @@ where
                 return Err(ChannelNotOpened(initial_addr.to_string(), hop.to_string()));
             }
 
-            weight = weight.add(Self::calculate_weight(w));
+            weight = weight.add(Self::calculate_weight(w)?);
             initial_addr = *hop;
         }
 
