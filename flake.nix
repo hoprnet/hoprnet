@@ -211,10 +211,8 @@
             inherit hoprd hopli hoprd-docker anvil-docker hopli-docker;
             default = hoprd;
           };
-          devShells.default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ] ++
-              lib.optionals stdenv.isLinux [ autoPatchelfHook ];
-            buildInputs = with pkgs; [
+          devShells.default = craneLib.devShell {
+            packages = with pkgs; [
               # testing utilities
               jq
               yq-go
@@ -236,8 +234,8 @@
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
-            ];
-            inputsFrom = [ hoprd ];
+            ] ++
+            lib.optionals stdenv.isLinux [ autoPatchelfHook ];
             venvDir = "./.venv";
             postVenvCreation = ''
               unset SOURCE_DATE_EPOCH
