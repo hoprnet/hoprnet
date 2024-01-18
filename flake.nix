@@ -31,14 +31,17 @@
             inherit system overlays;
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-          crateNameFromCargoToml = craneLib.crateNameFromCargoToml {
-            cargoToml = ./hoprd/hoprd/Cargo.toml;
+          hoprdCrateInfo = {
+            pname = "hoprd";
+            version = (craneLib.crateNameFromCargoToml {
+              cargoToml = ./hopr/hopr-lib/Cargo.toml;
+            }).version;
           };
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           ethereumBindings = pkgs.stdenv.mkDerivation {
             pname = "hopr-ethereum-bindings";
-            version = crateNameFromCargoToml.version;
-            src = lib.fileset.toSource {
+            version = hoprdCrateInfo.version;
+            src = fs.toSource {
               root = ./.;
               fileset = fs.unions [
                 (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
@@ -68,6 +71,7 @@
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
               ./hopr/hopr-lib/data
+              ./ethereum/contracts/contracts-addresses.json
             ];
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -89,45 +93,39 @@
             # disable running tests automatically for now
             doCheck = false;
           };
-          hoprdDeps = craneLib.buildDepsOnly (commonArgs // {
-            inherit (crateNameFromCargoToml) pname version;
-            cargoExtraArgs = "--offline -p hoprd";
-            extraDummyScript = ''
-              mkdir -p $out/vendor/cargo
-              cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
-              echo "# placeholder" > $out/vendor/cargo/config.toml
-            '';
-          });
-          hoprd = craneLib.buildPackage (commonArgs // {
-            inherit (crateNameFromCargoToml) pname version;
-            cargoArtifacts = hoprdDeps;
-            cargoExtraArgs = "--offline -p hoprd";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              cp -r ${ethereumBindings}/src ./ethereum/bindings/
-            '';
-          });
-          hopliCrateNameFromCargoToml = craneLib.crateNameFromCargoToml {
+          hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
-          hopliDeps = craneLib.buildDepsOnly (commonArgs // {
-            inherit (hopliCrateNameFromCargoToml) pname version;
-            cargoExtraArgs = "--offline -p hopli";
+          rustPackageDeps = { pname, version }: craneLib.buildDepsOnly (commonArgs // {
+            inherit pname version;
+            cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
               cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          hopli = craneLib.buildPackage (commonArgs // {
-            inherit (hopliCrateNameFromCargoToml) pname version;
-            cargoArtifacts = hopliDeps;
-            cargoExtraArgs = "--offline -p hopli";
+          rustPackage = { pname, version }: cargoArtifacts: craneLib.buildPackage (commonArgs // {
+            inherit pname version cargoArtifacts;
+            cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
             '';
           });
+          rustPackageTest = { pname, version }: cargoArtifacts: craneLib.cargoTest (commonArgs // {
+            inherit pname version cargoArtifacts;
+            cargoExtraArgs = "--offline -p ${pname}";
+            preConfigure = ''
+              echo "# placeholder" > vendor/cargo/config.toml
+              cp -r ${ethereumBindings}/src ./ethereum/bindings/
+            '';
+            doCheck = true;
+          });
+          hoprd = rustPackage hoprdCrateInfo (rustPackageDeps hoprdCrateInfo);
+          hopli = rustPackage hopliCrateInfo (rustPackageDeps hopliCrateInfo);
+          hoprd-test = rustPackageTest hoprdCrateInfo (rustPackageDeps hoprdCrateInfo);
+          hopli-test = rustPackageTest hopliCrateInfo (rustPackageDeps hopliCrateInfo);
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -155,7 +153,7 @@
               ];
             };
           };
-          anvilSrc = lib.fileset.toSource {
+          anvilSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
@@ -208,7 +206,7 @@
             inherit hoprd-docker-build-and-upload hopli-docker-build-and-upload;
           };
           packages = {
-            inherit hoprd hopli hoprd-docker anvil-docker hopli-docker;
+            inherit hoprd hoprd-test hopli hopli-test hoprd-docker anvil-docker hopli-docker;
             default = hoprd;
           };
           devShells.default = craneLib.devShell {

@@ -274,7 +274,7 @@ def create_local_safes(nodes_args: dict, private_key):
         "IDENTITY_PASSWORD": PASSWORD,
         "DEPLOYER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
-        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+        "PATH": os.environ["PATH"],
     }
     for node_id, node_args in nodes_args.items():
         id_file = f"{node_args['dir']}.id"
@@ -315,7 +315,7 @@ def funding_nodes(private_key):
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
         "PRIVATE_KEY": private_key,
-        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+        "PATH": os.environ["PATH"],
     }
     subprocess.run(
         [

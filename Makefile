@@ -20,7 +20,7 @@ PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 # add users home Cargo install path (only once)
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add nix build result path (only once)
-PATH := $(subst :$(mydir)/result/bin,,$(PATH)):$(mydir)/result//bin
+PATH := $(subst :$(mydir)/result/bin,,$(PATH)):$(mydir)/result/bin
 # use custom PATH in all shell processes
 # escape spaces
 SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
