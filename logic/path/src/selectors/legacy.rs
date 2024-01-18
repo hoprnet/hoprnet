@@ -6,12 +6,11 @@ use hopr_crypto_random::random_float;
 use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
 use hopr_primitive_types::prelude::*;
+use hopr_primitive_types::traits::UnitaryFloatOps;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
-use utils_types::errors::GeneralError::InvalidInput;
-use utils_types::primitives::{Address, U256};
 
 /// Holds a weighted channel path and auxiliary information for graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,8 +68,8 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
             U256::one(),
             channel
                 .balance
-                .value()
-                .multiply_f64(random_float())
+                .amount()
+                .mul_f64(random_float())
                 .expect("Could not multiply edge weight with float"),
         )
     }
@@ -146,7 +145,7 @@ where
             return false;
         }
 
-        if U256::zero().eq(channel.channel.balance.value()) {
+        if U256::zero().eq(&channel.channel.balance.amount()) {
             // We cannot use channels with zero stake
             return false;
         }
@@ -324,7 +323,7 @@ mod tests {
                 src,
                 dest,
                 ChannelStatus::Open,
-                Balance::new(U256::new(stake_caps.get(1).unwrap().as_str()), BalanceType::HOPR),
+                Balance::new(U256::from_str(stake_caps.get(1).unwrap().as_str()).expect("failed to create U256 from given stake"), BalanceType::HOPR),
             ));
 
             graph.update_channel_quality(src, dest, quality(src, dest));
