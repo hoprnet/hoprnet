@@ -3,8 +3,7 @@ use crate::errors::{PathError, Result};
 use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
-use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::warn;
 use petgraph::visit::EdgeRef;
@@ -27,8 +26,8 @@ impl PartialOrd for WeightedChannelPath {
 }
 
 impl Ord for WeightedChannelPath {
-    /// Favors not expored paths over fully explored paths,
-    /// there could be better ones.
+    /// Favors unexplored paths over fully explored paths even when a better
+    /// alternative exists.
     ///
     /// Favors longer paths over shorter paths, longer path
     /// means more privacy.
