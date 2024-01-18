@@ -301,7 +301,7 @@ mod tests {
             .await
             .unwrap();
 
-        while let Some(value) = data_stream.next() {
+        for value in data_stream {
             let v = value.unwrap();
 
             if v.as_ref() != value_2.as_bytes() {

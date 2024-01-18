@@ -7,6 +7,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Parser)]
+#[derive(Default)]
 pub struct LocalIdentityFromDirectoryArgs {
     #[clap(
         help = "Path to the directory that stores identity files",
@@ -26,6 +27,7 @@ pub struct LocalIdentityFromDirectoryArgs {
 }
 
 #[derive(Debug, Clone, Parser)]
+#[derive(Default)]
 pub struct LocalIdentityArgs {
     #[clap(help = "Get identity file(s) from a directory", flatten)]
     pub identity_from_directory: Option<LocalIdentityFromDirectoryArgs>,
@@ -39,14 +41,7 @@ pub struct LocalIdentityArgs {
     pub identity_from_path: Option<PathBuf>,
 }
 
-impl Default for LocalIdentityFromDirectoryArgs {
-    fn default() -> Self {
-        LocalIdentityFromDirectoryArgs {
-            identity_directory: None,
-            identity_prefix: None,
-        }
-    }
-}
+
 
 impl LocalIdentityFromDirectoryArgs {
     /// read files from given directory or file path
@@ -80,14 +75,7 @@ impl LocalIdentityFromDirectoryArgs {
     }
 }
 
-impl Default for LocalIdentityArgs {
-    fn default() -> Self {
-        LocalIdentityArgs {
-            identity_from_directory: None,
-            identity_from_path: None,
-        }
-    }
-}
+
 
 impl LocalIdentityArgs {
     /// read files from given directory or file path

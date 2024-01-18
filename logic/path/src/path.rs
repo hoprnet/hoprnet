@@ -108,7 +108,7 @@ impl ChannelPath {
             .iter()
             .map(|addr| {
                 resolver.resolve_packet_key(addr).map(move |opt| {
-                    opt.map(|k| PeerId::from(k.clone()))
+                    opt.map(PeerId::from)
                         .ok_or(InvalidPeer(addr.to_string()))
                 })
             })
@@ -400,7 +400,7 @@ mod tests {
             self.0
                 .iter()
                 .find(|(_, addr)| addr.eq(onchain_key))
-                .map(|(pk, _)| pk.clone())
+                .map(|(pk, _)| *pk)
         }
 
         async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {

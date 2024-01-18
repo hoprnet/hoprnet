@@ -99,16 +99,18 @@ where
     TicketAggregationInteraction::new(db, chain_keypair)
 }
 
+type HoprPingComponents = (
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    UnboundedReceiver<(PeerId, ControlMessage)>,
+    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
+);
+
 pub fn build_manual_ping(
     cfg: core_protocol::config::ProtocolConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> (
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-    UnboundedReceiver<(PeerId, ControlMessage)>,
-    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
-) {
+) -> HoprPingComponents {
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
@@ -158,20 +160,24 @@ where
     )
 }
 
+type HoprHearbeat = Heartbeat<
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    adaptors::heartbeat::HeartbeatExternalInteractions,
+>;
+
+type HoprHeartbeatComponents = (
+    HoprHearbeat,
+    UnboundedReceiver<(PeerId, ControlMessage)>,
+    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
+);
+
 pub fn build_heartbeat(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> (
-    Heartbeat<
-        Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-        adaptors::heartbeat::HeartbeatExternalInteractions,
-    >,
-    UnboundedReceiver<(PeerId, ControlMessage)>,
-    UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
-) {
+) -> HoprHeartbeatComponents {
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
         libp2p_identity::PeerId,
@@ -258,6 +264,7 @@ pub struct HoprTransport {
 }
 
 impl HoprTransport {
+    #[allow(clippy::too_many_arguments)]        // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
         identity: libp2p_identity::Keypair,
         me_onchain: ChainKeypair,

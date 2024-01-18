@@ -233,7 +233,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -453,25 +453,26 @@ pub mod native {
     }
 }
 
+type AnvilRpcClient<R> = std::sync::Arc<
+ethers::middleware::SignerMiddleware<
+    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+>>;
+
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
-) -> std::sync::Arc<
-    ethers::middleware::SignerMiddleware<
-        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
-    >,
-> {
+) -> AnvilRpcClient<R> {
     use ethers::signers::Signer;
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
     let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, SimpleJsonRpcRetryPolicy::default());
-    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10u64));
+    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10_u64));
 
     std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
         provider,

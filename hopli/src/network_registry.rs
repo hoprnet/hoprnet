@@ -92,9 +92,7 @@ impl RegisterInNetworkRegistryArgs {
         log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_chain_addrs.join(","));
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_self_register(&network, &all_chain_addrs.join(","))

@@ -42,41 +42,39 @@
 //! ```rust
 //! use hopr_metrics::metrics::*;
 //!
-//! fn main() {
-//!     let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
+//! let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
 //!
-//!     // Counter can be only incremented by integers only
-//!     metric_counter.increment_by(10);
+//! // Counter can be only incremented by integers only
+//! metric_counter.increment_by(10);
 //!
-//!     let metric_gauge = SimpleGauge::new("test_gauge", "Some testing gauge").unwrap();
+//! let metric_gauge = SimpleGauge::new("test_gauge", "Some testing gauge").unwrap();
 //!
-//!     // Gauges can be incremented and decrements and support floats
-//!     metric_gauge.increment(5.0);
-//!     metric_gauge.decrement(3.2);
+//! // Gauges can be incremented and decrements and support floats
+//! metric_gauge.increment(5.0);
+//! metric_gauge.decrement(3.2);
 //!
-//!     let metric_histogram = SimpleHistogram::new("test_histogram", "Some testing histogram", vec![1.0, 2.0]).unwrap();
+//! let metric_histogram = SimpleHistogram::new("test_histogram", "Some testing histogram", vec![1.0, 2.0]).unwrap();
 //!
-//!     // Histograms can observe floating point values
-//!     metric_histogram.observe(10.1);
+//! // Histograms can observe floating point values
+//! metric_histogram.observe(10.1);
 //!
-//!     // ... and also can be used to measure time durations in seconds
-//!     let timer = metric_histogram.start_measure();
-//!     std::thread::sleep(std::time::Duration::from_secs(1));
-//!     metric_histogram.record_measure(timer);
+//! // ... and also can be used to measure time durations in seconds
+//! let timer = metric_histogram.start_measure();
+//! std::thread::sleep(std::time::Duration::from_secs(1));
+//! metric_histogram.record_measure(timer);
 //!
-//!     // Multi-metrics are labeled extensions
-//!     let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
+//! // Multi-metrics are labeled extensions
+//! let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
 //!
-//!     // Tracks counters per different versions
-//!     metric_counts_per_version.increment_by(&["1.0.0"], 2);
-//!     metric_counts_per_version.increment_by(&["1.0.1"], 1);
+//! // Tracks counters per different versions
+//! metric_counts_per_version.increment_by(&["1.0.0"], 2);
+//! metric_counts_per_version.increment_by(&["1.0.1"], 1);
 //!
-//!     // All metrics live in a global state and can be serialized at any time
-//!     let gathered_metrics = gather_all_metrics();
+//! // All metrics live in a global state and can be serialized at any time
+//! let gathered_metrics = gather_all_metrics();
 //!
-//!     // Metrics are in text format and can be exposed using an HTTP API endpoint
-//!     println!("{:?}", gathered_metrics);
-//! }
+//! // Metrics are in text format and can be exposed using an HTTP API endpoint
+//! println!("{:?}", gathered_metrics);
 //! ```
 //!
 //! ### Usage in JS/TS

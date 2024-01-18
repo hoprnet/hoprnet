@@ -329,7 +329,7 @@ mod tests {
             ADDRESSES[1],
             |_, b| {
                 Balance::new(
-                    (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1),
+                    ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1,
                     BalanceType::HOPR,
                 )
             },

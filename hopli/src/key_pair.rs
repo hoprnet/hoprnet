@@ -14,7 +14,7 @@ use std::{
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
+pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
     let mut results = HashMap::with_capacity(files.len());
 
     for file in files.iter() {
@@ -116,13 +116,13 @@ mod tests {
         let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
         assert_eq!(
-            read_id.values().nth(0).unwrap().chain_key.public().0.to_address(),
+            read_id.values().next().unwrap().chain_key.public().0.to_address(),
             created_id.chain_key.public().0.to_address()
         );
 
         // print the read id
         println!("Debug {:#?}", read_id);
-        println!("Display {}", read_id.values().nth(0).unwrap());
+        println!("Display {}", read_id.values().next().unwrap());
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
@@ -231,14 +231,13 @@ mod tests {
         // create dir if not exist.
         fs::create_dir_all(path).unwrap();
         // save the keystore as file
-        fs::write(PathBuf::from(path).join(&name), weak_crypto_alice_keystore.as_bytes()).unwrap();
+        fs::write(PathBuf::from(path).join(name), weak_crypto_alice_keystore.as_bytes()).unwrap();
 
         let files = get_files(path, &None);
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
         assert_eq!(
-            val.values()
-                .nth(0)
+            val.values().next()
                 .unwrap()
                 .chain_key
                 .public()

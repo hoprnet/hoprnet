@@ -255,7 +255,7 @@ mod tests {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
-        cg.update_channel(c.clone());
+        cg.update_channel(c);
 
         assert!(cg.contains_channel(&c), "must contain channel");
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[1]), "must have simple path");
@@ -270,7 +270,7 @@ mod tests {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
-        cg.update_channel(c.clone());
+        cg.update_channel(c);
 
         assert!(cg.contains_channel(&c), "must contain channel");
         assert!(
@@ -292,8 +292,8 @@ mod tests {
 
         let c1 = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         let c2 = dummy_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open);
-        cg.update_channel(c1.clone());
-        cg.update_channel(c2.clone());
+        cg.update_channel(c1);
+        cg.update_channel(c2);
 
         assert!(cg.is_own_channel(&c1), "must detect as own channel");
         assert!(!cg.is_own_channel(&c2), "must not detect as own channel");
@@ -305,7 +305,7 @@ mod tests {
 
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
 
-        let changes = cg.update_channel(c.clone());
+        let changes = cg.update_channel(c);
         assert!(changes.is_none(), "must not produce changes for a new channel");
 
         let cr = cg
@@ -315,7 +315,7 @@ mod tests {
 
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::PendingToClose;
-        let changes = cg.update_channel(c.clone()).expect("must contain changes");
+        let changes = cg.update_channel(c).expect("must contain changes");
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
@@ -348,7 +348,7 @@ mod tests {
 
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose);
 
-        let changes = cg.update_channel(c.clone());
+        let changes = cg.update_channel(c);
         assert!(changes.is_none(), "must not produce changes for a new channel");
 
         let cr = cg
@@ -358,7 +358,7 @@ mod tests {
 
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::Closed;
-        let changes = cg.update_channel(c.clone()).expect("must contain changes");
+        let changes = cg.update_channel(c).expect("must contain changes");
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
