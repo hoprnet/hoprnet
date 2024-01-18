@@ -51,6 +51,7 @@ pub struct IndexerConfig {
     /// The number of blocks including and decreasing from the chain HEAD
     /// that the logs will be buffered for before being considered
     /// successfully joined to the chain.
+    /// Default is 8.
     pub finalization: u64,
     /// The block at which the indexer should start
     ///
@@ -59,10 +60,12 @@ pub struct IndexerConfig {
     /// relevant smart contracts were introduced into the chain.
     ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
+    /// Default is 0.
     pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
+    /// Default is true.
     pub fetch_token_transactions: bool,
 }
 

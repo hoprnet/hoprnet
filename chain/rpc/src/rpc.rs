@@ -177,6 +177,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction> {
         // This only sets the nonce on the first TX, otherwise it is a no-op
         let _ = self.provider.initialize_nonce(None).await;
+        debug!("send outgoing tx: {:?}", tx);
 
         // Also fills the transaction including the EIP1559 fee estimates from the provider
         let sent_tx = self

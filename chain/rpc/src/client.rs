@@ -233,7 +233,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -471,7 +471,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
     let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, SimpleJsonRpcRetryPolicy::default());
-    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10u64));
+    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10_u64));
 
     std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
         provider,
