@@ -177,6 +177,7 @@ lint-sol: ## run linter for Solidity
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
 	cargo fmt --check
+	#cargo clippy -- -Dwarnings			# cannot be used unless all deprecation notices are removed as well
 
 .PHONY: lint-python
 lint-python: ## run linter for Python

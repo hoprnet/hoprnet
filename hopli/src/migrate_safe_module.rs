@@ -60,8 +60,6 @@ impl MigrateSafeModuleArgs {
 
         // 2. Calculate addresses from the identity file
         let pwd = password.read_password()?;
-        
-
 
         // read all the identities from the directory
         let files = local_identity.get_files();

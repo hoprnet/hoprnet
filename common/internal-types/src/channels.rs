@@ -437,7 +437,7 @@ impl Ticket {
     }
 
     /// Creates a ticket with signature attached.
-    #[warn(clippy::too_many_arguments)]         // TODO: Refactor the function to take either less arguments or is more straigtforward
+    #[allow(clippy::too_many_arguments)]         // TODO: Refactor the function to take either less arguments or is more straigtforward
     pub fn new_with_signature(
         own_address: &Address,
         counterparty: &Address,
