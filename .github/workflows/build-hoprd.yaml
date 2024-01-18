@@ -51,7 +51,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         continue-on-error: true
         env:
           USER: runner
