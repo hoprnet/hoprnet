@@ -1,6 +1,6 @@
 use async_lock::Mutex;
 use async_trait::async_trait;
-use core_types::protocol::{ApplicationData, Tag};
+use hopr_internal_types::prelude::*;
 use std::time::Duration;
 
 use crate::config::MessageInboxConfiguration;
@@ -169,7 +169,7 @@ where
 mod tests {
     use crate::inbox::{MessageInbox, MessageInboxConfiguration};
     use crate::ring::RingBufferInboxBackend;
-    use core_types::protocol::{ApplicationData, Tag};
+    use hopr_internal_types::prelude::*;
     use std::time::Duration;
 
     #[async_std::test]

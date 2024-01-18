@@ -1,6 +1,6 @@
 //! # HOPR Metrics Collection
 //!
-//! The purpose of the `utils-metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
+//! The purpose of the `hopr_metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
 //! over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 //!
 //! The reason for making this wrapper is to make it suitable for `wasm-bindgen` bindings to JS/TS. The
@@ -40,7 +40,7 @@
 //! #### Example use in Rust
 //!
 //! ```rust
-//! use metrics::metrics::*;
+//! use hopr_metrics::metrics::*;
 //!
 //! fn main() {
 //!     let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
@@ -138,7 +138,7 @@
 //! ```js
 //! #[wasm_bindgen]
 //! pub fn my_crate_gather_metrics() -> JsResult<String> {
-//!     metrics::metrics::wasm::gather_all_metrics()
+//!     hopr_metrics::metrics::wasm::gather_all_metrics()
 //! }
 //! ```
 //!

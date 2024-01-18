@@ -7,8 +7,9 @@ use aes::{
     Aes128,
 };
 use hex;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_crypto::random::random_bytes;
+use hopr_crypto_random::random_bytes;
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+use hopr_primitive_types::traits::ToHex;
 use log::{error, info};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -16,11 +17,10 @@ use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
 use crate::errors::KeyPairError::KeyDerivationError;
-use platform::file::native::{metadata, read_to_string, write};
+use hopr_platform::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;
@@ -442,7 +442,7 @@ mod tests {
     use std::fs;
 
     use super::HoprKeys;
-    use hopr_crypto::keypairs::Keypair;
+    use hopr_crypto_types::keypairs::Keypair;
     use tempfile::tempdir;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";

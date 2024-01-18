@@ -4,19 +4,18 @@ use chain_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
-use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use core_types::channels::ChannelDirection::Incoming;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
+use std::ops::Add;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
     time::Duration,
 };
-use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -25,7 +24,8 @@ use crate::{strategy::SingularStrategy, Strategy};
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::prelude::UnitaryFloatOps;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -249,11 +249,11 @@ where
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64);
+            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
             // and there are at least two tickets
-            if unredeemed_value.gte(&diminished_balance) {
+            if unredeemed_value.ge(&diminished_balance) {
                 if aggregatable_tickets > 1 {
                     info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
                     can_aggregate = true;
@@ -282,7 +282,7 @@ where
         direction: ChannelDirection,
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
-        if !self.cfg.aggregate_on_channel_close || direction != Incoming {
+        if !self.cfg.aggregate_on_channel_close || direction != ChannelDirection::Incoming {
             return Ok(());
         }
 
@@ -333,29 +333,19 @@ mod tests {
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
     };
-    use core_types::channels::ChannelDirection::Incoming;
-    use core_types::channels::{ChannelChange, ChannelStatus};
-    use core_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, Ticket},
-    };
     use futures::channel::oneshot::Receiver;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, Response},
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
+    use std::ops::Add;
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
     use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
@@ -419,7 +409,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &destination.into(),
-            &Balance::new(price_per_packet.divide_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
             index.into(),
             1u64.into(),
             ticket_win_prob,
@@ -516,7 +506,7 @@ mod tests {
                     let _ = finalizer.insert(request_finalizer);
                     alice
                         .writer()
-                        .receive_aggregation_request(PEERS[1].public().to_peerid(), acked_tickets, ())
+                        .receive_aggregation_request(PEERS[1].public().into(), acked_tickets, ())
                         .unwrap();
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -526,7 +516,7 @@ mod tests {
             match alice.next().await {
                 Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
                     .writer()
-                    .receive_ticket(PEERS[0].public().to_peerid(), aggregated_ticket, ())
+                    .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
                     .unwrap(),
                 _ => panic!("unexpected action happened"),
             };
@@ -689,7 +679,7 @@ mod tests {
 
         // Make this ticket aggregated
         acked_tickets[0].ticket.index_offset = 2;
-        channel.balance = Balance::new(100_u32.into(), BalanceType::HOPR);
+        channel.balance = Balance::new(100_u32, BalanceType::HOPR);
 
         dbs[0]
             .write()
@@ -794,7 +784,7 @@ mod tests {
         aggregation_strategy
             .on_own_channel_changed(
                 &channel,
-                Incoming,
+                ChannelDirection::Incoming,
                 ChannelChange::Status {
                     left: ChannelStatus::Open,
                     right: ChannelStatus::PendingToClose,

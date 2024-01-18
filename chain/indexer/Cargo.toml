@@ -17,30 +17,26 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
-hex = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
-primitive-types = "0.12.1"
-serde = { version = "1.0", features = ["derive"] }
 thiserror = { workspace = true }
 
-bindings = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
-hopr-crypto = { workspace = true, default-features = false }
-chain-db = { workspace = true, default-features = false }
-chain-rpc = { workspace = true, default-features = false }
-chain-types = { workspace = true, default-features = false }
+bindings = { workspace = true }
+hopr-crypto-types = { workspace = true }
+chain-db = { workspace = true }
+chain-rpc = { workspace = true }
+chain-types = { workspace = true}
 utils-db = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
-utils-types = { workspace = true, default-features = false }
+hopr-metrics = { workspace = true, optional = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-env_logger = "0.10"
 hex-literal = "0.4"
 mockall = "0.11"
+primitive-types = "0.12.2"
 
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "chain-rpc/wasm", "chain-types/wasm", "hopr-crypto/wasm", "core-types/wasm", "utils-db/wasm", "metrics?/wasm", "utils-types/wasm" ]
-prometheus = ["dep:metrics", "chain-rpc/prometheus" ]
+prometheus = ["dep:hopr-metrics", "chain-rpc/prometheus" ]

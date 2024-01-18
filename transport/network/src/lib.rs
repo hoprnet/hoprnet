@@ -1,3 +1,5 @@
+// TODO: docs need extending
+
 //! Primitives and structs for the network components.
 
 pub mod constants;

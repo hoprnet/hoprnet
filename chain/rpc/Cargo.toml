@@ -17,41 +17,32 @@ async-std = { workspace = true, features = ["unstable"] }
 async-stream = "0.3.5"
 ethers = { workspace = true }
 ethers-providers = { version = "2", default-features = false }
-ethnum = { version = "1.3.2", features = ["serde"] }
 futures = { workspace = true }
 futures-timer = { workspace = true }
-hex = { workspace = true }
 http-types = "2.12.0"
 lazy_static = { workspace = true }
 primitive-types = "0.12.1"
-pin-project = "1.1.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 thiserror = { workspace = true }
 validator = { workspace = true }
 
 bindings = { workspace = true }
-core-types = { workspace = true }
-hopr-crypto = { workspace = true }
-chain-db = { workspace = true }
+hopr-crypto-types = { workspace = true }
 chain-types = { workspace = true }
-utils-db = { workspace = true }
 log = { workspace = true }
-metrics = { workspace = true, optional = true }
-utils-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-primitive-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding", "middleware-logger"] }
+surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding"] }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 env_logger = "0.10"
-hex-literal = "0.4"
 mockall = "0.11.4"
 mockito = "1.2.0"
 
-
 [features]
 default = ["prometheus"]
-wasm = [ "chain-db/wasm", "hopr-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
-prometheus = ["dep:metrics"]
+prometheus = ["dep:hopr-metrics"]

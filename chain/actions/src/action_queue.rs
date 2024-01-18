@@ -3,19 +3,12 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
-use core_types::acknowledgement::AcknowledgedTicketStatus;
-use core_types::announcement::AnnouncementData;
-use core_types::{
-    acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus::BeingRedeemed},
-    channels::{
-        ChannelDirection,
-        ChannelStatus::{Closed, Open, PendingToClose},
-    },
-};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -23,7 +16,6 @@ use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use utils_types::primitives::{Address, Balance};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::CoreEthereumActionsError::{
@@ -34,7 +26,7 @@ use crate::errors::Result;
 use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::MultiCounter;
+use hopr_metrics::metrics::MultiCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -179,7 +171,7 @@ where
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
             Action::RedeemTicket(ack) => match ack.status {
-                BeingRedeemed { .. } => {
+                AcknowledgedTicketStatus::BeingRedeemed { .. } => {
                     let tx_hash = self.tx_exec.redeem_ticket(ack.clone()).await?;
                     IndexerExpectation::new(
                         tx_hash,
@@ -198,7 +190,7 @@ where
             }
 
             Action::FundChannel(channel, amount) => {
-                if channel.status == Open {
+                if channel.status == ChannelStatus::Open {
                     let tx_hash = self.tx_exec.fund_channel(channel.destination, amount).await?;
                     IndexerExpectation::new(
                         tx_hash,
@@ -211,20 +203,20 @@ where
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    Open | PendingToClose => {
+                    ChannelStatus::Open | ChannelStatus::PendingToClose => {
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
                             move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-                    Closed => {
+                    ChannelStatus::Closed => {
                         warn!("channel {} is already closed", channel.get_id());
                         return Err(ChannelAlreadyClosed);
                     }
                 },
                 ChannelDirection::Outgoing => match channel.status {
-                    Open => {
+                    ChannelStatus::Open => {
                         debug!("initiating closure of {channel}");
                         let tx_hash = self
                             .tx_exec
@@ -235,8 +227,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-
-                    PendingToClose => {
+                    ChannelStatus::PendingToClose => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec
@@ -247,8 +238,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-
-                    Closed => {
+                    ChannelStatus::Closed => {
                         warn!("channel {} is already closed", channel.get_id());
                         return Err(ChannelAlreadyClosed);
                     }

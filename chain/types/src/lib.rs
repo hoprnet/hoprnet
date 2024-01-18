@@ -15,11 +15,11 @@ use bindings::hopr_token::HoprToken;
 use ethers::abi::Token;
 use ethers::prelude::*;
 use hex_literal::hex;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
-use utils_types::primitives::Address;
 
 pub mod actions;
 pub mod chain_events;

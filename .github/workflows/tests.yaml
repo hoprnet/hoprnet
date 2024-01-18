@@ -41,11 +41,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -95,11 +95,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -125,15 +125,9 @@ jobs:
           HOPR_NETWORK: anvil-localhost
 
   smoke-tests:
-    name: Smoke
+    name: Smoke (integration)
     needs:
       - build
-    strategy:
-      matrix:
-        suite:
-          - integration
-          #- security      TODO: re-enable when fixed
-          #- websocket_api TODO: re-enable when fixed
     runs-on: ubuntu-8-core
     timeout-minutes: 30
     if: github.event.pull_request.draft == false
@@ -161,11 +155,11 @@ jobs:
           version: "v0.7.4"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v13
+      - uses: cachix/cachix-action@v14
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
@@ -188,9 +182,9 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Setup Hoprd Runtime
+      - name: Setup Hoprd
         run: |
-          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+          sudo ./scripts/toolchain/install-toolchain.sh
 
       - name: Build application
         run: nix develop -c make -j build
@@ -199,7 +193,7 @@ jobs:
         run: nix develop -c make -j install
 
       - name: Test with pytest
-        run: nix develop -c make smoke-test suite=${{ matrix.suite }}
+        run: nix develop -c make smoke-test-full
         timeout-minutes: 30
 
       - name: Compress test logs

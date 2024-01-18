@@ -4,7 +4,7 @@ pub mod errors;
 pub mod executors;
 
 pub use chain_types::chain_events::SignificantChainEvent;
-pub use core_types::channels::ChannelEntry;
+pub use hopr_internal_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
 use chain_db::db::CoreEthereumDb;
@@ -18,11 +18,11 @@ use chain_indexer::handlers::ContractEventHandlers;
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
-use core_types::account::AccountEntry;
-use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::account::AccountEntry;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HoprChainError, Result};
 
@@ -79,7 +79,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
         match rpc.get_balance(address, min_balance.balance_type()).await {
             Ok(current_balance) => {
                 info!("current balance is {}", current_balance.to_formatted_string());
-                if current_balance.gte(&min_balance) {
+                if current_balance.ge(&min_balance) {
                     info!("node is funded");
                     return Ok(());
                 } else {

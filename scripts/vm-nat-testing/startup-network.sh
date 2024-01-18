@@ -26,7 +26,7 @@ done
 
 echo "Anvil provider started up!"
 # Copies all the deployment files including the .chainId file
-declare protocol_config="${mydir}/../hopr/data/protocol-config.json"
+declare protocol_config="${mydir}/../hopr/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.json"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"

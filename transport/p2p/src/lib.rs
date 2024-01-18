@@ -35,7 +35,7 @@ use core_protocol::{
     msg::config::MsgProtocolConfig,
     ticket_aggregation::config::TicketAggregationProtocolConfig,
 };
-use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
+use hopr_internal_types::prelude::*;
 pub use libp2p::{
     core as libp2p_core, identity as libp2p_identity, identity, noise as libp2p_noise,
     request_response as libp2p_request_response, swarm as libp2p_swarm, StreamProtocol,
@@ -48,7 +48,7 @@ use libp2p_swarm::{NetworkBehaviour, SwarmBuilder};
 use serde::{Deserialize, Serialize};
 
 use core_network::messaging::ControlMessage;
-use core_types::acknowledgement::Acknowledgement;
+use hopr_internal_types::acknowledgement::Acknowledgement;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);

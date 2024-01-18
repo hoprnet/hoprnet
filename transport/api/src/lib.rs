@@ -1,3 +1,5 @@
+// TODO: docs for crate missing
+
 pub mod adaptors;
 pub mod config;
 pub mod constants;
@@ -7,11 +9,14 @@ mod p2p;
 mod processes;
 mod timer;
 
+/// Object representing different types of output from the transport layer
+#[derive(Clone)]
 pub enum TransportOutput {
     Received(ApplicationData),
     Sent(HalfKeyChallenge),
 }
 
+use std::ops::Add;
 pub use {
     crate::{
         adaptors::network::ExternalNetworkInteractions,
@@ -21,11 +26,11 @@ pub use {
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
     core_p2p::libp2p_identity,
-    core_types::protocol::ApplicationData,
-    hopr_crypto::{
+    hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
+    hopr_internal_types::protocol::ApplicationData,
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::execute_on_tick,
@@ -41,22 +46,18 @@ use core_protocol::{
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationInteraction},
 };
-use core_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{ChannelEntry, Ticket},
-    protocol::TagBloomFilter,
-};
 use futures::{
     channel::mpsc::{Receiver, UnboundedReceiver, UnboundedSender},
     FutureExt, SinkExt,
 };
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
-use utils_types::primitives::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {core_path::path::Path, metrics::metrics::SimpleHistogram};
+use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -67,7 +68,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use {async_std::task::sleep, platform::time::native::current_timestamp};
+use {async_std::task::sleep, hopr_platform::time::native::current_timestamp};
 
 pub fn build_network(
     peer_id: PeerId,
@@ -215,13 +216,13 @@ pub struct TicketStatistics {
     pub losing: u64,
     pub win_proportion: f64,
     pub unredeemed: u64,
-    pub unredeemed_value: utils_types::primitives::Balance,
+    pub unredeemed_value: hopr_primitive_types::primitives::Balance,
     pub redeemed: u64,
-    pub redeemed_value: utils_types::primitives::Balance,
+    pub redeemed_value: hopr_primitive_types::primitives::Balance,
     pub neglected: u64,
-    pub neglected_value: utils_types::primitives::Balance,
+    pub neglected_value: hopr_primitive_types::primitives::Balance,
     pub rejected: u64,
-    pub rejected_value: utils_types::primitives::Balance,
+    pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
 pub struct PublicNodesResult {
@@ -236,11 +237,10 @@ use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
-use core_types::channels::ChannelStatus;
 use futures::future::{select, Either};
 use futures::pin_mut;
-use utils_types::primitives::{Balance, BalanceType};
-use utils_types::traits::PeerIdLike;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct HoprTransport {
@@ -351,7 +351,7 @@ impl HoprTransport {
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
-            let pk = OffchainPublicKey::from_peerid(&destination)?;
+            let pk = OffchainPublicKey::try_from(destination)?;
 
             if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {
                 let selector = LegacyPathSelector::default();
@@ -427,7 +427,7 @@ impl HoprTransport {
         for node in db.get_public_node_accounts().await?.into_iter() {
             if let Ok(Some(v)) = db.get_packet_key(&node.chain_addr).await {
                 public_nodes.push((
-                    v.to_peerid(),
+                    v.into(),
                     node.chain_addr,
                     if let Some(ma) = node.get_multiaddr() {
                         vec![ma]
@@ -444,7 +444,7 @@ impl HoprTransport {
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
         let db = self.db.read().await;
 
-        if let Ok(pk) = OffchainPublicKey::from_peerid(peer) {
+        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
             if let Some(address) = db.get_chain_key(&pk).await.unwrap_or(None) {
                 return db.is_allowed_to_access_network(&address).await.unwrap_or(false);
             }

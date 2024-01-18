@@ -8,13 +8,13 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 use validator::Validate;
 
+use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
 use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
 
-use crate::client::RetryAction::{NoRetry, RetryAfter};
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, MultiHistogram};
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -233,7 +233,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -458,7 +458,7 @@ pub mod native {
 pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
-    signer: &hopr_crypto::keypairs::ChainKeypair,
+    signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> std::sync::Arc<
     ethers::middleware::SignerMiddleware<
         ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
@@ -466,12 +466,12 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
     >,
 > {
     use ethers::signers::Signer;
-    use hopr_crypto::keypairs::Keypair;
+    use hopr_crypto_types::keypairs::Keypair;
 
     let wallet =
         ethers::signers::LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
     let json_client = JsonRpcProviderClient::new(&anvil.endpoint(), backend, SimpleJsonRpcRetryPolicy::default());
-    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10u64));
+    let provider = ethers::providers::Provider::new(json_client).interval(Duration::from_millis(10_u64));
 
     std::sync::Arc::new(ethers::middleware::SignerMiddleware::new(
         provider,
@@ -483,10 +483,10 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 pub mod tests {
     use chain_types::{create_anvil, ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_primitive_types::primitives::Address;
     use serde_json::json;
     use std::time::Duration;
-    use utils_types::primitives::Address;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

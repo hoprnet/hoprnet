@@ -2,19 +2,19 @@ use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-use core_types::channels::ChannelStatus;
-use core_types::protocol::PeerAddressResolver;
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
-use hopr_crypto::types::OffchainPublicKey;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_internal_types::protocol::PeerAddressResolver;
+use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use utils_types::primitives::Address;
-use utils_types::traits::{PeerIdLike, ToHex};
 
 /// Base implementation of an abstract path.
 /// Must contain always at least a single entry.
@@ -108,21 +108,21 @@ impl ChannelPath {
             .hops
             .iter()
             .map(|addr| {
-                resolver
-                    .resolve_packet_key(addr)
-                    .map(move |opt| opt.map(|k| k.to_peerid()).ok_or(InvalidPeer(addr.to_string())))
+                resolver.resolve_packet_key(addr).map(move |opt| {
+                    opt.map(|k| PeerId::from(k.clone()))
+                        .ok_or(InvalidPeer(addr.to_string()))
+                })
             })
             .collect::<FuturesOrdered<_>>()
-            .try_collect::<Vec<_>>()
+            .try_collect::<Vec<PeerId>>()
             .await?;
 
         let last_hop = resolver
             .resolve_packet_key(&destination)
             .await
-            .ok_or(InvalidPeer(destination.to_string()))
-            .map(|key| key.to_peerid())?;
+            .ok_or(InvalidPeer(destination.to_string()))?;
 
-        hops.push(last_hop);
+        hops.push(last_hop.into());
         Ok(TransportPath::new_valid(hops))
     }
 }
@@ -175,7 +175,7 @@ impl TransportPath {
             let (mut addrs, hops): (Vec<Address>, Vec<PeerId>) = peers
                 .into_iter()
                 .map(|peer| async move {
-                    let key = OffchainPublicKey::from_peerid(&peer)?;
+                    let key = OffchainPublicKey::try_from(peer)?;
                     resolver
                         .resolve_chain_key(&key)
                         .await
@@ -217,7 +217,7 @@ impl Path<PeerId> for TransportPath {
 
 impl<T> TryFrom<&TransportPath> for Vec<T>
 where
-    T: PeerIdLike,
+    T: TryFrom<PeerId>,
 {
     type Error = PathError;
 
@@ -225,7 +225,7 @@ where
         value
             .hops()
             .iter()
-            .map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string())))
+            .map(|p| T::try_from(*p).map_err(|_| InvalidPeer(p.to_string())))
             .collect()
     }
 }
@@ -243,16 +243,12 @@ impl Display for TransportPath {
 
 #[cfg(test)]
 mod tests {
-    use crate::channel_graph::ChannelGraph;
-    use crate::path::{ChannelPath, Path, TransportPath};
+    use super::*;
     use async_trait::async_trait;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
-    use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;
-    use hopr_crypto::types::{OffchainPublicKey, PublicKey};
-    use libp2p_identity::PeerId;
-    use utils_types::primitives::{Address, Balance, BalanceType};
-    use utils_types::traits::PeerIdLike;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::channels::ChannelEntry;
+    use hopr_primitive_types::prelude::*;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -424,12 +420,16 @@ mod tests {
             .expect_err("should not resolve path");
     }
 
+    fn make_address_pairs(peer_addrs: Vec<(OffchainPublicKey, Address)>) -> (Vec<PeerId>, Vec<Address>) {
+        peer_addrs.into_iter().map(|(p, a)| (PeerId::from(p), a)).unzip()
+    }
+
     #[async_std::test]
     async fn test_transport_path_resolve_direct() {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1
         let (p, cp) = TransportPath::resolve(vec![peers[1]], &resolver, &cg)
@@ -444,7 +444,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 0
         let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
@@ -459,7 +459,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 3
         let (p, cp) = TransportPath::resolve(vec![peers[3]], &resolver, &cg)
@@ -474,7 +474,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 4 -> 0
         let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
@@ -489,8 +489,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2]], &resolver, &cg)
@@ -510,8 +509,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 4
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[4]], &resolver, &cg)
@@ -531,8 +529,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3]], &resolver, &cg)
@@ -552,8 +549,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 4
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[4]], &resolver, &cg)
@@ -573,8 +569,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 4
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[4]], &resolver, &cg)
@@ -598,8 +593,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 1
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1]], &resolver, &cg)
@@ -623,8 +617,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path 0 -> 1 -> 2 -> 3 -> 1 -> 2
         let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1], peers[2]], &resolver, &cg)
@@ -648,7 +641,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 0 -> 2 -> 3
         TransportPath::resolve(vec![peers[2], peers[3]], &resolver, &cg)
@@ -666,7 +659,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, _) = make_address_pairs(peer_addrs);
 
         // path 2 -> 3 -> 4 -> 0 -> 1
         TransportPath::resolve(vec![peers[3], peers[4], peers[0], peers[1]], &resolver, &cg)
@@ -679,8 +672,7 @@ mod tests {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
         let resolver = TestResolver(peer_addrs.clone());
-        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
-            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+        let (peers, addrs) = make_address_pairs(peer_addrs);
 
         // path: 0 -> 1 -> 2 -> 3
         let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg).expect("path must be constructible");

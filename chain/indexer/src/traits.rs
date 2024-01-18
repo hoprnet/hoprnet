@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use chain_types::chain_events::ChainEventType;
 use ethers::abi::RawLog;
-use utils_types::primitives::{Address, Snapshot};
+use hopr_primitive_types::prelude::*;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]

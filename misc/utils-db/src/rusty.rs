@@ -95,7 +95,7 @@ impl CurrentDbShim {
         }
     }
 
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     pub fn new_in_memory() -> Self {
         Self {
             db: Arc::new(Mutex::new(
@@ -104,7 +104,7 @@ impl CurrentDbShim {
         }
     }
 
-    #[cfg(feature = "wasm")]
+    #[cfg(feature = "js")]
     pub fn new(path: &str, create_if_missing: bool) -> Self {
         let mut opts = wasm::NodeJsEnv::create_options();
         opts.create_if_missing = create_if_missing;
@@ -221,7 +221,7 @@ impl AsyncKVStorage for CurrentDbShim {
     }
 }
 
-#[cfg(any(feature = "wasm", test))]
+#[cfg(any(feature = "js", test))]
 fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u64) {
     log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
@@ -466,12 +466,12 @@ mod tests {
         test_env(
             Box::new(MemEnv::new()),
             Path::new("/"),
-            platform::time::native::current_timestamp().as_millis() as u64,
+            hopr_platform::time::native::current_timestamp().as_millis() as u64,
         )
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(feature = "js")]
 pub mod wasm {
     use crate::rusty::test_env;
     use js_sys::{JsString, Uint8Array};
@@ -560,7 +560,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            platform::time::wasm::current_timestamp() * 1000
+            hopr_platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -876,7 +876,7 @@ pub mod wasm {
         }
 
         fn micros(&self) -> u64 {
-            platform::time::wasm::current_timestamp() * 1000
+            hopr_platform::time::wasm::current_timestamp() * 1000
         }
 
         fn sleep_for(&self, micros: u32) {
@@ -889,7 +889,7 @@ pub mod wasm {
         test_env(
             Box::new(NodeJsEnv::new()),
             Path::new(base_dir),
-            platform::time::wasm::current_timestamp(),
+            hopr_platform::time::wasm::current_timestamp(),
         );
     }
 }

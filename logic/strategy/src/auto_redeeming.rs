@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use core_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -11,7 +11,7 @@ use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleCounter;
+use hopr_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -88,16 +88,13 @@ mod tests {
     use chain_actions::redeem::TicketRedeemActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
-    use hopr_crypto::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use utils_types::traits::BinarySerializable;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -117,7 +114,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &ALICE.public().to_address(),
-            &Balance::new(price_per_packet.divide_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             0_u32.into(),
             idx_offset.into(),
             1.0f64,

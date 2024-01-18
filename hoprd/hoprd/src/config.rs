@@ -1,16 +1,12 @@
 use std::str::FromStr;
 
-use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use core_strategy::{Strategy, Strategy::AutoRedeeming};
-use core_transport::config::HostConfig;
-use utils_types::primitives::Address;
-
-use hopr_lib::{config::HoprLibConfig, ProtocolsConfig};
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig, Strategy, Strategy::AutoRedeeming};
+use hoprd_api::config::{Api, Auth};
+use hoprd_inbox::config::MessageInboxConfiguration;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
@@ -174,7 +170,7 @@ impl From<HoprdConfig> for HoprLibConfig {
     }
 }
 
-use platform::file::native::read_to_string;
+use hopr_platform::file::native::read_to_string;
 
 use log::debug;
 
@@ -275,7 +271,7 @@ impl HoprdConfig {
 
         if let Some(protocol_config) = cli_args.protocol_config_path {
             cfg.hopr.chain.protocols = ProtocolsConfig::from_str(
-                &platform::file::native::read_to_string(&protocol_config)
+                &hopr_platform::file::native::read_to_string(&protocol_config)
                     .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
             )
             .map_err(crate::errors::HoprdError::ConfigError)?;

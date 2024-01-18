@@ -1,23 +1,16 @@
 use std::collections::HashMap;
+use std::ops::{Add, Sub};
 
 use async_trait::async_trait;
-use core_types::channels::ChannelDirection;
-use core_types::{
-    account::AccountEntry,
-    acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
-};
-use hopr_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
     traits::AsyncKVStorage,
-};
-use utils_types::{
-    primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
-    traits::BinarySerializable,
 };
 
 use crate::{errors::Result, traits::HoprCoreEthereumDbActions};
@@ -112,7 +105,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                     .get(&ticket.channel_id)
                     .copied()
                     .unwrap_or(Balance::zero(BalanceType::HOPR))
-                    .add(&ticket.amount);
+                    .add(ticket.amount);
 
                 self.cached_unrealized_value
                     .insert(ticket.channel_id, unrealized_balance);
@@ -148,7 +141,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .get_or_none::<U256>(prefixed_key.clone())
             .await?
             .unwrap_or(U256::zero());
-        let _evicted = self.db.set(prefixed_key, &current_index.addn(1_u32)).await?;
+        let _evicted = self.db.set(prefixed_key, &current_index.add(1_u32)).await?;
         // Ignoring evicted value
         Ok(())
     }
@@ -1343,19 +1336,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_types::channels::ChannelEntry;
     use hex_literal::hex;
-    use hopr_crypto::{
-        keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey, Response},
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::channels::ChannelEntry;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use std::ops::Mul;
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};
-    use utils_types::{
-        primitives::{Address, EthereumChallenge},
-        traits::BinarySerializable,
-    };
 
     const ALICE: [u8; 32] = hex!("37eafd5038311f90fc08d13ff9ee16c6709be666e7d96808ba9a786c18f868a8");
     const BOB: [u8; 32] = hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26");
@@ -1383,7 +1371,7 @@ mod tests {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(PATH_POS),
+                price_per_packet.div_f64(win_prob).unwrap() * U256::from(PATH_POS),
                 BalanceType::HOPR,
             ),
             index.unwrap_or(U256::one()),
@@ -2260,7 +2248,7 @@ mod tests {
 
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         // Among all the 15 (3 epoch * 5 tickets3 epoch * 5 tickets) tickets, only 2 (start_index + tickets_to_generate_per_epoch - current_channel_ticket_index) tickets from the current epoch
-        let cumulated_ticket_balance = ticket_balance.mul(&Balance::new(2_u32.into(), BalanceType::HOPR));
+        let cumulated_ticket_balance = ticket_balance.mul(2);
         assert_eq!(
             unrealized_balance,
             Ok(current_channel_total_balance.sub(&cumulated_ticket_balance))

@@ -1,10 +1,10 @@
-use hopr_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
-use hopr_crypto::shared_keys::SharedSecret;
-use hopr_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use hopr_crypto_sphinx::{
+    derivation::{derive_ack_key_share, derive_own_key_share},
+    shared_keys::SharedSecret,
+};
+use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use hopr_primitive_types::prelude::*;
 use log::error;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::EthereumChallenge;
-use utils_types::traits::BinarySerializable;
 
 use crate::errors::{PacketError, Result};
 
@@ -69,7 +69,7 @@ impl ProofOfRelayString {
 impl BinarySerializable for ProofOfRelayString {
     const SIZE: usize = POR_SECRET_LENGTH;
 
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == POR_SECRET_LENGTH {
             let (next_ticket_challenge, hint) = data.split_at(POR_SECRET_LENGTH / 2);
             Ok(Self {
@@ -77,7 +77,7 @@ impl BinarySerializable for ProofOfRelayString {
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -163,10 +163,10 @@ mod tests {
         pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response, ProofOfRelayString,
         ProofOfRelayValues,
     };
-    use hopr_crypto::derivation::derive_ack_key_share;
-    use hopr_crypto::shared_keys::SharedSecret;
-    use hopr_crypto::types::Response;
-    use utils_types::traits::BinarySerializable;
+    use hopr_crypto_sphinx::derivation::derive_ack_key_share;
+    use hopr_crypto_sphinx::shared_keys::SharedSecret;
+    use hopr_crypto_types::types::Response;
+    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_por_preverify_validate() {

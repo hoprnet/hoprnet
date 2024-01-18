@@ -2,9 +2,10 @@ use crate::channel_graph::{ChannelEdge, ChannelGraph};
 use crate::errors::{PathError, Result};
 use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
-use core_types::channels::ChannelEntry;
-use core_types::protocol::INTERMEDIATE_HOPS;
-use hopr_crypto::random::random_float;
+use hopr_crypto_random::random_float;
+use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_primitive_types::prelude::*;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
@@ -174,7 +175,7 @@ where
         max_hops: usize,
     ) -> Result<ChannelPath> {
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
-            return Err(InvalidInput.into());
+            return Err(GeneralError::InvalidInput.into());
         }
 
         let mut queue = BinaryHeap::new();
@@ -260,11 +261,11 @@ mod tests {
     use crate::selectors::legacy::RandomizedEdgeWeighting;
     use crate::selectors::{EdgeWeighting, PathSelector};
     use core::panic;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use regex::Regex;
     use std::str::FromStr;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -385,7 +386,7 @@ mod tests {
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
         fn calculate_weight(channel: &ChannelEntry) -> U256 {
-            *channel.balance.value() + 1u32
+            channel.balance.amount() + 1u32
         }
     }
 

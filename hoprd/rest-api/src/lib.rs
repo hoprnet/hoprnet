@@ -1,5 +1,4 @@
 //! REST API for the HOPRd node.
-
 pub mod config;
 
 use std::error::Error;
@@ -7,7 +6,11 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use futures::StreamExt;
+use futures_concurrency::stream::Merge;
+use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
+use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::{HeaderName, AUTHORIZATION};
@@ -15,19 +18,22 @@ use tide::http::mime;
 use tide::utils::async_trait;
 use tide::{http::Mime, Request, Response};
 use tide::{Middleware, Next, StatusCode};
+use tide_websockets::{Message, WebSocket};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
 use crate::config::Auth;
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{Address, Balance, BalanceType, Hopr};
+use hopr_lib::{
+    errors::HoprLibError,
+    {Address, Balance, BalanceType, Hopr},
+};
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::{MultiCounter, MultiHistogram};
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -60,6 +66,7 @@ pub struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub aliases: Arc<RwLock<HashMap<String, PeerId>>>,
+    pub websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     pub msg_encoder: Option<MessageEncoder>,
 }
 
@@ -254,11 +261,17 @@ async fn serve_swagger(request: tide::Request<State<'_>>) -> tide::Result<Respon
     }
 }
 
+enum WebSocketInput {
+    Network(TransportOutput),
+    WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
+}
+
 pub async fn run_hopr_api(
     host: &str,
     cfg: &crate::config::Api,
     hopr: hopr_lib::Hopr,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
+    websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
 ) {
     // Prepare alias part of the state
@@ -289,6 +302,7 @@ pub async fn run_hopr_api(
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,
+            websocket_rx,
             aliases,
         });
 
@@ -340,6 +354,76 @@ pub async fn run_hopr_api(
         api.at("/messages/peek").post(messages::peek);
         api.at("/messages/peek-all").post(messages::peek_all);
         api.at("/messages/size").get(messages::size);
+        api.at("/messages/websocket")
+            .get(WebSocket::new(|request: Request<InternalState>, ws_con| {
+                let ws_rx = request.state().websocket_rx.activate_cloned();
+
+                async move {
+                    let mut queue = (
+                        ws_con.clone().map(|v| WebSocketInput::WsInput(v)),
+                        ws_rx.map(|v| WebSocketInput::Network(v)),
+                    )
+                        .merge();
+
+                    while let Some(v) = queue.next().await {
+                        match v {
+                            WebSocketInput::Network(net_in) => match net_in {
+                                TransportOutput::Received(data) => {
+                                    debug!("websocket notifying client with received msg {data}");
+                                    ws_con.send_json(&json!(messages::WebSocketReadMsg::from(data))).await?;
+                                }
+                                TransportOutput::Sent(hkc) => {
+                                    debug!("websocket notifying client with received ack {hkc}");
+                                    ws_con
+                                        .send_json(&json!(messages::WebSocketReadAck::from_ack(hkc)))
+                                        .await?;
+                                }
+                            },
+                            WebSocketInput::WsInput(ws_in) => match ws_in {
+                                Ok(Message::Text(input)) => {
+                                    let data: messages::WebSocketSendMsg = serde_json::from_str(&input)?;
+                                    if data.cmd == "sendmsg" {
+                                        let hopr = request.state().hopr.clone();
+
+                                        // Use the message encoder, if any
+                                        // TODO: remove RLP in 3.0
+                                        let msg_body = request
+                                            .state()
+                                            .msg_encoder
+                                            .as_ref()
+                                            .map(|enc| enc(data.args.body.as_bytes()))
+                                            .unwrap_or_else(|| Box::from(data.args.body.as_bytes()));
+
+                                        let hkc = hopr
+                                            .send_message(
+                                                // data.args.body.into_bytes().into_boxed_slice(),
+                                                msg_body,
+                                                data.args.peer_id,
+                                                data.args.path,
+                                                data.args.hops,
+                                                Some(data.args.tag),
+                                            )
+                                            .await?;
+
+                                        debug!("websocket notifying client with sent ack {hkc}");
+                                        ws_con
+                                            .send_json(&json!(messages::WebSocketReadAck::from_ack_challenge(hkc)))
+                                            .await?;
+                                    } else {
+                                        warn!("skipping an unsupported websocket command '{}'", data.cmd);
+                                    }
+                                }
+                                Ok(_) => {
+                                    warn!("encountered an unsupported websocket input type");
+                                }
+                                Err(e) => error!("failed to get a valid websocket message: {e}"),
+                            },
+                        }
+                    }
+
+                    Ok(())
+                }
+            }));
 
         api.at("/network/price").get(network::price);
 
@@ -670,9 +754,9 @@ mod account {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-      "amount": 20000,
-      "currency": "HOPR"
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "amount": 20000,
+        "currency": "HOPR"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct WithdrawRequest {
@@ -712,7 +796,7 @@ mod account {
             .hopr
             .withdraw(
                 withdraw_req_data.address,
-                Balance::new(withdraw_req_data.amount.into(), withdraw_req_data.currency),
+                Balance::new(withdraw_req_data.amount, withdraw_req_data.currency),
             )
             .await
         {
@@ -724,9 +808,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
-    use core_transport::errors::HoprTransportError;
-    use hopr_lib::Multiaddr;
+    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -734,12 +816,12 @@ mod peers {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "announced": [
-            "/ip4/10.0.2.100/tcp/19093"
-          ],
-          "observed": [
-            "/ip4/10.0.2.100/tcp/19093"
-          ]
+        "announced": [
+        "/ip4/10.0.2.100/tcp/19093"
+        ],
+        "observed": [
+        "/ip4/10.0.2.100/tcp/19093"
+        ]
     }))]
     pub(crate) struct NodePeerInfo {
         #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -825,9 +907,9 @@ mod peers {
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
-                Err(HoprLibError::TransportError(HoprTransportError::Protocol(
-                    core_protocol::errors::ProtocolError::Timeout,
-                ))) => Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build()),
+                Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
+                    Ok(Response::builder(422).body(ApiErrorStatus::Timeout).build())
+                }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
             Err(_) => Ok(Response::builder(400).body(ApiErrorStatus::InvalidPeerId).build()),
@@ -837,11 +919,9 @@ mod peers {
 
 mod channels {
     use super::*;
-    use chain_actions::errors::CoreEthereumActionsError;
-    use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::TryFutureExt;
-    use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_crypto_types::types::Hash;
+    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -873,16 +953,16 @@ mod channels {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "balance": "10000000000000000000",
-      "channelEpoch": 1,
-      "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-      "closureTime": 0,
-      "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-      "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
-      "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
-      "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
-      "status": "Open",
-      "ticketIndex": 0
+        "balance": "10000000000000000000",
+        "channelEpoch": 1,
+        "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+        "closureTime": 0,
+        "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+        "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+        "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+        "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "status": "Open",
+        "ticketIndex": 0
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTopologyChannel {
@@ -912,16 +992,16 @@ mod channels {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "all": [],
-          "incoming": [],
-          "outgoing": [
-            {
-              "balance": "10000000000000000010",
-              "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-              "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-              "status": "Open"
-            }
-          ]
+        "all": [],
+        "incoming": [],
+        "outgoing": [
+        {
+            "balance": "10000000000000000010",
+            "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+            "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+            "status": "Open"
+        }
+        ]
     }))]
     pub(crate) struct NodeChannels {
         pub incoming: Vec<NodeChannel>,
@@ -1148,8 +1228,8 @@ mod channels {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "channelStatus": "PendingToClose",
-      "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
+        "channelStatus": "PendingToClose",
+        "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelReceipt {
@@ -1276,13 +1356,13 @@ mod messages {
     #[derive(Debug, Clone, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     #[schema(example = json!({
-      "body": "Test message",
-      "hops": 1,
-      "path": [
-        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
-      ],
-      "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-      "tag": 20
+        "body": "Test message",
+        "hops": 1,
+        "path": [
+            "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+        ],
+        "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+        "tag": 20
     }))]
     pub(crate) struct SendMessageReq {
         /// The message tag used to filter messages based on application
@@ -1304,7 +1384,7 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-         "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
+        "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct SendMessageRes {
@@ -1388,6 +1468,121 @@ mod messages {
         }
     }
 
+    #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
+    #[schema(value_type = String)] //, format = Binary)]
+    pub struct Text(String);
+
+    #[derive(Debug, Clone, serde::Deserialize)]
+    pub(crate) struct WebSocketSendMsg {
+        pub cmd: String,
+        pub args: SendMessageReq,
+    }
+
+    #[derive(Debug, Clone, serde::Serialize)]
+    pub(crate) struct WebSocketReadMsg {
+        #[serde(rename = "type")]
+        type_: String,
+        pub tag: u16,
+        pub body: String,
+    }
+
+    impl From<hopr_lib::ApplicationData> for WebSocketReadMsg {
+        fn from(value: hopr_lib::ApplicationData) -> Self {
+            Self {
+                type_: "message".into(),
+                tag: value.application_tag.unwrap_or(0),
+                // TODO: Byte order structures should be used instead of the String object
+                body: String::from_utf8_lossy(value.plain_text.as_ref()).to_string(),
+            }
+        }
+    }
+
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize)]
+    pub(crate) struct WebSocketReadAck {
+        #[serde(rename = "type")]
+        type_: String,
+        #[serde_as(as = "DisplayFromStr")]
+        pub id: HalfKeyChallenge,
+    }
+
+    impl WebSocketReadAck {
+        pub fn from_ack(value: HalfKeyChallenge) -> Self {
+            Self {
+                type_: "message-ack".into(),
+                id: value,
+            }
+        }
+
+        pub fn from_ack_challenge(value: HalfKeyChallenge) -> Self {
+            Self {
+                type_: "message-ack-challenge".into(),
+                id: value,
+            }
+        }
+    }
+
+    /// Websocket endpoint exposing a subset of message functions.
+    ///
+    /// Incoming messages from other nodes are sent to the websocket client.
+    ///
+    /// The following message can be set to the server by the client:
+    /// ```json
+    /// {
+    ///     cmd: "sendmsg",
+    ///     args: {
+    ///         peerId: "SOME_PEER_ID",
+    ///         path: [],
+    ///         hops: 1,
+    ///         body: "asdasd",
+    ///         tag: 2
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+    ///
+    /// The following messages may be sent by the server over the Websocket connection:
+    /// ````json
+    /// {
+    ///   type: "message",
+    ///   tag: 12,
+    ///   body: "my example message"
+    /// }
+    ///
+    /// {
+    ///   type: "message-ack",
+    ///   id: "some challenge id"
+    /// }
+    ///
+    /// {
+    ///   type: "message-ack-challenge",
+    ///   id: "some challenge id"
+    /// }
+    ///
+    /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
+    ///
+    /// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
+    #[utoipa::path(
+        get,
+        path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
+        responses(
+            (status = 206, description = "Incoming data", body = Text, content_type = "application/text"),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = [])
+        ),
+        tag = "Messages",
+    )]
+    pub async fn websocket(_req: Request<InternalState>) -> tide::Result<Response> {
+        // Dummy implementation for utoipa, the websocket is created in place inside the tide server
+        return Ok(Response::builder(422)
+            .body(ApiErrorStatus::UnknownFailure("unimplemented".into()))
+            .build());
+    }
+
     /// Delete messages from nodes message inbox.
     #[utoipa::path(
         delete,
@@ -1436,9 +1631,9 @@ mod messages {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-          "body": "Test message 1",
-          "receivedAt": 1704453953073i64,
-          "tag": 20
+        "body": "Test message 1",
+        "receivedAt": 1704453953073i64,
+        "tag": 20
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MessagePopRes {
@@ -1665,12 +1860,8 @@ mod network {
 }
 mod tickets {
     use super::*;
-    use core_protocol::errors::ProtocolError;
-    use core_transport::errors::HoprTransportError;
-    use core_transport::TicketStatistics;
-    use core_types::channels::Ticket;
-    use hopr_crypto::types::Hash;
-    use utils_types::traits::ToHex;
+    use hopr_crypto_types::types::Hash;
+    use hopr_lib::{HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1682,7 +1873,7 @@ mod tickets {
         "indexOffset": 1,
         "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
         "winProb": "1"
-      }))]
+    }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct ChannelTicket {
         #[serde_as(as = "DisplayFromStr")]
@@ -1771,16 +1962,16 @@ mod tickets {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "losingTickets": 0,
-      "neglected": 0,
-      "neglectedValue": "0",
-      "redeemed": 1,
-      "redeemedValue": "100",
-      "rejected": 0,
-      "rejectedValue": "0",
-      "unredeemed": 2,
-      "unredeemedValue": "200",
-      "winProportion": 1
+        "losingTickets": 0,
+        "neglected": 0,
+        "neglectedValue": "0",
+        "redeemed": 1,
+        "redeemedValue": "100",
+        "rejected": 0,
+        "rejectedValue": "0",
+        "unredeemed": 2,
+        "unredeemedValue": "200",
+        "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeTicketStatistics {
@@ -2092,10 +2283,10 @@ mod node {
     }
 
     #[cfg(all(feature = "prometheus", not(test)))]
-    use metrics::metrics::gather_all_metrics as collect_metrics;
+    use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
 
     #[cfg(any(not(feature = "prometheus"), test))]
-    fn collect_metrics() -> Result<String, ApiErrorStatus> {
+    fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
         Err(ApiErrorStatus::UnknownFailure("BUILT WITHOUT METRICS SUPPORT".into()))
     }
 
@@ -2114,7 +2305,7 @@ mod node {
         tag = "Node"
     )]
     pub(crate) async fn metrics(_req: Request<InternalState>) -> tide::Result<Response> {
-        match collect_metrics() {
+        match collect_hopr_metrics() {
             Ok(metrics) => Ok(Response::builder(200)
                 .body(Body::from_string(metrics))
                 .content_type(Mime::from_str("text/plain; version=0.0.4").expect("must set mime type"))
@@ -2126,23 +2317,23 @@ mod node {
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-      "announcedAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "chain": "anvil-localhost",
-      "channelClosurePeriod": 15,
-      "connectivityStatus": "Green",
-      "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-      "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
-      "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
-      "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
-      "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
-      "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
-      "isEligible": true,
-      "listeningAddress": [
-        "/ip4/10.0.2.100/tcp/19092"
-      ],
-      "network": "anvil-localhost"
+        "announcedAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "chain": "anvil-localhost",
+        "channelClosurePeriod": 15,
+        "connectivityStatus": "Green",
+        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+        "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
+        "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
+        "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+        "isEligible": true,
+        "listeningAddress": [
+            "/ip4/10.0.2.100/tcp/19092"
+        ],
+        "network": "anvil-localhost"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodeInfoRes {

@@ -1,18 +1,18 @@
 use async_lock::RwLock;
 use futures::{pin_mut, StreamExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use log::{debug, error, info};
 use std::{collections::VecDeque, sync::Arc};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
-use utils_types::primitives::{Snapshot, U256};
+use hopr_primitive_types::prelude::*;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use metrics::metrics::SimpleGauge;
+use hopr_metrics::metrics::SimpleGauge;
 
 use async_std::task::spawn;
 
@@ -51,6 +51,7 @@ pub struct IndexerConfig {
     /// The number of blocks including and decreasing from the chain HEAD
     /// that the logs will be buffered for before being considered
     /// successfully joined to the chain.
+    /// Default is 8.
     pub finalization: u64,
     /// The block at which the indexer should start
     ///
@@ -59,10 +60,12 @@ pub struct IndexerConfig {
     /// relevant smart contracts were introduced into the chain.
     ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
+    /// Default is 0.
     pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
+    /// Default is true.
     pub fetch_token_transactions: bool,
 }
 
@@ -307,12 +310,11 @@ pub mod tests {
         contract::EthEvent,
     };
     use futures::{join, Stream};
-    use hopr_crypto::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
     use utils_db::{db::DB, CurrentDbShim};
-    use utils_types::traits::PeerIdLike;
-    use utils_types::{primitives::Address, traits::BinarySerializable};
 
     use crate::traits::MockChainLogHandler;
 
@@ -520,7 +522,7 @@ pub mod tests {
 
     fn random_announcement_chain_event() -> ChainEventType {
         ChainEventType::Announcement {
-            peer: OffchainKeypair::random().public().to_peerid(),
+            peer: (*OffchainKeypair::random().public()).into(),
             address: Address::random(),
             multiaddresses: vec![Multiaddr::empty()],
         }

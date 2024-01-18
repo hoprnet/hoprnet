@@ -2,7 +2,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
-use hopr_crypto::types::Hash;
+use hopr_crypto_types::types::Hash;
 use log::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -151,12 +151,11 @@ mod tests {
     use crate::errors::CoreEthereumActionsError;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
-    use hopr_crypto::random::random_bytes;
-    use hopr_crypto::types::Hash;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::types::Hash;
+    use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
-    use utils_types::primitives::Address;
-    use utils_types::traits::BinarySerializable;
 
     #[async_std::test]
     async fn test_expectation_should_resolve() {
