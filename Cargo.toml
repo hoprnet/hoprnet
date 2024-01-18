@@ -52,9 +52,9 @@ getrandom = "0.2.10"
 hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4.0"
-libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519"] }
-libp2p-mplex = "0.40.0"
-libp2p = "0.52.4"
+libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] }
+libp2p-mplex = "0.41.0"
+libp2p = { version = "0.53.2" }
 log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
 rust-stream-ext-concurrent = "1"

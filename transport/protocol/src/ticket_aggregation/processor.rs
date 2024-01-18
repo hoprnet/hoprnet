@@ -16,7 +16,7 @@ use futures_lite::stream::{Stream, StreamExt};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -544,7 +544,7 @@ pub struct TicketAggregationActions<T, U> {
     pub queue: Sender<TicketAggregationToProcess<T, U>>,
 }
 
-pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, RequestId>;
+pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, OutboundRequestId>;
 
 impl<T, U> Clone for TicketAggregationActions<T, U> {
     /// Generic type requires handwritten clone function

@@ -83,33 +83,21 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                {
-                    let mut cfg = libp2p::request_response::Config::default();
-                    cfg.set_request_timeout(hb_cfg.timeout);
-                    cfg
-                },
+                libp2p::request_response::Config::default().with_request_timeout(hb_cfg.timeout),
             ),
             msg: libp2p::request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                {
-                    let mut cfg = libp2p::request_response::Config::default();
-                    cfg.set_request_timeout(msg_cfg.timeout);
-                    cfg
-                },
+                libp2p::request_response::Config::default().with_request_timeout(msg_cfg.timeout),
             ),
             ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                {
-                    let mut cfg = libp2p::request_response::Config::default();
-                    cfg.set_request_timeout(ack_cfg.timeout);
-                    cfg
-                },
+                libp2p::request_response::Config::default().with_request_timeout(ack_cfg.timeout),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<AcknowledgedTicket>,
@@ -119,11 +107,7 @@ impl HoprNetworkBehavior {
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
-                {
-                    let mut cfg = libp2p::request_response::Config::default();
-                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout);
-                    cfg
-                },
+                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_cfg.timeout),
             ),
         }
     }
@@ -222,9 +206,9 @@ pub async fn build_p2p_network(
             mplex_config
         })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        // .with_dns()?
-        // .with_other_transport(|_| transport)
-        // , behavior,
+        .with_dns()
+        .await
+        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_behaviour(|_key| {
             HoprNetworkBehavior::new(
                 protocol_cfg.msg,

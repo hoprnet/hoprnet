@@ -52,7 +52,7 @@ use futures::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
 
@@ -92,7 +92,7 @@ pub fn build_network(
 pub fn build_ticket_aggregation<Db>(
     db: Arc<RwLock<Db>>,
     chain_keypair: &ChainKeypair,
-) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
+) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
@@ -258,7 +258,7 @@ pub struct HoprTransport {
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
-    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
 }
@@ -274,7 +274,7 @@ impl HoprTransport {
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
-        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {

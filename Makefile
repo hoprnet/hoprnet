@@ -155,7 +155,7 @@ smoke-test: ## run smoke test suite defained via parameter suite=
 	source .venv/bin/activate && python3 -m pytest tests/test_$(suite).py
 
 .PHONY: smoke-test-full
-smoke-test-full: ## run smoke tests
+smoke-test-full: ## run smoke testss
 	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: smart-contract-test

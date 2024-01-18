@@ -21,7 +21,7 @@ use futures::{
 };
 use futures_concurrency::stream::Merge;
 use hopr_internal_types::prelude::*;
-use libp2p::request_response::RequestId;
+use libp2p::request_response::OutboundRequestId;
 use log::{debug, error, info};
 use std::collections::{HashMap, HashSet};
 
@@ -34,7 +34,7 @@ pub enum Inputs {
     ManualPing(api::ManualPingChallenge),
     NetworkUpdate(NetworkEvent),
     Message(MsgProcessed),
-    TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>),
+    TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>),
     Acknowledgement(AckProcessed),
     Indexer(IndexerProcessed),
 }
@@ -69,8 +69,8 @@ impl From<MsgProcessed> for Inputs {
     }
 }
 
-impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>> for Inputs {
-    fn from(value: TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>) -> Self {
+impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>> for Inputs {
+    fn from(value: TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>) -> Self {
         Self::TicketAggregation(value)
     }
 }
@@ -121,7 +121,10 @@ pub async fn p2p_loop(
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
-    ticket_aggregation_interactions: TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    ticket_aggregation_interactions: TicketAggregationInteraction<
+        ResponseChannel<Result<Ticket, String>>,
+        OutboundRequestId,
+    >,
     heartbeat_requests: api::HeartbeatRequester,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
@@ -155,9 +158,11 @@ pub async fn p2p_loop(
     let mut pkt_writer = pkt_interactions.writer();
     let mut aggregation_writer = ticket_aggregation_interactions.writer();
 
-    let mut active_manual_pings: HashSet<libp2p::request_response::RequestId> = HashSet::new();
-    let mut active_aggregation_requests: HashMap<libp2p::request_response::RequestId, TicketAggregationFinalizer> =
-        HashMap::new();
+    let mut active_manual_pings: HashSet<libp2p::request_response::OutboundRequestId> = HashSet::new();
+    let mut active_aggregation_requests: HashMap<
+        libp2p::request_response::OutboundRequestId,
+        TicketAggregationFinalizer,
+    > = HashMap::new();
 
     let mut allowed_peers: HashSet<PeerId> = HashSet::new();
 
@@ -564,6 +569,7 @@ pub async fn p2p_loop(
                 } => {
                     debug!("Dialing peer {:?}, connection id: {:?}", peer_id, connection_id)
                 },
+                _ => error!("Unimplemented message type in p2p processing chain encountered")
             }
         }
     }
