@@ -5,9 +5,7 @@ use async_lock::RwLock;
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 pub use core_p2p::api;
 use core_p2p::{
-    libp2p::request_response::ResponseChannel,
-    libp2p::swarm::SwarmEvent,
-    HoprNetworkBehaviorEvent, Ping, Pong,
+    libp2p::request_response::ResponseChannel, libp2p::swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_protocol::{
     ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
@@ -29,7 +27,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::TransportOutput;
 
-#[allow(clippy::large_enum_variant)]        // TODO: refactor the large types used in the enum
+#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum Inputs {
     Heartbeat(api::HeartbeatChallenge),
@@ -114,7 +112,7 @@ fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::er
 /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
 ///
 /// This future can only be resolved by an unrecoverable error or a panic.
-#[allow(clippy::too_many_arguments)]        // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub async fn p2p_loop(
     version: String,
     me: libp2p::identity::Keypair,
@@ -133,7 +131,9 @@ pub async fn p2p_loop(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
-    let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg).await.expect("swarm must be constructible");
+    let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
+        .await
+        .expect("swarm must be constructible");
 
     for multiaddress in my_multiaddresses.iter() {
         match alter_multiaddress_to_allow_listening(multiaddress) {

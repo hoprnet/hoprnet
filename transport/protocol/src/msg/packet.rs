@@ -30,7 +30,7 @@ pub enum TransportPacket {
 }
 
 #[async_trait::async_trait]
-#[allow(clippy::wrong_self_convention)]      // TODO: The `from_*` and `into_*` should take self, not a reference
+#[allow(clippy::wrong_self_convention)] // TODO: The `from_*` and `into_*` should take self, not a reference
 pub trait PacketConstructing {
     type Input;
 

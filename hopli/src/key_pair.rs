@@ -237,7 +237,8 @@ mod tests {
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
         assert_eq!(
-            val.values().next()
+            val.values()
+                .next()
                 .unwrap()
                 .chain_key
                 .public()

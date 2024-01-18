@@ -26,10 +26,8 @@ use core_protocol::{
     ack::config::AckProtocolConfig,
     config::ProtocolConfig,
     constants::{
-        HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
-        HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, 
-        HOPR_MESSAGE_PROTOCOL_V_0_1_0,
-        HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0, self,
+        self, HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_PROTOCOL_V_0_1_0,
+        HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
     },
     heartbeat::config::HeartbeatProtocolConfig,
     msg::config::MsgProtocolConfig,
@@ -38,16 +36,13 @@ use core_protocol::{
 
 pub use libp2p;
 
-use libp2p::{
-    swarm::NetworkBehaviour,
-    StreamProtocol,
-};
+use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
 
 use serde::{Deserialize, Serialize};
 
 use core_network::messaging::ControlMessage;
-use hopr_internal_types::prelude::*;
 use hopr_internal_types::acknowledgement::Acknowledgement;
+use hopr_internal_types::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
@@ -65,7 +60,8 @@ pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
-    pub ticket_aggregation: libp2p::request_response::cbor::Behaviour<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+    pub ticket_aggregation:
+        libp2p::request_response::cbor::Behaviour<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -191,7 +187,6 @@ impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkB
     }
 }
 
-
 /// Build objects comprising the p2p network.
 ///
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
@@ -201,39 +196,35 @@ pub async fn build_p2p_network(
 ) -> crate::errors::Result<libp2p::Swarm<HoprNetworkBehavior>> {
     Ok(libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
-        .with_tcp(
-            Default::default(),
-            libp2p::noise::Config::new,
-            || {
-                let mut mplex_config = libp2p_mplex::MplexConfig::new();
+        .with_tcp(Default::default(), libp2p::noise::Config::new, || {
+            let mut mplex_config = libp2p_mplex::MplexConfig::new();
 
-                // libp2p default is 128
-                // we use more to accomodate many concurrent messages
-                // FIXME: make value configurable
-                mplex_config.set_max_num_streams(1024);
-            
-                // libp2p default is 32 Bytes
-                // we use the default for now
-                // FIXME: benchmark and find appropriate values
-                mplex_config.set_max_buffer_size(32);
-            
-                // libp2p default is 8 KBytes
-                // we use the default for now, max allowed would be 1MB
-                // FIXME: benchmark and find appropriate values
-                mplex_config.set_split_send_size(8 * 1024);
-            
-                // libp2p default is Block
-                // Alternative is ResetStream
-                // FIXME: benchmark and find appropriate values
-                mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
+            // libp2p default is 128
+            // we use more to accomodate many concurrent messages
+            // FIXME: make value configurable
+            mplex_config.set_max_num_streams(1024);
 
-                mplex_config
-            },
-        )
+            // libp2p default is 32 Bytes
+            // we use the default for now
+            // FIXME: benchmark and find appropriate values
+            mplex_config.set_max_buffer_size(32);
+
+            // libp2p default is 8 KBytes
+            // we use the default for now, max allowed would be 1MB
+            // FIXME: benchmark and find appropriate values
+            mplex_config.set_split_send_size(8 * 1024);
+
+            // libp2p default is Block
+            // Alternative is ResetStream
+            // FIXME: benchmark and find appropriate values
+            mplex_config.set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block);
+
+            mplex_config
+        })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         // .with_dns()?
         // .with_other_transport(|_| transport)
-        // , behavior, 
+        // , behavior,
         .with_behaviour(|_key| {
             HoprNetworkBehavior::new(
                 protocol_cfg.msg,
@@ -243,9 +234,7 @@ pub async fn build_p2p_network(
             )
         })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_swarm_config(|cfg| {
-            cfg.with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT)
-        })
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT))
         .build())
 }
 

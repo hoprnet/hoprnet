@@ -4,8 +4,6 @@ import pytest
 import time
 import asyncio
 import re
-import rlp
-from contextlib import asynccontextmanager
 
 import websocket
 import websockets

@@ -250,8 +250,9 @@ pub mod tests {
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
         sleep(timeout).await;
-        pending.await.unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds",
-            timeout.as_secs()));
+        pending
+            .await
+            .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
     }
 
     #[async_std::test]

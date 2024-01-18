@@ -264,7 +264,7 @@ pub struct HoprTransport {
 }
 
 impl HoprTransport {
-    #[allow(clippy::too_many_arguments)]        // TODO: Needs refactoring and cleanup once rearchitected
+    #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
         identity: libp2p::identity::Keypair,
         me_onchain: ChainKeypair,
