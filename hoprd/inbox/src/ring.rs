@@ -166,10 +166,7 @@ where
                 let mut all = self
                     .buffers
                     .iter()
-                    .flat_map(|(_, buf)| {
-                        buf.iter()
-                            .filter(|w| w.ts.as_millis() >= timestamp)
-                    })
+                    .flat_map(|(_, buf)| buf.iter().filter(|w| w.ts.as_millis() >= timestamp))
                     .collect::<Vec<_>>();
 
                 // NOTE: this approach is due to the requirement of considering
@@ -177,9 +174,7 @@ where
                 // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
                 all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
-                all.into_iter()
-                    .map(|w| (w.payload.clone(), w.ts))
-                    .collect()
+                all.into_iter().map(|w| (w.payload.clone(), w.ts)).collect()
             }
         }
     }

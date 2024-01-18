@@ -2,10 +2,10 @@
 //!
 //! This executable offers functionalities associated with configuration management
 //! of the HOPRd node configuration.
-//! 
+//!
 //! ## Help
 //! ```shell
-//! ➜   hoprd-cfg --help 
+//! ➜   hoprd-cfg --help
 //! Contains the main entry point of HOPR daemon application
 //!
 //! Usage: hoprd-cfg [OPTIONS]
@@ -16,7 +16,7 @@
 //!   -h, --help                 Print help
 //!   -V, --version              Print version
 //! ```
-//! 
+//!
 //! ## Dump a default configuration file
 //! ```shell
 //! ➜   hoprd-cfg -d     
@@ -24,17 +24,17 @@
 //! host:
 //!   address: !IPv4 0.0.0.0
 //!   port: 9091
-//! 
+//!
 //! ... <snip>
-//! 
+//!
 //! ```
-//! 
+//!
 //! ## Validate an existing configuration YAML
-//! 
+//!
 //! ```shell
 //! ➜   hoprd-cfg -v /tmp/bad-config.yaml
 //! Error: ValidationError("The specified network 'anvil-localhost' is not listed as supported ([\"debug-staging\", \"dufour\", \"rotsee\"])")
-//! 
+//!
 //! ➜   echo $?
 //! 1
 //! ```
@@ -57,17 +57,19 @@ struct CliArgs {
     validate: Option<PathBuf>,
 }
 
-
 fn main() -> Result<(), hoprd::errors::HoprdError> {
     let args = CliArgs::parse();
 
     if args.default {
-        println!("{}",
+        println!(
+            "{}",
             serde_yaml::to_string(&hoprd::config::HoprdConfig::default())
                 .map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?
         );
     } else if let Some(cfg_path) = args.validate {
-        let cfg_path = cfg_path.into_os_string().into_string()
+        let cfg_path = cfg_path
+            .into_os_string()
+            .into_string()
             .map_err(|e| hoprd::errors::HoprdError::ConfigError("file path not convertible".into()))?;
 
         let yaml_configuration = hopr_platform::file::native::read_to_string(&cfg_path)
