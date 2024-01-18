@@ -27,23 +27,24 @@ jobs:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-  build_anvil:
-    name: Anvil
-    uses: ./.github/workflows/build-anvil.yaml
-    secrets:
-      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+        # FIXME: disabled in CI until working via nix
+        # build_anvil:
+        #   name: Anvil
+        #   uses: ./.github/workflows/build-anvil.yaml
+        #   secrets:
+        #     GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+        #     GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-  build_pluto:
-    name: Pluto
-    needs:
-      - build_anvil
-      - build_hoprd
-      - build_hopli
-    uses: ./.github/workflows/build-pluto.yaml
-    secrets:
-      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+        # build_pluto:
+        #   name: Pluto
+        #   needs:
+        #     - build_anvil
+        #     - build_hoprd
+        #     - build_hopli
+        #   uses: ./.github/workflows/build-pluto.yaml
+        #   secrets:
+        #     GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+        #     GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
   docs:
     name: Docs
