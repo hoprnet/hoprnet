@@ -156,7 +156,8 @@ where
                     .get(&specific_tag)
                     .map(|buf| {
                         buf.iter()
-                            .filter_map(|w| (w.ts.as_millis() >= timestamp).then(|| (w.payload.clone(), w.ts)))
+                            .filter(|&w| w.ts.as_millis() >= timestamp)
+                            .map(|w| (w.payload.clone(), w.ts))
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default()
