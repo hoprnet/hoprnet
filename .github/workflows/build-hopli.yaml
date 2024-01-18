@@ -56,7 +56,7 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
         env:
-          USER: root
+          USER: runner
 
       - name: "Update version"
         id: update
