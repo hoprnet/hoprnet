@@ -17,6 +17,7 @@ chrono = "0.4.26"
 fern = "0.6.2"
 futures = { workspace = true }
 hex = { workspace = true }
+home = "0.5"
 humantime = "2.1.0"
 lazy_static = { workspace = true, optional = true }
 log = { workspace = true }

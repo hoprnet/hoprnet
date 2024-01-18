@@ -25,7 +25,7 @@ pub use {
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
-    core_p2p::libp2p_identity,
+    core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -180,7 +180,7 @@ pub fn build_heartbeat(
 ) -> HoprHeartbeatComponents {
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-        libp2p_identity::PeerId,
+        libp2p::identity::PeerId,
         std::result::Result<(ControlMessage, String), ()>,
     )>();
 
@@ -266,7 +266,7 @@ pub struct HoprTransport {
 impl HoprTransport {
     #[allow(clippy::too_many_arguments)]        // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
-        identity: libp2p_identity::Keypair,
+        identity: libp2p::identity::Keypair,
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,

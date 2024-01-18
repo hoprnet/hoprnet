@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};

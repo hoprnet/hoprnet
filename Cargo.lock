@@ -3332,6 +3332,7 @@ dependencies = [
  "fern",
  "futures",
  "hex",
+ "home",
  "hopr-lib",
  "hopr-metrics",
  "hopr-platform",
