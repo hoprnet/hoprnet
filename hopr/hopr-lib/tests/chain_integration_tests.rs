@@ -20,7 +20,7 @@ use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
 use futures::StreamExt;
 use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_primitive_types::prelude::*;
-use log::debug;
+use log::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
 use utils_db::db::DB;
@@ -28,7 +28,9 @@ use utils_db::CurrentDbShim;
 
 #[async_std::test]
 async fn integration_test_indexer() {
-    let anvil = create_anvil(Some(Duration::from_secs(4)));
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let anvil = create_anvil(Some(Duration::from_secs(2)));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
     let node_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
     let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
@@ -75,7 +77,16 @@ async fn integration_test_indexer() {
         SurfRequestor::default(),
         SimpleJsonRpcRetryPolicy::default(),
     );
-    let rpc_ops = RpcOperations::new(json_rpc_client, &node_chain_key, RpcOperationsConfig::default())
+    let rpc_cfg = RpcOperationsConfig {
+        chain_id: anvil.chain_id(),
+        tx_confirmations: 3,
+        contract_addrs: contract_addrs.clone(),
+        module_address: module_addr,
+        expected_block_time: Duration::from_secs(2),
+        tx_polling_interval: Duration::from_millis(100),
+        logs_page_size: 100
+    };
+    let rpc_ops = RpcOperations::new(json_rpc_client, &node_chain_key, rpc_cfg)
         .expect("failed to create RpcOperations");
 
     // Transaction executor
@@ -87,8 +98,8 @@ async fn integration_test_indexer() {
 
     // Actions
     let actions_cfg = ActionQueueConfig {
-        max_action_confirmation_wait: Duration::from_secs(60),
-    }; // use lower action confirmation limit
+        max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
+    };
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
     let actions = CoreEthereumActions::new(
@@ -114,14 +125,24 @@ async fn integration_test_indexer() {
         node_chain_key.public().to_address(),
         db.clone(),
     );
+    let indexer_cfg = IndexerConfig {
+        finalization: 2,
+        start_block_number: 1,
+        fetch_token_transactions: true,
+    };
     let mut indexer = Indexer::new(
         rpc_ops.clone(),
         chain_log_handler,
         db.clone(),
-        IndexerConfig::default(),
+        indexer_cfg,
         sce_tx,
     );
     indexer.start().await.expect("indexer should sync");
+
+    info!("======== STARTING TEST ========");
+    info!("-- contracts: {:?}", contract_addrs);
+    info!("-- safe address: {safe_addr}");
+    info!("-- module address: {module_addr}");
 
     // ----------------
     // Test plan:
