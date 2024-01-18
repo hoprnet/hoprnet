@@ -72,4 +72,5 @@ jobs:
       - name: Build and push docker image
         run: nix run .#hopli-docker-build-and-upload
         env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ steps.update.outputs.DOCKER_TAG }}
