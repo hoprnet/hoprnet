@@ -68,7 +68,7 @@ fn main() -> Result<(), hoprd::errors::HoprdError> {
         );
     } else if let Some(cfg_path) = args.validate {
         let cfg_path = cfg_path.into_os_string().into_string()
-            .map_err(|e| hoprd::errors::HoprdError::ConfigError("file path not convertible".into()))?;
+            .map_err(|_| hoprd::errors::HoprdError::ConfigError("file path not convertible".into()))?;
 
         let yaml_configuration = hopr_platform::file::native::read_to_string(&cfg_path)
             .map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?;

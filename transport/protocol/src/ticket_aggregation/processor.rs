@@ -181,6 +181,7 @@ impl AggregationList {
 }
 
 /// The input to the processor background pipeline
+#[allow(clippy::type_complexity)]       // TODO: The type needs to be significantly refactored to easily move around
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
@@ -189,6 +190,7 @@ pub enum TicketAggregationToProcess<T, U> {
 }
 
 /// Emitted by the processor background pipeline once processed
+#[allow(clippy::large_enum_variant)]        // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
@@ -599,16 +601,18 @@ impl<T, U> TicketAggregationActions<T, U> {
     }
 }
 
+type AckEventQueue<T, U> = (
+    Sender<TicketAggregationToProcess<T, U>>,
+    Receiver<TicketAggregationProcessed<T, U>>,
+);
+
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
 pub struct TicketAggregationInteraction<T, U>
 where
     T: Send,
     U: Send,
 {
-    ack_event_queue: (
-        Sender<TicketAggregationToProcess<T, U>>,
-        Receiver<TicketAggregationProcessed<T, U>>,
-    ),
+    ack_event_queue: AckEventQueue<T, U>,
 }
 
 impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U>
@@ -738,17 +742,13 @@ mod tests {
     use super::{AggregationList, TicketAggregationProcessed};
 
     lazy_static! {
-        static ref PEERS: Vec<OffchainKeypair> = vec![
-            hex!("b91a28ff9840e9c93e5fafd581131f0b9f33f3e61b02bf5dd83458aa0221f572"),
-            hex!("82283757872f99541ce33a47b90c2ce9f64875abf08b5119a8a434b2fa83ea98")
-        ]
+        static ref PEERS: Vec<OffchainKeypair> = [hex!("b91a28ff9840e9c93e5fafd581131f0b9f33f3e61b02bf5dd83458aa0221f572"),
+            hex!("82283757872f99541ce33a47b90c2ce9f64875abf08b5119a8a434b2fa83ea98")]
         .iter()
         .map(|private| OffchainKeypair::from_secret(private).unwrap())
         .collect();
-        static ref PEERS_CHAIN: Vec<ChainKeypair> = vec![
-            hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a"),
-            hex!("e1f89073a01831d0eed9fe2c67e7d65c144b9d9945320f6d325b1cccc2d124e9"),
-        ]
+        static ref PEERS_CHAIN: Vec<ChainKeypair> = [hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a"),
+            hex!("e1f89073a01831d0eed9fe2c67e7d65c144b9d9945320f6d325b1cccc2d124e9")]
         .iter()
         .map(|private| ChainKeypair::from_secret(private).unwrap())
         .collect();

@@ -221,8 +221,8 @@ where
                     }
                 }
 
-                while let Some(logs) = unconfirmed_events.get(0) {
-                    if let Some(log) = logs.get(0) {
+                while let Some(logs) = unconfirmed_events.front() {
+                    if let Some(log) = logs.first() {
                         if log.block_number + finalization <= current_block {
                             if let Err(error) = db
                                 .write()
@@ -576,7 +576,7 @@ pub mod tests {
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
         let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events.into());
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         assert!(indexer.start().await.is_ok());
 
         tx.close_channel();

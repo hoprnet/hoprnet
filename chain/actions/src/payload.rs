@@ -102,7 +102,7 @@ fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
             tx.set_data(
                 TransferCall {
                     recipient: destination.into(),
-                    amount: amount.amount().into(),
+                    amount: amount.amount(),
                 }
                 .encode()
                 .into(),
@@ -596,7 +596,7 @@ pub mod tests {
         hopr_token: &U256,
         hopr_token_contract: HoprToken<M>,
         client: Arc<M>,
-    ) -> () {
+    ) {
         let node_address = H160::from_slice(&node.to_bytes());
         let native_transfer_tx = Eip1559TransactionRequest::new().to(node_address).value(native_token);
         client
@@ -607,7 +607,7 @@ pub mod tests {
             .unwrap();
 
         hopr_token_contract
-            .transfer(node_address, hopr_token.clone())
+            .transfer(node_address, *hopr_token)
             .send()
             .await
             .unwrap()

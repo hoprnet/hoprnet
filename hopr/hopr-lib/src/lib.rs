@@ -51,10 +51,7 @@ use core_transport::{
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use hopr_internal_types::prelude::*;
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use hopr_primitive_types::prelude::*;
-use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use log::{error, info};
 use utils_db::db::DB;
@@ -154,6 +151,8 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
+/// 
+#[allow(clippy::too_many_arguments)]        // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn to_chain_events_refresh_process<Db, S>(
     me: PeerId,
     me_onchain: Address,
@@ -287,6 +286,8 @@ where
 }
 
 /// Main builder of the hopr lib components
+#[allow(clippy::type_complexity)]       // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)]    // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn build_components<FSaveTbf>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,

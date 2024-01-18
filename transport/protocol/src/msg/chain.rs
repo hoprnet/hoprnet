@@ -282,7 +282,7 @@ mod tests {
                 self.0
                     .iter()
                     .find(|(_, addr)| addr.eq(onchain_key))
-                    .map(|(pk, _)| pk.clone())
+                    .map(|(pk, _)| *pk)
             }
 
             async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {

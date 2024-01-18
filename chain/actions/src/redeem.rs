@@ -391,7 +391,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
         // and then all Charlie's tickets get redeemed
@@ -399,7 +399,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t| charlie_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
@@ -492,7 +492,7 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
-            .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
@@ -576,11 +576,11 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 2)
-            .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
+            .withf(move |t| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned().skip(2) {
+        for tkt in tickets.iter().skip(2).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -668,13 +668,12 @@ mod tests {
             .withf(move |t| {
                 tickets_clone[ticket_from_previous_epoch_count..]
                     .iter()
-                    .find(|tk| tk.ticket.eq(&t.ticket))
-                    .is_some()
+                    .any(|tk| tk.ticket.eq(&t.ticket))
             })
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned().skip(ticket_from_previous_epoch_count) {
+        for tkt in tickets.iter().skip(ticket_from_previous_epoch_count).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -749,13 +748,12 @@ mod tests {
             .withf(move |t| {
                 tickets_clone[ticket_from_next_epoch_count..]
                     .iter()
-                    .find(|tk| tk.ticket.eq(&t.ticket))
-                    .is_some()
+                    .any(|tk| tk.ticket.eq(&t.ticket))
             })
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
-        for tkt in tickets.iter().cloned().skip(ticket_from_next_epoch_count) {
+        for tkt in tickets.iter().skip(ticket_from_next_epoch_count).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
