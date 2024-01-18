@@ -3265,6 +3265,7 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-transport",
+ "env_logger",
  "futures",
  "hopr-internal-types",
  "hopr-metrics",
