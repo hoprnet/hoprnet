@@ -1,6 +1,6 @@
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
@@ -13,11 +13,10 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_primitive_types::sma::{SingleSumSMA, SMA};
-use hopr_primitive_types::traits::PeerIdLike;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Sub;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -147,14 +146,14 @@ where
             .await
             .all_peers_with_avg_quality()
             .iter()
-            .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(peer) {
+            .filter_map(|(peer, q)| match OffchainPublicKey::try_from(peer) {
                 Ok(offchain_key) => Some((offchain_key, q)),
                 Err(_) => {
                     error!("encountered invalid peer id: {peer}");
                     None
                 }
             })
-            .map(|(key, q)| async {
+            .map(|(key, q)| async move {
                 let k_clone = key;
                 match self
                     .db
@@ -293,7 +292,7 @@ where
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
-                if remaining_balance.lte(&self.cfg.minimum_node_balance) {
+                if remaining_balance.le(&self.cfg.minimum_node_balance) {
                     warn!("ran out of allowed node balance - balance is {remaining_balance}");
                     break;
                 }
@@ -409,12 +408,10 @@ mod tests {
     };
     use futures::{future::ok, FutureExt};
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus};
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_platform::time::native::current_timestamp;
-    use hopr_primitive_types::primitives::{Snapshot, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
@@ -422,7 +419,7 @@ mod tests {
     lazy_static! {
         static ref PEERS: Vec<(Address, PeerId)> = (0..10)
             .into_iter()
-            .map(|_| (Address::random(), OffchainKeypair::random().public().to_peerid()))
+            .map(|_| (Address::random(), OffchainKeypair::random().public().into()))
             .collect();
     }
 
@@ -505,7 +502,7 @@ mod tests {
         for (chain_key, peer_id) in PEERS.iter() {
             d.link_chain_and_packet_keys(
                 chain_key,
-                &OffchainPublicKey::from_peerid(peer_id).unwrap(),
+                &OffchainPublicKey::try_from(*peer_id).unwrap(),
                 &Snapshot::default(),
             )
             .await

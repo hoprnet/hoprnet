@@ -18,9 +18,9 @@ use chain_indexer::handlers::ContractEventHandlers;
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
+use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
 
@@ -79,7 +79,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
         match rpc.get_balance(address, min_balance.balance_type()).await {
             Ok(current_balance) => {
                 info!("current balance is {}", current_balance.to_formatted_string());
-                if current_balance.gte(&min_balance) {
+                if current_balance.ge(&min_balance) {
                     info!("node is funded");
                     return Ok(());
                 } else {

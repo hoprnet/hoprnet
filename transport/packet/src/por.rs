@@ -3,9 +3,7 @@ use hopr_crypto_sphinx::{
     shared_keys::SharedSecret,
 };
 use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::primitives::EthereumChallenge;
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_primitive_types::prelude::*;
 use log::error;
 
 use crate::errors::{PacketError, Result};
@@ -79,7 +77,7 @@ impl BinarySerializable for ProofOfRelayString {
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 

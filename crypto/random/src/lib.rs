@@ -3,13 +3,13 @@
 //!
 //! Instead of relying on external crates, all HOPR crates in this monorepo should
 //! exclusively rely on randomness functions only from this crate.
-//! Besided that, the `OsRng` type exported from this crate can be used, if a type implementing
+//! Besides that, the `OsRng` type exported from this crate can be used, if a type implementing
 //! random traits is needed.
 
 use generic_array::{ArrayLength, GenericArray};
-use rand::{Rng, RngCore};
 
 pub use rand::rngs::OsRng;
+pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.

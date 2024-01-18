@@ -12,17 +12,11 @@ use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use hopr_crypto_types::types::OffchainSignature;
-use hopr_internal_types::{
-    account::{AccountEntry, AccountType},
-    announcement::KeyBinding,
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
-};
-use hopr_primitive_types::{
-    primitives::{Address, Balance, BalanceType, Snapshot, U256},
-    traits::PeerIdLike,
-};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use log::{debug, error};
 use multiaddr::Multiaddr;
+use std::ops::Sub;
 use std::{str::FromStr, sync::Arc};
 
 #[derive(Debug, Clone)]
@@ -80,7 +74,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                     if let Some(ma) = account.get_multiaddr() {
                         return Ok(Some(ChainEventType::Announcement {
-                            peer: account.public_key.to_peerid(),
+                            peer: account.public_key.into(),
                             address: account.chain_addr,
                             multiaddresses: vec![ma],
                         }));
@@ -145,7 +139,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    let new_balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
+                    let new_balance = Balance::new(balance_decreased.new_balance, BalanceType::HOPR);
                     let diff = channel.balance.sub(&new_balance);
                     channel.balance = new_balance;
 
@@ -161,7 +155,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    let new_balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
+                    let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
                     let diff = new_balance.sub(&channel.balance);
                     channel.balance = new_balance;
 
@@ -230,7 +224,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     .unwrap_or(ChannelEntry::new(
                         source,
                         destination,
-                        Balance::new(0u64.into(), hopr_primitive_types::primitives::BalanceType::HOPR),
+                        Balance::new(0_u64, BalanceType::HOPR),
                         0u64.into(),
                         ChannelStatus::Open,
                         1u64.into(),
@@ -354,10 +348,10 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
-                    db.add_hopr_balance(&Balance::new(transfered.value.into(), BalanceType::HOPR), snapshot)
+                    db.add_hopr_balance(&Balance::new(transfered.value, BalanceType::HOPR), snapshot)
                         .await?;
                 } else if from.eq(&self.safe_address) {
-                    db.sub_hopr_balance(&Balance::new(transfered.value.into(), BalanceType::HOPR), snapshot)
+                    db.sub_hopr_balance(&Balance::new(transfered.value, BalanceType::HOPR), snapshot)
                         .await?;
                 }
             }
@@ -372,7 +366,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    db.set_staking_safe_allowance(&Balance::new(approved.value.into(), BalanceType::HOPR), snapshot)
+                    db.set_staking_safe_allowance(&Balance::new(approved.value, BalanceType::HOPR), snapshot)
                         .await?;
                 } else {
                     return Ok(None);
@@ -620,25 +614,15 @@ pub mod tests {
     };
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::ContractAddresses;
+    use ethers::contract::EthEvent;
     use ethers::{
         abi::{encode, Address as EthereumAddress, RawLog, Token},
-        prelude::*,
         types::U256 as EthU256,
     };
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::Hash,
-    };
-    use hopr_internal_types::{
-        account::{AccountEntry, AccountType},
-        announcement::KeyBinding,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
-    };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
     use utils_db::{db::DB, CurrentDbShim};
@@ -894,7 +878,7 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let value = U256::max();
+        let value = U256::max_value();
 
         let transferred_log = RawLog {
             topics: vec![
@@ -929,7 +913,7 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let value = U256::max();
+        let value = U256::max_value();
 
         db.write()
             .await
@@ -1366,8 +1350,8 @@ pub mod tests {
                 .unwrap()
                 .unwrap()
                 .balance
-                .value(),
-            &solidity_balance
+                .amount(),
+            solidity_balance
         );
     }
 
@@ -1454,8 +1438,8 @@ pub mod tests {
                 .unwrap()
                 .unwrap()
                 .balance
-                .value(),
-            &solidity_balance
+                .amount(),
+            solidity_balance
         );
     }
 
@@ -1516,7 +1500,7 @@ pub mod tests {
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());
 
-        assert!(closed_channel.balance.value().eq(&U256::zero()));
+        assert!(closed_channel.balance.amount().eq(&U256::zero()));
         assert!(current_ticket_index.eq(&U256::zero()));
     }
 

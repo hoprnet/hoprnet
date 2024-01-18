@@ -1,18 +1,15 @@
+use serde::{Deserialize, Serialize};
+
 use crate::errors::GeneralError::ParseError;
 use crate::errors::Result;
-use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 /// A generic type that can be converted to a hexadecimal string.
-pub trait ToHex {
+pub trait ToHex: Sized {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
 
     /// Tries to parse the type from the hexadecimal representation.
-    fn from_hex(str: &str) -> Result<Self>
-    where
-        Self: Sized;
+    fn from_hex(str: &str) -> Result<Self>;
 }
 
 /// A type that can be serialized and deserialized to a binary form.
@@ -74,21 +71,10 @@ where
     }
 }
 
-/// A generic type which can be equivalently and completely represented by a PeerID
-pub trait PeerIdLike: Sized {
-    /// Creates type from a PeerID representation
-    fn from_peerid(peer_id: &PeerId) -> Result<Self>;
-
-    /// Converts type to a PeerID representation
-    fn to_peerid(&self) -> PeerId;
-
-    /// Creates instance from base-58 PeerId representation
-    fn from_peerid_str(peer_id: &str) -> Result<Self> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_| ParseError)?)
-    }
-
-    /// Outputs base-58 PeerId representation
-    fn to_peerid_str(&self) -> String {
-        self.to_peerid().to_base58()
-    }
+/// Allows type to be multiplied and divided by a float in range [0.0, 1.0].
+pub trait UnitaryFloatOps: Sized {
+    /// Multiply with float in the interval [0.0, 1.0]
+    fn mul_f64(&self, rhs: f64) -> Result<Self>;
+    /// Divide by float in the interval (0.0, 1.0]
+    fn div_f64(&self, rhs: f64) -> Result<Self>;
 }

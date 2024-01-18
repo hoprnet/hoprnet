@@ -291,6 +291,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-broadcast"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "334d75cf09b33bede6cbc20e52515853ae7bee3d4eadd9540e13ce92af983d34"
+dependencies = [
+ "event-listener 3.1.0",
+ "event-listener-strategy 0.1.0",
+ "futures-core",
+]
+
+[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -309,7 +320,7 @@ checksum = "1ca33f4bc4ed1babef42cad36cc1f51fa88be00420404e5b1e80ab1b18f7678c"
 dependencies = [
  "concurrent-queue",
  "event-listener 4.0.3",
- "event-listener-strategy",
+ "event-listener-strategy 0.4.0",
  "futures-core",
  "pin-project-lite 0.2.13",
 ]
@@ -437,7 +448,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d034b430882f8381900d3fe6f0aaa3ad94f2cb4ac519b429692a1bc2dda4ae7b"
 dependencies = [
  "event-listener 4.0.3",
- "event-listener-strategy",
+ "event-listener-strategy 0.4.0",
  "pin-project-lite 0.2.13",
 ]
 
@@ -594,6 +605,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "async-tungstenite"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07b30ef0ea5c20caaa54baea49514a206308989c68be7ecd86c7f956e4da6378"
+dependencies = [
+ "futures-io",
+ "futures-util",
+ "log",
+ "pin-project-lite 0.2.13",
+ "tungstenite",
 ]
 
 [[package]]
@@ -763,6 +787,7 @@ name = "bindings"
 version = "0.1.0"
 dependencies = [
  "ethers",
+ "serde",
 ]
 
 [[package]]
@@ -1096,7 +1121,6 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
- "env_logger",
  "ethers",
  "futures",
  "hex-literal",
@@ -1147,9 +1171,7 @@ dependencies = [
 name = "chain-types"
 version = "0.8.0"
 dependencies = [
- "async-std",
  "bindings",
- "env_logger",
  "ethers",
  "hex",
  "hex-literal",
@@ -1466,14 +1488,12 @@ dependencies = [
  "async-std",
  "core-network",
  "core-protocol",
- "env_logger",
  "futures",
  "futures-lite 1.13.0",
  "hopr-internal-types",
  "libp2p",
  "libp2p-mplex",
  "log",
- "more-asserts",
  "serde",
  "thiserror",
  "void",
@@ -1483,13 +1503,10 @@ dependencies = [
 name = "core-packet"
 version = "0.7.0"
 dependencies = [
- "async-process",
  "async-std",
  "async-trait",
  "chain-db",
- "chain-types",
  "core-path",
- "env_logger",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -1501,7 +1518,6 @@ dependencies = [
  "log",
  "mockall",
  "parameterized",
- "serial_test",
  "thiserror",
  "typenum",
  "utils-db",
@@ -1525,10 +1541,8 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "log",
- "mockall",
  "petgraph",
  "serde",
- "tempfile",
  "thiserror",
  "utils-db",
 ]
@@ -1560,7 +1574,6 @@ dependencies = [
  "log",
  "more-asserts",
  "parameterized",
- "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
@@ -2217,26 +2230,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enum-iterator"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7add3873b5dd076766ee79c8e406ad1a472c385476b9e38849f8eec24f1be689"
-dependencies = [
- "enum-iterator-derive",
-]
-
-[[package]]
-name = "enum-iterator-derive"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eecf8589574ce9b895052fa12d69af7a233f99e6107f5cb8dd1044f2a17bfdcb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.48",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2550,15 +2543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ethnum"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2583,6 +2567,16 @@ checksum = "67b215c49b2b248c855fb73579eb1f4f26c38ffdc12973e20e07b91d78d5646e"
 dependencies = [
  "concurrent-queue",
  "parking",
+ "pin-project-lite 0.2.13",
+]
+
+[[package]]
+name = "event-listener-strategy"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15c97b4e30ea7e4b7e7b429d6e2d8510433ba8cee4e70dfb3243794e539d29fd"
+dependencies = [
+ "event-listener 3.1.0",
  "pin-project-lite 0.2.13",
 ]
 
@@ -3240,7 +3234,6 @@ dependencies = [
  "bincode",
  "bindings",
  "bloomfilter",
- "enum-iterator",
  "ethers",
  "hex-literal",
  "hopr-crypto-random",
@@ -3252,6 +3245,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_repr",
+ "strum 0.25.0",
  "thiserror",
 ]
 
@@ -3313,16 +3307,15 @@ name = "hopr-primitive-types"
 version = "0.3.2"
 dependencies = [
  "bincode",
- "ethnum",
  "hex",
  "hex-literal",
- "libp2p-identity",
+ "hopr-crypto-random",
  "primitive-types",
- "rand 0.8.5",
  "regex",
  "ringbuffer",
  "rlp",
  "serde",
+ "strum 0.25.0",
  "thiserror",
 ]
 
@@ -3330,6 +3323,7 @@ dependencies = [
 name = "hoprd"
 version = "2.1.0"
 dependencies = [
+ "async-broadcast",
  "async-lock 2.8.0",
  "async-std",
  "chrono",
@@ -3360,9 +3354,11 @@ dependencies = [
 name = "hoprd-api"
 version = "0.2.0"
 dependencies = [
+ "async-broadcast",
  "async-std",
  "const_format",
  "futures",
+ "futures-concurrency",
  "hopr-crypto-types",
  "hopr-lib",
  "hopr-metrics",
@@ -3375,6 +3371,7 @@ dependencies = [
  "serde_with",
  "strum 0.25.0",
  "tide",
+ "tide-websockets",
  "utoipa",
  "utoipa-swagger-ui",
  "validator",
@@ -3723,6 +3720,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0c10553d664a4d0bcff9f4215d0aac67a639cc68ef660840afe309b807bc9f5"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "input_buffer"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f97967975f448f1a7ddb12b0bc41069d09ed6a1c161a92687e057325db35d413"
+dependencies = [
+ "bytes",
 ]
 
 [[package]]
@@ -6150,6 +6156,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha-1"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99cd6713db3cf16b6c84e06321e049a9b9f699826e16096d23bbcc44d15d51a6"
+dependencies = [
+ "block-buffer 0.9.0",
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.9.0",
+ "opaque-debug",
+]
+
+[[package]]
 name = "sha1"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6953,6 +6972,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "tide-websockets"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3592c5cb5cb1b7a2ff3a0e5353170c1bb5b104b2f66dd06f73304169b52cc725"
+dependencies = [
+ "async-dup",
+ "async-std",
+ "async-tungstenite",
+ "base64 0.13.1",
+ "futures-util",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "sha-1",
+ "tide",
+]
+
+[[package]]
 name = "time"
 version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7282,6 +7319,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
+name = "tungstenite"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
+dependencies = [
+ "base64 0.13.1",
+ "byteorder",
+ "bytes",
+ "http",
+ "httparse",
+ "input_buffer",
+ "log",
+ "rand 0.8.5",
+ "sha-1",
+ "thiserror",
+ "url",
+ "utf-8",
+]
+
+[[package]]
 name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7442,6 +7499,12 @@ name = "urlencoding"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
+
+[[package]]
+name = "utf-8"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
 name = "utf8parse"

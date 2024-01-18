@@ -16,16 +16,10 @@ use core_packet::errors::PacketError::{
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
-use hopr_crypto_types::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{HalfKeyChallenge, OffchainPublicKey},
-};
-use hopr_internal_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use hopr_internal_types::channels::Ticket;
-use hopr_internal_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
-use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
-use hopr_primitive_types::traits::{BinarySerializable, PeerIdLike};
 use log::{debug, error, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
@@ -126,7 +120,7 @@ where
             .db
             .read()
             .await
-            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
+            .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
             .await?
             .ok_or_else(|| {
                 debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
@@ -179,7 +173,7 @@ where
                     payload.extend_from_slice(&ticket.to_bytes());
 
                     Ok(TransportPacket::Outgoing {
-                        next_hop: next_hop.to_peerid(),
+                        next_hop: next_hop.into(),
                         ack_challenge,
                         data: payload.into_boxed_slice(),
                     })
@@ -209,7 +203,7 @@ where
 
                 Ok(TransportPacket::Final {
                     packet_tag,
-                    previous_hop: previous_hop.to_peerid(),
+                    previous_hop: previous_hop.into(),
                     plain_text,
                     ack,
                 })
@@ -237,8 +231,8 @@ where
                             MissingDomainSeparator
                         })?;
 
-                let previous_peer = previous_hop.to_peerid();
-                let next_peer = next_hop.to_peerid();
+                let previous_peer = previous_hop.into();
+                let next_peer = next_hop.into();
 
                 // START: channel = get_channel_from_to(packet_key, packet_key)
                 let previous_hop_addr =
@@ -431,7 +425,7 @@ where
 
             let amount = Balance::new(
                 price_per_packet
-                    .divide_f64(TICKET_WIN_PROB)
+                    .div_f64(TICKET_WIN_PROB)
                     .expect("winning probability outside of allowed interval (0.0, 1.0]")
                     * U256::from(path_pos - 1),
                 BalanceType::HOPR,
@@ -835,20 +829,9 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
-    };
-    use hopr_internal_types::protocol::PeerAddressResolver;
-    use hopr_internal_types::{
-        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
-        channels::{ChannelEntry, ChannelStatus},
-        protocol::{Tag, TagBloomFilter},
-    };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::PeerIdLike,
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use log::debug;
@@ -1028,7 +1011,7 @@ mod tests {
         for (ack_key, _) in sent_challenges.clone() {
             ack_interaction_counterparty
                 .writer()
-                .send_acknowledgement(PEERS[0].public().to_peerid(), Acknowledgement::new(ack_key, &PEERS[1]))
+                .send_acknowledgement(PEERS[0].public().into(), Acknowledgement::new(ack_key, &PEERS[1]))
                 .expect("failed to send ack");
 
             // emulate channel to another peer
@@ -1036,7 +1019,7 @@ mod tests {
                 Some(value) => match value {
                     AckProcessed::Send(_, ack) => ack_interaction_sender
                         .writer()
-                        .receive_acknowledgement(PEERS[1].public().to_peerid(), ack)
+                        .receive_acknowledgement(PEERS[1].public().into(), ack)
                         .expect("failed to receive ack"),
                     _ => panic!("Unexpected incoming acknowledgement detected"),
                 },
@@ -1146,11 +1129,11 @@ mod tests {
                 .expect("pkt_sender should have sent a packet")
             {
                 MsgProcessed::Send(peer, data) => {
-                    assert_eq!(peer, PEERS[1].public().to_peerid());
+                    assert_eq!(peer, PEERS[1].public().into());
                     components[1]
                         .1
                         .writer()
-                        .receive_packet(data, PEERS[0].public().to_peerid())
+                        .receive_packet(data, PEERS[0].public().into())
                         .expect("Send to relayer should succeed")
                 }
                 _ => panic!("Should have gotten a send request"),
@@ -1166,8 +1149,8 @@ mod tests {
                     .expect("MSG relayer should forward a msg to the next")
                 {
                     MsgProcessed::Forward(peer, data, previous_peer, ack) => {
-                        assert_eq!(peer, PEERS[i + 1].public().to_peerid());
-                        assert_eq!(previous_peer, PEERS[i - 1].public().to_peerid());
+                        assert_eq!(peer, PEERS[i + 1].public().into());
+                        assert_eq!(previous_peer, PEERS[i - 1].public().into());
                         assert_ne!(
                             i,
                             component_length - 1,
@@ -1176,12 +1159,12 @@ mod tests {
                         components[i + 1]
                             .1
                             .writer()
-                            .receive_packet(data, PEERS[i].public().to_peerid())
+                            .receive_packet(data, PEERS[i].public().into())
                             .expect("Send of ack from relayer to receiver should succeed");
                         assert!(components[i - 1]
                             .0
                             .writer()
-                            .receive_acknowledgement(PEERS[i].public().to_peerid(), ack)
+                            .receive_acknowledgement(PEERS[i].public().into(), ack)
                             .is_ok());
                     }
                     MsgProcessed::Receive(_peer, packet, ack) => {
@@ -1190,7 +1173,7 @@ mod tests {
                         assert!(components[i - 1]
                             .0
                             .writer()
-                            .receive_acknowledgement(PEERS[i].public().to_peerid(), ack)
+                            .receive_acknowledgement(PEERS[i].public().into(), ack)
                             .is_ok());
                     }
                     _ => panic!("Should have gotten a send request or a final packet"),
@@ -1203,7 +1186,7 @@ mod tests {
                     .expect("MSG relayer should forward a msg to the next")
                 {
                     AckProcessed::Receive(peer, reply) => {
-                        assert_eq!(peer, PEERS[i].public().to_peerid());
+                        assert_eq!(peer, PEERS[i].public().into());
                         assert!(reply.is_ok());
 
                         match reply.unwrap() {
@@ -1233,7 +1216,7 @@ mod tests {
     async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
         let peers_addrs = peers
             .iter()
-            .map(|p| (OffchainPublicKey::from_peerid(p).unwrap(), Address::random()))
+            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
             .collect::<Vec<_>>();
         let mut cg = ChannelGraph::new(Address::random());
         let mut last_addr = cg.my_address();
@@ -1241,7 +1224,7 @@ mod tests {
             let c = ChannelEntry::new(
                 last_addr,
                 *addr,
-                Balance::new(1000u32.into(), BalanceType::HOPR),
+                Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
                 0u32.into(),
@@ -1292,7 +1275,7 @@ mod tests {
         let packet_path = resolve_mock_path(
             PEERS[1..peer_count]
                 .iter()
-                .map(|p| p.public().to_peerid())
+                .map(|p| p.public().into())
                 .collect::<Vec<PeerId>>(),
         )
         .await;

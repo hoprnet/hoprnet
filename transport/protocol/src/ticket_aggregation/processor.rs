@@ -13,19 +13,14 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use hopr_crypto_types::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
-use hopr_internal_types::{
-    acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, ChannelEntry, Ticket},
-};
-use hopr_primitive_types::{
-    primitives::{Balance, BalanceType},
-    traits::PeerIdLike,
-};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use log::{debug, error, info, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};
 
 use futures::stream::FuturesUnordered;
@@ -35,6 +30,7 @@ use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
+
 use hopr_primitive_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -252,7 +248,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .read()
             .await
             .get_chain_key(
-                &OffchainPublicKey::from_peerid(&destination)
+                &OffchainPublicKey::try_from(destination)
                     .expect("Invalid PeerId. Could not convert to OffchainPublicKey"),
             )
             .await?
@@ -334,7 +330,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).addn(1);
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
         self.db
             .write()
@@ -422,7 +418,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         // calculate the new current ticket index
         let current_ticket_index_from_aggregated_ticket =
-            U256::from(aggregated_ticket.index).addn(aggregated_ticket.index_offset);
+            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
 
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
@@ -485,7 +481,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             ))
         })?;
 
-        Ok((source_peer_id.to_peerid(), tickets_to_aggregate))
+        Ok((source_peer_id.into(), tickets_to_aggregate))
     }
 }
 
@@ -731,16 +727,10 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
-    use hopr_internal_types::{
-        acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
-    };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike},
-    };
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use std::ops::{Add, Mul};
     use std::{sync::Arc, time::Duration};
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::{db::DB, CurrentDbShim};
@@ -784,7 +774,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &destination.into(),
-            &Balance::new(price_per_packet.divide_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
             index.into(),
             1u64.into(),
             ticket_win_prob,
@@ -848,7 +838,7 @@ mod tests {
 
             // Mark the first ticket as redeemed, so it does not enter the aggregation
             if i == 1 {
-                ack_ticket.status = BeingRedeemed {
+                ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed {
                     tx_hash: Hash::default(),
                 };
             } else {
@@ -866,15 +856,15 @@ mod tests {
         let alice_addr: Address = (&PEERS_CHAIN[0]).into();
         let bob_addr: Address = (&PEERS_CHAIN[1]).into();
 
-        let alice_packet_key = PEERS[0].public().to_peerid();
-        let bob_packet_key = PEERS[1].public().to_peerid();
+        let alice_packet_key = PEERS[0].public().into();
+        let bob_packet_key = PEERS[1].public().into();
 
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
         let channel_alice_bob = ChannelEntry::new(
             alice_addr,
             bob_addr,
-            agg_balance.imul(10),
+            agg_balance.mul(10),
             NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),
@@ -943,7 +933,7 @@ mod tests {
         );
 
         assert_eq!(
-            BeingRedeemed {
+            AcknowledgedTicketStatus::BeingRedeemed {
                 tx_hash: Hash::default()
             },
             stored_acked_tickets[0].status,
@@ -954,7 +944,8 @@ mod tests {
             "aggregated balance invalid"
         );
         assert_eq!(
-            Untouched, stored_acked_tickets[1].status,
+            AcknowledgedTicketStatus::Untouched,
+            stored_acked_tickets[1].status,
             "second ticket must be untouched"
         );
         assert_eq!(

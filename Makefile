@@ -156,7 +156,7 @@ smoke-test: ## run smoke test suite defained via parameter suite=
 
 .PHONY: smoke-test-full
 smoke-test-full: ## run smoke tests
-	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/hopr-smoke-test_integration.log && false))
+	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts

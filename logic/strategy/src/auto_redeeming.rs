@@ -92,10 +92,8 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use hopr_internal_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, U256};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
     use mockall::mock;
 
     lazy_static::lazy_static! {
@@ -116,7 +114,7 @@ mod tests {
 
         let ticket = Ticket::new(
             &ALICE.public().to_address(),
-            &Balance::new(price_per_packet.divide_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
+            &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             0_u32.into(),
             idx_offset.into(),
             1.0f64,
