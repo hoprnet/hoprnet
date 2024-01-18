@@ -111,7 +111,7 @@ mod tests {
             "must be withdraw action"
         );
         assert!(
-            matches!(tx_res.event, None),
+            tx_res.event.is_none(),
             "withdraw tx must not connect to any chain event"
         );
     }

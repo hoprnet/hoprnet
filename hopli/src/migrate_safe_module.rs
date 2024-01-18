@@ -54,7 +54,7 @@ impl MigrateSafeModuleArgs {
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if let Err(_) = env::var("PRIVATE_KEY") {
+        if env::var("PRIVATE_KEY").is_err() {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
@@ -98,9 +98,7 @@ impl MigrateSafeModuleArgs {
         let checksumed_module_addr = Address::from_str(parsed_module_addr).unwrap().to_checksum();
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
 
         log!(target: "migrate_safe_module", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.

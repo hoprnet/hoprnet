@@ -49,7 +49,7 @@ pub fn x25519_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<curve2551
 /// Creates secp256k1 secret scalar from the given bytes.
 /// Note that this function allows zero scalars.
 pub fn k256_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<k256::Scalar> {
-    Ok(Option::from(k256::Scalar::from_repr(*k256::FieldBytes::from_slice(bytes))).ok_or(InvalidInputValue)?)
+    Option::from(k256::Scalar::from_repr(*k256::FieldBytes::from_slice(bytes))).ok_or(InvalidInputValue)
 }
 
 /// Represents a secret value of a fixed length that is zeroized on drop.

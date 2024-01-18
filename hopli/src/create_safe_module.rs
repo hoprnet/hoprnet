@@ -68,7 +68,7 @@ impl CreateSafeModuleArgs {
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if let Err(_) = env::var("PRIVATE_KEY") {
+        if env::var("PRIVATE_KEY").is_err() {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
@@ -98,9 +98,7 @@ impl CreateSafeModuleArgs {
         log!(target: "create_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
 
         // convert hopr_amount and native_amount from f64 to uint256 string
         let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();

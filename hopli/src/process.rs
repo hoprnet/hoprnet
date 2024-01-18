@@ -31,7 +31,7 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -
     // run in the repo where the make target is saved
     if let Some(new_root) = contracts_root {
         let root = Path::new(OsStr::new(&new_root));
-        match env::set_current_dir(&root) {
+        match env::set_current_dir(root) {
             Ok(_) => println!("Successfully changed working directory to {}!", root.display()),
             Err(_) => return Err(HelperErrors::UnableToSetFoundryRoot),
         }
@@ -98,7 +98,7 @@ pub fn child_process_call_foundry_express_initialization(
     chain_keys: &String,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let chain_addresses_str = vec!["[", &chain_keys, "]"].concat();
+    let chain_addresses_str = ["[", &chain_keys, "]"].concat();
     let self_register_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",

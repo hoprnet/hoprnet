@@ -587,7 +587,7 @@ mod tests {
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(my_id.clone(), cfg, DummyNetworkAction {})
+        Network::new(*my_id, cfg, DummyNetworkAction {})
     }
 
     #[test]
@@ -681,7 +681,7 @@ mod tests {
 
         let ts = peers.network_actions_api.create_timestamp();
 
-        peers.update(&peer, Ok(ts.clone()));
+        peers.update(&peer, Ok(ts));
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -725,7 +725,7 @@ mod tests {
 
             peers.update_with_metadata(
                 &peer,
-                Ok(ts.clone()),
+                Ok(ts),
                 Some([proto_version.clone(), other_metadata_2.clone()].into()),
             );
 
@@ -851,7 +851,7 @@ mod tests {
     #[test]
     fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() {
         let peer = PeerId::random();
-        let public = peer.clone();
+        let public = peer;
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
@@ -872,7 +872,7 @@ mod tests {
     #[test]
     fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
         let peer = PeerId::random();
-        let public = peer.clone();
+        let public = peer;
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
@@ -880,7 +880,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(3).returning(move |x| x == &public);
         mock.expect_emit()
-            .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer.clone())))
+            .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer)))
             .return_const(());
         mock.expect_create_timestamp()
             .returning(|| current_timestamp().as_millis() as u64);
@@ -898,13 +898,13 @@ mod tests {
     fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
         let me = PeerId::random();
         let peer = PeerId::random();
-        let public = vec![peer.clone(), me.clone()];
+        let public = [peer, me];
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
+        mock.expect_is_public().times(5).returning(move |x| public.contains(x));
         mock.expect_create_timestamp()
             .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(me, cfg, mock);
@@ -923,13 +923,13 @@ mod tests {
     ) {
         let peer = PeerId::random();
         let peer2 = PeerId::random();
-        let public = vec![peer.clone()];
+        let public = [peer];
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
+        mock.expect_is_public().times(8).returning(move |x| public.contains(x));
         mock.expect_create_timestamp()
             .returning(|| current_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);

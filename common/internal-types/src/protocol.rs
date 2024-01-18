@@ -189,7 +189,6 @@ mod tests {
         let mut filter1 = TagBloomFilter::default();
 
         let items = (0..10_000)
-            .into_iter()
             .map(|i| {
                 let mut ret = random_bytes::<{ hopr_crypto_types::types::PACKET_TAG_LENGTH }>();
                 ret[i % hopr_crypto_types::types::PACKET_TAG_LENGTH] = 0xaa; // ensure it is not completely just zeroes

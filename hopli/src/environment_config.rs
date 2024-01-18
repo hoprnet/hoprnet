@@ -113,7 +113,7 @@ pub fn get_environment_type_from_name(make_root_dir_path: &PathBuf, network: &st
         .get(network)
         .expect("Unable to find environment details");
 
-    return Ok(env_detail.environment_type);
+    Ok(env_detail.environment_type)
 }
 
 #[cfg(test)]
@@ -132,7 +132,7 @@ mod tests {
         let network = "anvil-localhost";
         let environment_type = "local";
         match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert_eq!(result, true),
+            Ok(result) => assert!(result),
             _ => assert!(false),
         }
     }
@@ -173,7 +173,7 @@ mod tests {
         let network = "anvil-localhost";
         let environment_type = "production";
         match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert_eq!(result, false),
+            Ok(result) => assert!(!result),
             _ => assert!(false),
         }
     }
