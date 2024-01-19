@@ -33,6 +33,7 @@ where
 
     /// Gets the last hop
     fn last_hop(&self) -> &N {
+        // Path must contain at least one hop
         self.hops().last().expect("path is invalid")
     }
 
