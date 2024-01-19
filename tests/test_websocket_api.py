@@ -1,16 +1,14 @@
-import random
-import json
-import pytest
-import time
 import asyncio
 import json
 import random
 import re
+import time
 
+import pytest
 import websocket
 import websockets
-from .conftest import API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
 
+from .conftest import API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
 from .node import Node
 
 

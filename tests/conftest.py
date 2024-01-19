@@ -44,8 +44,8 @@ TEST_PROTOCOL_CONFIG_FILE = FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}-protocol-
 DEPLOYMENTS_SUMMARY_FILE = PWD.parent.joinpath("ethereum/contracts/contracts-addresses.json")
 PREGENERATED_IDENTITIES_DIR = PWD.joinpath("identities")
 
-NODES = [
-    Node(
+NODES = {
+    "1": Node(
         19091,
         13301,
         API_TOKEN,
@@ -53,7 +53,7 @@ NODES = [
         "localhost",
         NETWORK1,
     ),
-    Node(
+    "2": Node(
         19092,
         13302,
         None,
@@ -61,7 +61,7 @@ NODES = [
         LOCALHOST,
         NETWORK1,
     ),
-    Node(
+    "3": Node(
         19093,
         13303,
         API_TOKEN,
@@ -69,7 +69,7 @@ NODES = [
         "localhost",
         NETWORK1,
     ),
-    Node(
+    "4": Node(
         19094,
         13304,
         API_TOKEN,
@@ -77,7 +77,7 @@ NODES = [
         LOCALHOST,
         NETWORK1,
     ),
-    Node(
+    "5": Node(
         19095,
         13305,
         API_TOKEN,
@@ -86,7 +86,7 @@ NODES = [
         NETWORK1,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5.cfg.yaml"),
     ),
-    Node(
+    "6": Node(
         19096,
         13306,
         API_TOKEN,
@@ -94,7 +94,7 @@ NODES = [
         LOCALHOST,
         NETWORK2,
     ),
-    Node(
+    "7": Node(
         19097,
         13307,
         API_TOKEN,
@@ -102,7 +102,7 @@ NODES = [
         "localhost",
         NETWORK1,
     ),
-]
+}
 
 
 def pytest_addoption(parser: pytest.Parser):
@@ -118,7 +118,7 @@ def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--stress-tested-api",
         action="store",
-        default=f"http://{LOCALHOST}:{NODES[0].api_port}",
+        default=f"http://{LOCALHOST}:{NODES['1'].api_port}",
         help="The API towards which the stress test is performed",
     )
     parser.addoption(
@@ -147,17 +147,17 @@ def cmd_line_args(request: pytest.FixtureRequest):
 
 def default_nodes():
     """All nodes within the same network as specified in the swarm7 fixture"""
-    return list(range(4))
+    return ["1", "2", "3", "4"]
 
 
 def default_nodes_with_auth():
     """All nodes within the same network as specified in the swarm7 fixture"""
-    return [0, 2, 3]
+    return ["1", "3", "4"]
 
 
 def passive_node():
     """A node that uses no strategy"""
-    return 5
+    return "5"
 
 
 def random_distinct_pairs_from(values: list, count: int):
@@ -205,7 +205,7 @@ def setup_node(node: Node):
             cwd=PWD.parent,
         )
 
-    return node
+    return (node.proc is not None)
 
 
 def check_socket(address: str, port: str):
@@ -307,7 +307,7 @@ def create_local_safe(node: Node, private_key: str):
         if el.startswith("module: address 0x"):
             node.module_address = el.split()[-1]
 
-    return node
+    return (node.safe_address is not None) and (node.module_address is not None)
 
 
 def fund_nodes(private_key: str):
@@ -381,14 +381,14 @@ async def swarm7(request):
     # CREATE LOCAL SAFES AND MODULES FOR ALL THE IDS
     logging.info("Create safe and modules for all the ids, store them in args files")
 
-    nodes = deepcopy(NODES)
+    nodes: dict[str, Node] = deepcopy(NODES)
 
-    nodes = [create_local_safe(node, private_key) for node in nodes]
-    nodes = [setup_node(node) for node in nodes]
+    assert all(create_local_safe(node, private_key) for node in nodes.values())
+    assert all(setup_node(node) for node in nodes.values())
 
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
-    for id, node in enumerate(nodes):
+    for id, node in nodes.items():
         while not await node.api.startedz():
             asyncio.sleep(0.1)
         logging.info(f"Node {id} is up")
@@ -399,7 +399,7 @@ async def swarm7(request):
 
     # FINAL WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be up")
-    for node in nodes:
+    for node in nodes.values():
         while not await node.api.readyz():
             asyncio.sleep(0.1)
 

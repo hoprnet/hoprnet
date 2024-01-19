@@ -5,19 +5,19 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 import requests
+
 from .conftest import (
+    API_TOKEN,
+    OPEN_CHANNEL_FUNDING_VALUE,
+    TICKET_AGGREGATION_THRESHOLD,
+    TICKET_PRICE_PER_HOP,
     default_nodes,
     default_nodes_with_auth,
     passive_node,
     random_distinct_pairs_from,
-    OPEN_CHANNEL_FUNDING_VALUE,
-    TICKET_AGGREGATION_THRESHOLD,
-    TICKET_PRICE_PER_HOP,
-    API_TOKEN,
 )
 from .hopr import HoprdAPI
 from .node import Node
-
 
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
@@ -134,17 +134,17 @@ async def check_received_packets_with_peek(receiver: Node, expected_packets: lis
     assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
 
 
-async def check_rejected_tickets(src: Node, count):
+async def check_rejected_tickets(src: Node, count: int):
     while int((await src.api.get_tickets_statistics()).rejected) < count:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_unredeemed_tickets_value(src: Node, value):
+async def check_unredeemed_tickets_value(src: Node, value: int):
     while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_all_tickets_redeemed(src: Node, channel_id=None):
+async def check_all_tickets_redeemed(src: Node, channel_id: str=None):
     if channel_id is not None:
         while len(await src.api.channel_get_tickets(channel_id)) > 0:
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
@@ -154,7 +154,7 @@ async def check_all_tickets_redeemed(src: Node, channel_id=None):
 
 
 async def send_and_receive_packets_with_pop(
-    packets, src: Node, dest: Node, path, timeout=MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int=MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = random.randint(10, 65530)
 
@@ -165,7 +165,7 @@ async def send_and_receive_packets_with_pop(
 
 
 async def send_and_receive_packets_with_peek(
-    packets, src: Node, dest: Node, path, timeout=MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int=MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = random.randint(10, 65530)
 
@@ -184,7 +184,7 @@ def balance_str_to_int(balance: str):
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
 # correct ticket price from api
 @pytest.mark.asyncio
-async def test_hoprd_swarm_connectivity(swarm7: list[Node]):
+async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
     async def check_all_connected(me: Node, others: list[str]):
         others2 = set(others)
         while True:
@@ -204,7 +204,7 @@ async def test_hoprd_swarm_connectivity(swarm7: list[Node]):
         ]
     )
 
-    ticket_price = await random.choice(list(swarm7)).api.ticket_price()
+    ticket_price = await random.choice(list(swarm7.values())).api.ticket_price()
     if ticket_price is not None:
         global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
         TICKET_PRICE_PER_HOP = ticket_price
@@ -214,7 +214,7 @@ async def test_hoprd_swarm_connectivity(swarm7: list[Node]):
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7, peer):
+def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: dict[str, Node], peer: str):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
 
     r = requests.get(url)
@@ -223,7 +223,7 @@ def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7, peer):
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer, swarm7):
+def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, swarm7: dict[str, Node]):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
     headers = {"X-Auth-Token": "DefiNItEly_A_baD_TokEn"}
 
@@ -233,7 +233,7 @@ def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer, swarm7
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer, swarm7):
+def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer:str, swarm7: dict[str, Node]):
     url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
     headers = {"X-Auth-Token": f"{API_TOKEN}"}
 
@@ -243,8 +243,8 @@ def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer, swarm7):
 
 
 @pytest.mark.asyncio
-async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: list[Node]):
-    for node in swarm7:
+async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: dict[str, Node]):
+    for node in swarm7.values():
         addr = await node.api.addresses("native")
         assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
         balances = await node.api.balances()
@@ -256,7 +256,7 @@ async def test_hoprd_protocol_check_balances_without_prior_tests(swarm7: list[No
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
-async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: int, swarm7: list[Node]):
+async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: str, swarm7: dict[str, Node]):
     peer_id = swarm7[random.choice(default_nodes())].peer_id
 
     assert await swarm7[peer].api.aliases_set_alias("Alice", peer_id) is True
@@ -269,7 +269,7 @@ async def test_hoprd_node_should_be_able_to_alias_other_peers(peer: int, swarm7:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: int, dest: int, swarm7: list[Node]):
+async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str, dest: str, swarm7: dict[str, Node]):
     response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
     assert response is not None
@@ -278,14 +278,14 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: int
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
-async def test_hoprd_ping_should_timeout_on_pinging_self(peer: int, swarm7: list[Node]):
+async def test_hoprd_ping_should_timeout_on_pinging_self(peer: str, swarm7: dict[str, Node]):
     response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
 
     assert response is None, f"Pinging self should produce timeout, not '{response}'"
 
 
 @pytest.mark.asyncio
-async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFINISHED(swarm7: list[Node]):
+async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFINISHED(swarm7: dict[str, Node]):
     """
     # FIXME: re-enable when network check works
     # log "Node 1 should not be able to talk to Node 6 (different network id)"
@@ -301,7 +301,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFI
 
 
 @pytest.mark.asyncio
-async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(swarm7: list[Node]):
+async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(swarm7: dict[str, Node]):
     """
     # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
     # result=$(ping "${api7}" ${addr1} "TIMEOUT")
@@ -316,7 +316,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_re
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", default_nodes())
-async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages(peer: int, swarm7: list[Node]):
+async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages(peer: str, swarm7: dict[str, Node]):
     statistics = await swarm7[peer].api.get_tickets_statistics()
 
     assert balance_str_to_int(statistics.unredeemed_value) == 0
@@ -326,7 +326,7 @@ async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(
-    src: Node, dest: Node, swarm7: list[Node]
+    src: Node, dest: Node, swarm7: dict[str, Node]
 ):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
@@ -339,7 +339,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
     "src,dest", [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
-    src: int, dest: int, swarm7: list[Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE*1e18:.0f}"  # convert HOPR (int) to weiHOPR (str)
 
@@ -366,7 +366,7 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
     "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
-    src: Node, dest: Node, swarm7: list[Node]
+    src: Node, dest: Node, swarm7: dict[str, Node]
 ):
     message_count = 2
 
@@ -398,7 +398,7 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     "src,dest", [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(
-    src: int, dest: Node, swarm7: list[Node]
+    src: str, dest: Node, swarm7: dict[str, Node]
 ):
     """
     # FIXME: The following part can be enabled once incoming channel closure is
@@ -473,7 +473,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
     "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(
-    src: int, dest: int, swarm7: list[Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     # send 90% of messages before ticket aggregation would kick in
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
@@ -518,7 +518,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_request(
-    src: int, dest: int, swarm7: list[Node]
+    src: str, dest: str, swarm7: dict[str, Node]
 ):
     message_count = 2
 
@@ -554,7 +554,7 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
     [shuffled(default_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
 )
-async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_hop(route, swarm7: list[Node]):
+async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_hop(route, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
     async with AsyncExitStack() as channels:
@@ -587,7 +587,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("route", [shuffled(default_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
-async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_tickets(route, swarm7: list[Node]):
+async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_tickets(route, swarm7: dict[str, Node]):
     ticket_count = 2
 
     async with AsyncExitStack() as channels:
@@ -614,7 +614,7 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(src: int, dest: int, swarm7: list[Node]):
+async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(src: str, dest: str, swarm7: dict[str, Node]):
     async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE):
         # the context manager handles opening and closing of the channel with verification
         assert True
@@ -622,7 +622,7 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(sr
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("route", [shuffled(default_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
-async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, swarm7: list[Node]):
+async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, swarm7: dict[str, Node]):
     ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
 
     async with AsyncExitStack() as channels:
@@ -662,7 +662,7 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
 
 
 @pytest.mark.asyncio
-async def test_hoprd_sanity_check_channel_status(swarm7: list[Node]):
+async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
     """
     The bash integration-test.sh opens and closes channels that can be visible inside this test scope
     """
@@ -731,7 +731,7 @@ async def test_hoprd_check_native_withdraw_results_UNFINISHED():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
-async def test_hoprd_check_ticket_price_is_default(peer, swarm7: list[Node]):
+async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]):
     price = await swarm7[peer].api.ticket_price()
 
     assert isinstance(price, int)
@@ -740,7 +740,7 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: list[Node]):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_peeking_messages_with_timestamp(src: int, dest: int, swarm7: list[Node]):
+async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = random.randint(10, 65530)
 
@@ -765,7 +765,7 @@ async def test_peeking_messages_with_timestamp(src: int, dest: int, swarm7: list
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_send_message_return_timestamp(src: int, dest: int, swarm7: list[Node]):
+async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = random.randint(10, 65530)
 
