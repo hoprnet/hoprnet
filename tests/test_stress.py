@@ -37,7 +37,7 @@ async def test_hoprd_stress_1_hop_to_self(src, dest, swarm7, cmd_line_args):
         ]
 
         await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]], timeout=60.0
+            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id], timeout=60.0
         )
 
 
