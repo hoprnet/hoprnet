@@ -60,35 +60,3 @@ jobs:
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version} || true
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version}-cache || true
           done
-
-      - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.4.0"
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@v14
-        with:
-          name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .foundry/bin/
-
-      - name: Clean build
-        run: nix develop -c make clean
