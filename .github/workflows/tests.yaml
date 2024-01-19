@@ -6,8 +6,6 @@ name: Test
 
 env:
   RUST_BACKTRACE: "1"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
   FOUNDRY_PROFILE: ci
 
 on:
@@ -19,117 +17,14 @@ concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true
 jobs:
-  build:
-    name: Build
+  tests:
+    strategy:
+      matrix:
+        target:
+          - unit
+          - smoke
     runs-on: ubuntu-8-core
-    timeout-minutes: 30
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
-
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
-        with:
-          name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
-
-      - name: Build
-        run: nix develop -c make -j build
-
-  unit-tests:
-    name: Unit
-    needs:
-      - build
-    runs-on: ubuntu-2-core
-    timeout-minutes: 30
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
-
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
-        with:
-          name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
-
-      - name: Test
-        run: nix develop -c make -j test
-        env:
-          HOPR_NETWORK: anvil-localhost
-
-  smoke-tests:
-    name: Smoke (integration)
-    needs:
-      - build
-    runs-on: ubuntu-8-core
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
@@ -142,18 +37,6 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.7.4"
-
       - name: Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -164,40 +47,24 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
+        env:
+          USER: runner
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/bin/
-            .foundry/bin/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
-
-      - name: Setup Hoprd
+      - name: Run unit tests
+        if: matrix.target == 'unit'
         run: |
-          sudo ./scripts/toolchain/install-toolchain.sh
+          nix develop -c make build-solidity-types
+          nix develop -c make -j test
+        env:
+          HOPR_NETWORK: anvil-localhost
 
-      - name: Build application
-        run: nix develop -c make -j build
-
-      - name: Install
-        run: nix develop -c make -j install
-
-      - name: Test with pytest
-        run: nix develop -c make smoke-test-full
-        timeout-minutes: 30
+      - name: Run smoke tests
+        if: matrix.target == 'smoke'
+        run: |
+          nix develop .#smoke-tests -c make smoke-test-full
 
       - name: Compress test logs
-        if: always()
+        if: matrix.target == 'smoke' && always()
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_path=/tmp/test-smoke-${{ github.run_id }}-${{ github.run_number }}
@@ -209,7 +76,7 @@ jobs:
 
       - name: Upload test logs
         uses: 'google-github-actions/upload-cloud-storage@v1'
-        if: always()
+        if: matrix.target == 'smoke' && always()
         with:
           path: /tmp/
           glob: 'test-smoke-*'
