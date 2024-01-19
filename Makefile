@@ -174,7 +174,7 @@ run-local: id_path=$$(pwd)/.identity-local.id
 run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
-	target/debug/hoprd --init --api \
+	hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
@@ -422,7 +422,7 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
-	target/debug/hoprd-api-schema >| openapi.spec.json
+	hoprd-api-schema >| openapi.spec.json
 
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
