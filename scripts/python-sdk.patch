@@ -1,46 +1,30 @@
---- hoprd_sdk/api_client.orig.py	2024-01-13 23:37:55.152613000 +0100
-+++ hoprd_sdk/api_client.py	2024-01-13 23:39:42.562424533 +0100
-@@ -17,6 +17,7 @@
- import os
- import re
- import tempfile
-+import atexit
-
- # python 2 and python 3 compatibility library
- import six
-@@ -49,90 +50,120 @@
+--- hoprd_sdk/api_client.py
++++ hoprd_sdk/api_client.py
+@@ -10,6 +10,7 @@
+ """
+ from __future__ import absolute_import
  
-     PRIMITIVE_TYPES = (float, bool, bytes, six.text_type) + six.integer_types
-     NATIVE_TYPES_MAPPING = {
--        'int': int,
--        'long': int if six.PY3 else long,  # noqa: F821
--        'float': float,
--        'str': str,
--        'bool': bool,
--        'date': datetime.date,
--        'datetime': datetime.datetime,
--        'object': object,
-+        "int": int,
-+        "long": int if six.PY3 else long,  # noqa: F821
-+        "float": float,
-+        "str": str,
-+        "bool": bool,
-+        "date": datetime.date,
-+        "datetime": datetime.datetime,
-+        "object": object,
++import atexit
+ import datetime
+ import json
+ import mimetypes
+@@ -58,6 +59,7 @@ class ApiClient(object):
+         'datetime': datetime.datetime,
+         'object': object,
      }
 +    _pool = None
  
-@@ -66,7 +66,7 @@
+     def __init__(self, configuration=None, header_name=None, header_value=None,
+                  cookie=None):
+@@ -65,7 +67,6 @@ class ApiClient(object):
              configuration = Configuration()
          self.configuration = configuration
  
 -        self.pool = ThreadPool()
-+        # self.pool = ThreadPool()
          self.rest_client = rest.RESTClientObject(configuration)
          self.default_headers = {}
          if header_name is not None:
-@@ -75,9 +75,30 @@
+@@ -74,9 +75,30 @@ class ApiClient(object):
          # Set default User-Agent.
          self.user_agent = 'Swagger-Codegen//python'
  
@@ -74,3 +58,21 @@
  
      @property
      def user_agent(self):
+@@ -242,7 +264,7 @@ class ApiClient(object):
+         if data is None:
+             return None
+ 
+-        if type(klass) == str:
++        if isinstance(klass, str):
+             if klass.startswith('list['):
+                 sub_kls = re.match(r'list\[(.*)\]', klass).group(1)
+                 return [self.__deserialize(sub_data, sub_kls)
+@@ -437,7 +459,7 @@ class ApiClient(object):
+             for k, v in six.iteritems(files):
+                 if not v:
+                     continue
+-                file_names = v if type(v) is list else [v]
++                file_names = v if isinstance(v, list) else [v]
+                 for n in file_names:
+                     with open(n, 'rb') as f:
+                         filename = os.path.basename(f.name)
