@@ -508,7 +508,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 /// Not implemented using From trait because logic fits better here
 pub fn convert_vrf_parameters(off_chain: &VrfParameters) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.v.to_bytes();
+    let v = off_chain.get_decompressed_v().to_bytes();
     let s_b = off_chain.s_b.to_bytes();
     let h_v = off_chain.h_v.to_bytes();
 

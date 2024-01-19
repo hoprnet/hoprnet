@@ -287,11 +287,11 @@ impl ChannelChange {
 #[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {
     pub channel_id: Hash,
-    pub amount: Balance,
-    pub index: u64,
-    pub index_offset: u32,
-    pub encoded_win_prob: EncodedWinProb,
-    pub channel_epoch: u32,
+    pub amount: Balance, // 92 ---
+    pub index: u64,  // 48
+    pub index_offset: u32, // 32
+    pub encoded_win_prob: EncodedWinProb, // 56
+    pub channel_epoch: u32, // 24
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
 }

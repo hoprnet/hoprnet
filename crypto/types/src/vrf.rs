@@ -15,72 +15,52 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
-    pub v: CurvePoint,
+    #[serde(with = "serde_bytes")]
+    pub v: [u8; CurvePoint::SIZE_COMPRESSED],
     pub h: Scalar,
     pub s: Scalar,
-    /// helper value for smart contract
-    pub h_v: CurvePoint,
-    /// helper value for smart contract
-    pub s_b: CurvePoint,
+}
+
+impl Default for VrfParameters {
+    fn default() -> Self {
+        Self {
+            v: [0u8; CurvePoint::SIZE_COMPRESSED],
+            h: Scalar::default(),
+            s: Scalar::default(),
+        }
+    }
 }
 
 impl std::fmt::Debug for VrfParameters {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v_encoded = self.v.affine.to_encoded_point(false);
-        let h_v_encoded = self.h_v.affine.to_encoded_point(false);
-        let s_b_encoded = self.s_b.affine.to_encoded_point(false);
         f.debug_struct("VrfParameters")
             .field(
                 "V",
                 &format!(
-                    "({},{})",
-                    hex::encode(v_encoded.x().unwrap()),
-                    hex::encode(v_encoded.y().unwrap())
+                    "({}",
+                    hex::encode(self.v),
                 ),
             )
             .field("h", &hex::encode(self.h.to_bytes()))
             .field("s", &hex::encode(self.s.to_bytes()))
-            .field(
-                "h_v",
-                &format!(
-                    "({},{})",
-                    hex::encode(h_v_encoded.x().unwrap()),
-                    hex::encode(h_v_encoded.y().unwrap())
-                ),
-            )
-            .field(
-                "s_b",
-                &format!(
-                    "({},{})",
-                    hex::encode(s_b_encoded.x().unwrap()),
-                    hex::encode(s_b_encoded.y().unwrap())
-                ),
-            )
             .finish()
     }
 }
 
 impl BinarySerializable for VrfParameters {
-    const SIZE: usize = CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE;
+    const SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
 
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
+            let mut v = [0u8; CurvePoint::SIZE_COMPRESSED];
+            v.copy_from_slice(&data[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
-                v: CurvePoint::from_bytes(&data[0..CurvePoint::SIZE]).unwrap(),
-                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE..CurvePoint::SIZE + 32]).unwrap(),
-                s: k256_scalar_from_bytes(&data[CurvePoint::SIZE + 32..CurvePoint::SIZE + 32 + 32]).unwrap(),
-                h_v: CurvePoint::from_bytes(
-                    &data[CurvePoint::SIZE + 32 + 32..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE],
-                )
-                .unwrap(),
-                s_b: CurvePoint::from_bytes(
-                    &data[CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE
-                        ..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE],
-                )
-                .unwrap(),
+                v,
+                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32]).unwrap(),
+                s: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32]).unwrap(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -89,11 +69,9 @@ impl BinarySerializable for VrfParameters {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.v.to_bytes());
+        ret.extend_from_slice(&self.v);
         ret.extend_from_slice(&self.h.to_bytes());
         ret.extend_from_slice(&self.s.to_bytes());
-        ret.extend_from_slice(&self.h_v.to_bytes());
-        ret.extend_from_slice(&self.s_b.to_bytes());
         ret.into_boxed_slice()
     }
 }
@@ -104,22 +82,14 @@ impl VrfParameters {
         let cap_b =
             Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.to_bytes(), msg], &[dst]).unwrap();
 
-        // Check point witness
-        if self.s_b.to_projective_point() != cap_b * self.s {
-            return Err(CalculationError);
-        }
+        let v = self.get_decompressed_v()?; // decompresses the point
 
-        // Check point witness
-        if self.h_v.to_projective_point() != self.v.to_projective_point() * self.h {
-            return Err(CalculationError);
-        }
-
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.to_projective_point() * self.h;
+        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - v.to_projective_point() * self.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 &creator.to_bytes(),
-                &self.v.to_bytes()[1..],
+                &v.to_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
             ],
@@ -132,6 +102,11 @@ impl VrfParameters {
         }
 
         Ok(())
+    }
+
+    /// Returns decompressed `v`.
+    pub fn get_decompressed_v(&self) -> crate::errors::Result<CurvePoint> {
+        Ok(CurvePoint::from_bytes(&self.v)?)
     }
 }
 
@@ -176,12 +151,14 @@ pub fn derive_vrf_parameters<const T: usize>(
     )?;
     let s = r + h * a;
 
+    // We only store the compressed point
+    let mut comp_v = [0u8; CurvePoint::SIZE_COMPRESSED];
+    comp_v.copy_from_slice(v.to_encoded_point(true).as_bytes());
+
     Ok(VrfParameters {
-        v: v.to_affine().into(),
+        v: comp_v,
         h,
         s,
-        h_v: (v * h).to_affine().into(),
-        s_b: (b * s).to_affine().into(),
     })
 }
 

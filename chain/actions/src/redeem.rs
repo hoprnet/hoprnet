@@ -64,16 +64,11 @@ where
                 return Err(NotAWinningTicket);
             }
         }
-        AcknowledgedTicketStatus::BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed { tx_hash: txh } => {
-            // If there's already some hash set for this ticket, do not allow unsetting it
-            if txh != Hash::default() && tx_hash == Hash::default() {
-                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
-            }
-        }
+        AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
+        AcknowledgedTicketStatus::BeingRedeemed  => {}
     }
 
-    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed { tx_hash };
+    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
     debug!(
         "setting a winning {} as being redeemed with TX hash {tx_hash}",
         ack_ticket.ticket

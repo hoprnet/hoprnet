@@ -163,7 +163,7 @@ impl AggregationList {
         let mut total_amount = Balance::zero(BalanceType::HOPR);
 
         for tkt in list.iter() {
-            if tkt.signer != signer || tkt.ticket.channel_id != channel_id || !tkt.status.is_being_aggregated() {
+            if tkt.signer != signer || tkt.ticket.channel_id != channel_id || tkt.status != AcknowledgedTicketStatus::BeingAggregated {
                 error!("{tkt} does not belong to the aggregation list");
                 return Err(ProtocolTicketAggregation(
                     "invalid list of tickets to aggregate given".into(),
