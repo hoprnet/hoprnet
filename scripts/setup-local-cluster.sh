@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="target/debug/hoprd"
+declare hoprd_command="hoprd"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
