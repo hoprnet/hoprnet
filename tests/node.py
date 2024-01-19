@@ -78,7 +78,7 @@ class Node:
             "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
         }
         cmd = [
-            "target/debug/hoprd",
+            "hoprd",
             "--announce",
             "--api",
             "--disableTicketAutoRedeem",
