@@ -50,7 +50,7 @@ NODES = {
         13301,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
-        LOCALHOST,
+        "localhost",
         NETWORK1,
     ),
     "2": Node(
@@ -66,7 +66,7 @@ NODES = {
         13303,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
-        LOCALHOST,
+        "localhost",
         NETWORK1,
     ),
     "4": Node(
@@ -82,7 +82,7 @@ NODES = {
         13305,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5"),
-        LOCALHOST,
+        "localhost",
         NETWORK1,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_5.cfg.yaml"),
     ),
@@ -99,7 +99,7 @@ NODES = {
         13307,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
-        LOCALHOST,
+        "localhost",
         NETWORK1,
     ),
 }
@@ -109,7 +109,7 @@ def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--stress-seq-request-count",
         action="store",
-        default=200,
+        default=500,
         help="Number of sequential requests in the stress test",
     )
     parser.addoption(
@@ -162,6 +162,7 @@ def passive_node():
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
+
 
 def check_socket(address: str, port: str):
     s = socket.socket()
@@ -225,6 +226,7 @@ def copy_identities():
     for f in PWD.glob(f"{NODE_NAME_PREFIX}_*.cfg.yaml"):
         shutil.copy(f, FIXTURES_DIR.joinpath(f.name))
     logging.info(f"Copied '*.cfg.yaml' files to {FIXTURES_DIR}")
+
 
 def fund_nodes(private_key: str):
     custom_env = {
@@ -318,9 +320,9 @@ async def swarm7(request):
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
 
-    # minimal wait to ensure api is ready for `stardedz` call. 
-    # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
-    await asyncio.sleep(10) 
+    # minimal wait to ensure api is ready for `stardedz` call.
+    # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
+    await asyncio.sleep(10)
     for id, node in nodes.items():
         while not await node.api.startedz():
             await asyncio.sleep(0.1)

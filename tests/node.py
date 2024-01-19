@@ -40,7 +40,6 @@ class Node:
     def api(self):
         return HoprdAPI(f"http://{self.host_addr}:{self.api_port}", self.api_token)
 
-
     def create_local_safe(self, custom_env: dict):
         res = run(
             [
@@ -68,8 +67,7 @@ class Node:
             if el.startswith("module: address 0x"):
                 self.module_address = el.split()[-1]
 
-        return (self.address is not None and self.module_address is not None)
-
+        return self.address is not None and self.module_address is not None
 
     def setup_node(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
@@ -111,7 +109,7 @@ class Node:
                 cwd=dir,
             )
 
-        return (self.proc is not None)
+        return self.proc is not None
 
     def clean_up(self):
         self.proc.kill()

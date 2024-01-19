@@ -144,7 +144,7 @@ async def check_unredeemed_tickets_value(src: Node, value: int):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_all_tickets_redeemed(src: Node, channel_id: str=None):
+async def check_all_tickets_redeemed(src: Node, channel_id: str = None):
     if channel_id is not None:
         while len(await src.api.channel_get_tickets(channel_id)) > 0:
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
@@ -154,7 +154,7 @@ async def check_all_tickets_redeemed(src: Node, channel_id: str=None):
 
 
 async def send_and_receive_packets_with_pop(
-    packets, src: Node, dest: Node, path: str, timeout: int=MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = random.randint(10, 65530)
 
@@ -165,7 +165,7 @@ async def send_and_receive_packets_with_pop(
 
 
 async def send_and_receive_packets_with_peek(
-    packets, src: Node, dest: Node, path: str, timeout: int=MULTIHOP_MESSAGE_SEND_TIMEOUT
+    packets, src: Node, dest: Node, path: str, timeout: int = MULTIHOP_MESSAGE_SEND_TIMEOUT
 ):
     random_tag = random.randint(10, 65530)
 
@@ -233,7 +233,7 @@ def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, s
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer:str, swarm7: dict[str, Node]):
+def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer: str, swarm7: dict[str, Node]):
     url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
     headers = {"X-Auth-Token": f"{API_TOKEN}"}
 
@@ -301,7 +301,9 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFI
 
 
 @pytest.mark.asyncio
-async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(swarm7: dict[str, Node]):
+async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(
+    swarm7: dict[str, Node]
+):
     """
     # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
     # result=$(ping "${api7}" ${addr1} "TIMEOUT")
@@ -341,7 +343,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
-    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}" # convert HOPR to weiHOPR
+    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"  # convert HOPR to weiHOPR
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()
@@ -354,9 +356,9 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
             balance_after.safe_hopr
         ) == balance_str_to_int(hopr_amount)
 
-        assert balance_str_to_int(
-            balance_before.safe_hopr_allowance
-        ) - balance_str_to_int(balance_after.safe_hopr_allowance) ==  balance_str_to_int(hopr_amount)
+        assert balance_str_to_int(balance_before.safe_hopr_allowance) - balance_str_to_int(
+            balance_after.safe_hopr_allowance
+        ) == balance_str_to_int(hopr_amount)
 
         assert balance_str_to_int(balance_after.native) < balance_str_to_int(balance_before.native)
 
@@ -614,7 +616,9 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(src: str, dest: str, swarm7: dict[str, Node]):
+async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
+    src: str, dest: str, swarm7: dict[str, Node]
+):
     async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
         # the context manager handles opening and closing of the channel with verification
         assert True
