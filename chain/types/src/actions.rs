@@ -1,3 +1,4 @@
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
@@ -7,8 +8,9 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
-    /// Redeem the given acknowledged ticket
-    RedeemTicket(AcknowledgedTicket),
+    /// Redeem the given acknowledged ticket. The domain separator is required
+    /// to expand VRF parameters such that they can get used in the smart contract.
+    RedeemTicket(AcknowledgedTicket, Hash),
 
     /// Open channel to the given destination with the given stake
     OpenChannel(Address, Balance),
@@ -32,7 +34,7 @@ pub enum Action {
 impl Display for Action {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Action::RedeemTicket(ack) => write!(f, "redeem action of {ack}"),
+            Action::RedeemTicket(ack, domain_separator) => write!(f, "redeem action of {ack}, used domain_separator: {domain_separator}"),
             Action::OpenChannel(dst, amount) => write!(f, "open channel action to {dst} with {amount}"),
             Action::FundChannel(channel, amount) => write!(
                 f,

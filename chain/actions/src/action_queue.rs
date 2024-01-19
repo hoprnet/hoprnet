@@ -44,7 +44,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
@@ -170,9 +170,9 @@ where
 {
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack) => match ack.status {
+            Action::RedeemTicket(ack, domain_separator) => match ack.status {
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {
-                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone()).await?;
+                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), domain_separator).await?;
                     IndexerExpectation::new(
                         tx_hash,
                         move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
@@ -369,7 +369,7 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack) = act {
+                        if let Action::RedeemTicket(mut ack, _) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
                             if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {

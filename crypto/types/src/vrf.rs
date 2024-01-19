@@ -37,13 +37,7 @@ impl Default for VrfParameters {
 impl std::fmt::Debug for VrfParameters {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VrfParameters")
-            .field(
-                "V",
-                &format!(
-                    "({}",
-                    hex::encode(self.v),
-                ),
-            )
+            .field("V", &format!("({}", hex::encode(self.v),))
             .field("h", &hex::encode(self.h.to_bytes()))
             .field("s", &hex::encode(self.s.to_bytes()))
             .finish()
@@ -59,8 +53,12 @@ impl BinarySerializable for VrfParameters {
             v.copy_from_slice(&data[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
                 v,
-                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32]).unwrap(),
-                s: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32]).unwrap(),
+                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
+                    .unwrap(),
+                s: k256_scalar_from_bytes(
+                    &data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
+                )
+                .unwrap(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -79,8 +77,7 @@ impl BinarySerializable for VrfParameters {
 impl VrfParameters {
     /// Verifies that VRF values are valid
     pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> crate::errors::Result<()> {
-        let cap_b =
-            Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.to_bytes(), msg], &[dst]).unwrap();
+        let cap_b = self.get_encoded_payload(creator, msg, dst);
 
         let v = self.get_decompressed_v()?; // decompresses the point
 
@@ -102,6 +99,42 @@ impl VrfParameters {
         }
 
         Ok(())
+    }
+
+    /// Performs a scalar point multiplication of `self.h` and `self.v`
+    /// and returns the point in affine coordinates.
+    ///
+    /// Used to create the witness values needed by the smart contract.
+    pub fn get_h_v_witness(&self) -> k256::EncodedPoint {
+        (self.get_decompressed_v().unwrap().affine * self.h)
+            .to_affine()
+            .to_encoded_point(false)
+    }
+
+    /// Performs a scalar point multiplication with the encoded payload
+    /// and `self.s`. Expands the payload and applies the hash_to_curve
+    /// algorithm.
+    ///
+    /// Used to create the witness values needed by the smart contract.
+    pub fn get_s_b_witness<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> k256::EncodedPoint {
+        (self.get_encoded_payload(creator, msg, dst) * self.s)
+            .to_affine()
+            .to_encoded_point(false)
+    }
+
+    /// Takes the message upon which the VRF gets computed, the domain separation tag
+    /// and the Ethereum address of the creator, expand the raw data with the
+    /// `ExpandMsgXmd` algorithm (https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-expand_message_xmd)
+    /// and applies the hash-to-curve function to it.
+    ///
+    /// Finally, returns a elliptic curve point on Secp256k1.
+    fn get_encoded_payload<const T: usize>(
+        &self,
+        creator: &Address,
+        msg: &[u8; T],
+        dst: &[u8],
+    ) -> k256::ProjectivePoint {
+        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.to_bytes(), msg], &[dst]).unwrap()
     }
 
     /// Returns decompressed `v`.
@@ -155,11 +188,7 @@ pub fn derive_vrf_parameters<const T: usize>(
     let mut comp_v = [0u8; CurvePoint::SIZE_COMPRESSED];
     comp_v.copy_from_slice(v.to_encoded_point(true).as_bytes());
 
-    Ok(VrfParameters {
-        v: comp_v,
-        h,
-        s,
-    })
+    Ok(VrfParameters { v: comp_v, h, s })
 }
 
 #[cfg(test)]

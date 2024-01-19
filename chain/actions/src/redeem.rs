@@ -13,7 +13,7 @@ use utils_db::errors::DbError;
 use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
+    CoreEthereumActionsError::{MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::CoreEthereumActions;
@@ -65,7 +65,7 @@ where
             }
         }
         AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed  => {}
+        AcknowledgedTicketStatus::BeingRedeemed => {}
     }
 
     ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
@@ -79,13 +79,16 @@ where
 async fn unchecked_ticket_redeem<Db>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
+    domain_separator: Hash,
     on_chain_tx_sender: ActionSender,
 ) -> Result<PendingAction>
 where
     Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
+    on_chain_tx_sender
+        .send(Action::RedeemTicket(ack_ticket, domain_separator))
+        .await
 }
 
 #[async_trait]
@@ -193,9 +196,19 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
         let mut receivers: Vec<PendingAction> = vec![];
 
+        let domain_separator = self
+            .db
+            .read()
+            .await
+            .get_channels_domain_separator()
+            .await
+            .unwrap()
+            .ok_or(MissingDomainSeparator)?;
+
         for acked_ticket in to_redeem {
             let ticket_index = acked_ticket.ticket.index;
-            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, self.tx_sender.clone()).await {
+            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, domain_separator, self.tx_sender.clone()).await
+            {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
@@ -214,12 +227,20 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
+        let domain_separator = self
+            .db
+            .read()
+            .await
+            .get_channels_domain_separator()
+            .await
+            .unwrap()
+            .ok_or(MissingDomainSeparator)?;
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {
             if ack_ticket.status == AcknowledgedTicketStatus::Untouched
                 && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
             {
-                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
+                unchecked_ticket_redeem(self.db.clone(), ack_ticket, domain_separator, self.tx_sender.clone()).await
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
             }
@@ -290,6 +311,15 @@ mod tests {
         utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
+    async fn set_domain_separator(rdb: CurrentDbShim) {
+        let inner_db = DB::new(rdb);
+        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
+
+        db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+            .await
+            .unwrap();
+    }
+
     async fn create_channel_with_ack_tickets(
         rdb: CurrentDbShim,
         ticket_count: usize,
@@ -342,6 +372,9 @@ mod tests {
         let (channel_from_charlie, charlie_tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
+
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
             ALICE.public().to_address(),
@@ -386,8 +419,8 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_| Ok(random_hash));
+            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _| Ok(random_hash));
 
         // and then all Charlie's tickets get redeemed
         tx_exec
@@ -460,6 +493,9 @@ mod tests {
         let (channel_from_charlie, _) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
+
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
             ALICE.public().to_address(),
@@ -487,8 +523,8 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
-            .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_| Ok(random_hash));
+            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
@@ -549,6 +585,9 @@ mod tests {
 
         let (channel_from_bob, mut tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -646,6 +685,9 @@ mod tests {
         )
         .await;
 
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
+
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
             ALICE.public().to_address(),
@@ -725,6 +767,9 @@ mod tests {
             U256::from(4u32),
         )
         .await;
+
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
