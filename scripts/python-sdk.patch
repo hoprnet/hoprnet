@@ -1,5 +1,36 @@
 --- hoprd_sdk/api_client.orig.py	2024-01-13 23:37:55.152613000 +0100
 +++ hoprd_sdk/api_client.py	2024-01-13 23:39:42.562424533 +0100
+@@ -17,6 +17,7 @@
+ import os
+ import re
+ import tempfile
++import atexit
+
+ # python 2 and python 3 compatibility library
+ import six
+@@ -49,90 +50,120 @@
+ 
+     PRIMITIVE_TYPES = (float, bool, bytes, six.text_type) + six.integer_types
+     NATIVE_TYPES_MAPPING = {
+-        'int': int,
+-        'long': int if six.PY3 else long,  # noqa: F821
+-        'float': float,
+-        'str': str,
+-        'bool': bool,
+-        'date': datetime.date,
+-        'datetime': datetime.datetime,
+-        'object': object,
++        "int": int,
++        "long": int if six.PY3 else long,  # noqa: F821
++        "float": float,
++        "str": str,
++        "bool": bool,
++        "date": datetime.date,
++        "datetime": datetime.datetime,
++        "object": object,
+     }
++    _pool = None
+ 
 @@ -66,7 +66,7 @@
              configuration = Configuration()
          self.configuration = configuration
