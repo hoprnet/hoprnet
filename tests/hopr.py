@@ -135,14 +135,14 @@ class HoprdAPI:
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
 
-    async def channels_fund_channel(self, channel_id: str, amount: int):
+    async def channels_fund_channel(self, channel_id: str, amount: str):
         """
         Funds a given channel.
         :param: channel_id: str
         :param: amount: int
         :return: bool
         """
-        body = FundRequest(amount=f"{amount*1e18:.0f}")
+        body = FundRequest(amount=amount)
         status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
@@ -333,7 +333,7 @@ class HoprdAPI:
         _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = None) -> dict:
+    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> dict:
         """
         Peek all messages from the inbox
         :param: tag = 0x0320

@@ -8,7 +8,7 @@ import shutil
 import socket
 from copy import deepcopy
 from pathlib import Path
-from subprocess import STDOUT, Popen, run
+from subprocess import run
 
 import pytest
 
@@ -19,7 +19,7 @@ random.seed(SEED)
 
 # Global variables
 LOCALHOST = "127.0.0.1"
-OPEN_CHANNEL_FUNDING_VALUE = 1000
+OPEN_CHANNEL_FUNDING_VALUE_HOPR = 1000
 
 TICKET_AGGREGATION_THRESHOLD = 100
 TICKET_PRICE_PER_HOP = 100
@@ -50,7 +50,7 @@ NODES = {
         13301,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_1"),
-        "localhost",
+        LOCALHOST,
         NETWORK1,
     ),
     "2": Node(
@@ -66,7 +66,7 @@ NODES = {
         13303,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_3"),
-        "localhost",
+        LOCALHOST,
         NETWORK1,
     ),
     "4": Node(
@@ -99,7 +99,7 @@ NODES = {
         13307,
         API_TOKEN,
         FIXTURES_DIR.joinpath(f"{NODE_NAME_PREFIX}_7"),
-        "localhost",
+        LOCALHOST,
         NETWORK1,
     ),
 }
@@ -163,51 +163,6 @@ def passive_node():
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
-
-def setup_node(node: Node):
-    logging.info(f"Setting up {node}")
-    api_token_param = f"--api-token={node.api_token}" if node.api_token else "--disableApiAuthentication"
-    custom_env = {
-        "HOPRD_HEARTBEAT_INTERVAL": "2500",
-        "HOPRD_HEARTBEAT_THRESHOLD": "2500",
-        "HOPRD_HEARTBEAT_VARIANCE": "1000",
-        "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
-    }
-    cmd = [
-        "target/debug/hoprd",
-        "--announce",
-        "--api",
-        "--disableTicketAutoRedeem",
-        "--init",
-        "--testAnnounceLocalAddresses",
-        "--testPreferLocalAddresses",
-        "--testUseWeakCrypto",
-        f"--apiPort={node.api_port}",
-        f"--data={node.dir}",
-        f"--host={node.host_addr}:{node.p2p_port}",
-        f"--identity={node.dir}.id",
-        f"--moduleAddress={node.module_address}",
-        f"--network={node.network}",
-        f"--password={PASSWORD}",
-        f"--safeAddress={node.safe_address}",
-        f"--protocolConfig={TEST_PROTOCOL_CONFIG_FILE}",
-        api_token_param,
-    ]
-    if node.cfg_file is not None:
-        cmd += [f"--configurationFilePath={node.cfg_file}"]
-
-    with open(f"{node.dir}.log", "w") as log_file:
-        node.proc = Popen(
-            cmd,
-            stdout=log_file,
-            stderr=STDOUT,
-            env=os.environ | custom_env,
-            cwd=PWD.parent,
-        )
-
-    return (node.proc is not None)
-
-
 def check_socket(address: str, port: str):
     s = socket.socket()
     try:
@@ -270,45 +225,6 @@ def copy_identities():
     for f in PWD.glob(f"{NODE_NAME_PREFIX}_*.cfg.yaml"):
         shutil.copy(f, FIXTURES_DIR.joinpath(f.name))
     logging.info(f"Copied '*.cfg.yaml' files to {FIXTURES_DIR}")
-
-
-def create_local_safe(node: Node, private_key: str):
-    custom_env: dict = {
-        "ETHERSCAN_API_KEY": "anykey",
-        "IDENTITY_PASSWORD": PASSWORD,
-        "DEPLOYER_PRIVATE_KEY": private_key,
-        "PRIVATE_KEY": private_key,
-        "PATH": PWD.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
-    }
-
-    res = run(
-        [
-            "hopli",
-            "create-safe-module",
-            "--network",
-            NETWORK1,
-            "--identity-from-path",
-            f"{node.dir}.id",
-            "--contracts-root",
-            "./ethereum/contracts",
-            "--hopr-amount",
-            "20000.0",
-        ],
-        env=os.environ | custom_env,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    for el in res.stdout.split("\n"):
-        if el.startswith("safe: address 0x"):
-            node.safe_address = el.split()[-1]
-
-        if el.startswith("module: address 0x"):
-            node.module_address = el.split()[-1]
-
-    return (node.safe_address is not None) and (node.module_address is not None)
-
 
 def fund_nodes(private_key: str):
     custom_env = {
@@ -383,14 +299,31 @@ async def swarm7(request):
 
     nodes: dict[str, Node] = deepcopy(NODES)
 
-    assert all(create_local_safe(node, private_key) for node in nodes.values())
-    assert all(setup_node(node) for node in nodes.values())
+    safe_custom_env: dict = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "IDENTITY_PASSWORD": PASSWORD,
+        "DEPLOYER_PRIVATE_KEY": private_key,
+        "PRIVATE_KEY": private_key,
+        "PATH": PWD.parent.joinpath(f".foundry/bin:{os.environ['PATH']}").as_posix(),
+    }
+
+    for node in nodes.values():
+        logging.info(f"Creating safe and module for {node}")
+        node.create_local_safe(safe_custom_env)
+
+    for node in nodes.values():
+        logging.info(f"Setting up {node}")
+        node.setup_node(PASSWORD, TEST_PROTOCOL_CONFIG_FILE, PWD.parent)
 
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
+
+    # minimal wait to ensure api is ready for `stardedz` call. 
+    # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
+    await asyncio.sleep(10) 
     for id, node in nodes.items():
         while not await node.api.startedz():
-            asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
         logging.info(f"Node {id} is up")
 
     # FUND NODES
@@ -398,17 +331,18 @@ async def swarm7(request):
     fund_nodes(private_key)
 
     # FINAL WAIT FOR NODES TO BE UP
-    logging.info("Node setup finished, waiting for nodes to be up")
+    logging.info("Node setup finished, waiting for nodes to be ready")
     for node in nodes.values():
         while not await node.api.readyz():
             asyncio.sleep(0.1)
 
         node.peer_id = await node.api.addresses("hopr")
         node.address = await node.api.addresses("native")
+        logging.info(f"Node {node} is ready")
 
     # YIELD NODES
     yield nodes
 
     # POST TEST CLEANUP
     logging.debug(f"Tearing down the {len(nodes)} nodes cluster")
-    [node.clean_up() for node in nodes]
+    [node.clean_up() for node in nodes.values()]

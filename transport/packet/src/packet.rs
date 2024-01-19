@@ -292,7 +292,7 @@ mod tests {
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .forward(pair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
-                .expect(&format!("failed to unwrap at {i}"));
+                .unwrap_or_else(|_| panic!("failed to unwrap at {i}"));
 
             match fwd {
                 ForwardedMetaPacket::RelayedPacket { packet, .. } => {

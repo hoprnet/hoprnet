@@ -8,7 +8,7 @@ import requests
 
 from .conftest import (
     API_TOKEN,
-    OPEN_CHANNEL_FUNDING_VALUE,
+    OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     TICKET_AGGREGATION_THRESHOLD,
     TICKET_PRICE_PER_HOP,
     default_nodes,
@@ -215,7 +215,7 @@ async def test_hoprd_swarm_connectivity(swarm7: dict[str, Node]):
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: dict[str, Node], peer: str):
-    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+    url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
 
     r = requests.get(url)
 
@@ -224,7 +224,7 @@ def test_hoprd_rest_api_should_reject_connection_without_any_auth(swarm7: dict[s
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, swarm7: dict[str, Node]):
-    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+    url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
     headers = {"X-Auth-Token": "DefiNItEly_A_baD_TokEn"}
 
     r = requests.get(url, headers=headers)
@@ -234,7 +234,7 @@ def test_hoprd_rest_api_should_reject_connection_with_invalid_token(peer: str, s
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer:str, swarm7: dict[str, Node]):
-    url = f"http://{swarm7[peer]['host_addr']}:{swarm7[peer]['api_port']}/api/v3/node/version"
+    url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/version"
     headers = {"X-Auth-Token": f"{API_TOKEN}"}
 
     r = requests.get(url, headers=headers)
@@ -341,7 +341,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
-    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE*1e18:.0f}"  # convert HOPR (int) to weiHOPR (str)
+    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}" # convert HOPR to weiHOPR
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()
@@ -356,7 +356,7 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
         assert balance_str_to_int(
             balance_before.safe_hopr_allowance
-        ) - balance_after.safe_hopr_allowance == balance_str_to_int(hopr_amount)
+        ) - balance_str_to_int(balance_after.safe_hopr_allowance) ==  balance_str_to_int(hopr_amount)
 
         assert balance_str_to_int(balance_after.native) < balance_str_to_int(balance_before.native)
 
@@ -615,7 +615,7 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(src: str, dest: str, swarm7: dict[str, Node]):
-    async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE):
+    async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
         # the context manager handles opening and closing of the channel with verification
         assert True
 
@@ -742,13 +742,20 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    split_index = int(message_count * 0.66)
+
     random_tag = random.randint(10, 65530)
 
     src_peer = swarm7[src]
     dest_peer = swarm7[dest]
 
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-    for packet in packets:
+    for packet in packets[:split_index]:
+        await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
+
+    await asyncio.sleep(2)
+
+    for packet in packets[split_index:]:
         await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
 
     await asyncio.wait_for(
@@ -758,9 +765,11 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     packets = await dest_peer.api.messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
 
-    packets = await dest_peer.api.messages_peek_all(random_tag, timestamps[-3])
+    ts_for_query = timestamps[split_index]
 
-    assert len(packets.messages) == 3
+    packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
+
+    assert len(packets.messages) == message_count - split_index
 
 
 @pytest.mark.asyncio

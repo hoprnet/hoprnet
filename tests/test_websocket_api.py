@@ -20,7 +20,7 @@ EXTRA_HEADERS = [("X-Auth-Token", API_TOKEN)]
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: int, swarm7: list[Node]):
+def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
         ws.connect(url(swarm7[peer].host_addr, swarm7[peer].api_port))
@@ -31,7 +31,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_without_a_valid_token(pe
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(peer: int, swarm7: list[Node]):
+def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
         ws.connect(
@@ -45,7 +45,7 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(pe
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer: int, swarm7: list[Node]):
+def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
         url(swarm7[peer].host_addr, swarm7[peer].api_port),
@@ -56,7 +56,7 @@ def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer:
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
-def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: int, swarm7: list[Node]):
+def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     try:
         ws.connect(
@@ -70,22 +70,22 @@ def test_hoprd_websocket_api_should_reject_connection_on_invalid_path(peer: int,
 
 
 @pytest.fixture
-async def ws_connections(swarm7: list[Node]):
+async def ws_connections(swarm7: dict[str, Node]):
     async with websockets.connect(
-        url(swarm7[0].host_addr, swarm7[0].api_port), extra_headers=EXTRA_HEADERS
+        url(swarm7["1"].host_addr, swarm7["1"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws1, websockets.connect(
-        url(swarm7[1].host_addr, swarm7[1].api_port), extra_headers=EXTRA_HEADERS
+        url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws2, websockets.connect(
-        url(swarm7[2].host_addr, swarm7[2].api_port), extra_headers=EXTRA_HEADERS
+        url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws3, websockets.connect(
-        url(swarm7[3].host_addr, swarm7[3].api_port), extra_headers=EXTRA_HEADERS
+        url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws4:
-        yield {0: ws1, 1: ws2, 2: ws3, 3: ws4}
+        yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes_with_auth(), count=1))
-async def test_websocket_send_receive_messages(src: int, dest: int, swarm7: list[Node], ws_connections):
+async def test_websocket_send_receive_messages(src: str, dest: str, swarm7: dict[str, Node], ws_connections):
     tag = random.randint(30000, 60000)
     message_target_count = 10
 

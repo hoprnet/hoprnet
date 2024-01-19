@@ -62,7 +62,7 @@ impl From<ethers::types::Log> for Log {
             data: Box::from(value.data.as_ref()),
             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
             block_number: value.block_number.expect("block id must be present").as_u64(),
-            log_index: value.log_index.expect("log index must be present").into(),
+            log_index: value.log_index.expect("log index must be present"),
             tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
         }
     }

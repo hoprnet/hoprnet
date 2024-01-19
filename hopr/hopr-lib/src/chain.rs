@@ -383,6 +383,7 @@ where
     (tx_queue, chain_actions, rpc_operations)
 }
 
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,

@@ -75,7 +75,7 @@ impl FaucetArgs {
         } = self;
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if let Err(_) = env::var("PRIVATE_KEY") {
+        if env::var("PRIVATE_KEY").is_err() {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
@@ -93,7 +93,7 @@ impl FaucetArgs {
 
         // if local identity dirs/path is provided, read files
         let local_files = local_identity.get_files();
-        if local_files.len() > 0 {
+        if !local_files.is_empty() {
             // check if password is provided
             let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,
@@ -115,9 +115,7 @@ impl FaucetArgs {
         log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network) {
-            return Err(e);
-        }
+        set_process_path_env(&contracts_root, &network)?;
 
         // convert hopr_amount and native_amount from f64 to uint256 string
         let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
@@ -126,17 +124,9 @@ impl FaucetArgs {
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        addresses_all
-            .into_iter()
-            .map(|a| {
-                child_process_call_foundry_faucet(
-                    &network,
-                    &a,
-                    &hopr_amount_uint256_string,
-                    &native_amount_uint256_string,
-                )
-            })
-            .collect()
+        addresses_all.into_iter().try_for_each(|a| {
+            child_process_call_foundry_faucet(&network, &a, &hopr_amount_uint256_string, &native_amount_uint256_string)
+        })
     }
 }
 

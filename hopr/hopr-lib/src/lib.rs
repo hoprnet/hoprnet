@@ -44,17 +44,14 @@ use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
-use core_transport::libp2p_identity::PeerId;
+use core_transport::libp2p::identity::PeerId;
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
+    build_ticket_aggregation, execute_on_tick, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
-use hopr_internal_types::prelude::*;
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use hopr_primitive_types::prelude::*;
-use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use log::{error, info};
 use utils_db::db::DB;
@@ -154,6 +151,8 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
+///
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn to_chain_events_refresh_process<Db, S>(
     me: PeerId,
     me_onchain: Address,
@@ -287,6 +286,8 @@ where
 }
 
 /// Main builder of the hopr lib components
+#[allow(clippy::type_complexity)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn build_components<FSaveTbf>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,
@@ -305,7 +306,7 @@ pub fn build_components<FSaveTbf>(
 where
     FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
 {
-    let identity: libp2p_identity::Keypair = (&me).into();
+    let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
     let (network, network_events_rx) = build_network(identity.public().to_peer_id(), cfg.network_options);
 

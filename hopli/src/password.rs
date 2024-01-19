@@ -3,7 +3,7 @@ use clap::{Parser, ValueHint};
 use std::{env, fs::read_to_string, path::PathBuf};
 
 /// Verification provider arguments
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 pub struct PasswordArgs {
     #[clap(
         long,
@@ -14,12 +14,6 @@ pub struct PasswordArgs {
         value_name = "PASSWORD_PATH"
     )]
     password_path: Option<PathBuf>,
-}
-
-impl Default for PasswordArgs {
-    fn default() -> Self {
-        PasswordArgs { password_path: None }
-    }
 }
 
 impl PasswordArgs {

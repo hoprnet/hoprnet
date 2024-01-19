@@ -360,8 +360,8 @@ pub async fn run_hopr_api(
 
                 async move {
                     let mut queue = (
-                        ws_con.clone().map(|v| WebSocketInput::WsInput(v)),
-                        ws_rx.map(|v| WebSocketInput::Network(v)),
+                        ws_con.clone().map(WebSocketInput::WsInput),
+                        ws_rx.map(WebSocketInput::Network),
                     )
                         .merge();
 
@@ -1563,6 +1563,7 @@ mod messages {
     /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
     ///
     /// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
+    #[allow(dead_code)] // not dead code, just for documentation
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),
@@ -1577,10 +1578,10 @@ mod messages {
         tag = "Messages",
     )]
     pub async fn websocket(_req: Request<InternalState>) -> tide::Result<Response> {
-        // Dummy implementation for utoipa, the websocket is created in place inside the tide server
-        return Ok(Response::builder(422)
+        // Dummy implementation for utoipa, the websocket is created in-place inside the tide server
+        Ok(Response::builder(422)
             .body(ApiErrorStatus::UnknownFailure("unimplemented".into()))
-            .build());
+            .build())
     }
 
     /// Delete messages from nodes message inbox.
