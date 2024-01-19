@@ -229,18 +229,6 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
     }
 }
 
-fn workspace_dir() -> std::path::PathBuf {
-    let output = std::process::Command::new(env!("CARGO"))
-        .arg("locate-project")
-        .arg("--workspace")
-        .arg("--message-format=plain")
-        .output()
-        .unwrap()
-        .stdout;
-    let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
-    cargo_path.parent().unwrap().to_path_buf()
-}
-
 /// Creates local Anvil instance.
 ///
 /// Used for testing. When block time is given, new blocks are mined periodically.
