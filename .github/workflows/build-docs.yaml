@@ -35,7 +35,8 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
+        env:
+          USER: runner
 
       - name: Build bindings
         run: nix develop -c make build-solidity-types

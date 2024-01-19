@@ -47,7 +47,8 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
+        env:
+          USER: runner
 
       - name: Generate Changelog
         id: template

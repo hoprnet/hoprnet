@@ -203,16 +203,40 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-        in
-        {
-          apps = {
-            inherit hoprd-docker-build-and-upload hopli-docker-build-and-upload;
+          smoke-tests = pkgs.stdenv.mkDerivation {
+            pname = "hoprd-smoke-tests";
+            version = hoprdCrateInfo.version;
+            src = fs.toSource {
+              root = ./.;
+              fileset = fs.unions [
+                (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+                ./tests
+                ./scripts
+                ./ethereum/contracts/foundry.toml
+                ./ethereum/contracts/remappings.txt
+              ];
+            };
+            buildInputs = with pkgs; [
+              foundry-bin
+              solcDefault
+              hopli
+              hoprd
+              python39
+            ];
+            buildPhase = ''
+              unset SOURCE_DATE_EPOCH
+              python -m venv .venv
+              source .venv/bin/activate
+              pip install -U pip setuptools wheel
+              pip install -r tests/requirements.txt
+            '';
+            checkPhase = ''
+              source .venv/bin/activate
+              python3 -m pytest tests/
+            '';
+            doCheck = true;
           };
-          packages = {
-            inherit hoprd hoprd-test hopli hopli-test hoprd-docker anvil-docker hopli-docker;
-            default = hoprd;
-          };
-          devShells.default = craneLib.devShell {
+          buildDevShell = extraPackages: craneLib.devShell {
             packages = with pkgs; [
               # testing utilities
               jq
@@ -236,7 +260,7 @@
               python39
               python39Packages.venvShellHook
             ] ++
-            lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+            lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
               unset SOURCE_DATE_EPOCH
@@ -246,6 +270,22 @@
               autoPatchelf ./.venv
             '';
           };
+          defaultDevShell = buildDevShell [ ];
+          smoketestsDevShell = buildDevShell [ hoprd hopli ];
+        in
+        {
+          apps = {
+            inherit hoprd-docker-build-and-upload hopli-docker-build-and-upload;
+          };
+          packages = {
+            inherit hoprd hoprd-test hoprd-docker;
+            inherit hopli hopli-test hopli-docker;
+            inherit anvil-docker;
+            inherit smoke-tests;
+            default = hoprd;
+          };
+          devShells.default = defaultDevShell;
+          devShells.smoke-tests = smoketestsDevShell;
         };
       systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
       flake = {

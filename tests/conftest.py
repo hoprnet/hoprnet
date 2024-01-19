@@ -172,7 +172,7 @@ def setup_node(args: dict):
         "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
     }
     cmd = [
-        "target/debug/hoprd",
+        "hoprd",
         "--announce",
         "--api",
         "--disableTicketAutoRedeem",
@@ -247,10 +247,10 @@ def reuse_pregenerated_identities():
     # remove existing identity files in tmp folder, .safe.args
     suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
 
-    def is_relevant_file(f):
+    def is_relevant_fixture_file(f):
         return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
 
-    for f in filter(is_relevant_file, os.listdir(FIXTURE_FILES_DIR)):
+    for f in filter(is_relevant_fixture_file, os.listdir(FIXTURE_FILES_DIR)):
         os.remove(f"{FIXTURE_FILES_DIR}{f}")
         logging.info(f"Removed file {FIXTURE_FILES_DIR}{f}")
 
@@ -258,10 +258,10 @@ def reuse_pregenerated_identities():
     node_nr = 1
     id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
 
-    def is_relevant_file(f):
+    def is_relevant_id_file(f):
         return fnmatch.fnmatch(f, "*.id")
 
-    for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
+    for f in filter(is_relevant_id_file, id_files):
         shutil.copyfile(
             f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-node_{node_nr}.id"
         )
