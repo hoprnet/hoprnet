@@ -43,8 +43,6 @@ jobs:
         env:
           USER: runner
 
-      - name: Build bindings
-
       - name: Run unit tests
         if: matrix.target == 'unit'
         run: |
