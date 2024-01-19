@@ -206,3 +206,6 @@ debug-identity
 
 # generated SDK
 /hoprd-sdk-python/
+
+# nix generated files
+/result

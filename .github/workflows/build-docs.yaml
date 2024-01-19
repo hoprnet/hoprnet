@@ -35,27 +35,14 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
+        env:
+          USER: runner
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .foundry/bin/
+      - name: Build bindings
+        run: nix develop -c make build-solidity-types
 
       - name: Generate rust docs
-        uses: workflow/nix-shell-action@v3.3.0
-        with:
-          flakes-from-devshell: true
-          script: |
-            cargo doc --no-deps
+        run: nix develop -c cargo doc --no-deps
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'

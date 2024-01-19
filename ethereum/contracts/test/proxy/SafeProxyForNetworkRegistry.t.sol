@@ -16,7 +16,6 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
     /**
      * Manually import the errors and events
      */
-
     function setUp() public virtual {
         owner = vm.addr(101); // make address(101) new owner
         token = vm.addr(102); // make address(102) new token
