@@ -364,7 +364,8 @@ impl HoprTransport {
                 let selector = LegacyPathSelector::default();
                 let cp = {
                     let cg = self.channel_graph.read().await;
-                    selector.select_path(&cg, cg.my_address(), chain_key, hops as usize)?
+                    // Sends 1-hop packet if > 1-hop does not work
+                    selector.select_path(&cg, cg.my_address(), chain_key, 1, hops as usize)?
                 };
 
                 cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?

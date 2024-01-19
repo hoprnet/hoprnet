@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 prometheus = "0.13"
-regex = "1"
+regex = { workspace = true }
 
 [features]
 default = []

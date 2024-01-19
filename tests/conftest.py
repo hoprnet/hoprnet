@@ -10,7 +10,7 @@ import subprocess
 from time import sleep
 
 import pytest
-from hopr import HoprdAPI
+from .hopr import HoprdAPI
 
 random_data = os.urandom(8)
 SEED = int.from_bytes(random_data, byteorder="big")
@@ -27,7 +27,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-seq-request-count",
         action="store",
-        default=200,
+        default=500,
         help="Number of sequential requests in the stress test",
     )
     parser.addoption(

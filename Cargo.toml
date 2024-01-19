@@ -57,6 +57,7 @@ libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
 log = { version = "0.4.20", features = ["kv_unstable"] }
 multiaddr = "0.18.0"
+regex = "1"
 rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
