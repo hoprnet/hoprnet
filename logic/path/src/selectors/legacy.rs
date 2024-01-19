@@ -164,7 +164,7 @@ where
 {
     /// Attempts to find a path with at least `min_hops` hops and at most `max_hops` hops
     /// that goes from `source` to `destination`. There does not need to be a
-    /// a payment channel to to `destination`, so the path only includes intermediate hops.
+    /// a payment channel to `destination`, so the path only includes intermediate hops.
     ///
     /// Implements a randomized best-first search through the path space. The graph
     /// traversal is bounded by `self.max_iterations` to prevent from long-running path
