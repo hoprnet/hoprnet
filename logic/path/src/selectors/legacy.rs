@@ -89,6 +89,7 @@ where
     /// If true, include paths with payment channels, which have no
     /// funds in it. By default, that option is set to `false` to
     /// prevent from tickets being dropped immediately.
+    /// Defaults to false.
     pub allow_zero_edge_weight: bool,
     cw: PhantomData<CW>,
 }
