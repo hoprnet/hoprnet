@@ -7,7 +7,7 @@ import re
 
 import websocket
 import websockets
-from tests.conftest import DEFAULT_API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
+from .conftest import DEFAULT_API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
 
 
 def url(host, port):
