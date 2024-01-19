@@ -97,7 +97,10 @@
             cargoToml = ./hopli/Cargo.toml;
           };
           rustPackageDeps = { pname, version }: craneLib.buildDepsOnly (commonArgs // {
-            inherit pname version;
+            inherit pname;
+            # normalize the version to not include any suffixes so the cache
+            # does not get busted
+            version = pkgs.lib.strings.concatStringsSep "." (pkgs.lib.lists.take 3 (builtins.splitVersion version));
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
