@@ -36,6 +36,8 @@ jobs:
 
       - name: Update vendored cargo dependencies
         run: |
+          mkdir -p ethereum/bindings/src/
+          touch ethereum/bindings/src/lib.rs
           nix develop -c make cargo-download
           nix develop -c make cargo-update
 
