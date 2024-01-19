@@ -279,10 +279,7 @@ mod tests {
         #[async_trait]
         impl PeerAddressResolver for TestResolver {
             async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-                self.0
-                    .iter()
-                    .find(|(_, addr)| addr.eq(onchain_key))
-                    .map(|(pk, _)| pk.clone())
+                self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
             }
 
             async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {

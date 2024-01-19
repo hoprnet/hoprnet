@@ -52,12 +52,13 @@ where
         graph: &ChannelGraph,
         source: Address,
         destination: Address,
+        min_hops: usize,
         max_hops: usize,
     ) -> Result<ChannelPath>;
 
     /// Constructs a new valid packet `Path` from self and the given destination.
     /// This method uses `INTERMEDIATE_HOPS` as the maximum number of hops.
     fn select_auto_path(&self, graph: &ChannelGraph, destination: Address) -> Result<ChannelPath> {
-        self.select_path(graph, graph.my_address(), destination, INTERMEDIATE_HOPS)
+        self.select_path(graph, graph.my_address(), destination, 1usize, INTERMEDIATE_HOPS)
     }
 }

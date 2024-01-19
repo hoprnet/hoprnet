@@ -255,7 +255,7 @@ mod tests {
         };
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer.clone()]), ideal_single_use_channel);
+        futures::join!(pinger.ping(vec![peer]), ideal_single_use_channel);
     }
 
     #[async_std::test]
@@ -269,7 +269,7 @@ mod tests {
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
             .with(
-                predicate::eq(peer.clone()),
+                predicate::eq(peer),
                 predicate::function(|x: &crate::types::Result| x.is_err()),
                 predicate::eq("version".to_owned()),
             )
@@ -282,7 +282,7 @@ mod tests {
         };
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer.clone()]), bad_pong_single_use_channel);
+        futures::join!(pinger.ping(vec![peer]), bad_pong_single_use_channel);
     }
 
     #[async_std::test]
@@ -315,7 +315,7 @@ mod tests {
         };
 
         let mut pinger = Ping::new(ping_config, tx, rx, mock);
-        futures::join!(pinger.ping(vec![peer.clone()]), timeout_single_use_channel);
+        futures::join!(pinger.ping(vec![peer]), timeout_single_use_channel);
     }
 
     #[async_std::test]
@@ -329,14 +329,14 @@ mod tests {
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
             .with(
-                predicate::eq(peers[0].clone()),
+                predicate::eq(peers[0]),
                 predicate::function(|x: &crate::types::Result| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
-                predicate::eq(peers[1].clone()),
+                predicate::eq(peers[1]),
                 predicate::function(|x: &crate::types::Result| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
@@ -376,14 +376,14 @@ mod tests {
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
             .with(
-                predicate::eq(peers[0].clone()),
+                predicate::eq(peers[0]),
                 predicate::function(|x: &crate::types::Result| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
-                predicate::eq(peers[1].clone()),
+                predicate::eq(peers[1]),
                 predicate::function(|x: &crate::types::Result| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )

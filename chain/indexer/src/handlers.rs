@@ -513,7 +513,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     update.1.to_string()
                 );
 
-                db.set_ticket_price(&update.1.into()).await?;
+                db.set_ticket_price(&update.1).await?;
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -685,15 +685,11 @@ pub mod tests {
             ]),
         };
 
-        let account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
             .on_event(
-                handlers.addresses.announcements.clone(),
+                handlers.addresses.announcements,
                 0u32,
                 keybinding_log,
                 Snapshot::default(),
@@ -714,11 +710,7 @@ pub mod tests {
         let handlers = init_handlers(db.clone());
 
         // Assume that there is a keybinding
-        let account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         db.write()
             .await
@@ -738,7 +730,7 @@ pub mod tests {
 
         let _error = handlers
             .on_event(
-                handlers.addresses.announcements.clone(),
+                handlers.addresses.announcements,
                 0u32,
                 address_announcement_empty_log,
                 Snapshot::default(),
@@ -762,7 +754,7 @@ pub mod tests {
         };
 
         let announced_account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
+            *SELF_PRIV_KEY.public(),
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr,
@@ -772,7 +764,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.announcements.clone(),
+                handlers.addresses.announcements,
                 0u32,
                 address_announcement_log,
                 Snapshot::default(),
@@ -796,7 +788,7 @@ pub mod tests {
         };
 
         let announced_dns_account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
+            *SELF_PRIV_KEY.public(),
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr_dns,
@@ -806,7 +798,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.announcements.clone(),
+                handlers.addresses.announcements,
                 0u32,
                 address_announcement_dns_log,
                 Snapshot::default(),
@@ -829,7 +821,7 @@ pub mod tests {
 
         // Assume that there is a keybinding and an address announcement
         let announced_account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
+            *SELF_PRIV_KEY.public(),
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr,
@@ -850,15 +842,11 @@ pub mod tests {
             ))]),
         };
 
-        let account_entry = AccountEntry::new(
-            SELF_PRIV_KEY.public().clone(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
             .on_event(
-                handlers.addresses.announcements.clone(),
+                handlers.addresses.announcements,
                 0u32,
                 revoke_announcement_log,
                 Snapshot::default(),
@@ -890,12 +878,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.token.clone(),
-                0u32,
-                transferred_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
             .await
             .unwrap();
 
@@ -931,12 +914,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.token.clone(),
-                0u32,
-                transferred_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
             .await
             .unwrap();
 
@@ -968,7 +946,7 @@ pub mod tests {
         );
 
         handlers
-            .on_event(handlers.addresses.token.clone(), 0u32, log.clone(), Snapshot::default())
+            .on_event(handlers.addresses.token, 0u32, log.clone(), Snapshot::default())
             .await
             .unwrap();
 
@@ -992,7 +970,7 @@ pub mod tests {
         );
 
         handlers
-            .on_event(handlers.addresses.token.clone(), 0u32, log, Snapshot::default())
+            .on_event(handlers.addresses.token, 0u32, log, Snapshot::default())
             .await
             .unwrap();
 
@@ -1026,7 +1004,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 registered_log,
                 Snapshot::default(),
@@ -1066,7 +1044,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 registered_log,
                 Snapshot::default(),
@@ -1112,7 +1090,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 registered_log,
                 Snapshot::default(),
@@ -1158,7 +1136,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 registered_log,
                 Snapshot::default(),
@@ -1190,7 +1168,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 nr_enabled,
                 Snapshot::default(),
@@ -1223,7 +1201,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 nr_disabled,
                 Snapshot::default(),
@@ -1251,7 +1229,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 set_eligible,
                 Snapshot::default(),
@@ -1285,7 +1263,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.network_registry.clone(),
+                handlers.addresses.network_registry,
                 0u32,
                 set_eligible,
                 Snapshot::default(),
@@ -1334,7 +1312,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 balance_increased_log,
                 Snapshot::default(),
@@ -1374,7 +1352,7 @@ pub mod tests {
         assert!(db.read().await.get_channels_domain_separator().await.unwrap().is_none());
 
         handlers
-            .on_event(handlers.addresses.channels.clone(), 0u32, log, Snapshot::default())
+            .on_event(handlers.addresses.channels, 0u32, log, Snapshot::default())
             .await
             .unwrap();
 
@@ -1422,7 +1400,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 balance_increased_log,
                 Snapshot::default(),
@@ -1480,7 +1458,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 channel_closed_log,
                 Snapshot::default(),
@@ -1523,7 +1501,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 channel_opened_log,
                 Snapshot::default(),
@@ -1584,7 +1562,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 channel_opened_log,
                 Snapshot::default(),
@@ -1647,7 +1625,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 ticket_redeemed_log,
                 Snapshot::default(),
@@ -1708,7 +1686,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.channels.clone(),
+                handlers.addresses.channels,
                 0u32,
                 closure_initiated_log,
                 Snapshot::default(),
@@ -1741,7 +1719,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.safe_registry.clone(),
+                handlers.addresses.safe_registry,
                 0u32,
                 safe_registered_log,
                 Snapshot::default(),
@@ -1780,7 +1758,7 @@ pub mod tests {
 
         handlers
             .on_event(
-                handlers.addresses.safe_registry.clone(),
+                handlers.addresses.safe_registry,
                 0u32,
                 safe_registered_log,
                 Snapshot::default(),
@@ -1807,7 +1785,7 @@ pub mod tests {
         assert_eq!(db.read().await.get_ticket_price().await.unwrap(), None);
 
         handlers
-            .on_event(handlers.addresses.price_oracle.clone(), 0u32, log, Snapshot::default())
+            .on_event(handlers.addresses.price_oracle, 0u32, log, Snapshot::default())
             .await
             .unwrap();
 
