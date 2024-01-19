@@ -11,7 +11,7 @@ use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 
-/// Holds a weighted channel path and auxiliary information for graph traversal.
+/// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct WeightedChannelPath {
     path: Vec<Address>,
@@ -26,8 +26,8 @@ impl PartialOrd for WeightedChannelPath {
 }
 
 impl Ord for WeightedChannelPath {
-    /// Favors unexplored paths over fully explored paths even when a better
-    /// alternative exists.
+    /// Favors unexplored paths over fully explored paths even
+    /// when a better alternative exists.
     ///
     /// Favors longer paths over shorter paths, longer path
     /// means more privacy.
@@ -56,9 +56,9 @@ impl Ord for WeightedChannelPath {
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
-    /// Multiply all channel stake with a random float in the interval (0,1].
-    /// Given that the floats are uniform, nodes with higher stake have a higher
-    /// probability of reaching a higher value.
+    /// Multiply all channel stake with a random float in the interval [0,1).
+    /// Given that the floats are uniformly distributed, nodes with higher
+    /// stake have a higher probability of reaching a higher value.
     ///
     /// Sorting the list of weights thus moves nodes with higher stakes more
     /// often to the front.
@@ -177,11 +177,9 @@ where
         min_hops: usize,
         max_hops: usize,
     ) -> Result<ChannelPath> {
-        if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
-            return Err(GeneralError::InvalidInput.into());
-        }
-
-        if min_hops > max_hops || min_hops == 0 {
+        // The protocol does not support >3 hop paths and will presumably never do, 
+        // so we can exclude it here.
+        if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) || !(1..=max_hops).contains(&min_hops) {
             return Err(GeneralError::InvalidInput.into());
         }
 
