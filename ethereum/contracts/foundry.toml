@@ -17,7 +17,7 @@ optimizer_runs = 200
 
 [rpc_endpoints]
 local = "http://localhost:8545"
-gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+gnosis = "https://gnosis-provider.rpch.tech/"
 
 [etherscan]
 gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io" }
@@ -30,19 +30,19 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 [profile.development]
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 
 # staging environment
 [profile.staging]
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 
 # production environment
 [profile.production]
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 
 [profile.ci]
   # disabled for now since the CI nodes are not powerful enough
