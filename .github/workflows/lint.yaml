@@ -39,11 +39,10 @@ jobs:
         env:
           USER: runner
 
-      - name: Build bindings
-        run: nix develop -c make build-solidity-types
-
-      - name: Format generated code to pass the linter
-        run: nix develop -c cargo fmt -p bindings
+      - name: Build and format generated code
+        run: |
+          nix develop -c cargo build -p bindings
+          nix develop -c cargo fmt -p bindings
 
       - name: Run linter
         run: nix develop -c make lint

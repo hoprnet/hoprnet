@@ -30,19 +30,19 @@ jobs:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
-        with:
-          name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        env:
-          USER: runner
+      # # NOTE: We don't want to cache the nightly Rust build necessary for workspace
+      # # documentation index.html file generation until the https://github.com/hoprnet/hoprnet/issues/5915
+      # # is implemented.
+      # - uses: cachix/cachix-action@v14
+      #   if: ${{ !env.ACT }}
+      #   with:
+      #     name: hoprnet
+      #     authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      #   env:
+      #     USER: runner
 
       - name: Install nightly Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
-
-      - name: Build bindings
-        run: nix develop -c make build-solidity-types
 
       - name: Build docs
         env:
