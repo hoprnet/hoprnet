@@ -7,7 +7,7 @@
       "contractAddress": "0x098B275485c406573D042848D66eb9d63fca311C",
       "function": null,
       "arguments": null,
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -27,7 +27,7 @@
       "contractAddress": "0xB7397C218766eBe6A1A634df523A1a7e412e67eA",
       "function": null,
       "arguments": null,
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -47,7 +47,7 @@
       "contractAddress": "0xe15C24a0910311c83aC78B5930d771089E93077b",
       "function": null,
       "arguments": null,
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -71,7 +71,7 @@
         "300",
         "0xe15C24a0910311c83aC78B5930d771089E93077b"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -98,7 +98,7 @@
         "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
         "0xe15C24a0910311c83aC78B5930d771089E93077b"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -121,7 +121,7 @@
         "0x0000000000000000000000000000000000000000000000000000000000000000",
         "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -145,7 +145,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0x01BFbCB6A2924b083969ce6237AdBbF3BFa7De13"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -169,7 +169,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0xDCcC4a8ee2BF3CaF5a4AB1cDBa1ee7cc04E324Dd"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -193,7 +193,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0x529F995739C9C425CECeE9deF78e95CB07887565"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -217,7 +217,7 @@
         "0x0000000000000000000000000000000000000000000000000000000000000000",
         "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -242,7 +242,7 @@
         "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976",
         "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -265,7 +265,7 @@
         "0x0000000000000000000000000000000000000000000000000000000000000000",
         "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -289,7 +289,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0x01BFbCB6A2924b083969ce6237AdBbF3BFa7De13"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -313,7 +313,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0xDCcC4a8ee2BF3CaF5a4AB1cDBa1ee7cc04E324Dd"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -337,7 +337,7 @@
         "0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08",
         "0x529F995739C9C425CECeE9deF78e95CB07887565"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -361,7 +361,7 @@
         "0x0000000000000000000000000000000000000000000000000000000000000000",
         "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -385,7 +385,7 @@
         "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976",
         "100"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
@@ -407,7 +407,7 @@
       "arguments": [
         "0xe15C24a0910311c83aC78B5930d771089E93077b"
       ],
-      "rpc": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "rpc": "https://gnosis-provider.rpch.tech/",
       "transaction": {
         "type": "0x02",
         "from": "0x4ff4e61052a4dfb1be72866ab711ae08dd861976",
