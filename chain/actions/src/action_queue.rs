@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::CoreEthereumActionsError::{
-    ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
+    ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed,
 };
 use crate::errors::Result;
 
@@ -170,8 +170,16 @@ where
 {
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack, domain_separator) => match ack.status {
+            Action::RedeemTicket(ack) => match ack.status {
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {
+                    let domain_separator = self
+                        .db
+                        .read()
+                        .await
+                        .get_channels_domain_separator()
+                        .await?
+                        .ok_or(MissingDomainSeparator)?;
+
                     let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), domain_separator).await?;
                     IndexerExpectation::new(
                         tx_hash,
@@ -369,7 +377,7 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack, _) = act {
+                        if let Action::RedeemTicket(mut ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
                             if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {

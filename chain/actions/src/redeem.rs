@@ -13,7 +13,7 @@ use utils_db::errors::DbError;
 use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
+    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::CoreEthereumActions;
@@ -79,16 +79,13 @@ where
 async fn unchecked_ticket_redeem<Db>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
-    domain_separator: Hash,
     on_chain_tx_sender: ActionSender,
 ) -> Result<PendingAction>
 where
     Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender
-        .send(Action::RedeemTicket(ack_ticket, domain_separator))
-        .await
+    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
 #[async_trait]
@@ -196,19 +193,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
         let mut receivers: Vec<PendingAction> = vec![];
 
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await
-            .unwrap()
-            .ok_or(MissingDomainSeparator)?;
-
         for acked_ticket in to_redeem {
             let ticket_index = acked_ticket.ticket.index;
-            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, domain_separator, self.tx_sender.clone()).await
-            {
+            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, self.tx_sender.clone()).await {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
@@ -227,20 +214,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await
-            .unwrap()
-            .ok_or(MissingDomainSeparator)?;
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {
             if ack_ticket.status == AcknowledgedTicketStatus::Untouched
                 && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
             {
-                unchecked_ticket_redeem(self.db.clone(), ack_ticket, domain_separator, self.tx_sender.clone()).await
+                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
             }

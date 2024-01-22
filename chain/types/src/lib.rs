@@ -234,7 +234,17 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let mut anvil = ethers::utils::Anvil::new();
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
+    let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
+
+    let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());

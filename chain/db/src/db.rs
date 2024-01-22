@@ -1762,10 +1762,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1776,9 +1773,7 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {
@@ -1798,10 +1793,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1812,12 +1804,8 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
-        ack_tickets[17].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed;
+        ack_tickets[17].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {
@@ -1837,10 +1825,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1851,9 +1836,7 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[28].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[28].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {

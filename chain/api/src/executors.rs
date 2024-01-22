@@ -118,7 +118,11 @@ where
     C: EthereumClient<T> + Clone + Sync + Send,
     PGen: PayloadGenerator<T> + Clone + Sync + Send,
 {
-    async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> chain_actions::errors::Result<Hash> {
+    async fn redeem_ticket(
+        &self,
+        acked_ticket: AcknowledgedTicket,
+        domain_separator: Hash,
+    ) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.redeem_ticket(acked_ticket, domain_separator)?;
         Ok(self.client.post_transaction(payload).await?)
     }
