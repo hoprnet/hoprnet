@@ -233,7 +233,7 @@ def fund_nodes(private_key: str):
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
         "PRIVATE_KEY": private_key,
-        "PATH": os.environ['PATH'],
+        "PATH": os.environ["PATH"],
     }
     run(
         [
@@ -306,7 +306,7 @@ async def swarm7(request):
         "IDENTITY_PASSWORD": PASSWORD,
         "DEPLOYER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
-        "PATH": os.environ['PATH']
+        "PATH": os.environ["PATH"],
     }
 
     for node in nodes.values():
