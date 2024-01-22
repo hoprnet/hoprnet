@@ -102,7 +102,7 @@ fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
             tx.set_data(
                 TransferCall {
                     recipient: destination.into(),
-                    amount: amount.amount().into(),
+                    amount: amount.amount(),
                 }
                 .encode()
                 .into(),

@@ -538,7 +538,7 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |dest, balance| channel.destination.eq(&dest) && stake.eq(balance))
+            .withf(move |dest, balance| channel.destination.eq(dest) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();

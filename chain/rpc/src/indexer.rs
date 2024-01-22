@@ -166,7 +166,7 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs.clone(),
+            contract_addrs: contract_addrs,
             expected_block_time: block_time,
             ..RpcOperationsConfig::default()
         };
@@ -273,7 +273,7 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs.clone(),
+            contract_addrs: contract_addrs,
             expected_block_time: block_time,
             ..RpcOperationsConfig::default()
         };

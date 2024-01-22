@@ -10,7 +10,7 @@ import subprocess
 from time import sleep
 
 import pytest
-from hopr import HoprdAPI
+from .hopr import HoprdAPI
 
 random_data = os.urandom(8)
 SEED = int.from_bytes(random_data, byteorder="big")
@@ -27,7 +27,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-seq-request-count",
         action="store",
-        default=200,
+        default=500,
         help="Number of sequential requests in the stress test",
     )
     parser.addoption(
@@ -172,7 +172,7 @@ def setup_node(args: dict):
         "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
     }
     cmd = [
-        "target/debug/hoprd",
+        "hoprd",
         "--announce",
         "--api",
         "--disableTicketAutoRedeem",
@@ -247,10 +247,10 @@ def reuse_pregenerated_identities():
     # remove existing identity files in tmp folder, .safe.args
     suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
 
-    def is_relevant_file(f):
+    def is_relevant_fixture_file(f):
         return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
 
-    for f in filter(is_relevant_file, os.listdir(FIXTURE_FILES_DIR)):
+    for f in filter(is_relevant_fixture_file, os.listdir(FIXTURE_FILES_DIR)):
         os.remove(f"{FIXTURE_FILES_DIR}{f}")
         logging.info(f"Removed file {FIXTURE_FILES_DIR}{f}")
 
@@ -258,10 +258,10 @@ def reuse_pregenerated_identities():
     node_nr = 1
     id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
 
-    def is_relevant_file(f):
+    def is_relevant_id_file(f):
         return fnmatch.fnmatch(f, "*.id")
 
-    for f in filter(lambda f: fnmatch.fnmatch(f, "*.id"), id_files):
+    for f in filter(is_relevant_id_file, id_files):
         shutil.copyfile(
             f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-node_{node_nr}.id"
         )
@@ -274,7 +274,7 @@ def create_local_safes(nodes_args: dict, private_key):
         "IDENTITY_PASSWORD": PASSWORD,
         "DEPLOYER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
-        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+        "PATH": os.environ["PATH"],
     }
     for node_id, node_args in nodes_args.items():
         id_file = f"{node_args['dir']}.id"
@@ -315,7 +315,7 @@ def funding_nodes(private_key):
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
         "PRIVATE_KEY": private_key,
-        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+        "PATH": os.environ["PATH"],
     }
     subprocess.run(
         [

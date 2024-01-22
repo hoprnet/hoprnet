@@ -200,7 +200,7 @@ mod tests {
     fn test_prp_random_inplace() {
         let prp = PRP::new(random_bytes(), random_bytes());
         let mut data: [u8; 278] = random_bytes();
-        let data_old = data.clone();
+        let data_old = data;
 
         prp.forward_inplace(&mut data).unwrap();
         assert_ne!(&data_old, data.as_ref(), "buffer must be encrypted in-place");

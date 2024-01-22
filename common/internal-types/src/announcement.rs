@@ -32,7 +32,7 @@ impl KeyBinding {
         let to_sign = Self::prepare_for_signing(&chain_key, packet_key.public());
         Self {
             chain_key,
-            packet_key: packet_key.public().clone(),
+            packet_key: *packet_key.public(),
             signature: OffchainSignature::sign_message(&to_sign, packet_key),
         }
     }
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_key_binding() {
         let kb_1 = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let kb_2 = KeyBinding::from_parts(kb_1.chain_key.clone(), kb_1.packet_key.clone(), kb_1.signature.clone())
+        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())
             .expect("should verify correctly");
 
         assert_eq!(kb_1, kb_2, "must be equal");
@@ -171,23 +171,23 @@ mod tests {
         for (ma_str, decapsulated_ma_str) in vec![
             (
                 format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}"),
-                format!("/ip4/127.0.0.1/tcp/10000"),
+                "/ip4/127.0.0.1/tcp/10000".to_string(),
             ),
             (
                 format!("/ip6/::1/tcp/10000/p2p/{peer_id}"),
-                format!("/ip6/::1/tcp/10000"),
+                "/ip6/::1/tcp/10000".to_string(),
             ),
             (
                 format!("/dns4/hoprnet.org/tcp/10000/p2p/{peer_id}"),
-                format!("/dns4/hoprnet.org/tcp/10000"),
+                "/dns4/hoprnet.org/tcp/10000".to_string(),
             ),
             (
                 format!("/dns6/hoprnet.org/tcp/10000/p2p/{peer_id}"),
-                format!("/dns6/hoprnet.org/tcp/10000"),
+                "/dns6/hoprnet.org/tcp/10000".to_string(),
             ),
             (
                 format!("/ip4/127.0.0.1/udp/10000/quic/p2p/{peer_id}"),
-                format!("/ip4/127.0.0.1/udp/10000/quic"),
+                "/ip4/127.0.0.1/udp/10000/quic".to_string(),
             ),
         ] {
             let maddr: Multiaddr = ma_str.parse().unwrap();
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_announcement_no_keybinding() {
-        let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000").parse().unwrap();
+        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
 
         let ad = AnnouncementData::new(&maddr, None).expect("construction of announcement data should work");
 
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_announcement_decapsulated_ma() {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000").parse().unwrap();
+        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
 
         let ad = AnnouncementData::new(&maddr, Some(key_binding.clone()))
             .expect("construction of announcement data should work");

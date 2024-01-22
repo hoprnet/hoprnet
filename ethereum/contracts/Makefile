@@ -29,7 +29,7 @@ sc-audit-coverage:
 
 .PHONY: forked-local-anvil
 forked-local-anvil:
-	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
+	anvil -f 'https://gnosis-provider.rpch.tech/'
 
 generate-bindings: ${SOLIDITY_FILES}
 generate-bindings: ## Only create types for Hopr* contracts

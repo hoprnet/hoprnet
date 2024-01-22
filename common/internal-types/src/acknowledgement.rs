@@ -368,7 +368,9 @@ impl BinarySerializable for UnacknowledgedTicket {
 
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+
 pub enum PendingAcknowledgement {
     /// We're waiting for acknowledgement as a sender
     WaitingAsSender,

@@ -7,7 +7,7 @@ pub mod sma;
 pub mod traits;
 
 // TODO: remove in 3.0
-#[deprecated(note = "RLP encoding will be removed in 3.0")]
+// #[deprecated(note = "RLP encoding will be removed in 3.0")]
 pub mod rlp {
     use crate::errors::GeneralError;
     use std::time::Duration;

@@ -51,6 +51,7 @@ pub struct IndexerConfig {
     /// The number of blocks including and decreasing from the chain HEAD
     /// that the logs will be buffered for before being considered
     /// successfully joined to the chain.
+    /// Default is 8.
     pub finalization: u64,
     /// The block at which the indexer should start
     ///
@@ -59,10 +60,12 @@ pub struct IndexerConfig {
     /// relevant smart contracts were introduced into the chain.
     ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
+    /// Default is 0.
     pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
+    /// Default is true.
     pub fetch_token_transactions: bool,
 }
 
@@ -218,8 +221,8 @@ where
                     }
                 }
 
-                while let Some(logs) = unconfirmed_events.get(0) {
-                    if let Some(log) = logs.get(0) {
+                while let Some(logs) = unconfirmed_events.front() {
+                    if let Some(log) = logs.first() {
                         if log.block_number + finalization <= current_block {
                             if let Err(error) = db
                                 .write()
@@ -573,7 +576,7 @@ pub mod tests {
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
         let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events.into());
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         assert!(indexer.start().await.is_ok());
 
         tx.close_channel();

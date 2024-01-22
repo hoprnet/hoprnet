@@ -4,12 +4,10 @@ import pytest
 import time
 import asyncio
 import re
-import rlp
-from contextlib import asynccontextmanager
 
 import websocket
 import websockets
-from tests.conftest import DEFAULT_API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
+from .conftest import DEFAULT_API_TOKEN, default_nodes_with_auth, random_distinct_pairs_from
 
 
 def url(host, port):

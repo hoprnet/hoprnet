@@ -47,6 +47,7 @@ impl PRGParameters {
 /// using AES-128 block cipher in Counter mode (with 32-bit counter).
 /// It forms an infinite sequence of pseudo-random bytes (generated deterministically from the parameters)
 /// and can be queried by chunks using the `digest` function.
+#[allow(clippy::upper_case_acronyms)]
 #[derive(ZeroizeOnDrop)]
 pub struct PRG {
     params: PRGParameters,

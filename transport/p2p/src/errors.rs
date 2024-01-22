@@ -10,6 +10,9 @@ pub enum P2PError {
 
     #[error("Failed on a logical error: {0}")]
     Logic(String),
+
+    #[error("libp2p failed with: {0}")]
+    Libp2p(String),
 }
 
 pub type Result<T> = core::result::Result<T, P2PError>;

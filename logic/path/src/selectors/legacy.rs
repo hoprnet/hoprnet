@@ -3,17 +3,21 @@ use crate::errors::{PathError, Result};
 use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
-use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use log::warn;
 use petgraph::visit::EdgeRef;
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
+use std::cmp::{max, Ordering};
+use std::collections::BinaryHeap;
 use std::marker::PhantomData;
-use std::ops::Add;
 
+/// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct WeightedChannelPath(Vec<Address>, U256);
+struct WeightedChannelPath {
+    path: Vec<Address>,
+    weight: U256,
+    fully_explored: bool,
+}
 
 impl PartialOrd for WeightedChannelPath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -22,23 +26,51 @@ impl PartialOrd for WeightedChannelPath {
 }
 
 impl Ord for WeightedChannelPath {
+    /// Favors unexplored paths over fully explored paths even
+    /// when a better alternative exists.
+    ///
+    /// Favors longer paths over shorter paths, longer path
+    /// means more privacy.
+    ///
+    /// If both parts are of the same length, favors paths
+    /// with higher weights.
     fn cmp(&self, other: &Self) -> Ordering {
-        self.1.cmp(&other.1)
+        if other.fully_explored == self.fully_explored {
+            match self.path.len().cmp(&other.path.len()) {
+                Ordering::Equal => self.weight.cmp(&other.weight),
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Less => Ordering::Less,
+            }
+        } else if other.fully_explored {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
     }
 }
 
-/// Calculates the channel weight as (channel stake + 1) * (1 + R)
-/// where R is uniform random in (0,1]
+/// Assigns each channel a weight.
+/// The weight is randomized such that not always the same
+/// nodes get selected. This is necessary to achieve privacy.
+/// It also favors nodes with higher stake.
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
+    /// Multiply all channel stake with a random float in the interval [0,1).
+    /// Given that the floats are uniformly distributed, nodes with higher
+    /// stake have a higher probability of reaching a higher value.
+    ///
+    /// Sorting the list of weights thus moves nodes with higher stakes more
+    /// often to the front.
     fn calculate_weight(channel: &ChannelEntry) -> U256 {
-        const PATH_RANDOMNESS: f64 = 0.1;
-
-        let r = random_float() * PATH_RANDOMNESS;
-        let base = channel.balance.amount() + 1;
-
-        base.add(base.mul_f64(r).unwrap())
+        max(
+            U256::one(),
+            channel
+                .balance
+                .amount()
+                .mul_f64(random_float())
+                .expect("Could not multiply edge weight with float"),
+        )
     }
 }
 
@@ -54,7 +86,11 @@ where
     /// Peer quality threshold for a channel to be taken into account.
     /// Default is 0.5
     pub quality_threshold: f64,
-
+    /// If true, include paths with payment channels, which have no
+    /// funds in it. By default, that option is set to `false` to
+    /// prevent from tickets being dropped immediately.
+    /// Defaults to false.
+    pub allow_zero_edge_weight: bool,
     cw: PhantomData<CW>,
 }
 
@@ -66,6 +102,7 @@ where
         Self {
             max_iterations: 100,
             quality_threshold: 0.5_f64,
+            allow_zero_edge_weight: false,
             cw: PhantomData,
         }
     }
@@ -75,17 +112,50 @@ impl<CW> DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
+    /// Determines whether a node is considered "interesting".
+    ///
+    /// To achieve privacy, we need at least one honest node along
+    /// the path. Each additional node decreases the probability of
+    /// having only malicious nodes, so we can sort out many nodes.
+    /// Nodes that have shown to be unreliable are of no use, so
+    /// drop them.
     fn filter_channel(
         &self,
         channel: &ChannelEdge,
+        source: &Address,
         destination: &Address,
-        current: &[Address],
-        dead_ends: &HashSet<Address>,
+        current_path: &[Address],
     ) -> bool {
-        !destination.eq(&channel.channel.destination) &&                    // last hop does not need a channel
-            channel.quality.unwrap_or(1_f64) > self.quality_threshold &&  // quality threshold
-            !current.contains(&channel.channel.destination) &&     // must not be in the path already (no loops allowed)
-            !dead_ends.contains(&channel.channel.destination) // must not be in the dead end list
+        if source.eq(&channel.channel.destination) {
+            // looping back to self does not give any privacy
+            return false;
+        }
+
+        if destination.eq(&channel.channel.destination) {
+            // We cannot use destination as last intermediate hop as
+            // this would be a loopback which does not give any privacy
+            return false;
+        }
+
+        // Check node reliability, new nodes are considered reliable
+        // unless the opposite has been observed
+        if channel.quality.unwrap_or(1.0f64) < self.quality_threshold {
+            // Only use nodes that have shown to be somewhat reliable
+            return false;
+        }
+
+        if current_path.contains(&channel.channel.destination) {
+            // At the moment, we do not allow circles because they
+            // do not give additional privacy
+            return false;
+        }
+
+        if !self.allow_zero_edge_weight && U256::zero().eq(&channel.channel.balance.amount()) {
+            // We cannot use channels with zero stake
+            return false;
+        }
+
+        true
     }
 }
 
@@ -93,55 +163,84 @@ impl<CW> PathSelector<CW> for DfsPathSelector<CW>
 where
     CW: EdgeWeighting<U256>,
 {
+    /// Attempts to find a path with at least `min_hops` hops and at most `max_hops` hops
+    /// that goes from `source` to `destination`. There does not need to be a
+    /// a payment channel to `destination`, so the path only includes intermediate hops.
+    ///
+    /// Implements a randomized best-first search through the path space. The graph
+    /// traversal is bounded by `self.max_iterations` to prevent from long-running path
+    /// selection runs.
     fn select_path(
         &self,
         graph: &ChannelGraph,
         source: Address,
         destination: Address,
+        min_hops: usize,
         max_hops: usize,
     ) -> Result<ChannelPath> {
-        if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
+        // The protocol does not support >3 hop paths and will presumably never do,
+        // so we can exclude it here.
+        if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) || !(1..=max_hops).contains(&min_hops) {
             return Err(GeneralError::InvalidInput.into());
         }
 
         let mut queue = BinaryHeap::new();
-        let mut dead_ends = HashSet::new();
 
-        graph
-            .open_channels_from(source)
-            .filter_map(|channel| {
-                let w = channel.weight();
-                self.filter_channel(w, &destination, &[], &dead_ends)
-                    .then(|| WeightedChannelPath(vec![w.channel.destination], CW::calculate_weight(&w.channel)))
-            })
-            .for_each(|wcp| queue.push(wcp));
+        queue.extend(graph.open_channels_from(source).filter_map(|channel| {
+            let w = channel.weight();
+            self.filter_channel(w, &source, &destination, &[])
+                .then(|| WeightedChannelPath {
+                    path: vec![w.channel.destination],
+                    weight: CW::calculate_weight(&w.channel),
+                    fully_explored: false,
+                })
+        }));
 
         let mut iters = 0;
-        while !queue.is_empty() && iters < self.max_iterations {
-            let current_path = queue.peek().unwrap();
-            let current_path_len = current_path.0.len();
+        while let Some(mut current) = queue.pop() {
+            let current_len = current.path.len();
 
-            if current_path_len >= max_hops && current_path_len <= INTERMEDIATE_HOPS {
-                return Ok(ChannelPath::new_valid(queue.pop().unwrap().0));
+            if current_len == max_hops || current.fully_explored || iters > self.max_iterations {
+                if iters > self.max_iterations {
+                    warn!(
+                        "Could not find a path from {} to {} with {} hops within {} iterations",
+                        source, destination, max_hops, self.max_iterations
+                    );
+                }
+
+                if current_len >= min_hops && current_len <= max_hops {
+                    return Ok(ChannelPath::new_valid(current.path));
+                } else {
+                    return Err(PathError::PathNotFound(
+                        max_hops,
+                        source.to_string(),
+                        destination.to_string(),
+                    ));
+                }
             }
 
-            let last_peer = *current_path.0.last().unwrap();
-            let new_channels = graph
+            let last_peer = *current.path.last().unwrap();
+            let mut new_channels = graph
                 .open_channels_from(last_peer)
-                .filter(|channel| self.filter_channel(channel.weight(), &destination, &current_path.0, &dead_ends))
-                .collect::<Vec<_>>();
+                .filter(|channel| self.filter_channel(channel.weight(), &source, &destination, &current.path))
+                .peekable();
 
-            if !new_channels.is_empty() {
-                let current_path_clone = current_path.clone();
-                for new_channel in new_channels {
-                    let mut next_path_variant = current_path_clone.clone();
-                    next_path_variant.0.push(new_channel.weight().channel.destination);
-                    next_path_variant.1 += CW::calculate_weight(&new_channel.weight().channel);
-                    queue.push(next_path_variant);
-                }
+            if new_channels.peek().is_some() {
+                queue.extend(new_channels.map(|new_channel| {
+                    let mut next_path_variant = WeightedChannelPath {
+                        path: Vec::with_capacity(current_len + 1),
+                        weight: current.weight + CW::calculate_weight(&new_channel.weight().channel),
+                        fully_explored: false,
+                    };
+                    next_path_variant.path.extend(&current.path);
+                    next_path_variant.path.push(new_channel.weight().channel.destination);
+
+                    next_path_variant
+                }));
             } else {
-                queue.pop();
-                dead_ends.insert(last_peer);
+                current.fully_explored = true;
+                // Keep the current path in case we do not find anything better
+                queue.push(current);
             }
 
             iters += 1;
@@ -164,10 +263,13 @@ mod tests {
     use crate::channel_graph::ChannelGraph;
     use crate::path::{ChannelPath, Path};
     use crate::selectors::legacy::DfsPathSelector;
+    use crate::selectors::legacy::RandomizedEdgeWeighting;
     use crate::selectors::{EdgeWeighting, PathSelector};
+    use core::panic;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use regex::Regex;
     use std::str::FromStr;
 
     lazy_static! {
@@ -185,119 +287,109 @@ mod tests {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), U256::zero())
     }
 
-    fn initialize_star_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
-    where
-        Q: Fn(Address, Address) -> f64,
-        B: Fn(Address, Address) -> Balance,
-    {
-        let mut graph = ChannelGraph::new(me);
-
-        graph.update_channel(create_channel(
-            ADDRESSES[1],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[1], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[1], ADDRESSES[0], quality(ADDRESSES[1], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[2],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[2], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[2], ADDRESSES[0], quality(ADDRESSES[2], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[3],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[3], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[3], ADDRESSES[0], quality(ADDRESSES[3], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[4],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[4], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[4], ADDRESSES[0], quality(ADDRESSES[4], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[1],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[1]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[2],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[2]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[2], quality(ADDRESSES[0], ADDRESSES[2]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[3],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[3]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[3], quality(ADDRESSES[0], ADDRESSES[3]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[4],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[4]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[4], quality(ADDRESSES[0], ADDRESSES[4]));
-
-        graph
-    }
-
-    fn initialize_arrow_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
-    where
-        Q: Fn(Address, Address) -> f64,
-        B: Fn(Address, Address) -> Balance,
-    {
-        let mut graph = ChannelGraph::new(me);
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[1],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[1]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[1],
-            ADDRESSES[2],
-            ChannelStatus::Open,
-            stake(ADDRESSES[1], ADDRESSES[2]),
-        ));
-        graph.update_channel_quality(ADDRESSES[1], ADDRESSES[2], quality(ADDRESSES[1], ADDRESSES[2]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[2],
-            ADDRESSES[3],
-            ChannelStatus::Open,
-            stake(ADDRESSES[2], ADDRESSES[3]),
-        ));
-        graph.update_channel_quality(ADDRESSES[2], ADDRESSES[3], quality(ADDRESSES[2], ADDRESSES[3]));
-
-        graph
-    }
-
     fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {
         let other = ChannelPath::new(path.hops().into(), graph).expect("path must be valid");
         assert_eq!(other, path.clone(), "valid paths must be equal");
         assert!(!path.contains_cycle(), "path must not be cyclic");
         assert!(!path.hops().contains(&dst), "path must not contain destination");
+    }
+
+    /// Quickly define a graph with edge weights.
+    /// Syntax:
+    /// `0 [1] -> 1` => edge from `0` to `1` with edge weight `1`
+    /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
+    /// `0 [1] <-> [2] 1` => edge from `0` to `1` with edge weight `1` and edge from `1` to `0` with edge weight `2`
+    /// ```
+    /// let star = define_graph(
+    ///     "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
+    ///     ADDRESSES[1],
+    ///     |_, _| 1_f64,
+    /// );
+    /// ```
+    fn define_graph<Q>(def: &str, me: Address, quality: Q) -> ChannelGraph
+    where
+        Q: Fn(Address, Address) -> f64,
+    {
+        let mut graph = ChannelGraph::new(me);
+
+        if def.is_empty() {
+            return graph;
+        }
+
+        let re: Regex = Regex::new(r"^\s*(\d+)\s*(\[\d+\])?\s*(<?->?)\s*(\[\d+\])?\s*(\d+)\s*$").unwrap();
+        let re_stake = Regex::new(r"^\[(\d+)\]$").unwrap();
+
+        let mut match_stake_and_update_channel = |src: Address, dest: Address, stake_str: &str| {
+            let stake_caps = re_stake.captures(stake_str).unwrap();
+
+            if stake_caps.get(0).is_none() {
+                panic!("no matching stake. got {}", stake_str);
+            }
+            graph.update_channel(create_channel(
+                src,
+                dest,
+                ChannelStatus::Open,
+                Balance::new(
+                    U256::from_str(stake_caps.get(1).unwrap().as_str())
+                        .expect("failed to create U256 from given stake"),
+                    BalanceType::HOPR,
+                ),
+            ));
+
+            graph.update_channel_quality(src, dest, quality(src, dest));
+        };
+
+        for edge in def.split(",") {
+            let caps = re.captures(edge).unwrap();
+
+            if caps.get(0).is_none() {
+                panic!("no matching edge. got `{}`", edge);
+            }
+
+            let addr_a = ADDRESSES[usize::from_str(caps.get(1).unwrap().as_str()).unwrap()];
+            let addr_b = ADDRESSES[usize::from_str(caps.get(5).unwrap().as_str()).unwrap()];
+
+            let dir = caps.get(3).unwrap().as_str();
+
+            match dir {
+                "->" => {
+                    if let Some(stake_b) = caps.get(4) {
+                        panic!(
+                            "Cannot assign stake for counterparty because channel is unidirectional. Got `{}`",
+                            stake_b.as_str()
+                        );
+                    }
+
+                    let stake_opt_a = caps.get(2).ok_or("missing stake for initiator").unwrap();
+
+                    match_stake_and_update_channel(addr_a, addr_b, stake_opt_a.as_str());
+                }
+                "<-" => {
+                    if let Some(stake_a) = caps.get(2) {
+                        panic!(
+                            "Cannot assign stake for counterparty because channel is unidirectional. Got `{}`",
+                            stake_a.as_str()
+                        );
+                    }
+
+                    let stake_opt_b = caps.get(4).ok_or("missing stake for counterparty").unwrap();
+
+                    match_stake_and_update_channel(addr_b, addr_a, stake_opt_b.as_str());
+                }
+                "<->" => {
+                    let stake_opt_a = caps.get(2).ok_or("missing stake for initiator").unwrap();
+
+                    match_stake_and_update_channel(addr_a, addr_b, stake_opt_a.as_str());
+
+                    let stake_opt_b = caps.get(4).ok_or("missing stake for counterparty").unwrap();
+
+                    match_stake_and_update_channel(addr_b, addr_a, stake_opt_b.as_str());
+                }
+                _ => panic!("unknown direction infix"),
+            };
+        }
+
+        graph
     }
 
     pub struct TestWeights;
@@ -308,15 +400,71 @@ mod tests {
     }
 
     #[test]
+    fn test_should_not_find_path_if_isolated() {
+        let isolated = define_graph("", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 2)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_zero_path() {
+        let isolated = define_graph("0 [0] -> 1", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_unreliable_path() {
+        let isolated = define_graph("0 [1] -> 1", ADDRESSES[0], |_, _| 0_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_find_loopback_path() {
+        let isolated = define_graph("0 [1] <-> [1] 1", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 2, 2)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_should_not_include_destination_in_path() {
+        let isolated = define_graph("0 [1] -> 1", ADDRESSES[0], |_, _| 1_f64);
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&isolated, ADDRESSES[0], ADDRESSES[1], 1, 1)
+            .expect_err("should not find a path");
+    }
+
+    #[test]
     fn test_dfs_should_find_path_in_reliable_star() {
-        let star = initialize_star_graph(
+        let star = define_graph(
+            "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
             ADDRESSES[1],
-            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, _| 1_f64,
         );
+
         let selector = DfsPathSelector::<TestWeights>::default();
         let path = selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)
             .expect("should find a path");
 
         check_path(&path, &star, ADDRESSES[5]);
@@ -324,72 +472,50 @@ mod tests {
     }
 
     #[test]
-    fn test_dfs_should_find_most_valuable_path_in_reliable_star() {
-        let star = initialize_star_graph(
-            ADDRESSES[1],
-            |_, b| {
-                Balance::new(
-                    ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1,
-                    BalanceType::HOPR,
-                )
-            },
-            |_, _| 1_f64,
-        );
-
-        let selector = DfsPathSelector::<TestWeights>::default();
-        let path = selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
-            .expect("should find a path");
-
-        check_path(&path, &star, ADDRESSES[5]);
-        assert_eq!(2, path.length(), "should have 2 hops");
-        assert_eq!(path.hops()[1], ADDRESSES[4], "last hop should be the most valuable one");
-    }
-
-    #[test]
-    fn test_dfs_should_not_find_path_when_does_not_exist() {
-        let star = initialize_star_graph(
-            ADDRESSES[1],
-            |_, _| Balance::new(1_u32, BalanceType::HOPR),
-            |_, _| 1_f64,
-        );
-        let selector = DfsPathSelector::<TestWeights>::default();
-
-        selector
-            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 3)
-            .expect_err("should not find a path 1");
-        selector
-            .select_path(&star, ADDRESSES[5], ADDRESSES[0], 3)
-            .expect_err("should not find a path 2");
-    }
-
-    #[test]
-    fn test_dfs_should_find_path_in_reliable_arrow() {
-        let arrow = initialize_arrow_graph(
+    fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() {
+        let arrow = define_graph(
+            "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
             ADDRESSES[0],
-            |_, _| Balance::new(1_u32, BalanceType::HOPR),
             |_, _| 1_f64,
         );
         let selector = DfsPathSelector::<TestWeights>::default();
 
         let path = selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
             .expect("should find a path");
         check_path(&path, &arrow, ADDRESSES[5]);
         assert_eq!(3, path.length(), "should have 3 hops");
     }
 
     #[test]
-    fn test_dfs_should_not_find_path_if_unreliable_node_in_arrow() {
-        let arrow = initialize_arrow_graph(
+    fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() {
+        let arrow = define_graph(
+            "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
-            |_, _| Balance::new(1_u32, BalanceType::HOPR),
-            |_, dst| if dst == ADDRESSES[3] { 0.1_f64 } else { 1_f64 },
-        ); // node 3 is unreliable
-
+            |_, _| 1_f64,
+        );
         let selector = DfsPathSelector::<TestWeights>::default();
-        selector
-            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
-            .expect_err("should not find a path");
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() {
+        let arrow = define_graph(
+            "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",
+            ADDRESSES[0],
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<RandomizedEdgeWeighting>::default();
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
     }
 }

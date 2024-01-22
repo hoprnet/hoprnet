@@ -9,6 +9,7 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 
 /// Performs validations of the given unacknowledged ticket and channel.
+#[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     db: &T,
     ticket: &Ticket,
@@ -420,7 +421,7 @@ mod tests {
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let mut ticket = create_valid_ticket();
-        ticket.channel_epoch = 2u32.into();
+        ticket.channel_epoch = 2u32;
         ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let channel = create_channel_entry();
@@ -493,7 +494,7 @@ mod tests {
             SENDER_PRIV_KEY.public().to_address(),
         );
 
-        db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
+        db.store_pending_acknowledgment(hkc, PendingAcknowledgement::WaitingAsRelayer(unack))
             .await
             .unwrap();
         let num_tickets = db.get_tickets(None).await.unwrap();

@@ -1337,9 +1337,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use hopr_crypto_types::prelude::*;
+
     use hopr_internal_types::channels::ChannelEntry;
-    use hopr_primitive_types::prelude::*;
+
     use lazy_static::lazy_static;
     use std::ops::Mul;
     use std::str::FromStr;
@@ -1464,19 +1464,19 @@ mod tests {
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
-        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
+        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
 
         db.set_allowed_to_access_network(&test_address, true, &Snapshot::default())
             .await
             .unwrap();
 
-        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), true);
+        assert!(db.is_allowed_to_access_network(&test_address).await.unwrap());
 
         db.set_allowed_to_access_network(&test_address, false, &Snapshot::default())
             .await
             .unwrap();
 
-        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
+        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
     }
 
     #[async_std::test]
@@ -1601,7 +1601,7 @@ mod tests {
         assert_eq!(channel_id, channel.get_id());
 
         // check acked ticket count
-        let acked_tickets_count = db.get_acknowledged_tickets_count(Some(channel.clone())).await.unwrap();
+        let acked_tickets_count = db.get_acknowledged_tickets_count(Some(channel)).await.unwrap();
 
         assert_eq!(acked_tickets_count, tickets_to_generate as usize);
 
