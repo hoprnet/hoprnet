@@ -12,20 +12,46 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
+fn validate_announced(v: &bool) -> Result<(), ValidationError> {
+    if *v {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "Announce option should be turned ON in 2.*, only public nodes are supported",
+        ))
+    }
+}
+
+#[inline]
+fn default_network() -> String {
+    "anvil-localhost".to_owned()
+}
+
+#[inline]
+fn default_is_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
+    #[validate(custom = "validate_announced")]
+    #[serde(default = "default_is_true")]
     pub announce: bool,
+    #[serde(default = "default_network")]
     pub network: String,
+    #[serde(default)]
     pub provider: Option<String>,
+    #[serde(default)]
     pub protocols: crate::chain::ProtocolsConfig,
+    #[serde(default = "default_is_true")]
     pub check_unrealized_balance: bool,
 }
 
 impl Default for Chain {
     fn default() -> Self {
         Self {
-            announce: false,
-            network: "anvil-localhost".to_owned(),
+            announce: true,
+            network: default_network(),
             provider: None,
             protocols: crate::chain::ProtocolsConfig::default(),
             check_unrealized_balance: true,
