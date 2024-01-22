@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Callable, Optional
 
@@ -377,33 +378,31 @@ class HoprdAPI:
     async def startedz(self):
         """
         Checks if the node is started.
-        :return: started: int
         """
-        url = f"{self.configuration.host}/startedz"
-        success = False
-
-        while success is False:
-            try:
-                response = requests.get(url, timeout=1)
-                print(f"{response=}")
-                success = response.status_code == 200
-            except Exception:
-                success = False
-
-        return success
+        return await is_url_returning_200(f"{self.configuration.host}/startedz")
 
     async def readyz(self):
         """
         Checks if the node is ready to accept connections.
         """
-        url = f"{self.configuration.host}/readyz"
-        success = False
+        return await is_url_returning_200(f"{self.configuration.host}/readyz")
 
-        while success is False:
+
+def query_url(url):
+    return requests.get(url, timeout=0.3)
+
+
+async def is_url_returning_200(url, timeout=20):
+    async def check_url():
+        while True:
             try:
-                response = requests.get(url, timeout=1)
-                success = response.status_code == 200
+                query_url(url)
+                break
             except Exception:
-                success = False
+                await asyncio.sleep(0.2)
 
-        return success
+    try:
+        await asyncio.wait_for(check_url(), timeout=timeout)
+        return query_url(url).status_code == 200
+    except Exception:
+        return False
