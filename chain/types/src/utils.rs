@@ -3,10 +3,10 @@
 
 use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
 use bindings::{
-    hopr_channels::HoprChannels, 
+    hopr_channels::HoprChannels,
     hopr_node_management_module::{IncludeNodeCall, ScopeTargetTokenCall},
     hopr_node_stake_factory::NewHoprNodeStakeModuleFilter,
-    hopr_token::{HoprToken, ApproveCall},
+    hopr_token::{ApproveCall, HoprToken},
 };
 use ethers::abi::{encode_packed, AbiEncode, RawLog, Token};
 use ethers::core::k256::ecdsa::SigningKey;
@@ -72,7 +72,7 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::A
 pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amount: U256) -> u64 {
     let deployer = hopr_token.client().default_sender().expect("client must have a signer");
     hopr_token
-        .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
+        .grant_role(hopr_token.minter_role().await.unwrap(), deployer)
         .send()
         .await
         .unwrap()
@@ -81,8 +81,8 @@ pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amou
 
     hopr_token
         .mint(
-            deployer.into(),
-            amount.into(),
+            deployer,
+            amount,
             ethers::types::Bytes::new(),
             ethers::types::Bytes::new(),
         )
@@ -113,7 +113,7 @@ pub async fn fund_node<M: Middleware>(
     native_token: U256,
     hopr_token: U256,
     hopr_token_contract: HoprToken<M>,
-) -> () {
+) {
     let native_transfer_tx = Eip1559TransactionRequest::new()
         .to(NameOrAddress::Address(node.into()))
         .value(native_token);
@@ -128,7 +128,7 @@ pub async fn fund_node<M: Middleware>(
         .unwrap();
 
     hopr_token_contract
-        .transfer(node.into(), hopr_token.into())
+        .transfer(node.into(), hopr_token)
         .send()
         .await
         .unwrap()
@@ -145,7 +145,7 @@ pub async fn fund_channel<M: Middleware>(
     amount: U256,
 ) {
     hopr_token
-        .approve(hopr_channels.address(), amount.into())
+        .approve(hopr_channels.address(), amount)
         .send()
         .await
         .unwrap()
