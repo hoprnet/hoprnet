@@ -107,8 +107,27 @@ impl FromStr for Address {
 /// Represents a type of the balance: native or HOPR tokens.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString)]
 pub enum BalanceType {
+    /// Native tokens of the underlying chain.
     Native,
+    /// HOPR tokens.
     HOPR,
+}
+
+impl BalanceType {
+    /// Creates [Balance] of 1 of this type.
+    pub fn one(self) -> Balance {
+        self.balance(1)
+    }
+
+    /// Creates zero [Balance] of this type.
+    pub fn zero(self) -> Balance {
+        self.balance(0)
+    }
+
+    /// Creates [Balance] of the given `amount` of this type.
+    pub fn balance<T: Into<U256>>(self, amount: T) -> Balance {
+        Balance::new(amount, self)
+    }
 }
 
 /// Represents balance of some coin or token.

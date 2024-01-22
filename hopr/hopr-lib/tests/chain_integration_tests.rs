@@ -1,9 +1,11 @@
 use async_std::sync::RwLock;
+use async_std::task::JoinHandle;
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};
 use chain_actions::channels::ChannelActions;
 use chain_actions::node::NodeActions;
 use chain_actions::payload::SafePayloadGenerator;
+use chain_actions::redeem::TicketRedeemActions;
 use chain_actions::CoreEthereumActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_db::db::CoreEthereumDb;
@@ -15,115 +17,155 @@ use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, Simpl
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
 use chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe, generate_the_first_ack_ticket,
+    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use chain_types::{ContractAddresses, ContractInstances};
-use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
+use core_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use ethers::providers::Middleware;
+use ethers::utils::AnvilInstance;
 use futures::StreamExt;
-use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, info};
-use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use std::sync::Arc;
 use std::time::Duration;
 use utils_db::db::DB;
+use utils_db::sqlite::SqliteShim;
 use utils_db::CurrentDbShim;
 
-#[async_std::test]
-async fn integration_test_indexer() {
-    let _ = env_logger::builder().is_test(true).try_init();
+// Helper function to generate the first acked ticket (channel_epoch 0, index 0, offset 0) of win prob 100%
+fn generate_the_first_ack_ticket(myself: &ChainKeypair, counterparty: &ChainKeypair) -> (Vec<u8>, AcknowledgedTicket) {
+    let hk1 = HalfKey::random();
+    let hk2 = HalfKey::random();
 
-    let anvil = create_anvil(Some(Duration::from_secs(2)));
-    let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-    let node_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
-    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
+    let cp1: CurvePoint = hk1.to_challenge().into();
+    let cp2: CurvePoint = hk2.to_challenge().into();
+    let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-    // Deploy contracts
-    let (contract_addrs, module_addr, safe_addr) = {
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
-        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
-            .await
-            .expect("failed to deploy");
+    let price_per_packet: U256 = 1.into(); // 1e-18 HOPR
 
-        // Mint some tokens
-        chain_types::utils::mint_tokens(instances.token.clone(), 1000_u128.into()).await;
+    let ticket = Ticket::new(
+        &myself.public().to_address(),
+        &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
+        0u32.into(),
+        U256::one(),
+        1.0f64,
+        0u32.into(),
+        Challenge::from(cp_sum).to_ethereum_challenge(),
+        counterparty,
+        &Hash::default(),
+    )
+    .unwrap();
 
-        // Fund the node address with 10 native token
-        chain_types::utils::fund_node(
-            node_chain_key.public().to_address(),
-            10_u128.into(),
-            0_u128.into(),
-            instances.token.clone(),
-        )
-        .await;
-        // Also fund Bob address with 10 native token and 100 * 1e-18 HOPR token
-        chain_types::utils::fund_node(
-            bob_chain_key.public().to_address(),
-            10_u128.into(),
-            100_u128.into(),
-            instances.token.clone(),
-        )
-        .await;
+    let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
+    let ack_ticket = unacked_ticket.acknowledge(&hk2, myself, &Hash::default()).unwrap();
 
-        let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-            &instances,
-            client.clone(),
-            &contract_deployer,
-        )
-        .await
-        .expect("could not deploy safe and module");
+    // get key for the db
+    let mut ack_key = Vec::new();
+    ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
+    ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
+    ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
 
-        // ----------------
-        // Onboarding:
-        // Include node to the module
-        // Add announcement contract to be a target in the module
-        // Mint HOPR tokens to the Safe
-        // Approve token transfer for Channel contract
+    (ack_key, ack_ticket)
+}
 
-        // Include Node to the module
-        include_node_to_module_by_safe(
-            client.clone(),
-            safe,
-            module,
-            node_chain_key.public().to_address(),
-            &contract_deployer,
-        )
-        .await
-        .expect("could not include node to module");
+async fn onboard_node<M: Middleware>(
+    instances: &ContractInstances<M>,
+    contract_deployer: &ChainKeypair,
+    node_chain_key: &ChainKeypair,
+) -> (Address, Address) {
+    let client = instances.token.client();
 
-        // Add announcement as target into the module
-        add_announcement_as_target(
-            client.clone(),
-            safe,
-            module,
-            instances.announcements.address().into(),
-            &contract_deployer,
-        )
-        .await
-        .expect("could not add announcement to module");
+    // Deploy Safe and Module for node
+    let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
+        &instances,
+        client.clone(),
+        contract_deployer,
+    )
+    .await
+    .expect("could not deploy safe and module");
 
-        // Fund the safe with 10 native token and 100 * 1e-18 hopr token to the Safe
-        chain_types::utils::fund_node(safe, 10_u128.into(), 100_u128.into(), instances.token.clone()).await;
+    // ----------------
+    // Onboarding:
+    // Include node to the module
+    // Add announcement contract to be a target in the module
+    // Mint HOPR tokens to the Safe
+    // Approve token transfer for Channel contract
 
-        // Approve token trasnfer for channels contract
-        approve_channel_transfer_from_safe(
-            client.clone(),
-            safe,
-            instances.token.address().into(),
-            instances.channels.address().into(),
-            &contract_deployer,
-        )
-        .await
-        .expect("could not approve channels to be a spender for safe");
-
-        (ContractAddresses::from(&instances), module, safe)
-    };
-
-    // DB
-    let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-    let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-        inner_db.clone(),
+    // Include node to the module
+    include_node_to_module_by_safe(
+        client.clone(),
+        safe,
+        module,
         node_chain_key.public().to_address(),
+        contract_deployer,
+    )
+    .await
+    .expect("could not include node to module");
+
+    // Add announcement as target into the module
+    add_announcement_as_target(
+        client.clone(),
+        safe,
+        module,
+        instances.announcements.address().into(),
+        &contract_deployer,
+    )
+    .await
+    .expect("could not add announcement to module");
+
+    // Fund the node's Safe with 10 native token and 10 000 * 1e-18 HOPR token
+    chain_types::utils::fund_node(safe, 10_u128.into(), 10_000_u128.into(), instances.token.clone()).await;
+
+    // Fund node's address with 10 native token
+    chain_types::utils::fund_node(
+        node_chain_key.public().to_address(),
+        10_u128.into(),
+        0.into(),
+        instances.token.clone(),
+    )
+    .await;
+
+    // Approve token transfer for channels contract
+    approve_channel_transfer_from_safe(
+        client.clone(),
+        safe,
+        instances.token.address().into(),
+        instances.channels.address().into(),
+        &contract_deployer,
+    )
+    .await
+    .expect("could not approve channels to be a spender for safe");
+
+    (module, safe)
+}
+
+type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
+type TestContractEvents<'a> = ContractEventHandlers<CoreEthereumDb<SqliteShim<'a>>>;
+
+struct ChainNode {
+    db: Arc<RwLock<CoreEthereumDb<SqliteShim<'static>>>>,
+    actions: CoreEthereumActions<CoreEthereumDb<SqliteShim<'static>>>,
+    indexer: Indexer<TestRpc, TestContractEvents<'static>, CoreEthereumDb<SqliteShim<'static>>>,
+    node_tasks: Vec<JoinHandle<()>>,
+}
+
+async fn start_node_chain_logic(
+    chain_key: &ChainKeypair,
+    anvil: &AnvilInstance,
+    contract_addrs: ContractAddresses,
+    module_addr: Address,
+    safe_addr: Address,
+    rpc_cfg: RpcOperationsConfig,
+    actions_cfg: ActionQueueConfig,
+    indexer_cfg: IndexerConfig,
+) -> ChainNode {
+    // DB
+    let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
+    let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+        inner_db,
+        chain_key.public().to_address(),
     )));
 
     // RPC
@@ -132,66 +174,121 @@ async fn integration_test_indexer() {
         SurfRequestor::default(),
         SimpleJsonRpcRetryPolicy::default(),
     );
-    let rpc_cfg = RpcOperationsConfig {
-        chain_id: anvil.chain_id(),
-        tx_confirmations: 3,
-        contract_addrs: contract_addrs.clone(),
-        module_address: module_addr,
-        expected_block_time: Duration::from_secs(2),
-        tx_polling_interval: Duration::from_millis(100),
-        logs_page_size: 100,
-    };
-    let rpc_ops =
-        RpcOperations::new(json_rpc_client, &node_chain_key, rpc_cfg).expect("failed to create RpcOperations");
+
+    let rpc_ops = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg).expect("failed to create RpcOperations");
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
     let tx_exec = EthereumTransactionExecutor::new(
         eth_client,
-        SafePayloadGenerator::new(&node_chain_key, contract_addrs.clone(), module_addr),
+        SafePayloadGenerator::new(chain_key, contract_addrs.clone(), module_addr),
     );
 
     // Actions
-    let actions_cfg = ActionQueueConfig {
-        max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
-    };
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = CoreEthereumActions::new(
-        node_chain_key.public().to_address(),
-        db.clone(),
-        action_queue.new_sender(),
-    );
-    async_std::task::spawn_local(action_queue.action_loop());
+    let actions = CoreEthereumActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
+
+    let mut node_tasks = Vec::new();
+
+    node_tasks.push(async_std::task::spawn(action_queue.action_loop()));
 
     // Action state tracking
     let (sce_tx, mut sce_rx) = futures::channel::mpsc::unbounded();
-    async_std::task::spawn_local(async move {
+    node_tasks.push(async_std::task::spawn(async move {
         while let Some(sce) = sce_rx.next().await {
             let res = action_state.match_and_resolve(&sce).await;
             debug!("{:?}: expectations resolved {:?}", sce, res);
         }
-    });
+    }));
 
     // Indexer
-    let chain_log_handler = ContractEventHandlers::new(
-        contract_addrs,
-        safe_addr,
-        node_chain_key.public().to_address(),
-        db.clone(),
-    );
+    let chain_log_handler =
+        ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.public().to_address(), db.clone());
+
+    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    indexer.start().await.expect("indexer should sync");
+
+    ChainNode {
+        db,
+        actions,
+        indexer,
+        node_tasks,
+    }
+}
+
+#[async_std::test]
+async fn integration_test_indexer() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let block_time = Duration::from_secs(1);
+    let anvil = create_anvil(Some(block_time));
+    let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+    let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+    let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
+
+    let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+    let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+        .await
+        .expect("failed to deploy");
+
+    // Mint some tokens
+    chain_types::utils::mint_tokens(instances.token.clone(), 1_000_000_u128.into()).await;
+
+    let contract_addrs = ContractAddresses::from(&instances);
+
+    // ----------------------------------------
+
+    let mut rpc_cfg = RpcOperationsConfig {
+        chain_id: anvil.chain_id(),
+        tx_confirmations: 3,
+        contract_addrs: contract_addrs.clone(),
+        module_address: Address::default(),
+        expected_block_time: block_time,
+        tx_polling_interval: Duration::from_millis(100),
+        logs_page_size: 100,
+    };
+
+    let actions_cfg = ActionQueueConfig {
+        max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
+    };
+
     let indexer_cfg = IndexerConfig {
         finalization: 2,
         start_block_number: 1,
         fetch_token_transactions: true,
     };
-    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
-    indexer.start().await.expect("indexer should sync");
+
+    info!("Setting up ALICE");
+    // Setup ALICE
+    let (module_addr, safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
+
+    rpc_cfg.module_address = module_addr;
+
+    let alice_node = start_node_chain_logic(
+        &alice_chain_key,
+        &anvil,
+        contract_addrs,
+        module_addr,
+        safe_addr,
+        rpc_cfg,
+        actions_cfg,
+        indexer_cfg,
+    )
+    .await;
+
+    /*info!("Setting up BOB");
+    // Setup BOB
+    let (module_addr, safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
+
+    rpc_cfg.module_address = module_addr;
+
+    let bob_node = start_node_chain_logic(&bob_chain_key, &anvil, contract_addrs, module_addr, safe_addr, rpc_cfg, actions_cfg, indexer_cfg)
+        .await;
+    */
 
     info!("======== STARTING TEST ========");
-    info!("-- contracts: {:?}", contract_addrs);
-    info!("-- safe address: {safe_addr}");
-    info!("-- module address: {module_addr}");
 
     // ----------------
     // Test plan:
@@ -202,7 +299,8 @@ async fn integration_test_indexer() {
     // Close channel to Bob
 
     // Register Safe
-    let confirmation = actions
+    let confirmation = alice_node
+        .actions
         .register_safe_by_node(safe_addr)
         .await
         .expect("should submit safe registration tx")
@@ -217,7 +315,8 @@ async fn integration_test_indexer() {
     // Announce the node
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
     let offchain_key = OffchainKeypair::random();
-    let confirmation = actions
+    let confirmation = alice_node
+        .actions
         .announce(&maddr, &offchain_key)
         .await
         .expect("should submit announcement tx")
@@ -228,71 +327,85 @@ async fn integration_test_indexer() {
         matches!(confirmation.event,
             Some(ChainEventType::Announcement{ peer, address, multiaddresses })
             if peer == offchain_key.public().into() &&
-            address == node_chain_key.public().to_address() &&
+            address == alice_chain_key.public().to_address() &&
             multiaddresses.contains(&maddr)
         ),
         "confirmed announcement must match"
     );
 
-    // Open channel (from alice to bob)
-    let confirmation = actions
-        .open_channel(
-            bob_chain_key.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-        )
+    // Open channel (from Alice to Bob) with 1 HOPR
+    let initial_channel_funds = BalanceType::HOPR.balance(1);
+    let confirmation = alice_node
+        .actions
+        .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
         .await
         .expect("should submit channel open tx")
         .await
         .expect("should confirm open channel");
 
-    match confirmation.event {
-        Some(ChainEventType::ChannelOpened(channel)) => {
-            let new_channel_in_db = db
-                .read()
-                .await
-                .get_channel_to(&bob_chain_key.public().to_address())
-                .await
-                .expect("db call should not fail")
-                .expect("should contain a channel to Bob");
-
-            assert_eq!(
-                channel.get_id(),
-                new_channel_in_db.get_id(),
-                "channel in the DB must match the confirmed action"
-            );
-        }
-        _ => panic!("invalid confirmation"),
-    }
-
-    let channel = db
+    let channel_alice_bob = alice_node
+        .db
         .read()
         .await
         .get_channel_to(&bob_chain_key.public().to_address())
         .await
-        .expect("must get channel")
-        .expect("channel to bob must exist");
+        .expect("db call should not fail")
+        .expect("should contain a channel to Bob");
 
-    assert_eq!(ChannelStatus::Open, channel.status, "channel must be opened");
+    match confirmation.event {
+        Some(ChainEventType::ChannelOpened(channel)) => {
+            assert_eq!(
+                channel.get_id(),
+                channel_alice_bob.get_id(),
+                "channel in the DB must match the confirmed action"
+            );
+        }
+        _ => panic!("invalid confirmation"),
+    };
 
-    // TODO: create acknowledged ticket from Bob and store it in the DB, so Alice can redeem it here
-    // Bob should have a channel opened to Alice
-    let bob_client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &bob_chain_key);
-    chain_types::utils::fund_channel_from_different_client(
-        node_chain_key.public().to_address(),
-        contract_addrs.token,
-        contract_addrs.channels,
-        100_u128.into(),
-        bob_client,
+    assert_eq!(ChannelStatus::Open, channel_alice_bob.status, "channel must be opened");
+    assert_eq!(
+        U256::from(1),
+        channel_alice_bob.balance.amount(),
+        "channel must have the correct balance"
+    );
+
+    // Fund the channel from Alice to Bob with additional 99 HOPR
+    let funding_amount = BalanceType::HOPR.balance(99);
+    let confirmation = alice_node
+        .actions
+        .fund_channel(channel_alice_bob.get_id(), funding_amount)
+        .await
+        .expect("should submit fund channel tx")
+        .await
+        .expect("should confirm fund channel");
+
+    match confirmation.event {
+        Some(ChainEventType::ChannelBalanceIncreased(channel, amount)) => {
+            assert_eq!(
+                channel.get_id(),
+                channel_alice_bob.get_id(),
+                "channel in the DB must match the confirmed action"
+            );
+            assert_eq!(funding_amount, amount, "invalid balance increase");
+        }
+        _ => panic!("invalid confirmation"),
+    };
+
+    // Alice redeems ticket
+    /*let confirmations = futures::future::try_join_all(
+        alice_node.actions.redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
+            .await
+            .expect("should submit redeem action")
     )
-    .await;
+    .await
+    .expect("should redeem all tickets");
 
-    // Alice stores an ack ticket from bob
-    let (ack_key, ack_ticket) = generate_the_first_ack_ticket(&node_chain_key, &bob_chain_key);
-    let ack_ticket_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap(); 
-    inner_db.set(ack_ticket_key, &ack_ticket).await.unwrap();
+    assert_eq!(1, confirmations.len(), "should redeem a single ticket");*/
 
     // Close channel
-    let confirmation = actions
+    let confirmation = alice_node
+        .actions
         .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, true)
         .await
         .expect("should submit channel close tx")
@@ -301,7 +414,8 @@ async fn integration_test_indexer() {
 
     match confirmation.event {
         Some(ChainEventType::ChannelClosureInitiated(channel)) => {
-            let closing_channel_in_db = db
+            let closing_channel_in_db = alice_node
+                .db
                 .read()
                 .await
                 .get_channel_to(&bob_chain_key.public().to_address())
@@ -318,7 +432,8 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     }
 
-    let channel = db
+    let channel_alice_bob = alice_node
+        .db
         .read()
         .await
         .get_channel_to(&bob_chain_key.public().to_address())
@@ -328,7 +443,9 @@ async fn integration_test_indexer() {
 
     assert_eq!(
         ChannelStatus::PendingToClose,
-        channel.status,
+        channel_alice_bob.status,
         "channel must be pending to close"
     );
+
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
 }

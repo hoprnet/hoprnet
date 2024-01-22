@@ -118,7 +118,7 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
     /// Defaults to 150 seconds.
