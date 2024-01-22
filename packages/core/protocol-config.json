@@ -132,7 +132,7 @@
       "live": true,
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
-      "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
+      "default_provider": "https://gnosis-provider.rpch.tech/",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR"
     },
