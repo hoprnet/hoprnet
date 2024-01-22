@@ -268,7 +268,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
 
         let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -466,7 +466,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -514,13 +514,13 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 pub fn convert_vrf_parameters(
     off_chain: &VrfParameters,
     signer: &Address,
-    ticket_hash: Hash,
-    domain_separator: Hash,
+    ticket_hash: &Hash,
+    domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.get_decompressed_v().unwrap().to_bytes();
     let s_b = off_chain
-        .get_s_b_witness(signer, &(ticket_hash).into(), &domain_separator.to_bytes())
+        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
         .to_bytes();
 
     let h_v = off_chain.get_h_v_witness().to_bytes();
@@ -767,7 +767,9 @@ pub mod tests {
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket, domain_separator).expect("should create tx");
+        let redeem_ticket_tx = generator
+            .redeem_ticket(acked_ticket, domain_separator)
+            .expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",
