@@ -15,7 +15,9 @@ use ethers::prelude::*;
 use ethers::utils::keccak256;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::primitives::{Address, U256};
+use hopr_internal_types::{acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket}, channels::Ticket};
+use hopr_primitive_types::{primitives::{Address, U256, Balance, BalanceType}, traits::UnitaryFloatOps};
+use hopr_primitive_types::traits::BinarySerializable;
 use log::debug;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -153,6 +155,34 @@ pub async fn fund_channel<M: Middleware>(
         .unwrap();
 
     hopr_channels
+        .fund_channel(counterparty.into(), amount.as_u128())
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+}
+
+/// Funds the channel to the counterparty with the given amount of HOPR tokens, from a different client
+/// The amount must be present in the wallet of the client.
+pub async fn fund_channel_from_different_client<M: Middleware>(
+    counterparty: Address,
+    hopr_token_address: Address,
+    hopr_channels_address: Address,
+    amount: U256,
+    new_client: Arc<M>
+) {
+    let hopr_token_with_new_client = HoprToken::new(hopr_token_address, new_client.clone());
+    let hopr_channels_with_new_client = HoprChannels::new(hopr_channels_address, new_client);
+    hopr_token_with_new_client
+        .approve(hopr_channels_address.into(), amount.into())
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+        hopr_channels_with_new_client
         .fund_channel(counterparty.into(), amount.as_u128())
         .send()
         .await
@@ -508,4 +538,40 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
     debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
 
     Ok((deployed_module_address, deployed_safe_address))
+}
+
+// generate the first acked ticket (channel_epoch 0, index 0, offset 0) of win prob 100%
+pub fn generate_the_first_ack_ticket(myself: &ChainKeypair, counterparty: &ChainKeypair) -> (Vec<u8>, AcknowledgedTicket) {
+    let hk1 = HalfKey::random();
+    let hk2 = HalfKey::random();
+
+    let cp1: CurvePoint = hk1.to_challenge().into();
+    let cp2: CurvePoint = hk2.to_challenge().into();
+    let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+
+    let price_per_packet: U256 = 10.into(); // 1e-17 HOPR
+
+    let ticket = Ticket::new(
+        &myself.public().to_address(),
+        &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
+        0u32.into(),
+        U256::one(),
+        1.0f64,
+        0u32.into(),
+        Challenge::from(cp_sum).to_ethereum_challenge(),
+        counterparty,
+        &Hash::default(),
+    )
+    .unwrap();
+
+    let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
+    let ack_ticket = unacked_ticket.acknowledge(&hk2, myself, &Hash::default()).unwrap();
+    
+    // get key for the db
+    let mut ack_key = Vec::new();
+    ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
+    ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
+    ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
+
+    (ack_key, ack_ticket)
 }

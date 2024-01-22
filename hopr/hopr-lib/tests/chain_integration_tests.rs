@@ -15,7 +15,7 @@ use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, Simpl
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
 use chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe, generate_the_first_ack_ticket,
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
@@ -23,6 +23,7 @@ use futures::StreamExt;
 use hopr_internal_types::channels::{ChannelDirection, ChannelStatus};
 use hopr_primitive_types::prelude::*;
 use log::{debug, info};
+use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use std::sync::Arc;
 use std::time::Duration;
 use utils_db::db::DB;
@@ -52,6 +53,14 @@ async fn integration_test_indexer() {
             node_chain_key.public().to_address(),
             10_u128.into(),
             0_u128.into(),
+            instances.token.clone(),
+        )
+        .await;
+        // Also fund Bob address with 10 native token and 100 * 1e-18 HOPR token
+        chain_types::utils::fund_node(
+            bob_chain_key.public().to_address(),
+            10_u128.into(),
+            100_u128.into(),
             instances.token.clone(),
         )
         .await;
@@ -93,7 +102,7 @@ async fn integration_test_indexer() {
         .await
         .expect("could not add announcement to module");
 
-        // Fund the safe with 10 native token and 100 hopr token to the Safe
+        // Fund the safe with 10 native token and 100 * 1e-18 hopr token to the Safe
         chain_types::utils::fund_node(safe, 10_u128.into(), 100_u128.into(), instances.token.clone()).await;
 
         // Approve token trasnfer for channels contract
@@ -111,8 +120,9 @@ async fn integration_test_indexer() {
     };
 
     // DB
+    let mut inner_db = DB::new(CurrentDbShim::new_in_memory().await);
     let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-        DB::new(CurrentDbShim::new_in_memory().await),
+        inner_db.clone(),
         node_chain_key.public().to_address(),
     )));
 
@@ -224,7 +234,7 @@ async fn integration_test_indexer() {
         "confirmed announcement must match"
     );
 
-    // Open channel
+    // Open channel (from alice to bob)
     let confirmation = actions
         .open_channel(
             bob_chain_key.public().to_address(),
@@ -265,10 +275,25 @@ async fn integration_test_indexer() {
     assert_eq!(ChannelStatus::Open, channel.status, "channel must be opened");
 
     // TODO: create acknowledged ticket from Bob and store it in the DB, so Alice can redeem it here
+    // Bob should have a channel opened to Alice
+    let bob_client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &bob_chain_key);
+    chain_types::utils::fund_channel_from_different_client(
+        node_chain_key.public().to_address(),
+        contract_addrs.token,
+        contract_addrs.channels,
+        100_u128.into(),
+        bob_client,
+    )
+    .await;
+
+    // Alice stores an ack ticket from bob
+    let (ack_key, ack_ticket) = generate_the_first_ack_ticket(&node_chain_key, &bob_chain_key);
+    let ack_ticket_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap(); 
+    inner_db.set(ack_ticket_key, &ack_ticket).await.unwrap();
 
     // Close channel
     let confirmation = actions
-        .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, false)
+        .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, true)
         .await
         .expect("should submit channel close tx")
         .await
