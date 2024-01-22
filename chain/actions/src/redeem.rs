@@ -427,8 +427,8 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_| Ok(random_hash));
+            .withf(move |t, _| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
@@ -470,11 +470,15 @@ mod tests {
             .unwrap();
 
         assert!(
-            db_acks_bob.into_iter().all(|tkt| tkt.status.is_being_redeemed()),
+            db_acks_bob
+                .into_iter()
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
             "all bob's tickets must be in BeingRedeemed state"
         );
         assert!(
-            db_acks_charlie.into_iter().all(|tkt| tkt.status.is_being_redeemed()),
+            db_acks_charlie
+                .into_iter()
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
             "all charlie's tickets must be in BeingRedeemed state"
         );
     }
@@ -566,11 +570,15 @@ mod tests {
             .unwrap();
 
         assert!(
-            db_acks_bob.into_iter().all(|tkt| tkt.status.is_being_redeemed()),
+            db_acks_bob
+                .into_iter()
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
             "all bob's tickets must be in BeingRedeemed state"
         );
         assert!(
-            db_acks_charlie.into_iter().all(|tkt| tkt.status.is_untouched()),
+            db_acks_charlie
+                .into_iter()
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::Untouched),
             "all charlie's tickets must be in Untouched state"
         );
     }
@@ -595,13 +603,11 @@ mod tests {
         )));
 
         // Make the first ticket unredeemable
-        tickets[0].status = AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 1 };
+        tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
         db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
 
         // Make the second ticket unredeemable
-        tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-        };
+        tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
         db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();
 
         // Expect only the redeemable tickets get redeemed
@@ -610,8 +616,8 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 2)
-            .withf(move |t| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_| Ok(random_hash));
+            .withf(move |t, _| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(2).cloned() {
@@ -702,12 +708,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_previous_epoch_count)
-            .withf(move |t| {
+            .withf(move |t, _| {
                 tickets_clone[ticket_from_previous_epoch_count..]
                     .iter()
                     .any(|tk| tk.ticket.eq(&t.ticket))
             })
-            .returning(move |_| Ok(random_hash));
+            .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(ticket_from_previous_epoch_count).cloned() {
@@ -785,12 +791,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_next_epoch_count)
-            .withf(move |t| {
+            .withf(move |t, _| {
                 tickets_clone[ticket_from_next_epoch_count..]
                     .iter()
                     .any(|tk| tk.ticket.eq(&t.ticket))
             })
-            .returning(move |_| Ok(random_hash));
+            .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(ticket_from_next_epoch_count).cloned() {

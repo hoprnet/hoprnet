@@ -767,7 +767,7 @@ pub mod tests {
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket).expect("should create tx");
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket, domain_separator).expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(
             "{:?}",
