@@ -178,7 +178,7 @@ where
         min_hops: usize,
         max_hops: usize,
     ) -> Result<ChannelPath> {
-        // The protocol does not support >3 hop paths and will presumably never do, 
+        // The protocol does not support >3 hop paths and will presumably never do,
         // so we can exclude it here.
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) || !(1..=max_hops).contains(&min_hops) {
             return Err(GeneralError::InvalidInput.into());

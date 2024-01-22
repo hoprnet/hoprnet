@@ -38,11 +38,16 @@ jobs:
         env:
           USER: runner
 
+      - name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
       - name: Build bindings
         run: nix develop -c make build-solidity-types
 
-      - name: Generate rust docs
-        run: nix develop -c cargo doc --no-deps
+      - name: Build docs
+        env:
+          RUSTDOCFLAGS: --enable-index-page -Z unstable-options
+        run: cargo +nightly doc --no-deps
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'

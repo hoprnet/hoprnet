@@ -1,10 +1,14 @@
 {
+  "editor.formatOnSave": false,
+  "git.ignoreLimitWarning": true,
+  "rust-analyzer.showUnlinkedFileNotification": true,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.19+commit.7dd6d404",
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
-  "solidity.formatter": "forge",
-  "editor.formatOnSave": false,
-  "git.ignoreLimitWarning": true,
-  "rust-analyzer.showUnlinkedFileNotification": false
 }
