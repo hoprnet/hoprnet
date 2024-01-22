@@ -424,9 +424,6 @@ impl Ticket {
 
         let channel_id = generate_channel_id(&own_address, counterparty);
 
-        let cached_signer = OnceLock::new();
-        cached_signer.set(signing_key.public().0.clone()).unwrap();
-
         let mut ret = Ticket {
             channel_id,
             amount: amount.to_owned(),
@@ -436,7 +433,7 @@ impl Ticket {
             challenge,
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
-            signer: cached_signer,
+            signer: OnceLock::new(),
         };
         ret.sign(signing_key, domain_separator);
 
