@@ -175,7 +175,7 @@ pub trait NetworkExternalActions {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
-    id: PeerId,
+    pub id: PeerId,
     pub origin: PeerOrigin,
     pub is_public: bool,
     pub last_seen: u64,         // timestamp
@@ -512,11 +512,15 @@ impl<T: NetworkExternalActions> Network<T> {
             .collect::<Vec<_>>()
     }
 
-    pub fn all_peers_with_avg_quality(&self) -> Vec<(PeerId, f64)> {
+    pub fn all_peers_with_avg_quality(&self) -> Vec<(PeerStatus, f64)> {
         self.entries
             .values()
-            .map(|status: &PeerStatus| (status.id, status.get_average_quality()))
+            .map(|status: &PeerStatus| (status.clone(), status.get_average_quality()))
             .collect::<Vec<_>>()
+    }
+
+    pub fn all_peers(&self) -> Vec<&PeerStatus> {
+        self.entries.values().collect()
     }
 
     pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
