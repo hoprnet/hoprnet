@@ -1,3 +1,5 @@
+use std::cell::OnceCell;
+
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
@@ -15,13 +17,15 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
     #[serde(with = "serde_bytes")]
     pub v: [u8; CurvePoint::SIZE_COMPRESSED],
     pub h: Scalar,
     pub s: Scalar,
+    #[serde(skip)]
+    v_decompressed: OnceCell<CurvePoint>,
 }
 
 impl Default for VrfParameters {
@@ -30,6 +34,7 @@ impl Default for VrfParameters {
             v: [0u8; CurvePoint::SIZE_COMPRESSED],
             h: Scalar::default(),
             s: Scalar::default(),
+            v_decompressed: OnceCell::new(),
         }
     }
 }
@@ -59,6 +64,7 @@ impl BinarySerializable for VrfParameters {
                     &data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
                 )
                 .unwrap(),
+                v_decompressed: OnceCell::new(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -139,7 +145,14 @@ impl VrfParameters {
 
     /// Returns decompressed `v`.
     pub fn get_decompressed_v(&self) -> crate::errors::Result<CurvePoint> {
-        Ok(CurvePoint::from_bytes(&self.v)?)
+        // OnceCell::get_try_or_init is a perfect fit, but unstable
+
+        if let Some(cached_v) = self.v_decompressed.get() {
+            Ok(*cached_v)
+        } else {
+            let v_decompressed = CurvePoint::from_bytes(&self.v)?;
+            Ok(*self.v_decompressed.get_or_init(|| v_decompressed))
+        }
     }
 }
 
@@ -188,7 +201,12 @@ pub fn derive_vrf_parameters<const T: usize>(
     let mut comp_v = [0u8; CurvePoint::SIZE_COMPRESSED];
     comp_v.copy_from_slice(v.to_encoded_point(true).as_bytes());
 
-    Ok(VrfParameters { v: comp_v, h, s })
+    Ok(VrfParameters {
+        v: comp_v,
+        h,
+        s,
+        v_decompressed: OnceCell::new(),
+    })
 }
 
 #[cfg(test)]
