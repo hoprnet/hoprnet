@@ -322,10 +322,9 @@ async def swarm7(request):
 
     # minimal wait to ensure api is ready for `startedz` call.
     # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
-    await asyncio.sleep(10)
+    # await asyncio.sleep(10)
     for id, node in nodes.items():
-        while not await node.api.startedz():
-            await asyncio.sleep(0.1)
+        asyncio.wait_for(node.api.startedz(), timeout=60)
         logging.info(f"Node {id} is up")
 
     # FUND NODES
@@ -335,8 +334,8 @@ async def swarm7(request):
     # FINAL WAIT FOR NODES TO BE UP
     logging.info("Node setup finished, waiting for nodes to be ready")
     for node in nodes.values():
-        while not await node.api.readyz():
-            asyncio.sleep(0.1)
+        asyncio.wait_for(node.api.startedz(), timeout=60)
+        asyncio.sleep(0.1)
 
         addresses = await node.api.addresses()
         node.peer_id = addresses["hopr"]

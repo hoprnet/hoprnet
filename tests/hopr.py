@@ -1,12 +1,12 @@
 import logging
 from typing import Callable, Optional
 
+import requests
 from hoprd_sdk import ApiClient, Configuration
 from hoprd_sdk.api import (
     AccountApi,
     AliasApi,
     ChannelsApi,
-    ChecksApi,
     MessagesApi,
     NetworkApi,
     NodeApi,
@@ -37,6 +37,8 @@ class HoprdAPI:
     """
 
     def __init__(self, url: str, token: str):
+        self.url: str = url
+        self.token: str = token
         self.configuration = Configuration()
         self.configuration.host = f"{url}"
         self.configuration.api_key["X-Auth-Token"] = token
@@ -379,12 +381,34 @@ class HoprdAPI:
         Checks if the node is started.
         :return: started: int
         """
-        status, _ = self.__call_api(ChecksApi, "startedz")
-        return status
+        url = f"{self.url}/startedz"
+        header = {"X-Auth-Token": self.token}
+        success = False
+
+        while success is False:
+            try:
+                response = requests.get(url, headers=header, timeout=1)
+                print(f"{response=}")
+                success = response.status_code == 200
+            except Exception:
+                success = False
+
+        return success
 
     async def readyz(self):
         """
         Checks if the node is ready to accept connections.
         """
-        status, _ = self.__call_api(ChecksApi, "readyz")
-        return status
+        url = f"{self.url}/readyz"
+        header = {"X-Auth-Token": self.token}
+        success = False
+
+        while success is False:
+            try:
+                response = requests.get(url, headers=header, timeout=1)
+                print(f"{response=}")
+                success = response.status_code == 200
+            except Exception:
+                success = False
+
+        return success
