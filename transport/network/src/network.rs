@@ -505,20 +505,6 @@ impl<T: NetworkExternalActions> Network<T> {
         self.entries.values().filter(f).map(|x| x.id).collect::<Vec<_>>()
     }
 
-    pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)> {
-        self.entries
-            .values()
-            .map(|status: &PeerStatus| (status.id, status.get_quality()))
-            .collect::<Vec<_>>()
-    }
-
-    pub fn all_peers_with_avg_quality(&self) -> Vec<(PeerStatus, f64)> {
-        self.entries
-            .values()
-            .map(|status: &PeerStatus| (status.clone(), status.get_average_quality()))
-            .collect::<Vec<_>>()
-    }
-
     pub fn all_peers(&self) -> Vec<&PeerStatus> {
         self.entries.values().collect()
     }
