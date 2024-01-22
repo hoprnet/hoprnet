@@ -315,12 +315,12 @@ async def swarm7(request):
 
     for node in nodes.values():
         logging.info(f"Setting up {node}")
-        node.setup_node(PASSWORD, TEST_PROTOCOL_CONFIG_FILE, PWD.parent)
+        node.setup(PASSWORD, TEST_PROTOCOL_CONFIG_FILE, PWD.parent)
 
     # WAIT FOR NODES TO BE UP
     logging.info(f"Wait for {len(nodes)} nodes to start up")
 
-    # minimal wait to ensure api is ready for `stardedz` call.
+    # minimal wait to ensure api is ready for `startedz` call.
     # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
     await asyncio.sleep(10)
     for id, node in nodes.items():
@@ -338,8 +338,9 @@ async def swarm7(request):
         while not await node.api.readyz():
             asyncio.sleep(0.1)
 
-        node.peer_id = await node.api.addresses("hopr")
-        node.address = await node.api.addresses("native")
+        addresses = await node.api.addresses()
+        node.peer_id = addresses["hopr"]
+        node.address = addresses["native"]
         logging.info(f"Node {node} is ready")
 
     # YIELD NODES

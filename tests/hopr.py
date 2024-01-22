@@ -99,21 +99,32 @@ class HoprdAPI:
         status, _ = self.__call_api(AliasApi, "delete_alias", alias)
         return status
 
-    async def addresses(self, address_type: str):
+    async def addresses(self, address_type: str = "all"):
         """
         Returns the address of the node.
-        :param: address: str = "hopr" | "native"
+        :param: address: str = "hopr" | "native" | "all"
         :return: address: str | undefined
         """
+        if address_type not in ["hopr", "native", "all"]:
+            log.error(f"Invalid address type: {address_type}")
+            return None
+        if address_type == "all":
+            address_type = ["hopr", "native"]
+        if isinstance(address_type, str):
+            address_type = [address_type]
+
         status, response = self.__call_api(AccountApi, "addresses")
-        if status:
-            if not hasattr(response, address_type):
+        if not status:
+            return None
+
+        return_dict = {}
+        for type in address_type:
+            if not hasattr(response, type):
                 log.error(f"No {address_type} returned from the API")
                 return None
+            return_dict[type] = getattr(response, type)
 
-            return getattr(response, address_type)
-        else:
-            return None
+        return return_dict if len(return_dict) > 1 else return_dict[address_type[0]]
 
     async def balances(self):
         """

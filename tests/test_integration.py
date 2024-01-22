@@ -670,7 +670,7 @@ async def test_hoprd_sanity_check_channel_status(swarm7: dict[str, Node]):
     """
     The bash integration-test.sh opens and closes channels that can be visible inside this test scope
     """
-    alice_api = swarm7[0].api
+    alice_api = swarm7["1"].api
 
     open_channels = await alice_api.all_channels(include_closed=False)
     open_and_closed_channels = await alice_api.all_channels(include_closed=True)

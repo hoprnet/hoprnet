@@ -69,7 +69,7 @@ class Node:
 
         return self.address is not None and self.module_address is not None
 
-    def setup_node(self, password: str, config_file: Path, dir: Path):
+    def setup(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
             "HOPRD_HEARTBEAT_INTERVAL": "2500",
