@@ -12,6 +12,7 @@ use serde_repr::*;
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    sync::OnceLock,
 };
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -294,6 +295,7 @@ pub struct Ticket {
     pub channel_epoch: u32,               // 24
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+    signer: OnceLock<PublicKey>,
 }
 
 impl PartialOrd for Ticket {
@@ -364,6 +366,7 @@ impl Default for Ticket {
             channel_epoch: 1u32,
             challenge: EthereumChallenge::default(),
             signature: None,
+            signer: OnceLock::new(),
         }
     }
 }
@@ -421,6 +424,9 @@ impl Ticket {
 
         let channel_id = generate_channel_id(&own_address, counterparty);
 
+        let cached_signer = OnceLock::new();
+        cached_signer.set(signing_key.public().0.clone()).unwrap();
+
         let mut ret = Ticket {
             channel_id,
             amount: amount.to_owned(),
@@ -430,6 +436,7 @@ impl Ticket {
             challenge,
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
+            signer: cached_signer,
         };
         ret.sign(signing_key, domain_separator);
 
@@ -471,6 +478,7 @@ impl Ticket {
             challenge,
             encoded_win_prob,
             signature: Some(signature),
+            signer: OnceLock::new(),
         };
 
         ret.verify(own_address, domain_separator)
@@ -511,6 +519,7 @@ impl Ticket {
             challenge: EthereumChallenge::default(),
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
+            signer: OnceLock::new(),
         })
     }
 
@@ -682,10 +691,16 @@ impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<PublicKey> {
-        PublicKey::from_signature_hash(
-            &self.get_hash(domain_separator).to_bytes(),
-            self.signature.as_ref().expect("ticket not signed"),
-        )
+        // OnceLock::get_or_try_insert fits better, but it is unstable
+        if let Some(signer) = self.signer.get() {
+            Ok(signer.clone())
+        } else {
+            let signer = PublicKey::from_signature_hash(
+                &self.get_hash(domain_separator).to_bytes(),
+                self.signature.as_ref().expect("ticket not signed"),
+            )?;
+            Ok(self.signer.get_or_init(|| signer).clone())
+        }
     }
 
     /// Verifies the signature of this ticket.
@@ -748,6 +763,7 @@ impl BinarySerializable for Ticket {
                 channel_epoch: u32::from_be_bytes(channel_epoch),
                 challenge,
                 signature: Some(signature),
+                signer: OnceLock::new(),
             })
         } else {
             // TODO: make Error a generic

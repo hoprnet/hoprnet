@@ -1,4 +1,4 @@
-use std::cell::OnceCell;
+use std::sync::OnceLock;
 
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
@@ -25,7 +25,7 @@ pub struct VrfParameters {
     pub h: Scalar,
     pub s: Scalar,
     #[serde(skip)]
-    v_decompressed: OnceCell<CurvePoint>,
+    v_decompressed: OnceLock<CurvePoint>,
 }
 
 impl Default for VrfParameters {
@@ -34,7 +34,7 @@ impl Default for VrfParameters {
             v: [0u8; CurvePoint::SIZE_COMPRESSED],
             h: Scalar::default(),
             s: Scalar::default(),
-            v_decompressed: OnceCell::new(),
+            v_decompressed: OnceLock::new(),
         }
     }
 }
@@ -64,7 +64,7 @@ impl BinarySerializable for VrfParameters {
                     &data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
                 )
                 .unwrap(),
-                v_decompressed: OnceCell::new(),
+                v_decompressed: OnceLock::new(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -145,7 +145,7 @@ impl VrfParameters {
 
     /// Returns decompressed `v`.
     pub fn get_decompressed_v(&self) -> crate::errors::Result<CurvePoint> {
-        // OnceCell::get_try_or_init is a perfect fit, but unstable
+        // OnceLock::get_try_or_init is a perfect fit, but unstable
 
         if let Some(cached_v) = self.v_decompressed.get() {
             Ok(*cached_v)
@@ -205,7 +205,7 @@ pub fn derive_vrf_parameters<const T: usize>(
         v: comp_v,
         h,
         s,
-        v_decompressed: OnceCell::new(),
+        v_decompressed: OnceLock::new(),
     })
 }
 
