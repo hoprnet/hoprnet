@@ -1,12 +1,17 @@
 //! Chain utilities used for testing.
 //! This used in unit and integration tests.
 
-use crate::{ContractAddresses, ContractInstances, TypedTransaction};
-use bindings::hopr_channels::HoprChannels;
-use bindings::hopr_node_stake_factory::{NewHoprNodeStakeModuleFilter};
-use bindings::hopr_token::HoprToken;
-use ethers::abi::{encode_packed, Token, RawLog};
+use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
+use bindings::{
+    hopr_channels::HoprChannels, 
+    hopr_node_management_module::{IncludeNodeCall, ScopeTargetTokenCall},
+    hopr_node_stake_factory::NewHoprNodeStakeModuleFilter,
+    hopr_token::{HoprToken, ApproveCall},
+};
+use ethers::abi::{encode_packed, AbiEncode, RawLog, Token};
+use ethers::core::k256::ecdsa::SigningKey;
 use ethers::prelude::*;
+// use ethers::utils::hex;
 use ethers::utils::keccak256;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
@@ -14,6 +19,16 @@ use hopr_primitive_types::primitives::{Address, U256};
 use log::debug;
 use std::str::FromStr;
 use std::sync::Arc;
+
+// define basic safe abi
+abigen!(
+    SafeContract,
+    r#"[
+        function nonce() view returns (uint256)
+        function getTransactionHash( address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes32)
+        function execTransaction(address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address payable refundReceiver, bytes memory signatures) public returns (bool)
+    ]"#,
+);
 
 /// ERC1820 deployer wallet
 pub const ERC_1820_DEPLOYER: &str = "a990077c3205cbDf861e17Fa532eeB069cE9fF96";
@@ -146,6 +161,167 @@ pub async fn fund_channel<M: Middleware>(
         .unwrap();
 }
 
+/// Prepare a safe transaction
+pub async fn get_safe_tx<M: Middleware>(
+    safe_contract: SafeContract<M>,
+    target: Address,
+    inner_tx_data: Bytes,
+    wallet: Wallet<SigningKey>,
+) -> Result<TypedTransaction, ContractError<M>> {
+    let nonce = safe_contract.nonce().call().await.unwrap();
+
+    let data_hash = safe_contract
+        .get_transaction_hash(
+            target.into(),
+            U256::zero(),
+            inner_tx_data.clone(),
+            0,
+            U256::zero(),
+            U256::zero(),
+            U256::zero(),
+            Address::default().into(),
+            wallet.address(),
+            nonce,
+        )
+        .call()
+        .await
+        .unwrap();
+    // Outer tx payload: execute as safe tx
+    let mut safe_tx = create_eip1559_transaction();
+
+    let signed_data_hash = wallet.sign_hash(data_hash.into()).unwrap();
+
+    safe_tx.set_data(
+        ExecTransactionCall {
+            to: target.into(),
+            value: U256::zero(),
+            data: inner_tx_data,
+            operation: 0,
+            safe_tx_gas: U256::zero(),
+            base_gas: U256::zero(),
+            gas_price: U256::zero(),
+            gas_token: Address::default().into(),
+            refund_receiver: wallet.address(),
+            signatures: encode_packed(&[Token::Bytes(signed_data_hash.to_vec())])
+                .unwrap()
+                .into(),
+        }
+        .encode()
+        .into(),
+    );
+    safe_tx.set_to(NameOrAddress::Address(safe_contract.address()));
+
+    Ok(safe_tx)
+}
+
+/// Send a Safe transaction to the module to include node to the module
+pub async fn include_node_to_module_by_safe<M: Middleware>(
+    provider: Arc<M>,
+    safe_address: Address,
+    module_address: Address,
+    node_address: Address,
+    deployer: &ChainKeypair, // also node address
+) -> Result<(), ContractError<M>> {
+    // prepare default permission for node.
+    // - Clearance: Function
+    // - TargetType: SEND
+    // - TargetPermission: allow all
+    // - NodeDefaultPermission: None
+    let node_target_permission = format!("{:?}010203000000000000000000", node_address);
+
+    // Inner tx payload: include node to the module
+    let inner_tx_data: ethers::types::Bytes = IncludeNodeCall {
+        node_default_target: U256::from_str(&node_target_permission).unwrap(),
+    }
+    .encode()
+    .into();
+
+    let safe_contract = SafeContract::new(safe_address, provider.clone());
+    let wallet =
+        ethers::signers::LocalWallet::from_bytes(deployer.secret().as_ref()).expect("failed to construct wallet");
+    let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data, wallet)
+        .await
+        .unwrap();
+
+    provider
+        .send_transaction(safe_tx, None)
+        .await
+        .map_err(|e| ContractError::MiddlewareError { e })?
+        .await?;
+
+    Ok(())
+}
+
+/// Send a Safe transaction to the module to include annoucement to the module
+pub async fn add_announcement_as_target<M: Middleware>(
+    provider: Arc<M>,
+    safe_address: Address,
+    module_address: Address,
+    announcement_contract_address: Address,
+    deployer: &ChainKeypair, // also node address
+) -> Result<(), ContractError<M>> {
+    // prepare default permission for announcement.
+    // - Clearance: Function
+    // - TargetType: TOKEN
+    // - TargetPermission: allow all
+    // - NodeDefaultPermission: None
+    let announcement_target_permission = format!("{:?}010003000000000000000000", announcement_contract_address);
+
+    // Inner tx payload: include node to the module
+    let inner_tx_data: ethers::types::Bytes = ScopeTargetTokenCall {
+        default_target: U256::from_str(&announcement_target_permission).unwrap(),
+    }
+    .encode()
+    .into();
+
+    let safe_contract = SafeContract::new(safe_address, provider.clone());
+    let wallet =
+        ethers::signers::LocalWallet::from_bytes(deployer.secret().as_ref()).expect("failed to construct wallet");
+    let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data, wallet)
+        .await
+        .unwrap();
+
+    provider
+        .send_transaction(safe_tx, None)
+        .await
+        .map_err(|e| ContractError::MiddlewareError { e })?
+        .await?;
+
+    Ok(())
+}
+
+/// Send a Safe transaction to the token contract, to approve channels on behalf of safe.
+pub async fn approve_channel_transfer_from_safe<M: Middleware>(
+    provider: Arc<M>,
+    safe_address: Address,
+    token_address: Address,
+    channel_address: Address,
+    deployer: &ChainKeypair, // also node address
+) -> Result<(), ContractError<M>> {
+    // Inner tx payload: include node to the module
+    let inner_tx_data: ethers::types::Bytes = ApproveCall {
+        spender: channel_address.into(),
+        value: U256::MAX,
+    }
+    .encode()
+    .into();
+
+    let safe_contract = SafeContract::new(safe_address, provider.clone());
+    let wallet =
+        ethers::signers::LocalWallet::from_bytes(deployer.secret().as_ref()).expect("failed to construct wallet");
+    let safe_tx = get_safe_tx(safe_contract, token_address, inner_tx_data, wallet)
+        .await
+        .unwrap();
+
+    provider
+        .send_transaction(safe_tx, None)
+        .await
+        .map_err(|e| ContractError::MiddlewareError { e })?
+        .await?;
+
+    Ok(())
+}
+
 /// Deploy a safe instance and a module instance
 /// Notice that to complete the on-boarding process,
 /// 1) node should be included to the module
@@ -200,10 +376,30 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
         );
         // other omitted libs: SimulateTxAccessor, CreateCall, and SignMessageLib
         // broadcast those transactions
-        provider.send_transaction(_tx_safe_proxy_factory, None).await.unwrap().await.unwrap();
-        provider.send_transaction(_tx_safe_compatibility_fallback_handler, None).await.unwrap().await.unwrap();
-        provider.send_transaction(_tx_safe_multisend_call_only, None).await.unwrap().await.unwrap();
-        provider.send_transaction(_tx_safe_singleton, None).await.unwrap().await.unwrap();
+        provider
+            .send_transaction(_tx_safe_proxy_factory, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        provider
+            .send_transaction(_tx_safe_compatibility_fallback_handler, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        provider
+            .send_transaction(_tx_safe_multisend_call_only, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        provider
+            .send_transaction(_tx_safe_singleton, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
     }
 
     // create a salt from the nonce
@@ -254,14 +450,18 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
     let module_log = instance_deployment_tx_logs
         .iter()
         .find(|log| {
-            log.topics[0].eq(&"0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206".parse::<H256>().unwrap())
+            log.topics[0].eq(&"0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206"
+                .parse::<H256>()
+                .unwrap())
         })
         .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeModule(address,address)"
 
     let safe_log = instance_deployment_tx_logs
         .iter()
         .find(|log| {
-            log.topics[0].eq(&"0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386".parse::<H256>().unwrap())
+            log.topics[0].eq(&"0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386"
+                .parse::<H256>()
+                .unwrap())
         })
         .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeSafe(address)"
 
@@ -274,9 +474,10 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
             module_log.data.clone(),
         )
         .unwrap()
-        .module_implementation.into();
+        .instance
+        .into();
 
-    // note that using the following snippet would cause error 
+    // note that using the following snippet would cause error
     // "DetokenizationError(InvalidOutputType("Expected Tuple, got Address(0x8819c5bab7d63c61d72f65b19b05a6772f55391b)"))"
     // ```
     // let decoded_safe_log: NewHoprNodeStakeSafeFilter = instances
@@ -284,13 +485,24 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
     // .decode_event("NewHoprNodeStakeSafe", safe_log.topics.clone(), safe_log.data.clone())
     // .unwrap();
     // ```
-    let deployed_safe_address: Address = instances.stake_factory.abi()
+    let deployed_safe_address: Address = instances
+        .stake_factory
+        .abi()
         .event("NewHoprNodeStakeSafe")
         .unwrap()
-        .parse_log(RawLog { topics:safe_log.topics.clone(), data: safe_log.data.clone().to_vec() })?
-        .params.into_iter()
-        .map(|param| param.value).collect::<Vec<_>>().pop().unwrap()
-        .into_address().unwrap().into();
+        .parse_log(RawLog {
+            topics: safe_log.topics.clone(),
+            data: safe_log.data.clone().to_vec(),
+        })?
+        .params
+        .into_iter()
+        .map(|param| param.value)
+        .collect::<Vec<_>>()
+        .pop()
+        .unwrap()
+        .into_address()
+        .unwrap()
+        .into();
 
     debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
     debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);

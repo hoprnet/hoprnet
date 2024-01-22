@@ -14,7 +14,9 @@ use chain_rpc::client::native::SurfRequestor;
 use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::ChainEventType;
-use chain_types::utils::create_anvil;
+use chain_types::utils::{
+    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+};
 use chain_types::{ContractAddresses, ContractInstances};
 use core_transport::{ChainKeypair, Keypair, Multiaddr, OffchainKeypair};
 use futures::StreamExt;
@@ -45,11 +47,11 @@ async fn integration_test_indexer() {
         // Mint some tokens
         chain_types::utils::mint_tokens(instances.token.clone(), 1000_u128.into()).await;
 
-        // Fund the node address
+        // Fund the node address with 10 native token
         chain_types::utils::fund_node(
             node_chain_key.public().to_address(),
             10_u128.into(),
-            100_u128.into(),
+            0_u128.into(),
             instances.token.clone(),
         )
         .await;
@@ -61,6 +63,49 @@ async fn integration_test_indexer() {
         )
         .await
         .expect("could not deploy safe and module");
+
+        // ----------------
+        // Onboarding:
+        // Include node to the module
+        // Add announcement contract to be a target in the module
+        // Mint HOPR tokens to the Safe
+        // Approve token transfer for Channel contract
+
+        // Include Node to the module
+        include_node_to_module_by_safe(
+            client.clone(),
+            safe,
+            module,
+            node_chain_key.public().to_address(),
+            &contract_deployer,
+        )
+        .await
+        .expect("could not include node to module");
+
+        // Add announcement as target into the module
+        add_announcement_as_target(
+            client.clone(),
+            safe,
+            module,
+            instances.announcements.address().into(),
+            &contract_deployer,
+        )
+        .await
+        .expect("could not add announcement to module");
+
+        // Fund the safe with 10 native token and 100 hopr token to the Safe
+        chain_types::utils::fund_node(safe, 10_u128.into(), 100_u128.into(), instances.token.clone()).await;
+
+        // Approve token trasnfer for channels contract
+        approve_channel_transfer_from_safe(
+            client.clone(),
+            safe,
+            instances.token.address().into(),
+            instances.channels.address().into(),
+            &contract_deployer,
+        )
+        .await
+        .expect("could not approve channels to be a spender for safe");
 
         (ContractAddresses::from(&instances), module, safe)
     };
@@ -84,10 +129,10 @@ async fn integration_test_indexer() {
         module_address: module_addr,
         expected_block_time: Duration::from_secs(2),
         tx_polling_interval: Duration::from_millis(100),
-        logs_page_size: 100
+        logs_page_size: 100,
     };
-    let rpc_ops = RpcOperations::new(json_rpc_client, &node_chain_key, rpc_cfg)
-        .expect("failed to create RpcOperations");
+    let rpc_ops =
+        RpcOperations::new(json_rpc_client, &node_chain_key, rpc_cfg).expect("failed to create RpcOperations");
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
@@ -130,13 +175,7 @@ async fn integration_test_indexer() {
         start_block_number: 1,
         fetch_token_transactions: true,
     };
-    let mut indexer = Indexer::new(
-        rpc_ops.clone(),
-        chain_log_handler,
-        db.clone(),
-        indexer_cfg,
-        sce_tx,
-    );
+    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
     indexer.start().await.expect("indexer should sync");
 
     info!("======== STARTING TEST ========");
