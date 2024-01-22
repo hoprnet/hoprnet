@@ -37,10 +37,8 @@ class HoprdAPI:
     """
 
     def __init__(self, url: str, token: str):
-        self.url: str = url
-        self.token: str = token
         self.configuration = Configuration()
-        self.configuration.host = f"{url}"
+        self.configuration.host = url
         self.configuration.api_key["X-Auth-Token"] = token
 
     def __call_api(self, obj: Callable[..., object], method: str, *args, **kwargs) -> tuple[bool, Optional[object]]:
@@ -381,13 +379,12 @@ class HoprdAPI:
         Checks if the node is started.
         :return: started: int
         """
-        url = f"{self.url}/startedz"
-        header = {"X-Auth-Token": self.token}
+        url = f"{self.configuration.host}/startedz"
         success = False
 
         while success is False:
             try:
-                response = requests.get(url, headers=header, timeout=1)
+                response = requests.get(url, timeout=1)
                 print(f"{response=}")
                 success = response.status_code == 200
             except Exception:
@@ -399,14 +396,12 @@ class HoprdAPI:
         """
         Checks if the node is ready to accept connections.
         """
-        url = f"{self.url}/readyz"
-        header = {"X-Auth-Token": self.token}
+        url = f"{self.configuration.host}/readyz"
         success = False
 
         while success is False:
             try:
-                response = requests.get(url, headers=header, timeout=1)
-                print(f"{response=}")
+                response = requests.get(url, timeout=1)
                 success = response.status_code == 200
             except Exception:
                 success = False
