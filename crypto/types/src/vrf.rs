@@ -17,7 +17,7 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
     #[serde(with = "serde_bytes")]
@@ -26,6 +26,13 @@ pub struct VrfParameters {
     pub s: Scalar,
     #[serde(skip)]
     v_decompressed: OnceLock<CurvePoint>,
+}
+
+impl PartialEq for VrfParameters {
+    fn eq(&self, other: &Self) -> bool {
+        // Exclude cached properties
+        self.v == other.v && self.h == other.h && self.s == other.s
+    }
 }
 
 impl Default for VrfParameters {

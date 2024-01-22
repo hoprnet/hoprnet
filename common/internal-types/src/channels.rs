@@ -285,7 +285,7 @@ impl ChannelChange {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,                  // 92 ---
@@ -298,6 +298,20 @@ pub struct Ticket {
     signer: OnceLock<PublicKey>,
 }
 
+impl PartialEq for Ticket {
+    fn eq(&self, other: &Self) -> bool {
+        // Exclude cached properties
+        self.channel_id == other.channel_id
+            && self.amount == other.amount
+            && self.index == other.index
+            && self.index_offset == other.index_offset
+            && self.encoded_win_prob == other.encoded_win_prob
+            && self.channel_epoch == other.channel_epoch
+            && self.challenge == other.challenge
+            && self.signature == other.signature
+    }
+}
+
 impl PartialOrd for Ticket {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -306,6 +320,8 @@ impl PartialOrd for Ticket {
 
 impl Ord for Ticket {
     fn cmp(&self, other: &Self) -> Ordering {
+        // Ordering:
+        // [channel_id][channel_epoch][ticket_index]
         match self.channel_id.cmp(&other.channel_id) {
             Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
                 Ordering::Equal => self.index.cmp(&other.index),
