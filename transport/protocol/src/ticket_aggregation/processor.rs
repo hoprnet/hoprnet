@@ -185,6 +185,7 @@ impl AggregationList {
 
 /// The input to the processor background pipeline
 #[allow(clippy::type_complexity)] // TODO: The type needs to be significantly refactored to easily move around
+#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
