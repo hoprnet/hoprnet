@@ -1,6 +1,6 @@
-//! The purpose of this module is to implement the [ActionQueue] type.
+//! The purpose of this module is to implement the [ActionQueue](action_queue::ActionQueue) type.
 //!
-//! The [ActionQueue] acts as a MPSC queue of [Actions](Action) which are executed one-by-one
+//! The [ActionQueue](action_queue::ActionQueue) acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
 use async_lock::RwLock;
 use async_trait::async_trait;

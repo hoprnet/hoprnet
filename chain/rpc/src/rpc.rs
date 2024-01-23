@@ -1,3 +1,5 @@
+//! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
+//! [RpcOperations](rpc::RpcOperations) type, which is the main API exposed by this crate.
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use chain_types::{ContractAddresses, ContractInstances};

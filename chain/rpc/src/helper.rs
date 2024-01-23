@@ -1,3 +1,6 @@
+//! This module contains private helper types for JSON RPC operation with an RPC endpoint.
+//! Most of these types were taken as-is from <https://github.com/gakonst/ethers-rs>, because
+//! they are not exposed as public from the `ethers` crate.
 use ethers_providers::JsonRpcError;
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{de, Deserialize, Serialize};
@@ -38,6 +41,7 @@ pub enum Response<'a> {
     Notification { method: &'a str, params: Params<'a> },
 }
 
+/// JSON-RPC request parameters.
 #[derive(Deserialize, Debug)]
 pub struct Params<'a> {
     pub subscription: ethers::types::U256,

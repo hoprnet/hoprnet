@@ -1,11 +1,11 @@
-//! This module defines the basic [PayloadGenerator] trait that describes how an action
-//! is translated into a [TypedTransaction] that can be submitted on-chain (via an RPC provider)
+//! This module defines the basic [PayloadGenerator](payload::PayloadGenerator) trait that describes how an action
+//! is translated into a [TypedTransaction](chain_types::TypedTransaction) that can be submitted on-chain (via an RPC provider)
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
-//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
+//! - [BasicPayloadGenerator](payload::BasicPayloadGenerator) which implements generation of a direct EIP1559 transaction payload. This is currently
 //! not used by a HOPR node.
-//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
+//! - [SafePayloadGenerator](payload::SafePayloadGenerator) which implements generation of a payload that embeds the transaction data into the
 //! SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
 use crate::errors::{

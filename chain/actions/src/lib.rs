@@ -3,13 +3,13 @@
 //! ## Actions
 //! The main concept is an "action", which a node can perform and results into an on-chain
 //! operation. These actions are all on the external interface of this crate which is represented
-//! by the [ChainActions<Db>] type.
+//! by the [ChainActions] type.
 //! There are 3 classes of actions implemented in submodules of this crate:
 //! - [channel actions](channels)
 //! - [ticket redeem actions](redeem)
 //! - [node actions](node)
 //!
-//! Each action is represented by a method (or methods) that are imported into the [ChainActions<Db>] type
+//! Each action is represented by a method (or methods) that are imported into the [ChainActions] type
 //! through a trait from the respective module (e.g. [ChannelActions](channels::ChannelActions) trait for channel actions).
 //! Each action will eventually translate to an on-chain transaction.
 //! An action will always return a [PendingAction](action_queue::PendingAction) future. This
@@ -32,7 +32,7 @@
 //! The [Action](chain_types::actions::Action) enum instance is then passed via
 //! an [ActionSender] into the [ActionQueue](action_queue::ActionQueue).
 //! The [ActionQueue](action_queue::ActionQueue) takes care of ensuring the FIFO order of the
-//! actions which is driven by a standalone [action loop](`ActionQueue::action_loop()`) and must be instantiated
+//! actions which is driven by a standalone [action loop](`action_queue::ActionQueue::action_loop()`) and must be instantiated
 //! before [ChainActions], so that it can provide it with an [ActionSender].
 //!
 //! ### Queueing of actions
@@ -81,6 +81,9 @@
 //! The former one is implemented via [BasicPayloadGenerator](payload::BasicPayloadGenerator), the latter
 //! is implemented in [SafePayloadGenerator](payload::SafePayloadGenerator).
 //!
+//! In most situations, the transaction payload an action translates to, typically constitutes a smart contract call
+//! of one of the HOPR smart contracts deployed on-chain.
+//!
 //! See the [payload] module for details.
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -89,8 +92,9 @@ use std::sync::Arc;
 
 use crate::action_queue::ActionSender;
 
+/// Defines the main FIFO MPSC queue for actions.
 pub mod action_queue;
-///
+/// Adds functionality of tracking the action results via expectations.
 pub mod action_state;
 /// Actions related to HOPR channels.
 pub mod channels;

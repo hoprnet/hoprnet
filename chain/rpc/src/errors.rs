@@ -1,9 +1,11 @@
+//! Errors produced by this crate and other error-related types.
 use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
 use ethers::prelude::ContractError;
 use ethers_providers::{JsonRpcError, ProviderError};
 use thiserror::Error;
 
+/// Enumerates different errors produced by this crate.
 #[derive(Error, Debug)]
 pub enum RpcError {
     #[error("error on backend interface: {0}")]

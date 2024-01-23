@@ -1,7 +1,7 @@
-//! This module defines the [TicketRedeemActions] trait which allows to perform operations regarding
+//! This module defines the [TicketRedeemActions](redeem::TicketRedeemActions) trait which allows to perform operations regarding
 //! ticket redemption.
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue].
+//! operations via [ActionQueue](action_queue::ActionQueue).
 //!
 //! There are 4 functions that can be used to redeem tickets in the `TicketRedeemActions` trait:
 //! - `redeem_all_tickets`
@@ -10,13 +10,15 @@
 //! - `redeem_ticket`
 //!
 //! Each method first checks if the tickets are redeemable.
-//! (= they are not marked as [BeingRedeemed](AcknowledgedTicketStatus::BeingRedeemed) or [BeingAggregated](AcknowledgedTicketStatus::BeingAggregated) in the DB),
-//! If they are redeemable, their state is changed to [BeingRedeemed](AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such state is transmitted into the [ActionQueue] so the redemption is soon executed on-chain.
+//! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or
+//! [BeingAggregated](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingAggregated) in the DB),
+//! If they are redeemable, their state is changed to
+//! [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
+//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](action_queue::ActionQueue) so the redemption is soon executed on-chain.
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of each ticket redemption.
 //!
-//! See the details in [ActionQueue] on how the confirmation is realized by awaiting the respective [SignificantChainEvent]
+//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
 use async_lock::RwLock;
 use async_trait::async_trait;
