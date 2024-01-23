@@ -17,7 +17,9 @@ fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
         Ok(())
     } else {
-        Err(ValidationError::new("Invalid file path specified"))
+        Err(ValidationError::new(
+            "Invalid file path specified, the file does not exist or is not a file",
+        ))
     }
 }
 
@@ -46,10 +48,13 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
     #[validate(custom = "validate_file_path")]
+    #[serde(default)]
     pub file: String,
     #[validate(custom = "validate_password")]
+    #[serde(default)]
     pub password: String,
     #[validate(custom = "validate_optional_private_key")]
+    #[serde(default)]
     pub private_key: Option<String>,
 }
 
@@ -76,15 +81,19 @@ impl std::fmt::Debug for Identity {
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
     #[validate]
+    #[serde(default)]
     pub hopr: HoprLibConfig,
     /// Configuration regarding the identity of the node
     #[validate]
+    #[serde(default)]
     pub identity: Identity,
     /// Configuration of the underlying database engine
     #[validate]
+    #[serde(default)]
     pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
     #[validate]
+    #[serde(default)]
     pub api: Api,
 }
 
