@@ -118,7 +118,7 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
     /// Defaults to 150 seconds.
@@ -157,7 +157,7 @@ where
             db: self.db.clone(),
             action_state: self.action_state.clone(),
             tx_exec: self.tx_exec.clone(),
-            cfg: self.cfg.clone(),
+            cfg: self.cfg,
         }
     }
 }
