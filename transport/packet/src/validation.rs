@@ -20,10 +20,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     check_unrealized_balance: bool,
     domain_separator: &Hash,
 ) -> Result<()> {
-    debug!(
-        "validating unack ticket from {}",
-        ticket.recover_signer(domain_separator)?
-    );
+    debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
     ticket

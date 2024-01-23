@@ -458,6 +458,10 @@ impl Hash {
     pub fn hash(&self) -> Self {
         Self::create(&[&self.0])
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl BinarySerializable for Hash {
@@ -498,6 +502,12 @@ impl From<[u8; Self::SIZE]> for Hash {
 
 impl From<Hash> for [u8; Hash::SIZE] {
     fn from(value: Hash) -> Self {
+        value.0
+    }
+}
+
+impl From<&Hash> for [u8; Hash::SIZE] {
+    fn from(value: &Hash) -> Self {
         value.0
     }
 }

@@ -47,6 +47,9 @@ pub enum CoreEthereumActionsError {
     #[error("indexer expectation has been unregistered")]
     ExpectationUnregistered,
 
+    #[error("no channel domain_separator tag found")]
+    MissingDomainSeparator,
+
     #[error(transparent)]
     DbError(#[from] DbError),
 

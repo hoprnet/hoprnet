@@ -75,42 +75,17 @@ impl BinarySerializable for Acknowledgement {
 }
 
 /// Status of the acknowledged ticket.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display, strum::EnumString)]
+#[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
     #[default]
     Untouched,
     /// Ticket is currently being redeemed in and on-going redemption process
-    BeingRedeemed { tx_hash: Hash },
+    BeingRedeemed,
     /// Ticket is currently being aggregated in and on-going aggregation process
-    BeingAggregated { start: u64, end: u64 },
-}
-
-impl AcknowledgedTicketStatus {
-    /// Short-hand to check if the ticket is `BeingAggregated`
-    pub fn is_being_redeemed(&self) -> bool {
-        matches!(self, AcknowledgedTicketStatus::BeingRedeemed { .. })
-    }
-
-    /// Short-hand to check if the ticket is `BeingRedeemed`
-    pub fn is_being_aggregated(&self) -> bool {
-        matches!(self, AcknowledgedTicketStatus::BeingAggregated { .. })
-    }
-
-    /// Short-hand to check if the ticket is `Untouched`
-    pub fn is_untouched(&self) -> bool {
-        matches!(self, AcknowledgedTicketStatus::Untouched { .. })
-    }
-}
-
-impl Display for AcknowledgedTicketStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AcknowledgedTicketStatus::Untouched => write!(f, "untouched"),
-            AcknowledgedTicketStatus::BeingRedeemed { .. } => write!(f, "being redeemed"),
-            AcknowledgedTicketStatus::BeingAggregated { start, end } => write!(f, "being aggregated ({start}-{end})"),
-        }
-    }
+    BeingAggregated,
 }
 
 /// Contains acknowledgment information and the respective ticket
@@ -207,7 +182,7 @@ impl AcknowledgedTicket {
             luck.copy_from_slice(
                 &Hash::create(&[
                     &self.ticket.get_hash(domain_separator).to_bytes(),
-                    &self.vrf_params.v.to_bytes()[1..], // skip prefix
+                    &self.vrf_params.get_decompressed_v()?.to_bytes()[1..], // skip prefix
                     &self.response.to_bytes(),
                     &signature.to_bytes(),
                 ])
@@ -600,7 +575,7 @@ pub mod test {
             )
             .is_ok());
 
-        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 };
+        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated;
 
         assert_eq!(
             deserialized_ticket,
