@@ -177,8 +177,8 @@ run-local: ## run HOPRd from local repo
 	hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
-		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication \
+		--testAnnounceLocalAddresses --testPreferLocalAddresses \
+		--disableApiAuthentication \
 		--protocolConfig $(mydir)scripts/protocol-config-anvil.json \
 		--data /tmp/ \
 		$(args)

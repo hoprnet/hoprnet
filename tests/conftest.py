@@ -179,7 +179,6 @@ def setup_node(args: dict):
         "--init",
         "--testAnnounceLocalAddresses",
         "--testPreferLocalAddresses",
-        "--testUseWeakCrypto",
         f"--apiPort={args['api_port']}",
         f"--data={args['dir']}",
         f"--host={args['host_addr']}:{args['p2p_port']}",

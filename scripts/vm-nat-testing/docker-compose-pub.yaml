@@ -16,7 +16,7 @@ services:
         hoprd \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --network anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
-          --identity /var/hopr/identities/local-public.id --testUseWeakCrypto --announce
+          --identity /var/hopr/identities/local-public.id --announce
     volumes:
       - '/var/hopr/identities:/var/hopr/identities'
     networks:
