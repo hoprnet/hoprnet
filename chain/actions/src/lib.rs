@@ -10,7 +10,7 @@
 //! - [node actions](node)
 //!
 //! Each action is represented by a method (or methods) that are imported into the [ChainActions<Db>] type
-//! through a trait from the respective module (e.g. [ChannelActions<Db>] trait for channel actions).
+//! through a trait from the respective module (e.g. [ChannelActions](channels::ChannelActions) trait for channel actions).
 //! Each action will eventually translate to an on-chain transaction.
 //! An action will always return a [PendingAction](action_queue::PendingAction) future. This
 //! future can be awaited or not, depending if the caller wishes to obtain the [ActionConfirmation](action_queue::ActionConfirmation)
