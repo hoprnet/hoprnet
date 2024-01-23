@@ -79,7 +79,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         initialize: cfg.hopr.db.initialize,
         id_path: cfg.identity.file.clone(),
         password: cfg.identity.password.clone(),
-        use_weak_crypto: Some(cfg.test.use_weak_crypto),
         private_key: cfg
             .identity
             .private_key
