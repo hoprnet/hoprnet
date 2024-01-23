@@ -9,6 +9,7 @@ env:
   FOUNDRY_PROFILE: ci
 
 on:
+  merge_group:
   pull_request:
     types:
       - synchronize
