@@ -29,20 +29,35 @@ pub enum Auth {
 
 #[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Api {
+    /// Selects whether the REST API is enabled
+    #[serde(default)]
     pub enable: bool,
     /// Auth enum holding the API auth configuration
     #[validate(custom = "validate_api_auth")]
+    #[serde(default = "default_api_auth_form")]
     pub auth: Auth,
+    /// Host and port combination where the REST API should be located
     #[validate]
+    #[serde(default = "default_api_host")]
     pub host: HostConfig,
+}
+
+#[inline]
+fn default_api_auth_form() -> Auth {
+    Auth::None
+}
+
+#[inline]
+fn default_api_host() -> HostConfig {
+    HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap()
 }
 
 impl Default for Api {
     fn default() -> Self {
         Self {
             enable: false,
-            auth: Auth::None,
-            host: HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap(),
+            auth: default_api_auth_form(),
+            host: default_api_host(),
         }
     }
 }

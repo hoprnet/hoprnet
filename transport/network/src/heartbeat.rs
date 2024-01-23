@@ -39,21 +39,39 @@ use crate::ping::Pinging;
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[serde(default = "default_heartbeat_variance")]
     pub variance: std::time::Duration,
     /// Interval in which the heartbeat is triggered in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[serde(default = "default_heartbeat_interval")]
     pub interval: std::time::Duration,
     /// The time interval for which to consider peer heartbeat renewal in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[serde(default = "default_heartbeat_threshold")]
     pub threshold: std::time::Duration,
+}
+
+#[inline]
+fn default_heartbeat_interval() -> std::time::Duration {
+    DEFAULT_HEARTBEAT_INTERVAL
+}
+
+#[inline]
+fn default_heartbeat_threshold() -> std::time::Duration {
+    DEFAULT_HEARTBEAT_THRESHOLD
+}
+
+#[inline]
+fn default_heartbeat_variance() -> std::time::Duration {
+    DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
 }
 
 impl Default for HeartbeatConfig {
     fn default() -> Self {
         Self {
-            interval: DEFAULT_HEARTBEAT_INTERVAL,
-            threshold: DEFAULT_HEARTBEAT_THRESHOLD,
-            variance: DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
+            interval: default_heartbeat_interval(),
+            threshold: default_heartbeat_threshold(),
+            variance: default_heartbeat_variance(),
         }
     }
 }
