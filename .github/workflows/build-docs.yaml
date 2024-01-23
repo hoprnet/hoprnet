@@ -49,11 +49,14 @@ jobs:
           RUSTDOCFLAGS: --enable-index-page -Z unstable-options
         run: cargo +nightly doc --no-deps
 
-      - name: Add README.md content to the docs
-        run: |
-          README=$(nix develop -c pandoc -f markdown -t html README.md)
-          GENERATED=$(cat target/doc/index.html)
-          echo ${GENERATED//<h1>List of all crates<\/h1>/$README<h1>List of all crates<\/h1>} >| target/doc/index.html
+      - name: Add README.md content to the docs at index.html
+        uses: workflow/nix-shell-action@v3.3.0
+        with:
+          flakes-from-devshell: true
+          script: |
+            README=$(pandoc -f markdown+hard_line_breaks -t html README.md)
+            GENERATED=$(cat target/doc/index.html)
+            echo ${GENERATED//<h1>List of all crates<\/h1>/$README<h1>List of all crates<\/h1>} >| target/doc/index.html
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
