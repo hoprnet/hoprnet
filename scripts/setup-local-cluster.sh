@@ -176,7 +176,6 @@ function setup_node() {
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
-      --testUseWeakCrypto \
       --protocolConfig ${protocol_config} \
       ${additional_args} \
       > "${log}" 2>&1 &

@@ -25,7 +25,7 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
         match HoprKeys::read_eth_keystore(file_str, password) {
             Ok((keys, needs_migration)) => {
                 if needs_migration {
-                    keys.write_eth_keystore(file_str, password, false)?
+                    keys.write_eth_keystore(file_str, password)?
                 }
                 let file_key = file.file_name().unwrap();
                 results.insert(String::from(file_key.to_str().unwrap()), keys);
@@ -73,7 +73,7 @@ pub fn create_identity(
     if path.exists() {
         return Err(HelperErrors::IdentityFileExists(file_path));
     } else {
-        keys.write_eth_keystore(&file_path, password, false)?;
+        keys.write_eth_keystore(&file_path, password)?;
     }
 
     path.file_name()

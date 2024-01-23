@@ -85,7 +85,6 @@ class Node:
             "--init",
             "--testAnnounceLocalAddresses",
             "--testPreferLocalAddresses",
-            "--testUseWeakCrypto",
             f"--apiPort={self.api_port}",
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
