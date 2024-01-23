@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!(
         "This node has packet key '{}' and uses a blockchain address '{}'",
         hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex()
+        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex()
     );
 
     // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged

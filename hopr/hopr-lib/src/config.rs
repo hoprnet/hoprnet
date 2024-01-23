@@ -12,20 +12,46 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
+fn validate_announced(v: &bool) -> Result<(), ValidationError> {
+    if *v {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "Announce option should be turned ON in 2.*, only public nodes are supported",
+        ))
+    }
+}
+
+#[inline]
+fn default_network() -> String {
+    "anvil-localhost".to_owned()
+}
+
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
+    #[validate(custom = "validate_announced")]
+    #[serde(default = "just_true")]
     pub announce: bool,
+    #[serde(default = "default_network")]
     pub network: String,
+    #[serde(default)]
     pub provider: Option<String>,
+    #[serde(default)]
     pub protocols: crate::chain::ProtocolsConfig,
+    #[serde(default = "just_true")]
     pub check_unrealized_balance: bool,
 }
 
 impl Default for Chain {
     fn default() -> Self {
         Self {
-            announce: false,
-            network: "anvil-localhost".to_owned(),
+            announce: true,
+            network: default_network(),
             provider: None,
             protocols: crate::chain::ProtocolsConfig::default(),
             check_unrealized_balance: true,
@@ -33,23 +59,36 @@ impl Default for Chain {
     }
 }
 
+#[inline]
+fn default_invalid_address() -> Address {
+    Address::from_bytes(&[0; Address::SIZE]).unwrap()
+}
+
+#[inline]
+fn default_safe_transaction_service_provider() -> String {
+    DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned()
+}
+
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
     #[validate(url)]
+    #[serde(default = "default_safe_transaction_service_provider")]
     pub safe_transaction_service_provider: String,
     #[serde_as(as = "DisplayFromStr")]
+    #[serde(default = "default_invalid_address")]
     pub safe_address: Address,
     #[serde_as(as = "DisplayFromStr")]
+    #[serde(default = "default_invalid_address")]
     pub module_address: Address,
 }
 
 impl Default for SafeModule {
     fn default() -> Self {
         Self {
-            safe_transaction_service_provider: DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned(),
-            safe_address: Address::from_bytes(&[0; Address::SIZE]).unwrap(),
-            module_address: Address::from_bytes(&[0; Address::SIZE]).unwrap(),
+            safe_transaction_service_provider: default_safe_transaction_service_provider(),
+            safe_address: default_invalid_address(),
+            module_address: default_invalid_address(),
         }
     }
 }
@@ -66,8 +105,11 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
+    #[serde(default)]
     pub data: String,
+    #[serde(default = "just_true")]
     pub initialize: bool,
+    #[serde(default)]
     pub force_initialize: bool,
 }
 
@@ -85,43 +127,54 @@ impl Default for Db {
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
     #[validate]
+    #[serde(default = "default_host")]
     pub host: HostConfig,
-    // /// Configuration regarding the identity of the node
-    // #[validate]
-    // pub identity: Identity,
     /// Configuration of the underlying database engine
     #[validate]
+    #[serde(default)]
     pub db: Db,
     /// Configuration of underlying node behavior in the form strategies
     ///
     /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
     #[validate]
+    #[serde(default = "core_strategy::hopr_default_strategies")]
     pub strategy: StrategyConfig,
     /// Configuration of the protocol heartbeat mechanism
     #[validate]
+    #[serde(default)]
     pub heartbeat: HeartbeatConfig,
     /// Configuration of network properties
     #[validate]
+    #[serde(default)]
     pub network_options: NetworkConfig,
-    /// Configuration specific to protocol execution on the p2p layer
+    /// Configuration specific to transport mechanics
     #[validate]
+    #[serde(default)]
     pub transport: TransportConfig,
     /// Configuration specific to protocol execution on the p2p layer
     #[validate]
+    #[serde(default)]
     pub protocol: ProtocolConfig,
     /// Blockchain specific configuration
     #[validate]
+    #[serde(default)]
     pub chain: Chain,
     /// Configuration of the `Safe` mechanism
     #[validate]
+    #[serde(default)]
     pub safe_module: SafeModule,
+}
+
+#[inline]
+fn default_host() -> HostConfig {
+    HostConfig::from_str(format!("{DEFAULT_HOST}:{DEFAULT_PORT}").as_str()).unwrap()
 }
 
 impl Default for HoprLibConfig {
     fn default() -> Self {
         Self {
-            host: HostConfig::from_str(format!("{DEFAULT_HOST}:{DEFAULT_PORT}").as_str()).unwrap(),
+            host: default_host(),
             db: Db::default(),
             strategy: core_strategy::hopr_default_strategies(),
             heartbeat: HeartbeatConfig::default(),

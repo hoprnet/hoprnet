@@ -20,7 +20,7 @@ impl ExternalNetworkInteractions {
 
 impl NetworkExternalActions for ExternalNetworkInteractions {
     fn is_public(&self, _: &PeerId) -> bool {
-        // NOTE: In the Providence release all nodes are public
+        // NOTE: In the 2.* releases all nodes are public
         true
     }
 
