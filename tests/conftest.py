@@ -268,11 +268,11 @@ def event_loop():
 async def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    # STOP OLD LOCAL ANVIL SERVER
+    # STOP OLD LOCAL ANVIL SERVER
     logging.info("Ensure local anvil server is not running")
     run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
 
-    # START NEW LOCAL ANVIL SERVER
+    # START NEW LOCAL ANVIL SERVER
     logging.info("Starting and waiting for local anvil server to be up")
     run(
         f"./run-local-anvil.sh -l {ANVIL_LOG_FILE} -c {ANVIL_CFG_FILE}".split(),
