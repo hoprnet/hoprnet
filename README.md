@@ -19,33 +19,31 @@
 
 ## Table of Contents
 
-- [Table of Contents](#table-of-contents)
-- [Install](#install)
-  - [Install via Docker](#install-via-docker)
-  - [Install via Nix package manager](#install-via-nix-package-manager)
-- [Using](#using)
-  - [Using Docker](#using-docker)
-  - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
-- [Testnet accessibility](#testnet-accessibility)
-- [Migrating between releases](#migrating-between-releases)
-- [Develop](#develop)
-  - [Nix environment setup](#nix-environment-setup)
-  - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
-  - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
-- [Local cluster](#local-cluster)
-- [Test](#test)
-  - [Unit testing](#unit-testing)
-    - [Test-driven development](#test-driven-development)
-  - [Github Actions CI](#github-actions-ci)
-  - [End-to-End Testing](#end-to-end-testing)
-    - [Running Tests Locally](#running-tests-locally)
-      - [Testing environment](#testing-environment)
-      - [Test execution](#test-execution)
-- [Deploy](#deploy)
-  - [Using Google Cloud Platform](#using-google-cloud-platform)
-- [Tooling](#tooling)
-- [Contact](#contact)
-- [License](#license)
+- [Table of Contents](https://github.com/hoprnet/hoprnet#table-of-contents))
+- [Install](https://github.com/hoprnet/hoprnet#install)
+  - [Install via Docker](https://github.com/hoprnet/hoprnet#install-via-docker)
+  - [Install via Nix package manager](https://github.com/hoprnet/hoprnet#install-via-nix-package-manager)
+- [Using](https://github.com/hoprnet/hoprnet#using)
+  - [Using Docker](https://github.com/hoprnet/hoprnet#using-docker)
+  - [Using Docker Compose with extended HOPR node monitoring](https://github.com/hoprnet/hoprnet#using-docker-compose-with-extended-hopr-node-monitoring)
+- [Testnet accessibility](https://github.com/hoprnet/hoprnet#testnet-accessibility)
+- [Migrating between releases](https://github.com/hoprnet/hoprnet#migrating-between-releases)
+- [Develop](https://github.com/hoprnet/hoprnet#develop)
+  - [Nix environment setup](https://github.com/hoprnet/hoprnet#nix-environment-setup)
+    - [Nix flake outputs](https://github.com/hoprnet/hoprnet#nix-flake-outputs)
+  - [Local node with safe staking service (local network)](https://github.com/hoprnet/hoprnet#local-node-with-safe-staking-service-local-network)
+  - [Local node with safe staking service (rotsee network)](https://github.com/hoprnet/hoprnet#local-node-with-safe-staking-service-rotsee-network)
+- [Local cluster](https://github.com/hoprnet/hoprnet#local-cluster)
+- [Test](https://github.com/hoprnet/hoprnet#test)
+  - [Unit testing](https://github.com/hoprnet/hoprnet#unit-testing)
+    - [Test-driven development](https://github.com/hoprnet/hoprnet#test-driven-development)
+  - [Github Actions CI](https://github.com/hoprnet/hoprnet#github-actions-ci)
+  - [End-to-End Testing](https://github.com/hoprnet/hoprnet#end-to-end-testing)
+    - [Running Tests Locally](https://github.com/hoprnet/hoprnet#running-tests-locally)
+      - [Testing environment](https://github.com/hoprnet/hoprnet#testing-environment)
+      - [Test execution](https://github.com/hoprnet/hoprnet#test-execution)
+- [Contact](https://github.com/hoprnet/hoprnet#contact)
+- [License](https://github.com/hoprnet/hoprnet#license)
 
 ## Install
 
@@ -88,7 +86,7 @@ via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
 nix develop
 ```
 
-Now you may follow the instructions in [Develop](#develop).
+Now you may follow the instructions in [Develop](https://github.com/hoprnet/hoprnet#develop).
 
 Alternatively you may use a development Docker container which uses the same Nix
 setup.
@@ -174,7 +172,7 @@ As you might have noticed running the node without any command-line argument mig
 
 ### Using Docker
 
-The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
+The following command assumes you've setup an alias like described in [Install via Docker](https://github.com/hoprnet/hoprnet#install-via-docker).
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
@@ -216,9 +214,9 @@ The default username for Grafana is `admin` with password `hopr`.
 
 ## Testnet accessibility
 
-Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
+Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](https://github.com/hoprnet/hoprnet/blob/master/NETWORK_REGISTRY.md) for details.
 
-These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
+These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](https://github.com/hoprnet/hoprnet#develop)).
 
 ## Migrating between releases
 
@@ -373,7 +371,7 @@ make run-hopr-admin &
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
-See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
+See [how to start your local HOPR cluster](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
@@ -454,7 +452,7 @@ make smoke-test-full
 
 ## License
 
-[GPL v3](LICENSE) © HOPR Association
+[GPL v3](https://github.com/hoprnet/hoprnet/blob/master/LICENSE) © HOPR Association
 
 [1]: https://nixos.org/learn.html
 [2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv

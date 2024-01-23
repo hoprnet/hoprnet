@@ -246,6 +246,9 @@
               # test Github automation
               act
 
+              # documentation utilities
+              pandoc
+
               # docker image inspection and handling
               dive
               skopeo
