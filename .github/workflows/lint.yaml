@@ -8,6 +8,7 @@ env:
   RUST_BACKTRACE: "1"
 
 on:
+  merge_group:
   pull_request:
     types:
       - synchronize
