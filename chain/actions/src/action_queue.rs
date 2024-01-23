@@ -1,3 +1,10 @@
+//! The `ActionQueue` object acts as general outgoing on-chain action MPSC queue. The queue is picked up
+//! one-by-one in an infinite loop that's executed in `core-transport`. Any component that gets a `ActionSender` type,
+//! can send new action requests to the queue via its `send` method.
+//! A new `ActionSender` can be obtained by calling `new_sender` method on the `ActionQueue` and can be subsequently cloned.
+//! The possible actions that can be sent into the queue are declared in the `Action` enum.
+//! The `send` method of `ActionSender` returns a `ActionComplete` future that can be awaited if the caller
+//! wishes to await the underlying transaction being confirmed.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -18,7 +25,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::CoreEthereumActionsError::{
+use crate::errors::ChainActionsError::{
     ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
 };
 use crate::errors::Result;
@@ -298,9 +305,10 @@ where
     }
 }
 
-/// A queue of outgoing Ethereum transactions.
-/// This queue awaits new transactions to arrive and calls the corresponding
-/// method of the `TransactionExecutor` to execute it and await its confirmation.
+/// A queue of [Actions](Action) to be executed.
+/// This queue awaits new Actions to arrive, translates them into Ethereum
+/// transactions via [TransactionExecutor] to execute them and await their confirmation
+/// by registering their corresponding expectations in [ActionState].
 pub struct ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync,
@@ -321,7 +329,7 @@ where
     /// Number of pending transactions in the queue
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
-    /// Creates a new instance with the given `TransactionExecutor` implementation.
+    /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
     pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
         let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {

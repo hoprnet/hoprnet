@@ -22,11 +22,11 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
 
 use crate::action_queue::PendingAction;
-use crate::errors::CoreEthereumActionsError::{
+use crate::errors::ChainActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
 use crate::errors::{
-    CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
+    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
 use crate::redeem::TicketRedeemActions;
@@ -178,7 +178,7 @@ mod tests {
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
     use crate::channels::ChannelActions;
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -345,7 +345,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(*BOB, stake).await.err().unwrap(),
-                CoreEthereumActionsError::ChannelAlreadyExists
+                ChainActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
         );
@@ -379,7 +379,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(*ALICE, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
         );
@@ -414,7 +414,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -424,7 +424,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -460,7 +460,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::NotEnoughAllowance
+                ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
         );
@@ -503,7 +503,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::BalanceTooLow
+                ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
         );
@@ -630,7 +630,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::ChannelDoesNotExist
+                ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
         );
@@ -666,7 +666,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -675,7 +675,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -711,7 +711,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::NotEnoughAllowance
+                ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
         );
@@ -753,7 +753,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::BalanceTooLow
+                ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough balance"
         );
@@ -1005,7 +1005,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ClosureTimeHasNotElapsed(_)
+                ChainActionsError::ClosureTimeHasNotElapsed(_)
             ),
             "should fail when the channel closure period did not elapse"
         );
@@ -1034,7 +1034,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ChannelDoesNotExist
+                ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
         );
@@ -1080,7 +1080,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ChannelAlreadyClosed
+                ChainActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"
         );

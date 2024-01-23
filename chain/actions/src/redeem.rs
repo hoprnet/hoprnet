@@ -31,9 +31,9 @@ use std::sync::Arc;
 use utils_db::errors::DbError;
 
 use crate::action_queue::{ActionSender, PendingAction};
-use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use crate::errors::ChainActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
+    ChainActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::CoreEthereumActions;

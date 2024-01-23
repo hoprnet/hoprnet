@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, InvalidState},
+    ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -27,9 +27,9 @@ use hopr_primitive_types::prelude::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Operation {
+enum Operation {
     Call = 0,
-    DelegateCall = 1,
+    // Future use: DelegateCall = 1,
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.

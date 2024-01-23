@@ -9,7 +9,7 @@ mod helpers;
 
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
-    chain_actions::errors::CoreEthereumActionsError,
+    chain_actions::errors::ChainActionsError,
     core_strategy::{Strategy, Strategy::AutoRedeeming},
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
@@ -1157,11 +1157,11 @@ impl Hopr {
                     self.close_channel(&counterparty, direction, redeem_before_close).await
                 }
                 None => Err(errors::HoprLibError::ChainError(
-                    CoreEthereumActionsError::InvalidArguments("cannot close channel that is not own".into()),
+                    ChainActionsError::InvalidArguments("cannot close channel that is not own".into()),
                 )),
             },
             None => Err(errors::HoprLibError::ChainError(
-                CoreEthereumActionsError::ChannelDoesNotExist,
+                ChainActionsError::ChannelDoesNotExist,
             )),
         }
     }

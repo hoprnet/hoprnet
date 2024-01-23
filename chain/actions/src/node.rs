@@ -19,7 +19,7 @@ use log::info;
 use multiaddr::Multiaddr;
 
 use crate::action_queue::PendingAction;
-use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
+use crate::errors::{ChainActionsError::InvalidArguments, Result};
 use crate::CoreEthereumActions;
 
 /// Contains all on-chain calls specific to HOPR node itself.
@@ -65,7 +65,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
 mod tests {
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use crate::node::NodeActions;
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
@@ -154,7 +154,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"
         );

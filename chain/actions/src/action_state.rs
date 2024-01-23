@@ -23,7 +23,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::errors::{CoreEthereumActionsError, Result};
+use crate::errors::{ChainActionsError, Result};
 
 /// Future that resolves once an expectation is matched by some `SignificantChainEvent`
 /// Also allows mocking in tests.
@@ -139,7 +139,7 @@ impl ActionState for IndexerActionTracker {
         match self.expectations.write().await.entry(exp.tx_hash) {
             Entry::Occupied(_) => {
                 // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(CoreEthereumActionsError::InvalidState(format!(
+                return Err(ChainActionsError::InvalidState(format!(
                     "expectation for tx {} already present",
                     exp.tx_hash
                 )));
@@ -148,7 +148,7 @@ impl ActionState for IndexerActionTracker {
                 let (tx, rx) = channel::oneshot::channel();
                 e.insert((exp, tx));
                 Ok(rx
-                    .map_err(|_| CoreEthereumActionsError::ExpectationUnregistered)
+                    .map_err(|_| ChainActionsError::ExpectationUnregistered)
                     .boxed())
             }
         }
@@ -162,7 +162,7 @@ impl ActionState for IndexerActionTracker {
 #[cfg(test)]
 mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
@@ -238,7 +238,7 @@ mod tests {
             .expect_err("should return with error");
 
         assert!(
-            matches!(err, CoreEthereumActionsError::ExpectationUnregistered),
+            matches!(err, ChainActionsError::ExpectationUnregistered),
             "should notify on unregistration"
         );
     }

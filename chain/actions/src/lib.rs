@@ -1,14 +1,6 @@
 // TODO: docs need updating
 //! Contains high-level Core-Ethereum traits that translate to on-chain transactions
 //!
-//! ## `action_queue`
-//! The `ActionQueue` object acts as general outgoing on-chain action MPSC queue. The queue is picked up
-//! one-by-one in an infinite loop that's executed in `core-transport`. Any component that gets a `ActionSender` type,
-//! can send new action requests to the queue via its `send` method.
-//! A new `ActionSender` can be obtained by calling `new_sender` method on the `ActionQueue` and can be subsequently cloned.
-//! The possible actions that can be sent into the queue are declared in the `Action` enum.
-//! The `send` method of `ActionSender` returns a `ActionComplete` future that can be awaited if the caller
-//! wishes to await the underlying transaction being confirmed.
 //!
 
 use async_lock::RwLock;

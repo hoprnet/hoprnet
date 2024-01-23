@@ -921,7 +921,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{ChannelEntry, ChannelStatus, ChainActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1179,13 +1179,13 @@ mod channels {
                     transaction_receipt: channel_details.tx_hash
                 }))
                 .build()),
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
                 Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1270,10 +1270,10 @@ mod channels {
                         receipt: receipt.tx_hash
                     }))
                     .build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
+                Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1322,7 +1322,7 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
                 Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),

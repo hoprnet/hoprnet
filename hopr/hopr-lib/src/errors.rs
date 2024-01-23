@@ -9,7 +9,7 @@ pub enum HoprLibError {
     TransportError(#[from] core_transport::errors::HoprTransportError),
 
     #[error("'{0}'")]
-    ChainError(#[from] chain_actions::errors::CoreEthereumActionsError),
+    ChainError(#[from] chain_actions::errors::ChainActionsError),
 
     #[error("'{0}'")]
     ChainApi(#[from] chain_api::errors::HoprChainError),
