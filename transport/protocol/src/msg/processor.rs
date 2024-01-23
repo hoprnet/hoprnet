@@ -755,6 +755,7 @@ impl PacketInteraction {
 
                 async move {
                     match processed {
+                        #[cfg_attr(test, allow(unused_variables))]
                         Ok((processed_msg, metadata)) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
