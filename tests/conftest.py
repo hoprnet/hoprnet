@@ -268,11 +268,11 @@ def event_loop():
 async def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    ## STOP OLD LOCAL ANVIL SERVER
+    # STOP OLD LOCAL ANVIL SERVER
     logging.info("Ensure local anvil server is not running")
     run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
 
-    ## START NEW LOCAL ANVIL SERVER
+    # START NEW LOCAL ANVIL SERVER
     logging.info("Starting and waiting for local anvil server to be up")
     run(
         f"./run-local-anvil.sh -l {ANVIL_LOG_FILE} -c {ANVIL_CFG_FILE}".split(),
@@ -321,8 +321,6 @@ async def swarm7(request):
     logging.info(f"Wait for {len(nodes)} nodes to start up")
 
     # minimal wait to ensure api is ready for `startedz` call.
-    # This prevents cloging the log with "WARNING"s and "ERROR"s from the api
-    # await asyncio.sleep(10)
     for id, node in nodes.items():
         await asyncio.wait_for(node.api.startedz(), timeout=60)
         logging.info(f"Node {id} is up")
