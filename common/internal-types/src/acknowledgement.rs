@@ -207,11 +207,6 @@ impl AcknowledgedTicket {
 
         u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
     }
-
-    /// Recovers the signer of the ticket from its signature.
-    pub fn get_signer(&self, domain_separator: &Hash) -> crate::errors::Result<Address> {
-        Ok(self.ticket.recover_signer(domain_separator)?.to_address())
-    }
 }
 
 impl Display for AcknowledgedTicket {
@@ -301,11 +296,6 @@ impl UnacknowledgedTicket {
 
     pub fn get_response(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<Response> {
         Response::from_half_keys(&self.own_key, acknowledgement)
-    }
-
-    /// Recovers the signer of the ticket from its signature.
-    pub fn get_signer(&self, domain_separator: &Hash) -> crate::errors::Result<Address> {
-        Ok(self.ticket.recover_signer(domain_separator)?.to_address())
     }
 
     /// Turn an unacknowledged ticket into an acknowledged ticket by adding

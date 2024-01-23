@@ -440,7 +440,7 @@ impl Ticket {
 
         let channel_id = generate_channel_id(&own_address, counterparty);
 
-        let mut ret = Ticket {
+        let mut ret = Self {
             channel_id,
             amount: amount.to_owned(),
             index: index.as_u64(),
