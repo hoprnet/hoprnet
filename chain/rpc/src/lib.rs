@@ -21,8 +21,8 @@ use serde::Serialize;
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::{HttpRequestError, Result};
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
+use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;

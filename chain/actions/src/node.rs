@@ -1,5 +1,5 @@
 //! This module contains on-chain actions in the `NodeActions` trait, which related to HOPR node itself.
-//! An implementation of this trait is added to [CoreEthereumActions] which realizes the redemption
+//! An implementation of this trait is added to [ChainActions] which realizes the redemption
 //! operations via [ActionQueue].
 //!
 //! There are 3 functions that can be used to redeem tickets in the `NodeActions` trait:
@@ -20,7 +20,7 @@ use multiaddr::Multiaddr;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{ChainActionsError::InvalidArguments, Result};
-use crate::CoreEthereumActions;
+use crate::ChainActions;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]
@@ -36,7 +36,7 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainActions<Db> {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
@@ -67,7 +67,7 @@ mod tests {
     use crate::action_state::MockActionState;
     use crate::errors::ChainActionsError;
     use crate::node::NodeActions;
-    use crate::CoreEthereumActions;
+    use crate::ChainActions;
     use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;
@@ -108,7 +108,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(bob, stake)
@@ -145,7 +145,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

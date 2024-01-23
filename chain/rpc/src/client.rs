@@ -454,10 +454,11 @@ pub mod native {
 }
 
 type AnvilRpcClient<R> = std::sync::Arc<
-ethers::middleware::SignerMiddleware<
-    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
->>;
+    ethers::middleware::SignerMiddleware<
+        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+    >,
+>;
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]

@@ -685,11 +685,7 @@ pub mod tests {
             ]),
         };
 
-        let account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
             .on_event(
@@ -714,11 +710,7 @@ pub mod tests {
         let handlers = init_handlers(db.clone());
 
         // Assume that there is a keybinding
-        let account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         db.write()
             .await
@@ -850,11 +842,7 @@ pub mod tests {
             ))]),
         };
 
-        let account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::NotAnnounced,
-        );
+        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
             .on_event(
@@ -890,12 +878,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.token,
-                0u32,
-                transferred_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
             .await
             .unwrap();
 
@@ -931,12 +914,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.token,
-                0u32,
-                transferred_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
             .await
             .unwrap();
 

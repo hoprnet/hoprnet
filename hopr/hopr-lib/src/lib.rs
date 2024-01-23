@@ -151,8 +151,8 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
-/// 
-#[allow(clippy::too_many_arguments)]        // TODO: refactor this function into a reasonable group of components once fully rearchitected
+///
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn to_chain_events_refresh_process<Db, S>(
     me: PeerId,
     me_onchain: Address,
@@ -286,8 +286,8 @@ where
 }
 
 /// Main builder of the hopr lib components
-#[allow(clippy::type_complexity)]       // TODO: refactor this function into a reasonable group of components once fully rearchitected
-#[allow(clippy::too_many_arguments)]    // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::type_complexity)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn build_components<FSaveTbf>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,
@@ -1156,13 +1156,11 @@ impl Hopr {
                 Some((direction, counterparty)) => {
                     self.close_channel(&counterparty, direction, redeem_before_close).await
                 }
-                None => Err(errors::HoprLibError::ChainError(
-                    ChainActionsError::InvalidArguments("cannot close channel that is not own".into()),
-                )),
+                None => Err(errors::HoprLibError::ChainError(ChainActionsError::InvalidArguments(
+                    "cannot close channel that is not own".into(),
+                ))),
             },
-            None => Err(errors::HoprLibError::ChainError(
-                ChainActionsError::ChannelDoesNotExist,
-            )),
+            None => Err(errors::HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)),
         }
     }
 

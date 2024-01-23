@@ -921,7 +921,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{ChannelEntry, ChannelStatus, ChainActionsError, ToHex};
+    use hopr_lib::{ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1563,7 +1563,7 @@ mod messages {
     /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
     ///
     /// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/messages/websocket
-    #[allow(dead_code)]     // not dead code, just for documentation
+    #[allow(dead_code)] // not dead code, just for documentation
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/messages/websocket"),

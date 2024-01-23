@@ -11,7 +11,7 @@ use validator::Validate;
 use chain_actions::action_queue::ActionQueueConfig;
 use chain_actions::action_state::IndexerActionTracker;
 use chain_actions::payload::SafePayloadGenerator;
-use chain_actions::{action_queue::ActionQueue, CoreEthereumActions};
+use chain_actions::{action_queue::ActionQueue, ChainActions};
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -339,7 +339,7 @@ pub fn build_chain_components<Db>(
     db: Arc<RwLock<Db>>,
 ) -> (
     ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
-    CoreEthereumActions<Db>,
+    ChainActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
@@ -378,12 +378,12 @@ where
         action_queue_cfg,
     );
 
-    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
+    let chain_actions = ChainActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
 
     (tx_queue, chain_actions, rpc_operations)
 }
 
-#[allow(clippy::too_many_arguments)]    // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
@@ -392,7 +392,7 @@ pub fn build_chain_api(
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     confirmations: u64,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {

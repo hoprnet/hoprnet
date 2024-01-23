@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::TransportOutput;
 
-#[allow(clippy::large_enum_variant)]        // TODO: refactor the large types used in the enum
+#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum Inputs {
     Heartbeat(api::HeartbeatChallenge),
@@ -114,7 +114,7 @@ fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::er
 /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
 ///
 /// This future can only be resolved by an unrecoverable error or a panic.
-#[allow(clippy::too_many_arguments)]        // TODO: refactor this function into a reasonable group of components once fully rearchitected
+#[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub async fn p2p_loop(
     version: String,
     me: libp2p_identity::Keypair,

@@ -1,10 +1,7 @@
-//! The `ActionQueue` object acts as general outgoing on-chain action MPSC queue. The queue is picked up
-//! one-by-one in an infinite loop that's executed in `core-transport`. Any component that gets a `ActionSender` type,
-//! can send new action requests to the queue via its `send` method.
-//! A new `ActionSender` can be obtained by calling `new_sender` method on the `ActionQueue` and can be subsequently cloned.
-//! The possible actions that can be sent into the queue are declared in the `Action` enum.
-//! The `send` method of `ActionSender` returns a `ActionComplete` future that can be awaited if the caller
-//! wishes to await the underlying transaction being confirmed.
+//! The purpose of this module is to implement the [ActionQueue] type.
+//!
+//! The [ActionQueue] acts as a MPSC queue of [Actions](Action) which are executed one-by-one
+//! as they are being popped up from the queue by a runner task.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -25,9 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{
-    ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
-};
+use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::Result;
 
 use async_std::task::spawn;
@@ -103,7 +98,7 @@ pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>>
 /// Future that resolves once the transaction has been confirmed by the Indexer.
 type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
-/// Sends a future Ethereum transaction into the `TransactionQueue`.
+/// Sends a future Ethereum transaction into the `ActionQueue`.
 #[derive(Debug, Clone)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 

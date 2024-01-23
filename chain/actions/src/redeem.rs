@@ -1,6 +1,6 @@
 //! This module defines the [TicketRedeemActions] trait which allows to perform operations regarding
 //! ticket redemption.
-//! An implementation of this trait is added to [CoreEthereumActions] which realizes the redemption
+//! An implementation of this trait is added to [ChainActions] which realizes the redemption
 //! operations via [ActionQueue].
 //!
 //! There are 4 functions that can be used to redeem tickets in the `TicketRedeemActions` trait:
@@ -36,7 +36,7 @@ use crate::errors::{
     ChainActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
-use crate::CoreEthereumActions;
+use crate::ChainActions;
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -114,7 +114,7 @@ where
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for ChainActions<Db> {
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(
@@ -429,7 +429,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -522,7 +522,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -620,7 +620,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -713,7 +713,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -793,7 +793,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

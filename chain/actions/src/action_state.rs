@@ -147,9 +147,7 @@ impl ActionState for IndexerActionTracker {
             Entry::Vacant(e) => {
                 let (tx, rx) = channel::oneshot::channel();
                 e.insert((exp, tx));
-                Ok(rx
-                    .map_err(|_| ChainActionsError::ExpectationUnregistered)
-                    .boxed())
+                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
             }
         }
     }

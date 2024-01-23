@@ -124,15 +124,9 @@ impl FaucetArgs {
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        addresses_all
-            .into_iter().try_for_each(|a| {
-                child_process_call_foundry_faucet(
-                    &network,
-                    &a,
-                    &hopr_amount_uint256_string,
-                    &native_amount_uint256_string,
-                )
-            })
+        addresses_all.into_iter().try_for_each(|a| {
+            child_process_call_foundry_faucet(&network, &a, &hopr_amount_uint256_string, &native_amount_uint256_string)
+        })
     }
 }
 
