@@ -1,7 +1,19 @@
+import asyncio
 import logging
+from typing import Callable, Optional
 
+import requests
 from hoprd_sdk import ApiClient, Configuration
-from hoprd_sdk.api import AccountApi, AliasApi, ChannelsApi, MessagesApi, NetworkApi, NodeApi, PeersApi, TicketsApi
+from hoprd_sdk.api import (
+    AccountApi,
+    AliasApi,
+    ChannelsApi,
+    MessagesApi,
+    NetworkApi,
+    NodeApi,
+    PeersApi,
+    TicketsApi,
+)
 from hoprd_sdk.models import AliasPeerId, FundRequest, GetMessageReq, OpenChannelRequest, SendMessageReq, TagQuery
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
@@ -27,13 +39,13 @@ class HoprdAPI:
 
     def __init__(self, url: str, token: str):
         self.configuration = Configuration()
-        self.configuration.host = f"{url}"
+        self.configuration.host = url
         self.configuration.api_key["X-Auth-Token"] = token
 
-    def __call_api(self, obj, method, *args, **kwargs):
+    def __call_api(self, obj: Callable[..., object], method: str, *args, **kwargs) -> tuple[bool, Optional[object]]:
         try:
             with ApiClient(self.configuration) as client:
-                api_callback = obj(client).__getattribute__(method)
+                api_callback = getattr(obj(client), method)
                 kwargs["async_req"] = True
                 thread = api_callback(*args, **kwargs)
                 response = thread.get()
@@ -88,21 +100,32 @@ class HoprdAPI:
         status, _ = self.__call_api(AliasApi, "delete_alias", alias)
         return status
 
-    async def addresses(self, address_type: str):
+    async def addresses(self, address_type: str = "all"):
         """
         Returns the address of the node.
-        :param: address: str = "hopr" | "native"
+        :param: address: str = "hopr" | "native" | "all"
         :return: address: str | undefined
         """
+        if address_type not in ["hopr", "native", "all"]:
+            log.error(f"Invalid address type: {address_type}")
+            return None
+        if address_type == "all":
+            address_type = ["hopr", "native"]
+        if isinstance(address_type, str):
+            address_type = [address_type]
+
         status, response = self.__call_api(AccountApi, "addresses")
-        if status:
-            if not hasattr(response, address_type):
+        if not status:
+            return None
+
+        return_dict = {}
+        for type in address_type:
+            if not hasattr(response, type):
                 log.error(f"No {address_type} returned from the API")
                 return None
+            return_dict[type] = getattr(response, type)
 
-            return getattr(response, address_type)
-        else:
-            return None
+        return return_dict if len(return_dict) > 1 else return_dict[address_type[0]]
 
     async def balances(self):
         """
@@ -128,10 +151,9 @@ class HoprdAPI:
         """
         Funds a given channel.
         :param: channel_id: str
-        :param: amount: str
+        :param: amount: int
         :return: bool
         """
-
         body = FundRequest(amount=amount)
         status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
@@ -352,3 +374,35 @@ class HoprdAPI:
         """
         _, response = self.__call_api(NetworkApi, "price")
         return int(response.price) if hasattr(response, "price") else None
+
+    async def startedz(self):
+        """
+        Checks if the node is started.
+        """
+        return await is_url_returning_200(f"{self.configuration.host}/startedz")
+
+    async def readyz(self):
+        """
+        Checks if the node is ready to accept connections.
+        """
+        return await is_url_returning_200(f"{self.configuration.host}/readyz")
+
+
+def query_url(url):
+    return requests.get(url, timeout=0.3)
+
+
+async def is_url_returning_200(url, timeout=20):
+    async def check_url():
+        while True:
+            try:
+                query_url(url)
+                break
+            except Exception:
+                await asyncio.sleep(0.2)
+
+    try:
+        await asyncio.wait_for(check_url(), timeout=timeout)
+        return query_url(url).status_code == 200
+    except Exception:
+        return False
