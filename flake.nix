@@ -31,36 +31,25 @@
             inherit system overlays;
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+          hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
+            cargoToml = ./hopr/hopr-lib/Cargo.toml;
+          };
           hoprdCrateInfo = {
             pname = "hoprd";
-            version = (craneLib.crateNameFromCargoToml {
-              cargoToml = ./hopr/hopr-lib/Cargo.toml;
-            }).version;
+            # normalize the version to not include any suffixes so the cache
+            # does not get busted
+            version = pkgs.lib.strings.concatStringsSep "."
+              (pkgs.lib.lists.take 3 (builtins.splitVersion hoprdCrateInfoOriginal.version));
           };
           solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
-          ethereumBindings = pkgs.stdenv.mkDerivation {
-            pname = "hopr-ethereum-bindings";
-            version = hoprdCrateInfo.version;
-            src = fs.toSource {
-              root = ./.;
-              fileset = fs.unions [
-                (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-                (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
-                ./ethereum/bindings/Cargo.toml
-                ./ethereum/contracts/foundry.toml
-                ./ethereum/contracts/remappings.txt
-              ];
-            };
-            buildInputs = with pkgs; [ foundry-bin solcDefault ];
-            buildPhase = ''
-              cd ./ethereum/contracts
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" foundry.toml
-              forge bind --bindings-path ../bindings --crate-name bindings \
-                --overwrite --select '^Hopr.*?(Boost|[^t])$$'
-            '';
-            installPhase = ''
-              cp -r --no-preserve=mode,ownership ../bindings $out/
-            '';
+          depsSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./vendor/cargo
+              ./.cargo/config.toml
+              ./Cargo.lock
+              (fs.fileFilter (file: file.name == "Cargo.toml") ./.)
+            ];
           };
           src = fs.toSource {
             root = ./.;
@@ -68,10 +57,13 @@
               ./vendor/cargo
               ./.cargo/config.toml
               ./Cargo.lock
-              (fs.fileFilter (file: file.hasExt "rs") ./.)
-              (fs.fileFilter (file: file.hasExt "toml") ./.)
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/remappings.txt
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -87,7 +79,7 @@
             ]
           );
           commonArgs = {
-            inherit src buildInputs nativeBuildInputs;
+            inherit buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
@@ -97,10 +89,8 @@
             cargoToml = ./hopli/Cargo.toml;
           };
           rustPackageDeps = { pname, version }: craneLib.buildDepsOnly (commonArgs // {
-            inherit pname;
-            # normalize the version to not include any suffixes so the cache
-            # does not get busted
-            version = pkgs.lib.strings.concatStringsSep "." (pkgs.lib.lists.take 3 (builtins.splitVersion version));
+            inherit pname version;
+            src = depsSrc;
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
@@ -109,19 +99,19 @@
             '';
           });
           rustPackage = { pname, version }: cargoArtifacts: craneLib.buildPackage (commonArgs // {
-            inherit pname version cargoArtifacts;
+            inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
-              cp -r ${ethereumBindings}/src ./ethereum/bindings/
+              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
           });
           rustPackageTest = { pname, version }: cargoArtifacts: craneLib.cargoTest (commonArgs // {
-            inherit pname version cargoArtifacts;
+            inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
-              cp -r ${ethereumBindings}/src ./ethereum/bindings/
+              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
             doCheck = true;
           });
