@@ -134,16 +134,17 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let latest_block_in_db = self
+        let db_latest_block = self
             .db
             .read()
             .await
             .get_latest_block_number()
             .await?
-            .map(|v| v as u64)
-            .unwrap_or(self.cfg.start_block_number);
+            .map(|v| v as u64);
 
-        info!("Latest saved block {:?}", latest_block_in_db);
+        let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
+
+        info!("DB latest block: {:?}, Latest block {:?}", db_latest_block, latest_block_in_db);
 
         let mut topics = vec![];
         topics.extend(crate::constants::topics::announcement());
@@ -169,6 +170,7 @@ where
 
         let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
 
+        let genesis = self.cfg.start_block_number;
         let finalization = self.cfg.finalization;
         spawn(async move {
             let mut tx = Some(tx);
@@ -204,8 +206,7 @@ where
                 }
 
                 if tx.is_some() {
-                    let indexing_scope = chain_head - latest_block_in_db;
-                    let progress = 1_f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64));
+                    let progress = (current_block - genesis) as f64 / (chain_head - genesis) as f64;
                     info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                     #[cfg(all(feature = "prometheus", not(test)))]
