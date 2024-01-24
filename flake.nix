@@ -76,13 +76,13 @@
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           nativeBuildInputs = with pkgs; [
-            rustToolchain
             pkg-config
           ];
           buildInputs = with pkgs; [
             foundry-bin
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
+              CoreServices
               SystemConfiguration
             ]
           );
@@ -92,6 +92,7 @@
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
+            dontUpdateAutotoolsGnuConfigScripts = true;
           };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
@@ -256,13 +257,10 @@
               # test coverage generation
               lcov
 
-              # solidity development and chain interaction
-              foundry-bin
-
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
-            ] ++
+            ] ++ buildInputs ++ nativeBuildInputs ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
