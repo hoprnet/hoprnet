@@ -206,7 +206,7 @@
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
             postBuild = ''
-              ${pkgs.pandoc}/bin/pandoc -f markdown -t html README.md > readme.html
+              ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
               ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
               sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
               rm readme.html index.html
