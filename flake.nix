@@ -76,7 +76,6 @@
           };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           nativeBuildInputs = with pkgs; [
-            rustToolchain
             pkg-config
           ];
           buildInputs = with pkgs; [
@@ -258,13 +257,10 @@
               # test coverage generation
               lcov
 
-              # solidity development and chain interaction
-              foundry-bin
-
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
-            ] ++
+            ] ++ buildInputs ++ nativeBuildInputs ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
