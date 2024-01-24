@@ -17,6 +17,7 @@ libp2p-identity = { workspace = true }
 log = { workspace = true }
 primitive-types = "0.12.2"
 serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
 sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"

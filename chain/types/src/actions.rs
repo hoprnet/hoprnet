@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
-    /// Redeem the given acknowledged ticket
+    /// Redeem the given acknowledged ticket.
     RedeemTicket(AcknowledgedTicket),
 
     /// Open channel to the given destination with the given stake

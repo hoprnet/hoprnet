@@ -460,7 +460,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let last_redeemed_idx = tickets
             .iter()
             .enumerate()
-            .rfind(|(_, t)| t.status.is_being_redeemed())
+            .rfind(|(_, t)| t.status == AcknowledgedTicketStatus::BeingRedeemed)
             .map(|(idx, _)| idx);
 
         // If no `BeingRedeemed` tickets are in that range, take the entire range
@@ -485,10 +485,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 break;
             }
 
-            ticket.status = AcknowledgedTicketStatus::BeingAggregated {
-                start: index_start,
-                end: index_end,
-            };
+            ticket.status = AcknowledgedTicketStatus::BeingAggregated;
 
             batch_ops.put(
                 to_acknowledged_ticket_key(
@@ -549,7 +546,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let mut batch = utils_db::db::Batch::default();
 
         for acked_ticket in acked_tickets_to_replace.iter() {
-            if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = acked_ticket.status {
+            if AcknowledgedTicketStatus::BeingRedeemed == acked_ticket.status {
                 return Ok(());
             }
             batch.del(get_acknowledged_ticket_key(acked_ticket)?);
@@ -1765,10 +1762,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1779,9 +1773,7 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {
@@ -1801,10 +1793,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1815,12 +1804,8 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
-        ack_tickets[17].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed;
+        ack_tickets[17].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {
@@ -1840,10 +1825,7 @@ mod tests {
 
         assert!(stored_acked_tickets
             .iter()
-            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
-                start: 0u64,
-                end: u64::MAX,
-            } == acked_ticket.status));
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated == acked_ticket.status));
     }
 
     #[async_std::test]
@@ -1854,9 +1836,7 @@ mod tests {
         let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Add some being redeemed tickets
-        ack_tickets[28].status = AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        };
+        ack_tickets[28].status = AcknowledgedTicketStatus::BeingRedeemed;
 
         // Store ack tickets
         for ack in ack_tickets.iter() {

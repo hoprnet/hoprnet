@@ -268,16 +268,6 @@ pub struct CliArgs {
     pub test_prefer_local_addresses: bool,
 
     #[arg(
-        long = "testUseWeakCrypto",
-        env = "HOPRD_TEST_USE_WEAK_CRYPTO",
-        action = ArgAction::SetTrue,
-        help = "weaker crypto for faster node startup",
-        hide = true,
-        default_value_t = crate::config::Testing::default().use_weak_crypto
-    )]
-    pub test_use_weak_crypto: bool,
-
-    #[arg(
         long = "heartbeatInterval",
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
@@ -356,6 +346,18 @@ pub struct CliArgs {
     pub protocol_config_path: Option<String>,
 
     // ==================================
+    /// deprecated
+    #[deprecated]
+    #[arg(
+        long = "testUseWeakCrypto",
+        env = "HOPRD_TEST_USE_WEAK_CRYPTO",
+        action = ArgAction::SetTrue,
+        help = "DEPRECATED",
+        hide = true,
+        default_value_t = false
+    )]
+    pub test_use_weak_crypto: bool,
+
     /// deprecated
     #[deprecated]
     #[arg(

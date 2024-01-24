@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
+use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed};
 use crate::errors::Result;
 
 use async_std::task::spawn;
@@ -46,7 +46,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
@@ -120,7 +120,7 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
     /// Defaults to 150 seconds.
@@ -159,7 +159,7 @@ where
             db: self.db.clone(),
             action_state: self.action_state.clone(),
             tx_exec: self.tx_exec.clone(),
-            cfg: self.cfg.clone(),
+            cfg: self.cfg,
         }
     }
 }
@@ -174,7 +174,15 @@ where
         let expectation = match action.clone() {
             Action::RedeemTicket(ack) => match ack.status {
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {
-                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone()).await?;
+                    let domain_separator = self
+                        .db
+                        .read()
+                        .await
+                        .get_channels_domain_separator()
+                        .await?
+                        .ok_or(MissingDomainSeparator)?;
+
+                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), domain_separator).await?;
                     IndexerExpectation::new(
                         tx_hash,
                         move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),

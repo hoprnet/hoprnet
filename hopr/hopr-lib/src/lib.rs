@@ -44,10 +44,10 @@ use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
-use core_transport::libp2p_identity::PeerId;
+use core_transport::libp2p::identity::PeerId;
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, execute_on_tick, libp2p_identity, p2p_loop,
+    build_ticket_aggregation, execute_on_tick, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
@@ -306,7 +306,7 @@ pub fn build_components<FSaveTbf>(
 where
     FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
 {
-    let identity: libp2p_identity::Keypair = (&me).into();
+    let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
     let (network, network_events_rx) = build_network(identity.public().to_peer_id(), cfg.network_options);
 
@@ -544,12 +544,6 @@ pub struct Hopr {
 
 impl Hopr {
     pub fn new(mut cfg: config::HoprLibConfig, me: &OffchainKeypair, me_onchain: &ChainKeypair) -> Self {
-        // pre-flight checks
-        // Announced limitation for the `providence` release
-        if !cfg.chain.announce {
-            panic!("Announce option should be turned ON in Providence, only public nodes are supported");
-        }
-
         let multiaddress = match &cfg.host.address {
             core_transport::config::HostType::IPv4(ip) => {
                 Multiaddr::from_str(format!("/ip4/{}/tcp/{}", ip.as_str(), cfg.host.port).as_str()).unwrap()

@@ -28,21 +28,20 @@ pub enum HostType {
     Domain(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct HostConfig {
-    #[validate(custom = "validate_host_address")]
-    pub address: HostType,
-    #[validate(range(min = 1u16))]
-    pub port: u16,
+impl Default for HostType {
+    fn default() -> Self {
+        HostType::IPv4("127.0.0.1".to_owned())
+    }
 }
 
-impl Default for HostConfig {
-    fn default() -> Self {
-        Self {
-            address: HostType::IPv4("127.0.0.1".to_owned()),
-            port: 0,
-        }
-    }
+#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+pub struct HostConfig {
+    #[validate(custom = "validate_host_address")]
+    #[serde(default)]
+    pub address: HostType,
+    #[validate(range(min = 1u16))]
+    #[serde(default)]
+    pub port: u16,
 }
 
 impl FromStr for HostConfig {
@@ -105,9 +104,11 @@ fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
     /// not need any connection to nodes outside of the subnet
+    #[serde(default)]
     pub announce_local_addresses: bool,
     /// When true, assume a testnet with multiple nodes running on the same machine
     /// or in the same private IPv4 network
+    #[serde(default)]
     pub prefer_local_addresses: bool,
 }
 

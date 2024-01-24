@@ -19,44 +19,35 @@
 
 ## Table of Contents
 
-- [Table of Contents](#table-of-contents)
-- [Getting Started](#getting-started)
-- [Install](#install)
-  - [Install via Docker](#install-via-docker)
-  - [Install via Nix package manager](#install-via-nix-package-manager)
-- [Using](#using)
-  - [Using Docker](#using-docker)
-  - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
-- [Testnet accessibility](#testnet-accessibility)
-- [Migrating between releases](#migrating-between-releases)
-- [Develop](#develop)
-  - [Nix environment setup](#nix-environment-setup)
-  - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
-  - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
-- [Local cluster](#local-cluster)
-- [Test](#test)
-  - [Unit testing](#unit-testing)
-    - [Test-driven development](#test-driven-development)
-  - [Github Actions CI](#github-actions-ci)
-  - [End-to-End Testing](#end-to-end-testing)
-    - [Running Tests Locally](#running-tests-locally)
-      - [Testing environment](#testing-environment)
-      - [Test execution](#test-execution)
-- [Deploy](#deploy)
-  - [Using Google Cloud Platform](#using-google-cloud-platform)
-- [Tooling](#tooling)
-- [Contact](#contact)
-- [License](#license)
-
-## Getting Started
-
-A good place to start is the
-[Getting Started guide on YouTube][7] which walks through the following
-instructions using GitPod.
+- [Table of Contents](https://github.com/hoprnet/hoprnet#table-of-contents))
+- [Install](https://github.com/hoprnet/hoprnet#install)
+  - [Install via Docker](https://github.com/hoprnet/hoprnet#install-via-docker)
+  - [Install via Nix package manager](https://github.com/hoprnet/hoprnet#install-via-nix-package-manager)
+- [Using](https://github.com/hoprnet/hoprnet#using)
+  - [Using Docker](https://github.com/hoprnet/hoprnet#using-docker)
+  - [Using Docker Compose with extended HOPR node monitoring](https://github.com/hoprnet/hoprnet#using-docker-compose-with-extended-hopr-node-monitoring)
+- [Testnet accessibility](https://github.com/hoprnet/hoprnet#testnet-accessibility)
+- [Migrating between releases](https://github.com/hoprnet/hoprnet#migrating-between-releases)
+- [Develop](https://github.com/hoprnet/hoprnet#develop)
+  - [Nix environment setup](https://github.com/hoprnet/hoprnet#nix-environment-setup)
+    - [Nix flake outputs](https://github.com/hoprnet/hoprnet#nix-flake-outputs)
+  - [Local node with safe staking service (local network)](https://github.com/hoprnet/hoprnet#local-node-with-safe-staking-service-local-network)
+  - [Local node with safe staking service (rotsee network)](https://github.com/hoprnet/hoprnet#local-node-with-safe-staking-service-rotsee-network)
+- [Local cluster](https://github.com/hoprnet/hoprnet#local-cluster)
+- [Test](https://github.com/hoprnet/hoprnet#test)
+  - [Unit testing](https://github.com/hoprnet/hoprnet#unit-testing)
+    - [Test-driven development](https://github.com/hoprnet/hoprnet#test-driven-development)
+  - [Github Actions CI](https://github.com/hoprnet/hoprnet#github-actions-ci)
+  - [End-to-End Testing](https://github.com/hoprnet/hoprnet#end-to-end-testing)
+    - [Running Tests Locally](https://github.com/hoprnet/hoprnet#running-tests-locally)
+      - [Testing environment](https://github.com/hoprnet/hoprnet#testing-environment)
+      - [Test execution](https://github.com/hoprnet/hoprnet#test-execution)
+- [Contact](https://github.com/hoprnet/hoprnet#contact)
+- [License](https://github.com/hoprnet/hoprnet#license)
 
 ## Install
 
-The following instructions show how the latest community release may be
+The following instructions show how the latest release may be
 installed. The instructions should be adapted if you want to use the latest
 development release or any other older release.
 
@@ -64,30 +55,16 @@ The preferred way of installation should be via Docker.
 
 ### Install via Docker
 
-All our docker images can be found in [our Google Cloud Container Registry][4].
-Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
+Each image is prefixed with 
+`europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
 The `latest` tag represents the `master` branch, while the `providence` tag
 represents the most recent stable `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:providence
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:providence
 ```
-
-For ease of use you can set up a shell alias to run the latest release as a docker container:
-
-```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 gcr.io/hoprassociation/hoprd:providence'
-```
-
-**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
-
-```sh
-HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
-```
-
-Also all ports are mapped to your localhost, assuming you stick to the default port numbers.
 
 ### Install via [Nix package manager][1]
 
@@ -99,7 +76,6 @@ You will need to clone and initialize the `hoprnet` repo first:
 ```sh
 git clone https://github.com/hoprnet/hoprnet
 cd hoprnet
-make init
 ```
 
 If you have [direnv][2] set up properly your `nix-shell` will be
@@ -110,7 +86,7 @@ via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
 nix develop
 ```
 
-Now you may follow the instructions in [Develop](#develop).
+Now you may follow the instructions in [Develop](https://github.com/hoprnet/hoprnet#develop).
 
 Alternatively you may use a development Docker container which uses the same Nix
 setup.
@@ -196,7 +172,7 @@ As you might have noticed running the node without any command-line argument mig
 
 ### Using Docker
 
-The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
+The following command assumes you've setup an alias like described in [Install via Docker](https://github.com/hoprnet/hoprnet#install-via-docker).
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
@@ -238,9 +214,9 @@ The default username for Grafana is `admin` with password `hopr`.
 
 ## Testnet accessibility
 
-Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
+Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](https://github.com/hoprnet/hoprnet/blob/master/NETWORK_REGISTRY.md) for details.
 
-These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
+These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](https://github.com/hoprnet/hoprnet#develop)).
 
 ## Migrating between releases
 
@@ -260,7 +236,8 @@ We attempt to provide instructions on how to migrate your tokens between release
 ## Develop
 
 HOPR contains modules written in Rust, therefore a Rust toolchain is needed to successfully build the artifacts.
-First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (at least version 1.60) with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
+First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (check `rust-toolchain.toml` for required versions)
+with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
 
 ### Nix environment setup
 
@@ -287,6 +264,34 @@ nix-env -i nix-direnv
 
 ```bash
 direnv allow .
+```
+
+#### Nix flake outputs
+
+We provide a couple of packages, apps and shells to make building and
+development easier. You may get the full list like so:
+
+```
+> nix flake show
+├─── apps
+│   └─── x86_64-linux
+│       ├─── hopli-docker-build-and-uploadapp
+│       └─── hoprd-docker-build-and-uploadapp
+├─── devShells
+│   └─── x86_64-linux
+│       ├─── defaultdevelopment environment 'nix-shell'
+│       └─── smoke-testsdevelopment environment 'nix-shell'
+└─── packages
+    └─── x86_64-linux
+        ├─── anvil-dockerpackage 'hopr-anvil.tar.gz'
+        ├─── defaultpackage 'hoprd-2.1.0-rc.1'
+        ├─── hoplipackage 'hopli-0.4.0'
+        ├─── hopli-dockerpackage 'hopli.tar.gz'
+        ├─── hopli-testpackage 'hopli-test-0.4.0'
+        ├─── hoprdpackage 'hoprd-2.1.0-rc.1'
+        ├─── hoprd-dockerpackage 'hoprd.tar.gz'
+        ├─── hoprd-testpackage 'hoprd-test-2.1.0-rc.1'
+        └─── smoke-testspackage 'hoprd-smoke-tests-2.1.0-rc.1'
 ```
 
 ### Local node with safe staking service (local network)
@@ -366,7 +371,7 @@ make run-hopr-admin &
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
-See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
+See [how to start your local HOPR cluster](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
@@ -432,54 +437,8 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```sh
-python3 -m pytest tests/
+make smoke-test-full
 ```
-
-## Deploy
-
-The deployment nodes and networks are mostly orchestrated through the script
-files in `scripts/` which are executed by the Github Actions CI workflows.
-Therefore, all common and minimal networks do not require manual steps to be
-deployed.
-
-### Using Google Cloud Platform
-
-However, sometimes it is useful to deploy additional nodes or specific versions
-of `hoprd`. To accomplish that its possible to create a cluster on GCP using the
-following scripts:
-
-```sh
-./scripts/setup-gcloud-cluster.sh dufour my-cluster 10
-```
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/setup-gcloud-cluster.sh --help
-```
-
-The script requires a few environment variables to be set, but will inform the
-user if one is missing. It will create a cluster of 6 nodes. By default these
-nodes will use the latest Docker image of `hoprd` and run on the `Goerli`
-network. Different versions and different target networks can be configured
-through the parameters and environment variables.
-
-A previously started cluster can be destroyed, which includes all running nodes,
-by using the same script but setting the cleanup switch:
-
-```sh
-HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh my-cluster 3
-```
-
-## Tooling
-
-As some tools are only partially supported, please tag the respective team member
-whenever you need an issue about a particular tool.
-
-| Maintainer | Technology |
-| :--------- | :--------: |
-| @tolbrino  |    Nix     |
 
 ## Contact
 
@@ -493,11 +452,10 @@ whenever you need an issue about a particular tool.
 
 ## License
 
-[GPL v3](LICENSE) © HOPR Association
+[GPL v3](https://github.com/hoprnet/hoprnet/blob/master/LICENSE) © HOPR Association
 
 [1]: https://nixos.org/learn.html
 [2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
-[4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
 [8]: https://github.com/nektos/act
@@ -505,3 +463,4 @@ whenever you need an issue about a particular tool.
 [10]: https://github.com/hoprnet/hoprnet/pull/1974/commits/331d6e99d1199250a302211be7b8dd9a22fa6e23#diff-83e70acfe04a8f13821ff96a1115f02a4b683a6370568ba9beea16da6d0c2cffR33-R49
 [11]: https://github.com/hoprnet/hoprnet/pull/1974/commits/53663517309d0f8918c5066fd98503afe8d8dd76#diff-9bf7c02325c8f5b6330a15a745a3ad736ee139a78c28a15d594756c406378884R91-R96
 [12]: https://github.com/nomiclabs/hardhat/issues/1116
+

@@ -1,5 +1,5 @@
 black==23.3.0
-hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python@kauki/2.1-candidate
+hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python@jean/sdk-update-to-2.1.x
 pytest==7.2.1
 pytest-asyncio==0.21.0
 requests==2.28.2

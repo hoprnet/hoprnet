@@ -25,7 +25,7 @@ pub use {
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
     },
     core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
-    core_p2p::libp2p_identity,
+    core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -52,7 +52,7 @@ use futures::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use log::{info, warn};
 use std::sync::Arc;
 
@@ -92,7 +92,7 @@ pub fn build_network(
 pub fn build_ticket_aggregation<Db>(
     db: Arc<RwLock<Db>>,
     chain_keypair: &ChainKeypair,
-) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>
+) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
@@ -180,7 +180,7 @@ pub fn build_heartbeat(
 ) -> HoprHeartbeatComponents {
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-        libp2p_identity::PeerId,
+        libp2p::identity::PeerId,
         std::result::Result<(ControlMessage, String), ()>,
     )>();
 
@@ -258,7 +258,7 @@ pub struct HoprTransport {
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
-    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     my_multiaddresses: Vec<Multiaddr>,
 }
@@ -266,7 +266,7 @@ pub struct HoprTransport {
 impl HoprTransport {
     #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
-        identity: libp2p_identity::Keypair,
+        identity: libp2p::identity::Keypair,
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
@@ -274,7 +274,7 @@ impl HoprTransport {
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
-        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
@@ -364,7 +364,8 @@ impl HoprTransport {
                 let selector = LegacyPathSelector::default();
                 let cp = {
                     let cg = self.channel_graph.read().await;
-                    selector.select_path(&cg, cg.my_address(), chain_key, hops as usize)?
+                    // Sends 1-hop packet if > 1-hop does not work
+                    selector.select_path(&cg, cg.my_address(), chain_key, 1, hops as usize)?
                 };
 
                 cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?

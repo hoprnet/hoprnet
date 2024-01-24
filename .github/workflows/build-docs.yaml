@@ -35,27 +35,25 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
+        env:
+          USER: runner
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .foundry/bin/
+      - name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
 
-      - name: Generate rust docs
-        uses: workflow/nix-shell-action@v3.3.0
-        with:
-          flakes-from-devshell: true
-          script: |
-            cargo doc --no-deps
+      - name: Build bindings
+        run: nix develop -c make build-solidity-types
+
+      - name: Build docs
+        env:
+          RUSTDOCFLAGS: --enable-index-page -Z unstable-options
+        run: cargo +nightly doc --no-deps
+
+      - name: Add README.md content to the docs
+        run: |
+          README=$(nix develop -c pandoc -f markdown -t html README.md)
+          GENERATED=$(cat target/doc/index.html)
+          echo ${GENERATED//<h1>List of all crates<\/h1>/$README<h1>List of all crates<\/h1>} >| target/doc/index.html
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'

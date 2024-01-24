@@ -29,7 +29,7 @@ services:
         hoprd \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --network anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
-          --identity /var/hopr/identities/local-nat-node1.id --testUseWeakCrypto
+          --identity /var/hopr/identities/local-nat-node1.id
     volumes:
       - '/var/hopr/identities:/var/hopr/identities'
     networks:
@@ -48,7 +48,7 @@ services:
         hoprd \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --network anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
-          --identity /var/hopr/identities/local-nat-node2.id --testUseWeakCrypto
+          --identity /var/hopr/identities/local-nat-node2.id
     volumes:
       - '/var/hopr/identities:/var/hopr/identities'
     networks:
