@@ -134,17 +134,14 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self
-            .db
-            .read()
-            .await
-            .get_latest_block_number()
-            .await?
-            .map(|v| v as u64);
+        let db_latest_block = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
 
         let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
 
-        info!("DB latest block: {:?}, Latest block {:?}", db_latest_block, latest_block_in_db);
+        info!(
+            "DB latest block: {:?}, Latest block {:?}",
+            db_latest_block, latest_block_in_db
+        );
 
         let mut topics = vec![];
         topics.extend(crate::constants::topics::announcement());
