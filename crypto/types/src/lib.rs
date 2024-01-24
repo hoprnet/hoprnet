@@ -1,20 +1,19 @@
 //! This Rust crate contains implementation common cryptographic types.
 //!
-//!
-//! The crate is structured into the following modules:
-//! - `errors`: contains error enum implementation used across other `hopr-crypto-...` crates
-//! - `keypairs`: implements `ChainKeypair` and `OffchainKeypair`, important representations of chain key and packet key
-//! - `primitives`: implements low-level cryptographic primitives, such as `SimpleStreamCipher`, `Digest` and `SimpleMac`
-//! - `types`: implements basic cryptography related types based on `primitives`, such as `Hash`, `PublicKey` and `Signature`
-//! - `utils`: contains small utility functions used in other `hopr-crypto-...` crates
-//! - `vrf`: contains implementation of Verifiable Random Function used in tickets
 
+/// Contains error enum implementation used across other `hopr-crypto-...` crates
 pub mod errors;
+/// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypairs), the important representations of chain key and packet key.
 pub mod keypairs;
+/// Implements low-level cryptographic primitives, such as [SimpleStreamCipher](primitives::SimpleStreamCipher), [Digest](primitives::Digest) and [SimpleMac](primitives::SimpleMac).
 pub mod primitives;
+/// Implements basic cryptography related types based on [primitives], such as [Hash](types::Hash), [PublicKey](types::PublicKey) and [Signature](types::Signature).
 pub mod types;
+/// Contains small utility functions used in other `hopr-crypto-...` crates
 pub mod utils;
+/// Contains implementation of Verifiable Random Function used in tickets
 pub mod vrf;
+#[doc(hidden)]
 pub mod prelude {
     pub use super::errors::CryptoError;
     pub use super::keypairs::*;
