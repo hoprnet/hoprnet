@@ -280,12 +280,12 @@ where
                         let significant_event = SignificantChainEvent { tx_hash, event_type };
 
                         if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
-                            error!("failed to pass a significant chain event further: {}", e);
+                            error!("failed to pass a significant chain event further: {e}");
                         }
                     }
                     Ok(None) => {}
-                    Err(_) => {
-                        error!("failed to process logs");
+                    Err(e) => {
+                        error!("failed to process logs: {e}");
                     }
                 };
             }

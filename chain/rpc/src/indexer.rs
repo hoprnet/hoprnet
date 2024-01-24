@@ -52,7 +52,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                         // This is a hard-failure on subsequent iterations which is unrecoverable
                         // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
-                        assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
+                        assert!(latest_block >= from_block,
+                            "indexer start block number is greater than the chain latest block number =>
+                            possible causes: chain reorganiation, RPC provider out of sync, corrupted DB =>
+                            possible solutions: change the RPC provider, reinitialize the DB"
+                        );
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
@@ -65,7 +69,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         if from_block != latest_block {
                             debug!("polling logs from blocks #{from_block} - #{latest_block}");
                         } else {
-                             debug!("polling logs from block #{from_block}");
+                            debug!("polling logs from block #{from_block}");
                         }
 
                         // The provider internally performs retries on timeouts and errors.
