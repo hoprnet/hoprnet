@@ -22,7 +22,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed};
+use crate::errors::ChainActionsError::{
+    ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed,
+};
 use crate::errors::Result;
 
 use async_std::task::spawn;
