@@ -234,6 +234,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let req_duration = start.elapsed();
 
         debug!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc response body: {}", String::from_utf8_lossy(&body));
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
