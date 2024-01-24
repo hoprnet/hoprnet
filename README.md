@@ -1,7 +1,7 @@
 <!-- INTRODUCTION -->
 <p align="center">
-  <a align="center" href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
-    <img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
+  <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
+    <img align="middle" width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
   </a>
 
   <!-- Title Placeholder -->
