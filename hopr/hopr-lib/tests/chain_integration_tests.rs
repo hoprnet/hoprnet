@@ -278,15 +278,39 @@ async fn integration_test_indexer() {
     )
     .await;
 
-    /*info!("Setting up BOB");
+    info!("Setting up BOB");
     // Setup BOB
-    let (module_addr, safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
+    let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
 
     rpc_cfg.module_address = module_addr;
 
-    let bob_node = start_node_chain_logic(&bob_chain_key, &anvil, contract_addrs, module_addr, safe_addr, rpc_cfg, actions_cfg, indexer_cfg)
-        .await;
-    */
+    let bob_node = start_node_chain_logic(
+        &bob_chain_key,
+        &anvil,
+        contract_addrs,
+        bob_module_addr,
+        bob_safe_addr,
+        rpc_cfg,
+        actions_cfg,
+        indexer_cfg,
+    )
+    .await;
+    // Bob fund channel with 100 HOPR
+    let incoming_funding_amount = BalanceType::HOPR.balance(100);
+    bob_node
+        .actions
+        .register_safe_by_node(bob_safe_addr)
+        .await
+        .expect("should submit safe registration tx")
+        .await
+        .expect("should confirm safe registration");
+    bob_node
+        .actions
+        .open_channel(alice_chain_key.public().to_address(), incoming_funding_amount)
+        .await
+        .expect("should submit incoming channel open tx")
+        .await
+        .expect("should confirm open incoming channel");
 
     info!("======== STARTING TEST ========");
 
@@ -394,9 +418,11 @@ async fn integration_test_indexer() {
 
     // Alice redeems ticket
     /*let confirmations = futures::future::try_join_all(
-        alice_node.actions.redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
+        alice_node
+            .actions
+            .redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
             .await
-            .expect("should submit redeem action")
+            .expect("should submit redeem action"),
     )
     .await
     .expect("should redeem all tickets");
