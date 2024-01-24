@@ -1,3 +1,5 @@
+//! Module defining various Ethereum transaction payload generators for the actions.
+//!
 //! This module defines the basic [PayloadGenerator](payload::PayloadGenerator) trait that describes how an action
 //! is translated into a [TypedTransaction](chain_types::TypedTransaction) that can be submitted on-chain (via an RPC provider)
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).

@@ -1,9 +1,12 @@
-//! This module extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component
-//! (see the `chain-indexer` crate). Such functionality is defined in the [HoprIndexerRpcOperations] trait
+//! This module extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component.
+//!
+//! The functionality required functionality is defined in the [HoprIndexerRpcOperations] trait,
 //! which is implemented for [RpcOperations](rpc::RpcOperations) hereof.
 //! The primary goal is to provide a stream of [BlockWithLogs] filtered by the given [LogFilter]
 //! as the new matching blocks are mined in the underlying blockchain. The stream also allows to collect
 //! historical blockchain data.
+//!
+//! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;

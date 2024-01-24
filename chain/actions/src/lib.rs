@@ -92,7 +92,7 @@ use std::sync::Arc;
 
 use crate::action_queue::ActionSender;
 
-/// Defines the main FIFO MPSC queue for actions.
+/// Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
 pub mod action_queue;
 /// Adds functionality of tracking the action results via expectations.
 pub mod action_state;

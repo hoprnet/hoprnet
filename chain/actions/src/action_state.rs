@@ -1,4 +1,6 @@
-//! This module contains implementation of types necessary to perform tracking the
+//! This module adds functionality of tracking the action results via expectations.
+//!
+//! It contains implementation of types necessary to perform tracking the
 //! on-chain state of [Actions](chain_types::actions::Action).
 //! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation](action_state::IndexerExpectation)
 //! can be created and registered in an object implementing the [ActionState](action_state::ActionState) trait.

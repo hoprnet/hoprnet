@@ -1,13 +1,14 @@
-//! This module defines the [TicketRedeemActions](redeem::TicketRedeemActions) trait which allows to perform operations regarding
+//! This module contains the [TicketRedeemActions](redeem::TicketRedeemActions) trait defining actions regarding
 //! ticket redemption.
+//!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
 //! operations via [ActionQueue](action_queue::ActionQueue).
 //!
-//! There are 4 functions that can be used to redeem tickets in the `TicketRedeemActions` trait:
-//! - `redeem_all_tickets`
-//! - `redeem_tickets_in_channel`
-//! - `redeem_tickets_by_counterparty`
-//! - `redeem_ticket`
+//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions](redeem::TicketRedeemActions) trait:
+//! - [redeem_all_tickets](redeem::TicketRedeemActions::redeem_all_tickets)
+//! - [redeem_tickets_in_channel](redeem::TicketRedeemActions::redeem_tickets_in_channel)
+//! - [redeem_tickets_with_counterparty](redeem::TicketRedeemActions::redeem_tickets_with_counterparty)
+//! - [redeem_ticket](redeem::TicketRedeemActions::redeem_ticket)
 //!
 //! Each method first checks if the tickets are redeemable.
 //! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or

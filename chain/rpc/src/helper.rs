@@ -1,4 +1,5 @@
 //! This module contains private helper types for JSON RPC operation with an RPC endpoint.
+//!
 //! Most of these types were taken as-is from <https://github.com/gakonst/ethers-rs>, because
 //! they are not exposed as public from the `ethers` crate.
 use ethers_providers::JsonRpcError;

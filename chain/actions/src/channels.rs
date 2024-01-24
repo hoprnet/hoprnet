@@ -1,11 +1,11 @@
-//! This module defines the [ChannelActions](channels::ChannelActions) trait which allows to perform operations regarding
-//! HOPR channels.
+//! This module contains the [ChannelActions](channels::ChannelActions) trait defining HOPR channels operations.
+//!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
 //! operations via [ActionQueue](action_queue::ActionQueue).
 //! There are 4 basic high-level on-chain functions in the [ChannelActions](channels::ChannelActions) trait:
-//! - `open_channel`
-//! - `fund_channel`
-//! - `close_channel`
+//! - [open_channel](channels::ChannelActions::open_channel)
+//! - [fund_channel](channels::ChannelActions::fund_channel)
+//! - [close_channel](channels::ChannelActions::close_channel)
 //!
 //! All the functions do the necessary validations using the DB and then post the corresponding action
 //! into the [ActionQueue](action_queue::ActionQueue).

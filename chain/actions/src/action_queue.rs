@@ -1,4 +1,4 @@
-//! The purpose of this module is to implement the [ActionQueue](action_queue::ActionQueue) type.
+//! Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
 //!
 //! The [ActionQueue](action_queue::ActionQueue) acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.

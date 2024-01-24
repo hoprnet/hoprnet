@@ -1,4 +1,5 @@
-//! This module contains on-chain actions in the [NodeActions](node::NodeActions) trait, which related to HOPR node itself.
+//! This module contains the [NodeActions](node::NodeActions) trait defining action which relate to HOPR node itself.
+//!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
 //! operations via [ActionQueue](action_queue::ActionQueue).
 //!
