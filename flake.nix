@@ -83,6 +83,7 @@
             foundry-bin
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
+              CoreServices
               SystemConfiguration
             ]
           );
@@ -92,6 +93,7 @@
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
+            dontUpdateAutotoolsGnuConfigScripts = true;
           };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
