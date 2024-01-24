@@ -19,6 +19,11 @@ use multiaddr::Multiaddr;
 use std::ops::Sub;
 use std::{str::FromStr, sync::Arc};
 
+/// Event handling object for on-chain operations
+///
+/// Once an on-chain operation is recorded by the [chain_indexer::block::Indexer], it is pre-processed
+/// and passed on to this object that handles event specific actions for each on-chain operation.
+///
 #[derive(Debug, Clone)]
 pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     /// channels, announcements, network_registry, token: contract addresses
