@@ -18,6 +18,7 @@ use std::time::Duration;
 use validator::Validate;
 
 use crate::errors::Result;
+use crate::errors::RpcError::ContractError;
 use crate::{HoprRpcOperations, PendingTransaction};
 
 /// Configuration of the RPC related parameters.
@@ -134,46 +135,72 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 
                 Ok(Balance::new(native, BalanceType::Native))
             }
-            BalanceType::HOPR => {
-                let token_balance = self.contract_instances.token.balance_of(address.into()).call().await?;
-
-                Ok(Balance::new(token_balance, BalanceType::HOPR))
-            }
+            BalanceType::HOPR => match self.contract_instances.token.balance_of(address.into()).call().await {
+                Ok(token_balance) => Ok(Balance::new(token_balance, BalanceType::HOPR)),
+                Err(e) => Err(ContractError(
+                    "HoprToken".to_string(),
+                    "balance_of".to_string(),
+                    e.to_string(),
+                )),
+            },
         }
     }
 
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
-        let (exists, target) = self.node_module.try_get_target(target.into()).call().await?;
-
-        Ok(exists.then_some(target))
+        match self.node_module.try_get_target(target.into()).call().await {
+            Ok((exists, target)) => Ok(exists.then_some(target)),
+            Err(e) => Err(ContractError(
+                "NodeModule".to_string(),
+                "try_get_target".to_string(),
+                e.to_string(),
+            )),
+        }
     }
 
     async fn get_safe_from_node_safe_registry(&self, node_address: Address) -> Result<Address> {
-        let addr = self
+        match self
             .contract_instances
             .safe_registry
             .node_to_safe(node_address.into())
             .call()
-            .await?;
-
-        Ok(addr.into())
+            .await
+        {
+            Ok(addr) => Ok(addr.into()),
+            Err(e) => Err(ContractError(
+                "SafeRegistry".to_string(),
+                "node_to_safe".to_string(),
+                e.to_string(),
+            )),
+        }
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
-        let owner = self.node_module.owner().call().await?;
-        Ok(owner.into())
+        match self.node_module.owner().call().await {
+            Ok(owner) => Ok(owner.into()),
+            Err(e) => Err(ContractError(
+                "NodeModule".to_string(),
+                "owner".to_string(),
+                e.to_string(),
+            )),
+        }
     }
 
     async fn get_channel_closure_notice_period(&self) -> Result<Duration> {
         // TODO: should we cache this value internally ?
-        let notice_period = self
+        match self
             .contract_instances
             .channels
             .notice_period_channel_closure()
             .call()
-            .await?;
-
-        Ok(Duration::from_secs(notice_period as u64))
+            .await
+        {
+            Ok(notice_period) => Ok(Duration::from_secs(notice_period as u64)),
+            Err(e) => Err(ContractError(
+                "HoprChannels".to_string(),
+                "notice_period_channel_closure".to_string(),
+                e.to_string(),
+            )),
+        }
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction> {
@@ -187,8 +214,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .send_transaction(tx, None)
             .await?
             .confirmations(self.cfg.tx_confirmations)
-            .interval(self.cfg.tx_polling_interval); // This is the default, but let's be explicit
-                                                     // This has built-in max polling retries set to 3
+            .interval(self.cfg.tx_polling_interval);
 
         Ok(sent_tx.into())
     }

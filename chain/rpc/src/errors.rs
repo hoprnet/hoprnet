@@ -1,7 +1,6 @@
 //! Errors produced by this crate and other error-related types.
 use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
-use ethers::prelude::ContractError;
 use ethers_providers::{JsonRpcError, ProviderError};
 use thiserror::Error;
 
@@ -11,8 +10,8 @@ pub enum RpcError {
     #[error("error on backend interface: {0}")]
     InterfaceError(String),
 
-    #[error("contract error: {0}")]
-    ContractError(String),
+    #[error("error in smart contract '{0}' while executing '{1}': {2}")]
+    ContractError(String, String, String),
 
     #[error("middleware error: {0}")]
     MiddlewareError(String),
@@ -57,15 +56,6 @@ where
 {
     fn from(value: SignerMiddlewareError<M, S>) -> Self {
         Self::MiddlewareError(value.to_string())
-    }
-}
-
-impl<M> From<ContractError<M>> for RpcError
-where
-    M: ethers::middleware::Middleware,
-{
-    fn from(value: ContractError<M>) -> Self {
-        Self::ContractError(value.to_string())
     }
 }
 

@@ -65,7 +65,7 @@ lazy_static::lazy_static! {
 /// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
 /// No more additional retries are allowed on new requests, if the maximum number of concurrent
 /// requests being retried has reached `max_retry_queue_size`.
-#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
     /// Maximum number of retries.
     /// If `None` is given, will keep retrying indefinitely.
@@ -346,6 +346,8 @@ where
             RetryParams::Value(params)
         };
 
+        let in_queue = self.requests_enqueued.fetch_add(1, Ordering::SeqCst);
+
         let mut num_retries = 0;
         loop {
             let err;
@@ -374,17 +376,20 @@ where
                 }
             }
 
-            match self
-                .retry_policy
-                .is_retryable_error(&err, num_retries, self.requests_enqueued.load(Ordering::SeqCst))
-            {
+            match self.retry_policy.is_retryable_error(&err, num_retries, in_queue) {
                 NoRetry => {
+                    self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
+                    warn!("no more retries for RPC call {method}");
+
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RETRIES_PER_RPC_CALL.observe(&[method], num_retries as f64);
 
                     return Err(err);
                 }
-                RetryAfter(backoff) => async_std::task::sleep(backoff).await,
+                RetryAfter(backoff) => {
+                    warn!("RPC call {method} will retry in {}ms", backoff.as_millis());
+                    async_std::task::sleep(backoff).await
+                }
             }
         }
     }
@@ -405,12 +410,17 @@ pub mod native {
         /// Timeout for HTTP POST request
         /// Defaults to 5 seconds.
         pub http_request_timeout: Duration,
+
+        /// Maximum number of HTTP redirects to follow
+        /// Defaults to 3
+        pub max_redirects: u8,
     }
 
     impl Default for HttpPostRequestorConfig {
         fn default() -> Self {
             Self {
                 http_request_timeout: Duration::from_secs(5),
+                max_redirects: 3,
             }
         }
     }
@@ -428,7 +438,7 @@ pub mod native {
             // Here we do not set the timeout into the client's configuration
             // but rather the timeout is set on the entire Future in `http_post`
             Self {
-                client: surf::client(),
+                client: surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects)),
                 cfg,
             }
         }
@@ -499,6 +509,7 @@ pub mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;
+    use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     use crate::client::native::SurfRequestor;
@@ -551,6 +562,12 @@ pub mod tests {
             assert!(number.as_u64() > last_number, "next block number must be greater");
             last_number = number.as_u64();
         }
+
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero on successful requests"
+        );
     }
 
     #[async_std::test]
@@ -627,6 +644,11 @@ pub mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
     }
 
     #[async_std::test]
@@ -650,6 +672,11 @@ pub mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
     }
 
     #[async_std::test]
@@ -691,6 +718,11 @@ pub mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
     }
 
     #[async_std::test]
@@ -732,6 +764,11 @@ pub mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
     }
 
     #[async_std::test]
@@ -772,5 +809,10 @@ pub mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
     }
 }
