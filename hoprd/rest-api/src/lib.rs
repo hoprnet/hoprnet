@@ -225,8 +225,11 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+            // We're not interested on metrics for other endpoints
+            if path.starts_with("/api/v3/") {
+                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+            }
         }
 
         log::log!(
