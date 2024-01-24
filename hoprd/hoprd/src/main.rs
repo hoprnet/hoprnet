@@ -41,6 +41,8 @@ fn setup_logger(level: log::LevelFilter) {
         .level_for("libp2p_mplex", log::LevelFilter::Info)
         .level_for("multistream_select", log::LevelFilter::Info)
         .level_for("sqlx::query", log::LevelFilter::Info)
+        .level_for("tracing::span", log::LevelFilter::Error)
+        .level_for("rustls", log::LevelFilter::Error)
         .chain(std::io::stdout())
         .apply()
     {
