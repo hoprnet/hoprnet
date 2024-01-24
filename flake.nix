@@ -30,7 +30,10 @@
           pkgs = import nixpkgs {
             inherit system overlays;
           };
+          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+          craneLibNightly = (crane.mkLib pkgs).overrideToolchain rustNightly;
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
@@ -57,6 +60,7 @@
               ./vendor/cargo
               ./.cargo/config.toml
               ./Cargo.lock
+              ./README.md
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/remappings.txt
@@ -66,9 +70,7 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
-          rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           nativeBuildInputs = with pkgs; [
-            rustToolchain
             pkg-config
           ];
           buildInputs = with pkgs; [
@@ -88,7 +90,7 @@
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
-          rustPackageDeps = { pname, version }: craneLib.buildDepsOnly (commonArgs // {
+          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly}: builder (commonArgs // {
             inherit pname version;
             src = depsSrc;
             cargoExtraArgs = "--offline -p ${pname}";
@@ -98,7 +100,7 @@
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version }: cargoArtifacts: craneLib.buildPackage (commonArgs // {
+          rustPackage = { pname, version, cargoArtifacts}: craneLib.buildPackage (commonArgs // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
@@ -106,7 +108,7 @@
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
           });
-          rustPackageTest = { pname, version }: cargoArtifacts: craneLib.cargoTest (commonArgs // {
+          rustPackageTest = { pname, version, cargoArtifacts}: craneLib.cargoTest (commonArgs // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
@@ -115,10 +117,10 @@
             '';
             doCheck = true;
           });
-          hoprd = rustPackage hoprdCrateInfo (rustPackageDeps hoprdCrateInfo);
-          hopli = rustPackage hopliCrateInfo (rustPackageDeps hopliCrateInfo);
-          hoprd-test = rustPackageTest hoprdCrateInfo (rustPackageDeps hoprdCrateInfo);
-          hopli-test = rustPackageTest hopliCrateInfo (rustPackageDeps hopliCrateInfo);
+          hoprd = rustPackage (hoprdCrateInfo // {cargoArtifacts = rustPackageDeps hoprdCrateInfo;});
+          hopli = rustPackage (hopliCrateInfo // {cargoArtifacts = rustPackageDeps hopliCrateInfo;});
+          hoprd-test = rustPackageTest (hoprdCrateInfo // {cargoArtifacts = rustPackageDeps hoprdCrateInfo;});
+          hopli-test = rustPackageTest (hopliCrateInfo // {cargoArtifacts = rustPackageDeps hopliCrateInfo;});
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -193,6 +195,23 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
+          docs = craneLibNightly.cargoDoc (commonArgs // {
+            inherit src;
+            pname = "hopr";
+            version = hoprdCrateInfo.version;
+            cargoArtifacts = rustPackageDeps (hoprdCrateInfo // { builder = craneLibNightly.buildDepsOnly;});
+            buildPhaseCargoCommand = "cargo doc --offline --no-deps";
+            preConfigure = ''
+              echo "# placeholder" > vendor/cargo/config.toml
+              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
+            '';
+            postBuild = ''
+              ${pkgs.pandoc}/bin/pandoc -f markdown -t html README.md > readme.html
+              ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
+              sed '/<section id="main-content" class="content">/ r readme.html' index.html > target/doc/index.html
+              rm readme.html index.html
+            '';
+          });
           smoke-tests = pkgs.stdenv.mkDerivation {
             pname = "hoprd-smoke-tests";
             version = hoprdCrateInfo.version;
@@ -274,7 +293,7 @@
             inherit hoprd hoprd-test hoprd-docker;
             inherit hopli hopli-test hopli-docker;
             inherit anvil-docker;
-            inherit smoke-tests;
+            inherit smoke-tests docs;
             default = hoprd;
           };
           devShells.default = defaultDevShell;

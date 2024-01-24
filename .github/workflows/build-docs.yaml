@@ -30,35 +30,21 @@ jobs:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
-      # # NOTE: We don't want to cache the nightly Rust build necessary for workspace
-      # # documentation index.html file generation until the https://github.com/hoprnet/hoprnet/issues/5915
-      # # is implemented.
-      # - uses: cachix/cachix-action@v14
-      #   if: ${{ !env.ACT }}
-      #   with:
-      #     name: hoprnet
-      #     authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      #   env:
-      #     USER: runner
-
-      - name: Install nightly Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+      - uses: cachix/cachix-action@v14
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        env:
+          USER: runner
 
       - name: Build docs
-        env:
-          RUSTDOCFLAGS: --enable-index-page -Z unstable-options
-        run: cargo +nightly doc --no-deps
-
-      - name: Add README.md content to the docs
-        run: |
-          README=$(nix develop -c pandoc -f markdown -t html README.md)
-          GENERATED=$(cat target/doc/index.html)
-          echo ${GENERATED//<h1>List of all crates<\/h1>/$README<h1>List of all crates<\/h1>} >| target/doc/index.html
+        run: nix build .#docs
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./target/doc/
+          publish_dir: ./result/share/doc/
           force_orphan: true
