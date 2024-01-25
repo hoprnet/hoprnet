@@ -313,6 +313,9 @@ async def swarm7(request):
         logging.info(f"Creating safe and module for {node}")
         node.create_local_safe(safe_custom_env)
 
+    # wait before contract deployments are finalized
+    await asyncio.sleep(5)
+
     for node in nodes.values():
         logging.info(f"Setting up {node}")
         node.setup(PASSWORD, TEST_PROTOCOL_CONFIG_FILE, PWD.parent)
