@@ -73,7 +73,7 @@ pub struct AggregatingStrategyConfig {
 impl Default for AggregatingStrategyConfig {
     fn default() -> Self {
         Self {
-            aggregation_threshold: Some(100),
+            aggregation_threshold: Some(300),
             unrealized_balance_ratio: Some(0.9),
             aggregation_timeout: Duration::from_secs(60),
             aggregate_on_channel_close: true,
