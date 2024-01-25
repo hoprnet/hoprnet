@@ -141,7 +141,7 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ hoprd ];
+            contents = with pkgs; [ hoprd iana-etc cacert ];
             config = {
               Entrypoint = [
                 "/bin/hoprd"
@@ -153,7 +153,7 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ hopli ];
+            contents = with pkgs; [ hopli iana-etc cacert ];
             config = {
               Entrypoint = [
                 "/bin/hopli"
