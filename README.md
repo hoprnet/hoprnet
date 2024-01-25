@@ -340,10 +340,17 @@ Running one node in test mode, with safe and module attached (in dufour network)
 # build deps and HOPRd code
 make -j deps && make -j build
 
+# Fill out the `ethereum/contract/.env` from the `ethereum/contract/example.env`
+#
 # ensure a private key with enough xDAI is set as PRIVATE_KEY
-# Please use the deployer private key as PRIVATE_KEY
-# in `ethereum/contract/.env` which should be manually filled out
-# from the `ethereum/contract/example.env`
+# This PRIVATE_KEY is the "admin_key" (i.e. owner of the created safe and node management module)
+#
+# Please use the deployer private key as DEPLOYER_PRIVATE_KEY
+# The Ethereum address to the DEPLOYER_PRIVATE_KEY should be a "manager" of the network registry.
+# Role can be checked in the explorer:
+# ```
+# echo "https://gnosisscan.io/address/$(jq '.networks.dufour.addresses.network_registry' ./ethereum/contracts/contracts-addresses.json)\#readContract"
+# ```
 source ./ethereum/contracts/.env
 
 export HOPR_NETWORK="dufour"
