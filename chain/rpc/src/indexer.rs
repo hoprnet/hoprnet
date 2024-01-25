@@ -152,7 +152,8 @@ mod test {
 
     #[async_std::test]
     async fn test_should_get_block_number() {
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let client = JsonRpcProviderClient::new(
@@ -161,10 +162,21 @@ mod test {
             SimpleJsonRpcRetryPolicy::default(),
         );
 
-        let rpc = RpcOperations::new(client, &chain_key_0, Default::default()).expect("failed to construct rpc");
+        let cfg = RpcOperationsConfig {
+            finality: 2,
+            expected_block_time,
+            ..RpcOperationsConfig::default()
+        };
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
-        async_std::task::sleep(Duration::from_secs(2)).await;
+
+        async_std::task::sleep(expected_block_time * 2).await;
+
         let b2 = rpc.block_number().await.expect("should get block number");
 
         assert!(b2 > b1, "block number should increase");
@@ -174,9 +186,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let block_time = Duration::from_secs(1);
+        let expected_block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(block_time));
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -195,8 +207,8 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs,
-            expected_block_time: block_time,
+            contract_addrs,
+            expected_block_time,
             ..RpcOperationsConfig::default()
         };
 
@@ -205,6 +217,9 @@ mod test {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -228,7 +243,7 @@ mod test {
                 contract_instances.token,
                 contract_instances.channels,
             )
-            .delay(block_time * 2)
+            .delay(expected_block_time * 2)
             .await;
         });
 
@@ -279,9 +294,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let block_time = Duration::from_secs(1);
+        let expected_block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(block_time));
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -300,8 +315,9 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs,
-            expected_block_time: block_time,
+            contract_addrs,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -310,6 +326,9 @@ mod test {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -331,7 +350,7 @@ mod test {
                 contract_instances.token,
                 contract_instances.channels,
             )
-            .delay(block_time * 2)
+            .delay(expected_block_time * 2)
             .await;
         });
 

@@ -272,10 +272,12 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(
-            vec![1, 2, 3, 4, 5],
-            rb.pop_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
-        );
+        let mut popped = rb.pop_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>();
+
+        // We don't really care about the order, since this could differ based on CPU timing
+        popped.sort();
+
+        assert_eq!(vec![1, 2, 3, 4, 5], popped);
         assert_eq!(0, rb.count(None).await);
         assert_eq!(0, rb.count_untagged());
     }
@@ -293,14 +295,17 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(
-            vec![2, 1],
-            rb.pop_all(Some(1))
-                .await
-                .into_iter()
-                .map(|(d, _)| d)
-                .collect::<Vec<_>>()
-        );
+        let mut popped = rb
+            .pop_all(Some(1))
+            .await
+            .into_iter()
+            .map(|(d, _)| d)
+            .collect::<Vec<_>>();
+
+        // We don't really care about the order, since this could differ based on CPU timing
+        popped.sort();
+
+        assert_eq!(vec![1, 2], popped);
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(3, rb.count(None).await);
     }

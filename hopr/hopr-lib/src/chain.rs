@@ -358,7 +358,7 @@ where
         module_address,
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
-        tx_confirmations: chain_config.confirmations as usize,
+        finality: chain_config.confirmations,
         logs_page_size: chain_config.logs_page_size,
     };
 

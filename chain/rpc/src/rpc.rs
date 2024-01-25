@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use chain_types::{ContractAddresses, ContractInstances};
-use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
+use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware, TimeLag};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
@@ -41,11 +41,11 @@ pub struct RpcOperationsConfig {
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
     pub tx_polling_interval: Duration,
-    /// Number of confirmations to wait when performing
-    /// transaction polling.
+    /// Number of blocks to lag behind chain head and also number
+    /// of transaction confirmations while polling.
     /// Defaults to 8
-    #[validate(range(min = 1))]
-    pub tx_confirmations: usize,
+    #[validate(range(min = 1, max = 20))]
+    pub finality: u32,
 }
 
 impl Default for RpcOperationsConfig {
@@ -57,12 +57,12 @@ impl Default for RpcOperationsConfig {
             logs_page_size: 2500,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
-            tx_confirmations: 8,
+            finality: 8,
         }
     }
 }
 
-pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<TimeLag<Provider<P>>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -90,10 +90,12 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
 
         let provider = Arc::new(
-            Provider::new(json_rpc)
-                .interval(cfg.tx_polling_interval)
-                .with_signer(wallet)
-                .nonce_manager(chain_key.public().to_address().into()),
+            TimeLag::new(
+                Provider::new(json_rpc).interval(cfg.tx_polling_interval),
+                cfg.finality as u8,
+            )
+            .with_signer(wallet)
+            .nonce_manager(chain_key.public().to_address().into()),
         );
 
         debug!("{:?}", cfg.contract_addrs);
@@ -211,7 +213,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .provider
             .send_transaction(tx, None)
             .await?
-            .confirmations(self.cfg.tx_confirmations)
+            .confirmations(self.cfg.finality as usize)
             .interval(self.cfg.tx_polling_interval);
 
         Ok(sent_tx.into())
@@ -285,13 +287,15 @@ pub mod tests {
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -300,6 +304,9 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -322,13 +329,15 @@ pub mod tests {
     async fn test_should_send_consecutive_txs() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -337,6 +346,9 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -374,13 +386,15 @@ pub mod tests {
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -389,6 +403,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
@@ -416,7 +434,8 @@ pub mod tests {
     async fn test_get_balance_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(None);
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         // Deploy contracts
@@ -430,6 +449,8 @@ pub mod tests {
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
+            expected_block_time,
+            finality: 2,
             contract_addrs: ContractAddresses::from(&contract_instances),
             ..RpcOperationsConfig::default()
         };
@@ -447,6 +468,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
