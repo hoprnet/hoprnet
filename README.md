@@ -70,23 +70,37 @@ All releases and associated changelogs are located in the [official releases](ht
 
 ### Install via Docker
 
-The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
-- `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=providence` to track the latest changes on the repository's `release/providence` branch (2.0.X)
-- `export RELEASE=<version>` to get a specific `<version>`
+Docker images are published in a GCP registry under this registry/repository: `europe-west3-docker.pkg.dev/hoprassociation/docker-images/${PROJECT}:${RELEASE}`
+Where:
+- ${PROJECT} can be either `hopli` or `hoprd`
+- ${RELEASE} can be: `latest` or `stable`
 
-Container image has the format 
-`europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
-where:
-- `$PROJECT` can be either `hopli` or `hoprd`
-
-Pull the container image with `docker`:
+Here it is an example to pull the stable release for hoprd:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:providence
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:stable
 ```
 
-It is recommended to setup an alias `hoprd` for the docker command invocation.
+Here is an example of command line to run the docker container. Please note that some parameters should be set customized to your node configuration
+
+```shell
+$ docker run --pull always --platform linux/amd64 --restart on-failure -m 3g \
+  --log-driver json-file --log-opt max-size=1000M --log-opt max-file=5 \
+  -d -v $HOME/.hoprd-db:/app/hoprd-db --name hoprd \
+  -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e RUST_LOG="info" -e RUST_BACKTRACE="full" \
+  europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${RELEASE} \
+  --network dufour \
+  --identity /app/hoprd-db/.hopr-id \
+  --apiHost "$(curl http://ifconfig.me)" --apiToken '${HOPRD_API_TOKEN}' \
+  --password '${HOPRD_PASSWORD}' \
+  --safeAddress ${HOPRD_SAFE_ADDRESS} --moduleAddress ${HOPRD_MODULE_ADDRESS}
+```
+Where:
+- ${RELEASE} is one of the docker tags mentioned before
+- ${HOPRD_PASSWORD} is the password to encrypt your database 
+- ${HOPRD_API_TOKEN} is A REST API token used for user authentication
+- ${HOPRD_SAFE_ADDRESS} is the ethereum address obtained during the onboarding process
+- ${HOPRD_MODULE_ADDRESS} is the ethereum address obtained during the onboarding process.
 
 ### Install via [Nix package manager][1]
 
@@ -368,18 +382,6 @@ Tests both the Rust and Solidity code.
 
 ```shell
 make test
-```
-
-### Github Actions CI
-
-We run a fair amount of automation using Github Actions. To ease development
-of these workflows one can use [act][2] to run workflows locally in a
-Docker environment.
-
-E.g. running the build workflow:
-
-```shell
-$ act -j build
 ```
 
 For more information please refer to [act][2]'s documentation.
