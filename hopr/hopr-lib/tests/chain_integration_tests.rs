@@ -30,12 +30,13 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
+use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use utils_db::db::DB;
 use utils_db::sqlite::SqliteShim;
 use utils_db::CurrentDbShim;
 
-// Helper function to generate the first acked ticket (channel_epoch 0, index 0, offset 0) of win prob 100%
-fn generate_the_first_ack_ticket(myself: &ChainKeypair, counterparty: &ChainKeypair) -> (Vec<u8>, AcknowledgedTicket) {
+// Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
+async fn generate_the_first_ack_ticket(myself: &ChainNode, counterparty: &ChainKeypair, price: Balance) {
     let hk1 = HalfKey::random();
     let hk2 = HalfKey::random();
 
@@ -43,15 +44,13 @@ fn generate_the_first_ack_ticket(myself: &ChainKeypair, counterparty: &ChainKeyp
     let cp2: CurvePoint = hk2.to_challenge().into();
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-    let price_per_packet: U256 = 1.into(); // 1e-18 HOPR
-
     let ticket = Ticket::new(
-        &myself.public().to_address(),
-        &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
-        0u32.into(),
+        &myself.chain_key.public().to_address(),
+        &price,
+        0_u32.into(),
         U256::one(),
         1.0f64,
-        0u32.into(),
+        1_u32.into(),
         Challenge::from(cp_sum).to_ethereum_challenge(),
         counterparty,
         &Hash::default(),
@@ -59,15 +58,15 @@ fn generate_the_first_ack_ticket(myself: &ChainKeypair, counterparty: &ChainKeyp
     .unwrap();
 
     let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-    let ack_ticket = unacked_ticket.acknowledge(&hk2, myself, &Hash::default()).unwrap();
+    let ack_ticket = unacked_ticket.acknowledge(&hk2, &myself.chain_key, &Hash::default()).unwrap();
 
-    // get key for the db
     let mut ack_key = Vec::new();
     ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
     ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
     ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
+    let key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap();
 
-    (ack_key, ack_ticket)
+    myself.db.write().await.db.set(key, &ack_ticket).await.expect("should store ack key");
 }
 
 async fn onboard_node<M: Middleware>(
@@ -79,7 +78,7 @@ async fn onboard_node<M: Middleware>(
 
     // Deploy Safe and Module for node
     let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-        &instances,
+        instances,
         client.clone(),
         contract_deployer,
     )
@@ -110,7 +109,7 @@ async fn onboard_node<M: Middleware>(
         safe,
         module,
         instances.announcements.address().into(),
-        &contract_deployer,
+        contract_deployer,
     )
     .await
     .expect("could not add announcement to module");
@@ -133,7 +132,7 @@ async fn onboard_node<M: Middleware>(
         safe,
         instances.token.address().into(),
         instances.channels.address().into(),
-        &contract_deployer,
+        contract_deployer,
     )
     .await
     .expect("could not approve channels to be a spender for safe");
@@ -142,15 +141,18 @@ async fn onboard_node<M: Middleware>(
 }
 
 type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
-type TestContractEvents<'a> = ContractEventHandlers<CoreEthereumDb<SqliteShim<'a>>>;
+
+type TestDb = CoreEthereumDb<SqliteShim<'static>>;
 
 struct ChainNode {
-    db: Arc<RwLock<CoreEthereumDb<SqliteShim<'static>>>>,
-    actions: CoreEthereumActions<CoreEthereumDb<SqliteShim<'static>>>,
-    indexer: Indexer<TestRpc, TestContractEvents<'static>, CoreEthereumDb<SqliteShim<'static>>>,
+    chain_key: ChainKeypair,
+    db: Arc<RwLock<TestDb>>,
+    actions: CoreEthereumActions<TestDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestDb>, TestDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_node_chain_logic(
     chain_key: &ChainKeypair,
     anvil: &AnvilInstance,
@@ -181,7 +183,7 @@ async fn start_node_chain_logic(
     let eth_client = RpcEthereumClient::new(rpc_ops.clone(), RpcEthereumClientConfig::default());
     let tx_exec = EthereumTransactionExecutor::new(
         eth_client,
-        SafePayloadGenerator::new(chain_key, contract_addrs.clone(), module_addr),
+        SafePayloadGenerator::new(chain_key, contract_addrs, module_addr),
     );
 
     // Actions
@@ -210,9 +212,10 @@ async fn start_node_chain_logic(
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {
+        chain_key: chain_key.clone(),
         db,
         actions,
-        indexer,
+        _indexer: indexer,
         node_tasks,
     }
 }
@@ -243,7 +246,7 @@ async fn integration_test_indexer() {
     let mut rpc_cfg = RpcOperationsConfig {
         chain_id: anvil.chain_id(),
         tx_confirmations: 3,
-        contract_addrs: contract_addrs.clone(),
+        contract_addrs,
         module_address: Address::default(),
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
@@ -260,8 +263,8 @@ async fn integration_test_indexer() {
         fetch_token_transactions: true,
     };
 
-    info!("Setting up ALICE");
     // Setup ALICE
+    info!("Setting up ALICE");
     let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
 
     rpc_cfg.module_address = alice_module_addr;
@@ -278,8 +281,8 @@ async fn integration_test_indexer() {
     )
     .await;
 
-    info!("Setting up BOB");
     // Setup BOB
+    info!("Setting up BOB");
     let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
 
     rpc_cfg.module_address = bob_module_addr;
@@ -416,18 +419,69 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    // Alice redeems ticket
-    /*let confirmations = futures::future::try_join_all(
-        alice_node
+    let channel_alice_bob_seen_by_bob = bob_node
+        .db
+        .read()
+        .await
+        .get_channel_from(&alice_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel from Alice");
+
+    assert_eq!(channel_alice_bob.get_id(), channel_alice_bob_seen_by_bob.get_id(), "channel ids must match");
+
+    let ticket_price = Balance::new(1, BalanceType::HOPR);
+
+    // Create ticket from Alice in Bob's DB
+    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price).await;
+
+    let bob_ack_tickets = bob_node.db
+        .read()
+        .await
+        .get_acknowledged_tickets(Some(channel_alice_bob))
+        .await
+        .expect("get ack ticket call on Bob's db must not fail");
+
+    assert_eq!(1, bob_ack_tickets.len(), "Bob must have a single acknowledged ticket");
+
+    let channel_balance_before_redeem = channel_alice_bob.balance;
+
+    // Bob redeems ticket
+    let confirmations = futures::future::try_join_all(
+        bob_node
             .actions
-            .redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
+            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), false)
             .await
             .expect("should submit redeem action"),
     )
     .await
     .expect("should redeem all tickets");
 
-    assert_eq!(1, confirmations.len(), "should redeem a single ticket");*/
+    assert_eq!(1, confirmations.len(), "Bob should redeem a single ticket");
+
+    let bob_ack_tickets = bob_node.db
+        .read()
+        .await
+        .get_acknowledged_tickets(Some(channel_alice_bob))
+        .await
+        .expect("get ack ticket call on bob's db must not fail");
+
+    assert_eq!(0, bob_ack_tickets.len(), "Bob must have no acknowledged tickets after redeeming");
+
+    let channel_alice_bob = alice_node
+        .db
+        .read()
+        .await
+        .get_channel_to(&bob_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel to Bob");
+
+    assert_eq!(
+            channel_balance_before_redeem - ticket_price,
+            channel_alice_bob.balance,
+            "channel balance must decrease after redeem"
+    );
 
     // Close channel
     let confirmation = alice_node
