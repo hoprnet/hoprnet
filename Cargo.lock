@@ -664,6 +664,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic_enum"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6227a8d6fdb862bcb100c4314d0d9579e5cd73fa6df31a2e6f6e1acd3c5f1207"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3312,6 +3323,7 @@ version = "2.1.0-rc.1"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
+ "atomic_enum",
  "chain-actions",
  "chain-api",
  "chain-db",
