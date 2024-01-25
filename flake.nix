@@ -281,6 +281,9 @@
             '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               autoPatchelf ./.venv
             '';
+            shellHook = ''
+              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
+            '';
           };
           defaultDevShell = buildDevShell [ ];
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
