@@ -7,8 +7,8 @@ directory = "vendor/cargo"
 [install]
 root = ".cargo"
 
-[build]
-rustdocflags = ["--enable-index-page", "-Z", "unstable-options"]
+# [build]
 # rustflags = ["-Wunused-crate-dependencies"]
 # Nightly only
 #rustflags = [ "-Zlocation-detail=none" ]
+#rustdocflags = ["--enable-index-page", "-Z", "unstable-options"]
