@@ -202,7 +202,7 @@ impl HoprdConfig {
             cfg.hopr.strategy.strategies.push(x);
         }
 
-        if cli_args.auto_redeem_tickets > 0 {
+        if cli_args.auto_redeem_tickets == 0 {
             cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
         }
 
