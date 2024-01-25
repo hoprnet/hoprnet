@@ -262,16 +262,16 @@ async fn integration_test_indexer() {
 
     info!("Setting up ALICE");
     // Setup ALICE
-    let (module_addr, safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
+    let (alice_module_addr, alice_safe_addr) = onboard_node(&instances, &contract_deployer, &alice_chain_key).await;
 
-    rpc_cfg.module_address = module_addr;
+    rpc_cfg.module_address = alice_module_addr;
 
     let alice_node = start_node_chain_logic(
         &alice_chain_key,
         &anvil,
         contract_addrs,
-        module_addr,
-        safe_addr,
+        alice_module_addr,
+        alice_safe_addr,
         rpc_cfg,
         actions_cfg,
         indexer_cfg,
@@ -282,7 +282,7 @@ async fn integration_test_indexer() {
     // Setup BOB
     let (bob_module_addr, bob_safe_addr) = onboard_node(&instances, &contract_deployer, &bob_chain_key).await;
 
-    rpc_cfg.module_address = module_addr;
+    rpc_cfg.module_address = bob_module_addr;
 
     let bob_node = start_node_chain_logic(
         &bob_chain_key,
@@ -325,14 +325,14 @@ async fn integration_test_indexer() {
     // Register Safe
     let confirmation = alice_node
         .actions
-        .register_safe_by_node(safe_addr)
+        .register_safe_by_node(alice_safe_addr)
         .await
         .expect("should submit safe registration tx")
         .await
         .expect("should confirm safe registration");
 
     assert!(
-        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_addr),
+        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == alice_safe_addr),
         "confirmed safe address must match"
     );
 
