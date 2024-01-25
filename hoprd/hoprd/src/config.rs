@@ -226,7 +226,7 @@ impl HoprdConfig {
         if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x)
         };
-        if cli_args.check_unrealized_balance > 0 {
+        if cli_args.check_unrealized_balance == 0 {
             cfg.hopr.chain.check_unrealized_balance = true;
         }
 
