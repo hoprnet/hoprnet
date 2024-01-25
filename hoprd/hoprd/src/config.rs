@@ -355,7 +355,7 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
           tx_polling_interval: 1000
-          logs_page_size: 200
+          max_block_range: 200
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
@@ -446,7 +446,7 @@ mod tests {
                             "confirmations": 2,
                             "tags": [],
                             "tx_polling_interval": 1000,
-                            "logs_page_size": 200
+                            "max_block_range": 200
                           }
                         },
                         "chains": {

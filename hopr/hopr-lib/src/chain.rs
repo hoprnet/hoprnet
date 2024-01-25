@@ -111,8 +111,8 @@ pub struct Network {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch while indexing logs
+    pub max_block_range: u64,
 }
 
 #[serde_as]
@@ -189,8 +189,8 @@ pub struct ChainNetworkConfig {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch when indexing logs
+    pub max_block_range: u64,
 }
 
 /// Check whether the version is allowed
@@ -242,7 +242,7 @@ impl ChainNetworkConfig {
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
-                logs_page_size: network.logs_page_size,
+                max_block_range: network.max_block_range,
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
@@ -359,7 +359,7 @@ where
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
         finality: chain_config.confirmations,
-        logs_page_size: chain_config.logs_page_size,
+        max_block_range_fetch_size: chain_config.logs_page_size,
     };
 
     // TODO: extract this from the global config type
