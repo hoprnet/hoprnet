@@ -347,7 +347,6 @@ make -j deps && make -j build
 source ./ethereum/contracts/.env
 
 export HOPR_NETWORK="dufour"
-export PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
 export IDENTITY_PASSWORD="SOmeranDOmPassHere-DefiniteLyChangeThis!"
 
 # create identity files
