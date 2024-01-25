@@ -167,7 +167,6 @@ where
 
         let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
 
-        let genesis = self.cfg.start_block_number;
         let finalization = self.cfg.finalization;
         spawn(async move {
             let mut tx = Some(tx);
@@ -203,7 +202,8 @@ where
                 }
 
                 if tx.is_some() {
-                    let progress = (current_block - genesis) as f64 / (chain_head - genesis) as f64;
+                    let progress =
+                        (current_block - latest_block_in_db) as f64 / (chain_head - latest_block_in_db) as f64;
                     info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                     #[cfg(all(feature = "prometheus", not(test)))]
