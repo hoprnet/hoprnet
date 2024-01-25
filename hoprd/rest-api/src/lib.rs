@@ -269,10 +269,10 @@ enum WebSocketInput {
     WsInput(std::result::Result<tide_websockets::Message, tide_websockets::Error>),
 }
 
-pub async fn run_with_hopr_api(
+pub async fn run_hopr_api(
     host: &str,
     cfg: &crate::config::Api,
-    hopr: hopr_lib::Hopr,
+    hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
@@ -281,10 +281,8 @@ pub async fn run_with_hopr_api(
     let aliases: Arc<RwLock<HashMap<String, PeerId>>> = Arc::new(RwLock::new(HashMap::new()));
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
-    let hopr = Arc::new(hopr);
-
     let state = State {
-        hopr: hopr.clone(),
+        hopr,
         config: Arc::new(Config::from("/api-docs/openapi.json")),
     };
 
@@ -441,14 +439,9 @@ pub async fn run_with_hopr_api(
         api
     });
 
-    futures::join!(
-        async move { hopr.run().await.expect("the HOPR node failed to run").await },
-        async move {
-            app.listen(host)
-                .await
-                .expect("the REST API server should run successfully")
-        }
-    );
+    app.listen(host)
+        .await
+        .expect("the REST API server should run successfully")
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

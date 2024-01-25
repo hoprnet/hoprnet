@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use futures::Stream;
 use hopr_lib::{ApplicationData, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
-use hoprd_api::run_with_hopr_api;
+use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use log::{error, info, warn};
 
@@ -111,8 +111,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hoprlib_cfg: hopr_lib::config::HoprLibConfig = cfg.clone().into();
 
     let mut node = hopr_lib::Hopr::new(hoprlib_cfg, &hopr_keys.packet_key, &hopr_keys.chain_key);
-
     let mut ingress = node.ingress();
+
+    let node = Arc::new(node);
 
     // Create the message inbox
     let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
@@ -185,28 +186,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Show onboarding information
-    let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
-    let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
-    let version = hopr_lib::constants::APP_VERSION;
+    let hopr_clone = node.clone();
+    let run_the_hopr_node = async move {
+        // start indexing and initiate the node
+        let processes = hopr_clone.run().await.expect("the HOPR node should run without errors");
 
-    while !node.is_allowed_to_access_network(&my_peer_id).await {
-        info!("
-            Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
-        ");
+        // Show onboarding information
+        let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
+        let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
+        let version = hopr_lib::constants::APP_VERSION;
 
-        async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+        while !hopr_clone.is_allowed_to_access_network(&my_peer_id).await {
+            info!("
+                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
+            ");
 
-        info!(
+            async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+
+            info!(
+                "
+                Node information:
+
+                Node peerID: {my_peer_id}
+                Node address: {my_address}
+                Node version: {version}
             "
-            Node information:
+            );
+        }
 
-            Node peerID: {my_peer_id}
-            Node address: {my_address}
-            Node version: {version}
-        "
-        );
-    }
+        // now that the node is allowed in the network, run the background processes
+        processes.await;
+    };
 
     // setup API endpoint
     if cfg.api.enable {
@@ -222,8 +232,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         futures::join!(
+            run_the_hopr_node,
             node_ingress,
-            run_with_hopr_api(
+            run_hopr_api(
                 &host_listen,
                 &cfg.api,
                 node,
@@ -235,7 +246,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         info!("Running HOPRd without the API...");
 
-        futures::join!(node.run().await?, node_ingress);
+        futures::join!(run_the_hopr_node, node_ingress);
     };
 
     Ok(())

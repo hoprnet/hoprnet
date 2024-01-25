@@ -666,7 +666,7 @@ impl Hopr {
         if self.status() == state {
             Ok(())
         } else {
-            Err(errors::HoprLibError::GeneralError(error))
+            Err(errors::HoprLibError::StatusError(error))
         }
     }
 
@@ -891,11 +891,7 @@ impl Hopr {
 
     /// Ping another node in the network based on the PeerId
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
     }
@@ -916,11 +912,7 @@ impl Hopr {
         hops: Option<u16>,
         application_tag: Option<u16>,
     ) -> errors::Result<HalfKeyChallenge> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let result = self
             .transport_api
@@ -1071,11 +1063,7 @@ impl Hopr {
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
     pub async fn withdraw(&self, recipient: Address, amount: Balance) -> errors::Result<Hash> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self
             .chain_api
@@ -1087,11 +1075,7 @@ impl Hopr {
     }
 
     pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let awaiter = self.chain_api.actions_ref().open_channel(*destination, *amount).await?;
 
@@ -1103,11 +1087,7 @@ impl Hopr {
     }
 
     pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> errors::Result<Hash> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self
             .chain_api
@@ -1124,11 +1104,7 @@ impl Hopr {
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let confirmation = self
             .chain_api
@@ -1180,11 +1156,7 @@ impl Hopr {
     }
 
     pub async fn redeem_all_tickets(&self, only_aggregated: bool) -> errors::Result<()> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         // We do not await the on-chain confirmation
         self.chain_api.actions_ref().redeem_all_tickets(only_aggregated).await?;
@@ -1197,11 +1169,7 @@ impl Hopr {
         counterparty: &Address,
         only_aggregated: bool,
     ) -> errors::Result<()> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         // We do not await the on-chain confirmation
         let _ = self
@@ -1214,11 +1182,7 @@ impl Hopr {
     }
 
     pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<usize> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel = self.chain_api.db().read().await.get_channel(channel).await?;
         let mut redeem_count = 0;
@@ -1239,11 +1203,7 @@ impl Hopr {
     }
 
     pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
-        if self.status() != HoprState::Running {
-            return Err(crate::errors::HoprLibError::GeneralError(
-                "Node is not ready for on-chain operations".into(),
-            ));
-        }
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         // We do not await the on-chain confirmation
         #[allow(clippy::let_underscore_future)]
