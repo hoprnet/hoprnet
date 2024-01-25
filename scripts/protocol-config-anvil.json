@@ -16,7 +16,7 @@
       "confirmations": 2,
       "environment_type": "local",
       "indexer_start_block_number": 1,
-      "logs_page_size": 100,
+      "max_block_range": 100,
       "tags": [],
       "tx_polling_interval": 1000,
       "version_range": "*"
@@ -37,7 +37,7 @@
       "confirmations": 2,
       "environment_type": "local",
       "indexer_start_block_number": 1,
-      "logs_page_size": 100,
+      "max_block_range": 100,
       "tags": [],
       "tx_polling_interval": 1000,
       "version_range": "*"

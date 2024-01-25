@@ -72,11 +72,13 @@
           };
           nativeBuildInputs = with pkgs; [
             pkg-config
+            openssl # required to build curl rust bindings
           ];
           buildInputs = with pkgs; [
             foundry-bin
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
+              CoreServices
               SystemConfiguration
             ]
           );
@@ -86,6 +88,8 @@
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
+            # prevent nix from changing config.sub files under vendor/cargo
+            dontUpdateAutotoolsGnuConfigScripts = true;
           };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
@@ -115,6 +119,7 @@
               echo "# placeholder" > vendor/cargo/config.toml
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
+            # this ensures the tests are run as part of the build process
             doCheck = true;
           });
           hoprd = rustPackage (hoprdCrateInfo // {cargoArtifacts = rustPackageDeps hoprdCrateInfo;});
@@ -129,7 +134,7 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ hoprd ];
+            contents = with pkgs; [ hoprd iana-etc cacert ];
             config = {
               Entrypoint = [
                 "/bin/hoprd"
@@ -141,7 +146,7 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = [ hopli ];
+            contents = with pkgs; [ hopli iana-etc cacert ];
             config = {
               Entrypoint = [
                 "/bin/hopli"
@@ -265,13 +270,10 @@
               # test coverage generation
               lcov
 
-              # solidity development and chain interaction
-              foundry-bin
-
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
-            ] ++
+            ] ++ buildInputs ++ nativeBuildInputs ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
@@ -302,6 +304,6 @@
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
         };
-      systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };
 }
