@@ -281,7 +281,7 @@
             '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               autoPatchelf ./.venv
             '';
-            shellHook = ''
+            preShellHook = ''
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
           };
