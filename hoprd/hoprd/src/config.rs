@@ -128,15 +128,23 @@ impl HoprdConfig {
         };
 
         // hopr.transport
-        cfg.hopr.transport.announce_local_addresses = cli_args.test_announce_local_addresses;
-        cfg.hopr.transport.prefer_local_addresses = cli_args.test_prefer_local_addresses;
+        if cli_args.test_announce_local_addresses > 0 {
+            cfg.hopr.transport.announce_local_addresses = true;
+        }
+        if cli_args.test_prefer_local_addresses > 0 {
+            cfg.hopr.transport.prefer_local_addresses = true;
+        }
 
         // db
         if let Some(data) = cli_args.data {
             cfg.hopr.db.data = data
         }
-        cfg.hopr.db.initialize = cli_args.init;
-        cfg.hopr.db.force_initialize = cli_args.force_init;
+        if cli_args.init > 0 {
+            cfg.hopr.db.initialize = true;
+        }
+        if cli_args.force_init > 0 {
+            cfg.hopr.db.force_initialize = true;
+        }
 
         // inbox
         if let Some(x) = cli_args.inbox_capacity {
@@ -144,8 +152,10 @@ impl HoprdConfig {
         }
 
         // api
-        cfg.api.enable = cli_args.api;
-        if cli_args.disable_api_authentication && cfg.api.auth != Auth::None {
+        if cli_args.api > 0 {
+            cfg.api.enable = true;
+        }
+        if cli_args.disable_api_authentication > 0 && cfg.api.auth != Auth::None {
             cfg.api.auth = Auth::None;
         };
         if let Some(x) = cli_args.api_token {
@@ -192,12 +202,14 @@ impl HoprdConfig {
             cfg.hopr.strategy.strategies.push(x);
         }
 
-        if cli_args.auto_redeem_tickets {
+        if cli_args.auto_redeem_tickets > 0 {
             cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
         }
 
         // chain
-        cfg.hopr.chain.announce = cli_args.announce;
+        if cli_args.announce > 0 {
+            cfg.hopr.chain.announce = true;
+        }
         if let Some(network) = cli_args.network {
             cfg.hopr.chain.network = network;
         }
@@ -214,7 +226,9 @@ impl HoprdConfig {
         if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x)
         };
-        cfg.hopr.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
+        if cli_args.check_unrealized_balance > 0 {
+            cfg.hopr.chain.check_unrealized_balance = true;
+        }
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
