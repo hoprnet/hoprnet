@@ -21,14 +21,14 @@ fi
 mkdir -p gen
 
 if [ ! -f ./gen/node_0.id ]; then
-  ./.cargo/bin/hopli identity \
+  hopli identity \
     --action create \
     --identity-directory "./gen" \
     --identity-prefix node_ \
     --number 1
 fi
 
-env DEPLOYER_PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" ./.cargo/bin/hopli \
+env DEPLOYER_PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" hopli \
   create-safe-module --network $HOPR_NETWORK \
   --identity-directory "./gen" \
   --hopr-amount 10 --native-amount 0.1 \
