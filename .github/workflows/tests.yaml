@@ -9,6 +9,7 @@ env:
   FOUNDRY_PROFILE: ci
 
 on:
+  merge_group:
   pull_request:
     types:
       - synchronize
@@ -19,6 +20,7 @@ concurrency:
 jobs:
   tests:
     strategy:
+      fail-fast: false
       matrix:
         target:
           - unit

@@ -1,7 +1,7 @@
 <!-- INTRODUCTION -->
 <p align="center">
   <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
-    <img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
+    <img align="middle" width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
   </a>
 
   <!-- Title Placeholder -->
@@ -12,102 +12,111 @@
   <p align="center">
     HOPR is a privacy-preserving messaging protocol which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
   </p>
-  <p align="center">
-    <img src="https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod" alt="Gitpod">
-  </p>
 </p>
 
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
+- [About](#about)
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
-- [Using](#using)
-  - [Using Docker](#using-docker)
+- [Usage](#usage)
+  - [Example execution](#example-execution)
   - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
   - [Nix environment setup](#nix-environment-setup)
+    - [Nix flake outputs](#nix-flake-outputs)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
-  - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
+  - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
 - [Test](#test)
   - [Unit testing](#unit-testing)
-    - [Test-driven development](#test-driven-development)
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
-- [Deploy](#deploy)
-  - [Using Google Cloud Platform](#using-google-cloud-platform)
-- [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
 
+
+## About
+
+The HOPR project produces multiple artifacts that allow running, maintaining and modiyfing the HOPR node. The most relevant components for production use cases are:
+
+1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
+    - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incroporated into another projects as a transport layer.
+2. [hoprd](https://hoprnet.github.io/hoprnet/hoprd/index.html)
+    - Daemon application providing a higher level interface for creating a HOPR protocol compliant node that can use a dedicated REST API.
+3. [hoprd-api-schema](https://hoprnet.github.io/hoprnet/hoprd_api_schema/index.html)
+    - Utility to generate the OpenAPI spec for the `hoprd` served REST API.
+4. [hoprd-cfg](https://hoprnet.github.io/hoprnet/hoprd_cfg/index.html)
+    - Utility for configuration management of the `hoprd`
+5. [hopli](https://hoprnet.github.io/hoprnet/hopli/index.html)
+    - Utility designed to simplify and unify the management of on-chain and identity related tasks.
+
+Unless stated otherwise, the following sections only apply to `hoprd`.
+
 ## Install
 
-The following instructions show how the latest release may be
-installed. The instructions should be adapted if you want to use the latest
-development release or any other older release.
+For production purposes always run the latest stable release.
 
-The preferred way of installation should be via Docker.
+Multiple options for installation exist, the preferred choice for any production system should be to use the container image (e.g. using `docker`).
+
+All releases and associated changelogs are located in the [official releases](https://github.com/hoprnet/hoprnet/releases) section of the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository.
 
 ### Install via Docker
 
-Each image is prefixed with 
+The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
+- `export RELEASE=latest` to track the latest changes on the repository's `master` branch
+- `export RELEASE=providence` to track the latest changes on the repository's `release/providence` branch (2.0.X)
+- `export RELEASE=<version>` to get a specific `<version>`
+
+Container image has the format 
 `europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
-The `latest` tag represents the `master` branch, while the `providence` tag
-represents the most recent stable `release/*` branch.
+where:
+- `$PROJECT` can be either `hopli` or `hoprd`
 
-You can pull the Docker image like so:
+Pull the container image with `docker`:
 
-```sh
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:providence
+```shell
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:providence
 ```
+
+It is recommended to setup an alias `hoprd` for the docker command invocation.
 
 ### Install via [Nix package manager][1]
 
-NOTE: This setup should only be used for development or if you know what you
-are doing and don't need further support. Otherwise you should use the `docker` setup.
+WARNING: This setup should only be used for development or advanced usage without any further support.
 
-You will need to clone and initialize the `hoprnet` repo first:
+Clone and initialize the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository:
 
-```sh
-git clone https://github.com/hoprnet/hoprnet
-cd hoprnet
+```shell
+$ git clone https://github.com/hoprnet/hoprnet
+$ cd hoprnet
 ```
 
-If you have [direnv][2] set up properly your `nix-shell` will be
-configured automatically upon entering the `hoprnet` directory and enabling it
-via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
+Build and install the `hoprd` binary, e.g. on a UNIX platform:
 
-```sh
-nix develop
+```shell
+$ nix build
+$ sudo cp result/bin/* /usr/local/bin/
 ```
 
-Now you may follow the instructions in [Develop](#develop).
+## Usage
 
-Alternatively you may use a development Docker container which uses the same Nix
-setup.
+`hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
 
-```
-make run-docker-dev
-```
-
-## Using
-
-The `hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
-
-```sh
+```shell
 $ hoprd --help
 Usage: hoprd [OPTIONS]
 
 Options:
       --network <NETWORK>
-          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=] [possible values: debug-staging, anvil-localhost, dufour, rotsee, anvil-localhost2]
+          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=]
       --identity <IDENTITY>
           The path to the identity file [env: HOPRD_IDENTITY=]
       --data <DATA>
@@ -136,8 +145,6 @@ Options:
           Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
-      --dryRun
-          List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit
@@ -162,67 +169,77 @@ Options:
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
           Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+      --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
+          Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
+      --dryRun
+          DEPRECATED [env: HOPRD_DRY_RUN=]
+      --healthCheck
+          DEPRECATED
+      --healthCheckHost <HEALTH_CHECK_HOST>
+          DEPRECATED
+      --healthCheckPort <HEALTH_CHECK_PORT>
+          DEPRECATED
   -h, --help
           Print help
   -V, --version
           Print version
-
-All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.
 ```
 
-As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
+### Example execution
+Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
-### Using Docker
-
-The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
+A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
 ```
 
 Here is a short breakdown of each argument.
 
 ```sh
 hoprd
-  --identity /app/hoprd-db/.hopr-identity     # store your node identity information in the persisted database folder
-  --password switzerland   	                  # set the encryption password for your identity
-  --init 				                              # initialize the database and identity if not present
-  --announce 				                          # announce the node to other nodes in the network and act as relay if publicly reachable
-  --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
-  --network monte_rosa                        # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                                              # each release has a default network id set, but the user can override this value
-                                              # nodes from different networks are **not able** to communicate
+  # store your node identity information in the persisted database folder
+  --identity /app/hoprd-db/.hopr-identity
+  # set the encryption password for your identity     
+  --password switzerland
+  # initialize the database and identity if not present 	                  
+  --init
+  # announce the node to other nodes in the network and act as relay if publicly reachable	                              
+  --announce
+  # set IP and port of the P2P API to the container's external IP so it can be reached on your host		                          
+  --host "0.0.0.0:9091" 
+  # specify password for accessing REST API	                  
+  --apiToken <MY_TOKEN>
+  # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain                       
+  --network doufur                        
 ```
+
+Special care needs to given to the `network` argument, which defines the specific network `hoprd` node should join. Only nodes within the same network can communicate using the HOPR protocol.
 
 ### Using Docker Compose with extended HOPR node monitoring
 
-There is an optional Docker Compose setup that can be used to run the above Docker image with HOPRd and also
-have an extended monitoring of the HOPR node's activity (using Prometheus + Grafana dashboard).
-
-To startup a HOPRd node with monitoring, you can use the following command:
+An optional `docker compose` setup can be used to run the above containerized `hoprd` along with extension to observe the node's metrics using Prometheus + Grafana dashboard:
 
 ```shell
 docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
-The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
+Copy the  `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
 
-Once the configuration starts up, the HOPRd Admin UI is accessible as usual via `localhost:3000`. The Grafana instance is
-accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
-about the HOPR network as perceived from your node plus some additional runtime information.
-
-The default username for Grafana is `admin` with password `hopr`.
+The composite setup will publish multiple additional services alongside the `hoprd`:
+- Admin UI at `localhost:3000`
+- Grafana with `hoprd` dashboards at `localhost:3030` (default user: `admin` and pass `hopr`)
 
 ## Testnet accessibility
 
-Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
+To participate in a public network the node must be eligible. See [Network Registry](https://github.com/hoprnet/hoprnet/blob/master/NETWORK_REGISTRY.md) for details.
 
-These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
+Node eligibility is not required in a local development cluster (see [Develop section below](#develop)).
 
 ## Migrating between releases
 
-At the moment we DO NOT HAVE backward compatibility between releases.
+There is **NO** backward compatibility between releases.
+
 We attempt to provide instructions on how to migrate your tokens between releases.
 
 1. Set your automatic channel strategy to `passive`.
@@ -237,70 +254,50 @@ We attempt to provide instructions on how to migrate your tokens between release
 
 ## Develop
 
-HOPR contains modules written in Rust, therefore a Rust toolchain is needed to successfully build the artifacts.
-First, either setup nix and flake to use the nix environment automatically, or install Rust toolchain (check `rust-toolchain.toml` for required versions)
-with the instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
+Either setup `nix` and `flake` to use the nix environment, or [install Rust toolchain](https://www.rust-lang.org/tools/install) from the `rust-toolchain.toml`, as well as `foundry-rs` binaries (`forge`, `anvil`).
 
 ### Nix environment setup
 
-- install nix from official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html)
-- create `~/.config/nix/conf` file with the following content:
+Install `nix`` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
 
-```
+Create a nix configuration file at `~/.config/nix/nix.conf` with the following content:
+
+```nix
 experimental-features = nix-command flakes
 ```
 
-- append the following line to your schell rc file (depending on the shell you are using, it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Don't forget to modify the `<shell>` variable with your corresponding shell (`zsh`, `bash`, `csh`, etc.):
+Install the `nix-direnv` package to introduce the `direnv`:
 
-```bash
-eval "$(direnv hook <shell>)"
+```shell
+$ nix-env -i nix-direnv
 ```
 
-- install `nix-direnv` package:
+Append the following line to the shell rc file (depending on the shell used it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Modify the `<shell>` variable inside the below command with the currently used (`zsh`, `bash`, `csh`, etc.):
 
-```bash
-nix-env -i nix-direnv
+```shell
+$ eval "$(direnv hook <shell>)"
 ```
 
-- from within the `hoprnet` folder, execute the following command.
+From within the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository's directory, execute the following command.
 
 ```bash
-direnv allow .
+$ direnv allow .
 ```
 
 #### Nix flake outputs
 
 We provide a couple of packages, apps and shells to make building and
-development easier. You may get the full list like so:
+development easier, to get the full list execute:. You may get the full list like so:
 
-```
-> nix flake show
-├─── apps
-│   └─── x86_64-linux
-│       ├─── hopli-docker-build-and-uploadapp
-│       └─── hoprd-docker-build-and-uploadapp
-├─── devShells
-│   └─── x86_64-linux
-│       ├─── defaultdevelopment environment 'nix-shell'
-│       └─── smoke-testsdevelopment environment 'nix-shell'
-└─── packages
-    └─── x86_64-linux
-        ├─── anvil-dockerpackage 'hopr-anvil.tar.gz'
-        ├─── defaultpackage 'hoprd-2.1.0-rc.1'
-        ├─── hoplipackage 'hopli-0.4.0'
-        ├─── hopli-dockerpackage 'hopli.tar.gz'
-        ├─── hopli-testpackage 'hopli-test-0.4.0'
-        ├─── hoprdpackage 'hoprd-2.1.0-rc.1'
-        ├─── hoprd-dockerpackage 'hoprd.tar.gz'
-        ├─── hoprd-testpackage 'hoprd-test-2.1.0-rc.1'
-        └─── smoke-testspackage 'hoprd-smoke-tests-2.1.0-rc.1'
+```shell
+$ nix flake show
 ```
 
 ### Local node with safe staking service (local network)
 
-Running one node in test mode, with safe and module attached (in anvil-localhost network)
+Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
 
-```sh
+```shell
 # clean up, e.g.
 # make kill-anvil
 # make clean
@@ -335,36 +332,26 @@ make fund-local-all id_dir=`pwd`
 make run-hopr-admin &
 ```
 
-### Local node with safe staking service (rotsee network)
+### Local node with safe staking service (dufour network)
 
-Running one node in test mode, with safe and module attached (in rotsee network)
+Running one node in test mode, with safe and module attached (in dufour network)
 
-```sh
+```shell
 # build deps and HOPRd code
 make -j deps && make -j build
 
 # ensure a private key with enough xDAI is set as PRIVATE_KEY
 # Please use the deployer private key as PRIVATE_KEY
-# in `ethereum/contract/.env`
+# in `ethereum/contract/.env` which should be manually filled out
+# from the `ethereum/contract/example.env`
 source ./ethereum/contracts/.env
 
+export HOPR_NETWORK="dufour"
+export PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
+export IDENTITY_PASSWORD="SOmeranDOmPassHere-DefiniteLyChangeThis!"
+
 # create identity files
-make create-local-identity
-
-# create a safe and a node management module instance,
-# and passing the created safe and module as argument to
-# run a test node local (separate terminal)
-# It also register the created pairs in network registry, and
-# approve tokens for channels to move token.
-# fund safe with 2k wxHOPR and 1 xdai
-make run-local-with-safe-rotsee network=rotsee
-# or to restart a node and use the same id, safe and module
-# run:
-# make run-local network=rotsee id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
-
-# fund all your nodes to get started
-make fund-local-rotsee id_dir=`pwd`
-
+bash scripts/generate-identity.sh
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
@@ -372,57 +359,43 @@ make run-hopr-admin &
 
 ## Local cluster
 
-The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
-See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
+The best way to test with multiple HOPR nodes is by using a [local cluster of interconnected nodes](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
 ### Unit testing
 Tests both the Rust and Solidity code.
 
-```sh
+```shell
 make test
 ```
-
-#### Test-driven development
-
-To make sure we add the least amount of untested code to our codebase,
-whenever possible all code should come accompanied by a test. To do so,
-locate the `.spec` or equivalent test file for your code. If it does not
-exist, create it within the same file your code will live in.
-
-Afterwards, ensure you create a breaking test for your feature. For example,
-the [following commit][10] added a test to a non-existing feature. The
-immediate [commit][11] provided the actual feature for that given test. Repeat
-this process for all the code you add to our codebase.
-
-_(The code was pushed as an example, but ideally, you only push code that has
-working tests on your machine, as to avoid overusing our CI pipeline with
-known broken tests.)_
 
 ### Github Actions CI
 
 We run a fair amount of automation using Github Actions. To ease development
-of these workflows one can use [act][8] to run workflows locally in a
+of these workflows one can use [act][2] to run workflows locally in a
 Docker environment.
 
 E.g. running the build workflow:
 
-```sh
-act -j build
+```shell
+$ act -j build
 ```
 
-For more information please refer to [act][8]'s documentation.
+For more information please refer to [act][2]'s documentation.
 
 ### End-to-End Testing
+
+When using the `nix` environment, the test environment preparation and activation is automatic.
+
+Tests are using the `pytest` infrastructure. 
 
 #### Running Tests Locally
 
 ##### Testing environment
+If not using `nix`, setup the `pytest` environment:
 
-Tests are using the `pytest` infrastructure that can be set up inside a virtualenv using as:
-
-```sh
+```shell
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r tests/requirements.txt
@@ -430,7 +403,7 @@ python3 -m pip install -r tests/requirements.txt
 
 To deactivate the activated testing environment if no longer needed:
 
-```sh
+```shell
 deactivate
 ```
 
@@ -438,7 +411,7 @@ deactivate
 
 With the environment activated, execute the tests locally:
 
-```sh
+```shell
 make smoke-test-full
 ```
 
@@ -454,15 +427,10 @@ make smoke-test-full
 
 ## License
 
-[GPL v3](LICENSE) © HOPR Association
+[GPL v3](https://github.com/hoprnet/hoprnet/blob/master/LICENSE) © HOPR Association
 
 [1]: https://nixos.org/learn.html
-[2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
-[6]: https://www.npmjs.com/package/@hoprnet/hoprd
-[7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
-[8]: https://github.com/nektos/act
-[9]: https://mochajs.org/
-[10]: https://github.com/hoprnet/hoprnet/pull/1974/commits/331d6e99d1199250a302211be7b8dd9a22fa6e23#diff-83e70acfe04a8f13821ff96a1115f02a4b683a6370568ba9beea16da6d0c2cffR33-R49
-[11]: https://github.com/hoprnet/hoprnet/pull/1974/commits/53663517309d0f8918c5066fd98503afe8d8dd76#diff-9bf7c02325c8f5b6330a15a745a3ad736ee139a78c28a15d594756c406378884R91-R96
-[12]: https://github.com/nomiclabs/hardhat/issues/1116
+[2]: https://github.com/nektos/act
+
+
 

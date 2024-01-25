@@ -177,8 +177,8 @@ run-local: ## run HOPRd from local repo
 	hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
-		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication \
+		--testAnnounceLocalAddresses --testPreferLocalAddresses \
+		--disableApiAuthentication \
 		--protocolConfig $(mydir)scripts/protocol-config-anvil.json \
 		--data /tmp/ \
 		$(args)
@@ -422,15 +422,19 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
-	hoprd-api-schema >| openapi.spec.json
+	hoprd-api-schema >| /tmp/openapi.spec.json
 
+	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
+    
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
-		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
-		-c /local/scripts/python-sdk-config.json
+	
+	swagger-codegen3 generate \
+		-l python \
+		-o hoprd-sdk-python \
+		-i /tmp/openapi.spec.json \
+		-c /tmp/python-sdk-config.json
 
-	rm openapi.spec.json
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

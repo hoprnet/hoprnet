@@ -41,6 +41,10 @@ fn setup_logger(level: log::LevelFilter) {
         .level_for("libp2p_mplex", log::LevelFilter::Info)
         .level_for("multistream_select", log::LevelFilter::Info)
         .level_for("sqlx::query", log::LevelFilter::Info)
+        .level_for("tracing::span", log::LevelFilter::Error)
+        .level_for("isahc::handler", log::LevelFilter::Error)
+        .level_for("isahc::client", log::LevelFilter::Error)
+        .level_for("surf::middleware::logger::native", log::LevelFilter::Error)
         .chain(std::io::stdout())
         .apply()
     {
@@ -79,7 +83,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         initialize: cfg.hopr.db.initialize,
         id_path: cfg.identity.file.clone(),
         password: cfg.identity.password.clone(),
-        use_weak_crypto: Some(cfg.test.use_weak_crypto),
         private_key: cfg
             .identity
             .private_key
@@ -92,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!(
         "This node has packet key '{}' and uses a blockchain address '{}'",
         hopr_lib::Keypair::public(&hopr_keys.packet_key).to_peerid_str(),
-        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex()
+        hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex()
     );
 
     // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged

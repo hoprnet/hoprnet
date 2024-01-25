@@ -163,7 +163,10 @@ impl AggregationList {
         let mut total_amount = Balance::zero(BalanceType::HOPR);
 
         for tkt in list.iter() {
-            if tkt.signer != signer || tkt.ticket.channel_id != channel_id || !tkt.status.is_being_aggregated() {
+            if tkt.signer != signer
+                || tkt.ticket.channel_id != channel_id
+                || tkt.status != AcknowledgedTicketStatus::BeingAggregated
+            {
                 error!("{tkt} does not belong to the aggregation list");
                 return Err(ProtocolTicketAggregation(
                     "invalid list of tickets to aggregate given".into(),
@@ -182,6 +185,7 @@ impl AggregationList {
 
 /// The input to the processor background pipeline
 #[allow(clippy::type_complexity)] // TODO: The type needs to be significantly refactored to easily move around
+#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
@@ -842,9 +846,7 @@ mod tests {
 
             // Mark the first ticket as redeemed, so it does not enter the aggregation
             if i == 1 {
-                ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed {
-                    tx_hash: Hash::default(),
-                };
+                ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
             } else {
                 agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
             }
@@ -937,9 +939,7 @@ mod tests {
         );
 
         assert_eq!(
-            AcknowledgedTicketStatus::BeingRedeemed {
-                tx_hash: Hash::default()
-            },
+            AcknowledgedTicketStatus::BeingRedeemed,
             stored_acked_tickets[0].status,
             "first ticket must being redeemed"
         );

@@ -21,22 +21,39 @@ pub struct MessageInboxConfiguration {
     /// Maximum capacity per-each application tag.
     /// In the current implementation, the capacity must be a power of two.
     #[validate(custom = "validate_is_power_of_two")]
+    #[serde(default = "default_capacity")]
     pub capacity: u32,
     /// Maximum age of a message held in the inbox until it is purged.
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[serde(default = "just_15_minutes")]
     pub max_age: Duration,
     /// List of tags that are excluded on `push`.
+    #[serde(default = "default_excluded_tags")]
     pub excluded_tags: Vec<Tag>,
 }
 
-const RAW_15_MINUTES: Duration = Duration::from_secs(15 * 60);
+#[inline]
+fn just_15_minutes() -> Duration {
+    const RAW_15_MINUTES: Duration = Duration::from_secs(15 * 60);
+    RAW_15_MINUTES
+}
+
+#[inline]
+fn default_capacity() -> u32 {
+    512
+}
+
+#[inline]
+fn default_excluded_tags() -> Vec<Tag> {
+    vec![DEFAULT_APPLICATION_TAG]
+}
 
 impl Default for MessageInboxConfiguration {
     fn default() -> Self {
         Self {
-            capacity: 512,
-            max_age: RAW_15_MINUTES,
-            excluded_tags: vec![DEFAULT_APPLICATION_TAG],
+            capacity: default_capacity(),
+            max_age: just_15_minutes(),
+            excluded_tags: default_excluded_tags(),
         }
     }
 }

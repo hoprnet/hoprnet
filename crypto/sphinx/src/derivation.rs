@@ -195,17 +195,21 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(params.s_b.to_projective_point(), cap_b * params.s);
+        assert_eq!(
+            params.get_s_b_witness(&keypair.public().to_address(), &message, dst),
+            (cap_b * params.s).to_encoded_point(false)
+        );
 
         let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&priv_key).unwrap().into();
-        assert_eq!(params.h_v.to_projective_point(), cap_b * a * params.h);
+        assert_eq!(params.get_h_v_witness(), (cap_b * a * params.h).to_encoded_point(false));
 
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.v.to_projective_point() * params.h;
+        let r_v: ProjectivePoint<Secp256k1> =
+            cap_b * params.s - params.get_decompressed_v().unwrap().to_projective_point() * params.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 &pub_key.to_address().to_bytes(),
-                &params.v.to_bytes()[1..],
+                &params.get_decompressed_v().unwrap().to_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 &message,
             ],
