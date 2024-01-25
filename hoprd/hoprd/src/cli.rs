@@ -109,19 +109,17 @@ pub struct CliArgs {
         long,
         env = "HOPRD_ANNOUNCE",
         help = "Announce the node on chain with a public address",
-        action = ArgAction::SetTrue,
-        default_value_t = hopr_lib::config::Chain::default().announce
+        action = ArgAction::Count
     )]
-    pub announce: bool,
+    pub announce: u8,
 
     #[arg(
         long,
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
-        action = ArgAction::SetTrue,
-        default_value_t = hoprd_api::config::Api::default().enable
+        action = ArgAction::Count
     )]
-    pub api: bool,
+    pub api: u8,
 
     #[arg(
         long = "apiHost",
@@ -143,12 +141,11 @@ pub struct CliArgs {
     #[arg(
         long = "disableApiAuthentication",
         help = "Completely disables the token authentication for the API, overrides any apiToken if set",
-        action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         hide = true,
-        default_value_t = hoprd_api::config::Api::default().auth == hoprd_api::config::Auth::None
+        action = ArgAction::Count
     )]
-    pub disable_api_authentication: bool,
+    pub disable_api_authentication: u8,
 
     #[arg(
         long = "apiToken",
@@ -190,19 +187,17 @@ pub struct CliArgs {
         long = "disableTicketAutoRedeem",
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
         help = "Disables automatic redeeming of winning tickets.",
-        action = ArgAction::SetFalse,
-        default_value_t = false
+        action = ArgAction::Count
     )]
-    pub auto_redeem_tickets: bool,
+    pub auto_redeem_tickets: u8,
 
     #[arg(
         long = "disableUnrealizedBalanceCheck",
         env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
-        action = ArgAction::SetFalse,
-        default_value_t = hopr_lib::config::Chain::default().check_unrealized_balance
+        action = ArgAction::Count
     )]
-    pub check_unrealized_balance: bool,
+    pub check_unrealized_balance: u8,
 
     #[arg(
         long,
@@ -215,20 +210,18 @@ pub struct CliArgs {
     #[arg(
         long,
         help = "initialize a database if it doesn't already exist",
-        action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        default_value_t = hopr_lib::config::Db::default().initialize
+        action = ArgAction::Count
     )]
-    pub init: bool,
+    pub init: u8,
 
     #[arg(
         long = "forceInit",
         help = "initialize a database, even if it already exists",
-        action = ArgAction::SetTrue,
         env = "HOPRD_FORCE_INIT",
-        default_value_t = hopr_lib::config::Db::default().force_initialize
+        action = ArgAction::Count
     )]
-    pub force_init: bool,
+    pub force_init: u8,
 
     #[arg(
         long = "privateKey",
@@ -252,20 +245,19 @@ pub struct CliArgs {
         long = "testAnnounceLocalAddresses",
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
-        action = ArgAction::SetTrue,
-        default_value_t = hopr_lib::config::TransportConfig::default().announce_local_addresses
+        hide = true,
+        action = ArgAction::Count
     )]
-    pub test_announce_local_addresses: bool,
+    pub test_announce_local_addresses: u8,
 
     #[arg(
         long = "testPreferLocalAddresses",
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
-        action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
         hide = true,
-        default_value_t = hopr_lib::config::TransportConfig::default().prefer_local_addresses
+        action = ArgAction::Count
     )]
-    pub test_prefer_local_addresses: bool,
+    pub test_prefer_local_addresses: u8,
 
     #[arg(
         long = "heartbeatInterval",
