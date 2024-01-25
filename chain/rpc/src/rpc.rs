@@ -42,10 +42,14 @@ pub struct RpcOperationsConfig {
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
     pub tx_polling_interval: Duration,
-    /// Number of blocks to lag behind chain head and also number
-    /// of transaction confirmations while polling.
+    /// Finalization chain length
+    ///
+    /// The number of blocks including and decreasing from the chain HEAD
+    /// that the logs will be buffered for before being considered
+    /// successfully joined to the chain.
+    ///
     /// Defaults to 8
-    #[validate(range(min = 1, max = 20))]
+    #[validate(range(min = 1, max = 100))]
     pub finality: u32,
 }
 
