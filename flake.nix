@@ -77,6 +77,7 @@
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           nativeBuildInputs = with pkgs; [
             pkg-config
+            openssl # required to build curl rust bindings
           ];
           buildInputs = with pkgs; [
             foundry-bin
@@ -92,6 +93,7 @@
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
+            # prevent nix from changing config.sub files under vendor/cargo
             dontUpdateAutotoolsGnuConfigScripts = true;
           };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
@@ -124,6 +126,7 @@
               echo "# placeholder" > vendor/cargo/config.toml
               cp -r ${ethereumBindings}/src ./ethereum/bindings/
             '';
+            # this ensures the tests are run as part of the build process
             doCheck = true;
           });
           hoprd = rustPackage hoprdCrateInfo (rustPackageDeps hoprdCrateInfo);
@@ -288,6 +291,6 @@
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
         };
-      systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };
 }
