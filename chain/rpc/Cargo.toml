@@ -35,7 +35,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "encoding"] }
+surf = { version = "2.3.2" }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
