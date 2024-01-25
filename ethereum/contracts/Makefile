@@ -31,16 +31,6 @@ sc-audit-coverage:
 forked-local-anvil:
 	anvil -f 'https://gnosis-provider.rpch.tech/'
 
-generate-bindings: ${SOLIDITY_FILES}
-generate-bindings: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ../bindings --crate-name bindings \
-		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
-
-.PHONY: check-sc-bindings
-check-sc-bindings: ## Only create types for Hopr* contracts
-	$(forge-bind) --bindings-path ./bindings --root ./contracts \
-		--crate-name bindings --select '^Hopr.*?(Boost|[^t])$$'
-
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820: ensure-environment-and-network-are-set
 anvil-deploy-erc1820: ## deploy ERC1820 contracts
