@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use futures::Stream;
 use hopr_lib::{ApplicationData, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
-use hoprd_api::run_hopr_api;
+use hoprd_api::run_with_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use log::{error, info, warn};
 
@@ -185,8 +185,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let wait_til_end_of_time = node.run().await?;
-
     // Show onboarding information
     let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
     let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
@@ -224,9 +222,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         futures::join!(
-            wait_til_end_of_time,
             node_ingress,
-            run_hopr_api(
+            run_with_hopr_api(
                 &host_listen,
                 &cfg.api,
                 node,
@@ -238,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         info!("Running HOPRd without the API...");
 
-        futures::join!(wait_til_end_of_time, node_ingress);
+        futures::join!(node.run().await?, node_ingress);
     };
 
     Ok(())
