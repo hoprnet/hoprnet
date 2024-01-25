@@ -80,14 +80,8 @@ clean: # Cleanup build directories
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 	$(cargo) test
 
-.PHONY: smoke-test
-smoke-test: suite=integration
-smoke-test: ## run smoke test suite defained via parameter suite=
-	echo "Only run suite=$(suite)"
-	source .venv/bin/activate && python3 -m pytest tests/test_$(suite).py
-
-.PHONY: smoke-test-full
-smoke-test-full: ## run smoke testss
+.PHONY: smoke-tests
+smoke-tests: ## run smoke tests
 	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: smart-contract-test
