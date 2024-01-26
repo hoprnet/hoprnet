@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
+            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1642,7 +1642,7 @@ mod messages {
         "tag": 20
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct MessagePopRes {
+    pub(crate) struct MessagePopResponse {
         tag: u16,
         body: String,
         #[serde_as(as = "DurationMilliSeconds<u64>")]
@@ -1650,10 +1650,10 @@ mod messages {
         received_at: std::time::Duration,
     }
 
-    fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopRes, String> {
+    fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopResponse, String> {
         if let Some(tag) = data.application_tag {
             match std::str::from_utf8(&data.plain_text) {
-                Ok(data_str) => Ok(MessagePopRes {
+                Ok(data_str) => Ok(MessagePopResponse {
                     tag,
                     body: data_str.into(),
                     received_at,
@@ -1677,7 +1677,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "Message successfully extracted.", body = MessagePopRes),
+            (status = 200, description = "Message successfully extracted.", body = MessagePopResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1704,7 +1704,7 @@ mod messages {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     pub(crate) struct InboxMessagesRes {
-        pub messages: Vec<MessagePopRes>,
+        pub messages: Vec<MessagePopResponse>,
     }
 
     /// Get the list of messages currently present in the nodes message inbox.
@@ -1734,7 +1734,7 @@ mod messages {
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
-        let messages: Vec<MessagePopRes> = inbox
+        let messages: Vec<MessagePopResponse> = inbox
             .pop_all(tag.tag)
             .await
             .into_iter()
@@ -1758,7 +1758,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "Message successfully peeked at.", body = MessagePopRes),
+            (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
