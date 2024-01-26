@@ -164,7 +164,7 @@ where
             let mut chain_head = 0;
 
             while let Some(block_with_logs) = block_stream.next().await {
-                debug!("Processed block number: {}", block_with_logs.block_id);
+                info!("Processed block number: {}", block_with_logs.block_id);
 
                 let current_block = block_with_logs.block_id;
                 #[cfg(all(feature = "prometheus", not(test)))]

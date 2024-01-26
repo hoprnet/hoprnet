@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use chain_types::{ContractAddresses, ContractInstances};
-use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware, TimeLag};
+use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
@@ -67,7 +67,7 @@ impl Default for RpcOperationsConfig {
     }
 }
 
-pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<TimeLag<Provider<P>>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -95,12 +95,10 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
 
         let provider = Arc::new(
-            TimeLag::new(
-                Provider::new(json_rpc).interval(cfg.tx_polling_interval),
-                cfg.finality as u8,
-            )
-            .with_signer(wallet)
-            .nonce_manager(chain_key.public().to_address().into()),
+            Provider::new(json_rpc)
+                .interval(cfg.tx_polling_interval)
+                .with_signer(wallet)
+                .nonce_manager(chain_key.public().to_address().into()),
         );
 
         debug!("{:?}", cfg.contract_addrs);
@@ -116,18 +114,32 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             provider,
         })
     }
+
+    pub(crate) async fn get_block_number(&self) -> Result<u64> {
+        Ok(self
+            .provider
+            .get_block_number()
+            .await?
+            .as_u64()
+            .saturating_sub(self.cfg.finality as u64))
+    }
+
+    pub(crate) async fn get_block(
+        &self,
+        block_number: u64,
+    ) -> Result<Option<ethers::types::Block<ethers::types::H256>>> {
+        let sanitized_block_number = block_number.saturating_sub(self.cfg.finality as u64);
+        Ok(self
+            .provider
+            .get_block(BlockId::Number(sanitized_block_number.into()))
+            .await?)
+    }
 }
 
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        let ts = self
-            .provider
-            .get_block(BlockId::Number(block_number.into()))
-            .await?
-            .map(|b| b.timestamp.as_u64());
-
-        Ok(ts)
+        Ok(self.get_block(block_number).await?.map(|b| b.timestamp.as_u64()))
     }
 
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
@@ -135,7 +147,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             BalanceType::Native => {
                 let native = self
                     .provider
-                    .get_balance(NameOrAddress::Address(address.into()), None)
+                    .get_balance(
+                        NameOrAddress::Address(address.into()),
+                        Some(BlockId::Number(self.get_block_number().await?.into())),
+                    )
                     .await?;
 
                 Ok(Balance::new(native, BalanceType::Native))

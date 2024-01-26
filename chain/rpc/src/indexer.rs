@@ -2,9 +2,9 @@ use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
-use futures::{Stream, TryStreamExt};
-use log::debug;
+use futures::{Stream, StreamExt, TryStreamExt};
 use log::error;
+use log::{debug, warn};
 use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
@@ -26,7 +26,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
-        Ok(self.provider.get_block_number().await?.as_u64())
+        self.get_block_number().await
     }
 
     fn try_stream_logs<'a>(
@@ -69,24 +69,38 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             .from_block(BlockNumber::Number(from_block.into()))
                             .to_block(BlockNumber::Number(latest_block.into()));
 
-                        if from_block != latest_block {
-                            debug!("polling logs from blocks #{from_block} - #{latest_block}");
-                        } else {
-                            debug!("polling logs from block #{from_block}");
-                        }
-
                         // Range of blocks to fetch is always bounded
                         let page_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        debug!("block range fetch size: {page_size}");
 
-                        // The provider internally performs retries on timeouts and errors.
-                        let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, page_size);
+                        // If we're fetching logs from wide block range, we'll use the pagination log query.
+                        // For just a single block, we use the ordinary getLogs call which minimizes RPC calls
+                        let mut retrieved_logs = if page_size > 0 {
+                            debug!("polling logs from blocks #{from_block} - #{latest_block} (page {page_size})");
+                            self.provider.get_logs_paginated(&range_filter, page_size).boxed()
+                        } else {
+                            debug!("polling logs from block #{from_block}");
+                            futures::stream::iter(self.provider.get_logs(&range_filter)
+                                .await
+                                .unwrap_or_else(|e| {
+                                    error!("polling logs from block #{from_block} failed: {e}");
+                                    Vec::new()
+                                })
+                                .into_iter()
+                                .map(Ok)
+                            ).boxed()
+                        };
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {
                             let log = Log::from(log);
 
-                            // This assumes the logs are arriving ordered by blocks
+                            // This in general should not happen, but handle such case to be safe
+                            if log.block_number > latest_block {
+                                warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                break;
+                            }
+
+                            // This assumes the logs are arriving ordered by blocks when fetching a range
                             if current_block_log.block_id != log.block_number {
                                 debug!("completed {current_block_log}");
                                 yield current_block_log;
@@ -99,8 +113,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             current_block_log.logs.push(log);
                         }
 
-                        debug!("retrieved complete {current_block_log}");
-
+                        // Yield everything we've collected until this point
+                        debug!("completed {current_block_log}");
                         yield current_block_log;
                         from_block = latest_block + 1;
                     }

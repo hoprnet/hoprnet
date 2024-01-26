@@ -145,7 +145,7 @@ async def check_unredeemed_tickets_value(src: Node, value: int):
 
 
 async def check_safe_balance(src: Node, value: int):
-    while balance_str_to_int((await src.api.balances()).safe_hopr) == value:
+    while balance_str_to_int((await src.api.balances()).safe_hopr) != value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
