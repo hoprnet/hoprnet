@@ -123,7 +123,7 @@ pub struct InternalState {
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersionResponse
+            node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
         )
     ),
     modifiers(&SecurityAddon),
@@ -2192,7 +2192,7 @@ mod node {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct NodePeersRes {
+    pub(crate) struct NodePeersResponse {
         pub connected: Vec<PeerInfo>,
         pub announced: Vec<PeerInfo>,
     }
@@ -2209,7 +2209,7 @@ mod node {
         path = const_format::formatcp!("{BASE_PATH}/node/peers"),
         params(NodePeersReqQuery),
         responses(
-            (status = 200, description = "Successfully returned observed peers", body = NodePeersRes),
+            (status = 200, description = "Successfully returned observed peers", body = NodePeersResponse),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
@@ -2280,7 +2280,7 @@ mod node {
             .collect::<Vec<_>>()
             .await;
 
-        let body = NodePeersRes {
+        let body = NodePeersResponse {
             connected: all_network_peers.clone(),
             announced: all_network_peers, // TODO: currently these are the same, since everybody has to announce
         };
