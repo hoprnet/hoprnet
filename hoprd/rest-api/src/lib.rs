@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
-            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
+            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1369,7 +1369,7 @@ mod messages {
         "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
         "tag": 20
     }))]
-    pub(crate) struct SendMessageReq {
+    pub(crate) struct SendMessageBodyRequest {
         /// The message tag used to filter messages based on application
         pub tag: u16,
         /// Message to be transmitted over the network
@@ -1437,7 +1437,7 @@ mod messages {
         tag = "Messages",
     )]
     pub async fn send_message(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let args: SendMessageReq = req.body_json().await?;
+        let args: SendMessageBodyRequest = req.body_json().await?;
         let hopr = req.state().hopr.clone();
 
         // Use the message encoder, if any
@@ -1480,7 +1480,7 @@ mod messages {
     #[derive(Debug, Clone, serde::Deserialize)]
     pub(crate) struct WebSocketSendMsg {
         pub cmd: String,
-        pub args: SendMessageReq,
+        pub args: SendMessageBodyRequest,
     }
 
     #[derive(Debug, Clone, serde::Serialize)]
