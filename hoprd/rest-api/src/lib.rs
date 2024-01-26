@@ -113,7 +113,7 @@ pub struct InternalState {
     components(
         schemas(
             ApiError,
-            alias::PeerIdResponse, alias::AliasPeerId,
+            alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
@@ -525,7 +525,7 @@ mod alias {
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct AliasPeerId {
+    pub(crate) struct AliasPeerIdBodyRequest {
         pub alias: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -581,7 +581,7 @@ mod alias {
         tag = "Alias",
     )]
     pub async fn set_alias(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let args: AliasPeerId = req.body_json().await?;
+        let args: AliasPeerIdBodyRequest = req.body_json().await?;
         let aliases = req.state().aliases.clone();
 
         aliases.write().await.insert(args.alias, args.peer_id);
