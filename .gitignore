@@ -27,6 +27,7 @@ logs.txt
 /.cargo/.package-cache
 /.cargo/.crates.toml
 /.cargo/.crates2.json
+!/.cargo/config.toml
 
 
 # ignore local secret env file

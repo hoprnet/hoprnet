@@ -99,12 +99,11 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 #[derive(Debug, Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
+    safe_address: Address,
+    contract_addresses: ContractAddresses,
+    indexer_cfg: IndexerConfig,
+    indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    indexer: Indexer<
-        RpcOperations<JsonRpcClient>,
-        ContractEventHandlers<CoreEthereumDb<utils_db::CurrentDbShim>>,
-        CoreEthereumDb<utils_db::CurrentDbShim>,
-    >,
     chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
@@ -123,28 +122,36 @@ impl HoprChain {
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
-        let db_processor =
-            ContractEventHandlers::new(contract_addresses, safe_address, (&me_onchain).into(), db.clone());
-
-        let indexer = Indexer::new(
-            rpc_operations.clone(),
-            db_processor,
-            db.clone(),
-            indexer_cfg,
-            indexer_events_tx,
-        );
         Self {
             me_onchain,
+            safe_address,
+            contract_addresses,
+            indexer_cfg,
+            indexer_events_tx,
             db,
-            indexer,
             chain_actions,
             rpc_operations,
             channel_graph,
         }
     }
 
-    pub async fn sync_chain(&mut self) -> errors::Result<()> {
-        Ok(self.indexer.start().await?)
+    pub async fn sync_chain(&self) -> errors::Result<()> {
+        let db_processor = ContractEventHandlers::new(
+            self.contract_addresses,
+            self.safe_address,
+            (&self.me_onchain).into(),
+            self.db.clone(),
+        );
+
+        let mut indexer = Indexer::new(
+            self.rpc_operations.clone(),
+            db_processor,
+            self.db.clone(),
+            self.indexer_cfg,
+            self.indexer_events_tx.clone(),
+        );
+
+        Ok(indexer.start().await?)
     }
 
     pub fn me_onchain(&self) -> Address {
