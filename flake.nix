@@ -263,6 +263,7 @@
 
               # documentation utilities
               pandoc
+              swagger-codegen3
 
               # docker image inspection and handling
               dive
