@@ -119,7 +119,7 @@ pub struct InternalState {
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
-            messages::InboxMessagesRes,
+            messages::MessagePopAllResponse,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
@@ -1703,7 +1703,7 @@ mod messages {
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
-    pub(crate) struct InboxMessagesRes {
+    pub(crate) struct MessagePopAllResponse {
         pub messages: Vec<MessagePopResponse>,
     }
 
@@ -1719,7 +1719,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All message successfully extracted.", body = InboxMessagesRes),
+            (status = 200, description = "All message successfully extracted.", body = MessagePopAllResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1742,7 +1742,7 @@ mod messages {
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
-            .body(json!(InboxMessagesRes { messages }))
+            .body(json!(MessagePopAllResponse { messages }))
             .build())
     }
 
@@ -1795,7 +1795,7 @@ mod messages {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All messages successfully peeked at.", body = InboxMessagesRes),
+            (status = 200, description = "All messages successfully peeked at.", body = MessagePopAllResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -1819,7 +1819,7 @@ mod messages {
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
-            .body(json!(InboxMessagesRes { messages }))
+            .body(json!(MessagePopAllResponse { messages }))
             .build())
     }
 }
