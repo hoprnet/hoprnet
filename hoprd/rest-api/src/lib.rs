@@ -114,7 +114,7 @@ pub struct InternalState {
         schemas(
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerId,
-            account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
+            account::AccountAddressesResponse, account::AccountBalances, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
@@ -657,7 +657,7 @@ mod account {
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct AccountAddresses {
+    pub(crate) struct AccountAddressesResponse {
         pub native: String,
         pub hopr: String,
     }
@@ -669,7 +669,7 @@ mod account {
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
         responses(
-            (status = 200, description = "The node's public addresses", body = AccountAddresses),
+            (status = 200, description = "The node's public addresses", body = AccountAddressesResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -679,7 +679,7 @@ mod account {
         tag = "Account",
     )]
     pub(super) async fn addresses(req: Request<InternalState>) -> tide::Result<Response> {
-        let addresses = AccountAddresses {
+        let addresses = AccountAddressesResponse {
             native: req.state().hopr.me_onchain().to_string(),
             hopr: req.state().hopr.me_peer_id().to_string(),
         };
