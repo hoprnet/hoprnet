@@ -41,3 +41,7 @@ jobs:
 
       - name: Run linter
         run: nix develop -c make lint
+
+      - name: Ensure local changes were not committed
+        run: |
+           test "$(grep -c -E "^solc = \"/nix/store/.*$" ethereum/contracts/foundry.toml)" -eq "0"
