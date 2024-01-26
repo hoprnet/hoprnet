@@ -116,8 +116,8 @@ pub struct InternalState {
             alias::PeerIdResponse, alias::AliasPeerId,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
-            channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
+            channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelResponse,
+            channels::NodeChannel, channels::NodeChannelsResponse, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
@@ -1008,7 +1008,7 @@ mod channels {
         }
         ]
     }))]
-    pub(crate) struct NodeChannels {
+    pub(crate) struct NodeChannelsResponse {
         pub incoming: Vec<NodeChannel>,
         pub outgoing: Vec<NodeChannel>,
         pub all: Vec<NodeTopologyChannel>,
@@ -1052,7 +1052,7 @@ mod channels {
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         params(ChannelsQuery),
         responses(
-            (status = 200, description = "Channels fetched successfully", body = NodeChannels),
+            (status = 200, description = "Channels fetched successfully", body = NodeChannelsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1077,7 +1077,7 @@ mod channels {
 
             match topology {
                 Ok(all) => Ok(Response::builder(200)
-                    .body(json!(NodeChannels {
+                    .body(json!(NodeChannelsResponse {
                         incoming: vec![],
                         outgoing: vec![],
                         all
@@ -1096,7 +1096,7 @@ mod channels {
 
             match channels {
                 Ok((incoming, outgoing)) => {
-                    let channel_info = NodeChannels {
+                    let channel_info = NodeChannelsResponse {
                         incoming: incoming
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
@@ -1138,7 +1138,7 @@ mod channels {
         "transactionReceipt": "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct OpenChannelReceipt {
+    pub(crate) struct OpenChannelResponse {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_id: Hash,
@@ -1155,7 +1155,7 @@ mod channels {
             description = "Open channel request specification",
             content_type = "application/json"),
         responses(
-            (status = 201, description = "Channel successfully opened", body = OpenChannelReceipt),
+            (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
@@ -1179,7 +1179,7 @@ mod channels {
             .await
         {
             Ok(channel_details) => Ok(Response::builder(201)
-                .body(json!(OpenChannelReceipt {
+                .body(json!(OpenChannelResponse {
                     channel_id: channel_details.channel_id,
                     transaction_receipt: channel_details.tx_hash
                 }))
