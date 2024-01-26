@@ -63,7 +63,7 @@ hopr:
             node_stake_v2_factory: '0xb7f8bc63bbcad18155201308c8f3540b07f84f5e'
           confirmations: 2
           tx_polling_interval: 1000
-          logs_page_size: 100
+          max_block_range: 100
         anvil-localhost2:
           chain: anvil
           environment_type: local
@@ -82,7 +82,7 @@ hopr:
             node_stake_v2_factory: '0xb7f8bc63bbcad18155201308c8f3540b07f84f5e'
           confirmations: 2
           tx_polling_interval: 1000
-          logs_page_size: 100
+          max_block_range: 100
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
