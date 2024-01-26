@@ -116,7 +116,7 @@ pub struct InternalState {
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
+            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
             messages::MessagePopAllResponse,
@@ -1038,7 +1038,7 @@ mod channels {
     #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[into_params(parameter_in = Query)]
     #[serde(default, rename_all = "camelCase")]
-    pub(crate) struct ChannelsQuery {
+    pub(crate) struct ChannelsQueryRequest {
         #[schema(required = false)]
         #[serde(default)]
         pub including_closed: bool,
@@ -1050,7 +1050,7 @@ mod channels {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
-        params(ChannelsQuery),
+        params(ChannelsQueryRequest),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannelsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1063,7 +1063,7 @@ mod channels {
     )]
     pub(super) async fn list_channels(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        let query: ChannelsQuery = req.query()?;
+        let query: ChannelsQueryRequest = req.query()?;
 
         if query.full_topology {
             let hopr_clone = hopr.clone();
