@@ -113,7 +113,7 @@ pub struct InternalState {
     components(
         schemas(
             ApiError,
-            alias::PeerIdArg, alias::AliasPeerId,
+            alias::PeerIdResponse, alias::AliasPeerId,
             account::AccountAddresses, account::AccountBalances, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
@@ -512,7 +512,7 @@ mod alias {
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct PeerIdArg {
+    pub(crate) struct PeerIdResponse {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_id: PeerId,
@@ -570,7 +570,7 @@ mod alias {
             description = "Alias name along with the PeerId to be aliased",
             content_type = "application/json"),
         responses(
-            (status = 201, description = "Alias set successfully.", body = PeerIdArg),
+            (status = 201, description = "Alias set successfully.", body = PeerIdResponse),
             (status = 400, description = "Invalid PeerId: The format or length of the peerId is incorrect.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -586,7 +586,7 @@ mod alias {
 
         aliases.write().await.insert(args.alias, args.peer_id);
         Ok(Response::builder(200)
-            .body(json!(PeerIdArg { peer_id: args.peer_id }))
+            .body(json!(PeerIdResponse { peer_id: args.peer_id }))
             .build())
     }
 
@@ -598,7 +598,7 @@ mod alias {
             ("alias" = String, Path, description = "Alias to be shown"),
         ),
         responses(
-            (status = 200, description = "Get PeerId for an alias", body = PeerIdArg),
+            (status = 200, description = "Get PeerId for an alias", body = PeerIdResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
@@ -614,7 +614,7 @@ mod alias {
         let aliases = aliases.read().await;
         if let Some(peer_id) = aliases.get(&alias) {
             Ok(Response::builder(200)
-                .body(json!(PeerIdArg { peer_id: *peer_id }))
+                .body(json!(PeerIdResponse { peer_id: *peer_id }))
                 .build())
         } else {
             Ok(Response::builder(404).body(ApiErrorStatus::InvalidInput).build())
