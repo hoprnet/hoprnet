@@ -4,9 +4,9 @@ import random
 
 import pytest
 
-from .conftest import TICKET_PRICE_PER_HOP, default_nodes
+from .conftest import TICKET_PRICE_PER_HOP, default_nodes, passive_node
 from .hopr import HoprdAPI
-from .test_integration import create_channel, passive_node, send_and_receive_packets_with_pop
+from .test_integration import create_channel, send_and_receive_packets_with_pop
 
 
 async def check_connected_peer_count(me, count):
