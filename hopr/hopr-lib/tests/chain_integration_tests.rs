@@ -36,7 +36,12 @@ use utils_db::sqlite::SqliteShim;
 use utils_db::CurrentDbShim;
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
-async fn generate_the_first_ack_ticket(myself: &ChainNode, counterparty: &ChainKeypair, price: Balance) {
+async fn generate_the_first_ack_ticket<M: Middleware>(
+    myself: &ChainNode,
+    counterparty: &ChainKeypair,
+    price: Balance,
+    instances: &ContractInstances<M>,
+) {
     let hk1 = HalfKey::random();
     let hk2 = HalfKey::random();
 
@@ -44,21 +49,25 @@ async fn generate_the_first_ack_ticket(myself: &ChainNode, counterparty: &ChainK
     let cp2: CurvePoint = hk2.to_challenge().into();
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
+    let domain_separator: Hash = instances.channels.domain_separator().call().await.unwrap().into();
+
     let ticket = Ticket::new(
         &myself.chain_key.public().to_address(),
         &price,
-        0_u32.into(),
+        U256::zero(),
         U256::one(),
         1.0f64,
-        1_u32.into(),
+        U256::one(),
         Challenge::from(cp_sum).to_ethereum_challenge(),
         counterparty,
-        &Hash::default(),
+        &domain_separator,
     )
     .unwrap();
 
     let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-    let ack_ticket = unacked_ticket.acknowledge(&hk2, &myself.chain_key, &Hash::default()).unwrap();
+    let ack_ticket = unacked_ticket
+        .acknowledge(&hk2, &myself.chain_key, &domain_separator)
+        .unwrap();
 
     let mut ack_key = Vec::new();
     ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
@@ -66,7 +75,14 @@ async fn generate_the_first_ack_ticket(myself: &ChainNode, counterparty: &ChainK
     ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
     let key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap();
 
-    myself.db.write().await.db.set(key, &ack_ticket).await.expect("should store ack key");
+    myself
+        .db
+        .write()
+        .await
+        .db
+        .set(key, &ack_ticket)
+        .await
+        .expect("should store ack key");
 }
 
 async fn onboard_node<M: Middleware>(
@@ -419,55 +435,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    let channel_alice_bob_seen_by_bob = bob_node
-        .db
-        .read()
-        .await
-        .get_channel_from(&alice_chain_key.public().to_address())
-        .await
-        .expect("db call should not fail")
-        .expect("should contain a channel from Alice");
-
-    assert_eq!(channel_alice_bob.get_id(), channel_alice_bob_seen_by_bob.get_id(), "channel ids must match");
-
-    let ticket_price = Balance::new(1, BalanceType::HOPR);
-
-    // Create ticket from Alice in Bob's DB
-    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price).await;
-
-    let bob_ack_tickets = bob_node.db
-        .read()
-        .await
-        .get_acknowledged_tickets(Some(channel_alice_bob))
-        .await
-        .expect("get ack ticket call on Bob's db must not fail");
-
-    assert_eq!(1, bob_ack_tickets.len(), "Bob must have a single acknowledged ticket");
-
-    let channel_balance_before_redeem = channel_alice_bob.balance;
-
-    // Bob redeems ticket
-    let confirmations = futures::future::try_join_all(
-        bob_node
-            .actions
-            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), false)
-            .await
-            .expect("should submit redeem action"),
-    )
-    .await
-    .expect("should redeem all tickets");
-
-    assert_eq!(1, confirmations.len(), "Bob should redeem a single ticket");
-
-    let bob_ack_tickets = bob_node.db
-        .read()
-        .await
-        .get_acknowledged_tickets(Some(channel_alice_bob))
-        .await
-        .expect("get ack ticket call on bob's db must not fail");
-
-    assert_eq!(0, bob_ack_tickets.len(), "Bob must have no acknowledged tickets after redeeming");
-
+    // after the second funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
         .db
         .read()
@@ -477,10 +445,155 @@ async fn integration_test_indexer() {
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
+    let channel_alice_bob_seen_by_bob = bob_node
+        .db
+        .read()
+        .await
+        .get_channel_from(&alice_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel from Alice");
+
     assert_eq!(
-            channel_balance_before_redeem - ticket_price,
-            channel_alice_bob.balance,
-            "channel balance must decrease after redeem"
+        channel_alice_bob.get_id(),
+        channel_alice_bob_seen_by_bob.get_id(),
+        "channel ids must match"
+    );
+    assert_eq!(
+        channel_alice_bob.balance, channel_alice_bob_seen_by_bob.balance,
+        "channel balance must match"
+    );
+
+    let channel_bob_alice = bob_node
+        .db
+        .read()
+        .await
+        .get_channel_to(&alice_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel to Alice from Bob");
+    let ticket_price = Balance::new(1, BalanceType::HOPR);
+
+    // Create ticket from Bob in Alice's DB
+    generate_the_first_ack_ticket(&alice_node, &bob_chain_key, ticket_price, &instances).await;
+
+    let alice_ack_tickets = alice_node
+        .db
+        .read()
+        .await
+        .get_acknowledged_tickets(Some(channel_bob_alice))
+        .await
+        .expect("get ack ticket call on Alice's db must not fail");
+
+    assert_eq!(
+        1,
+        alice_ack_tickets.len(),
+        "Alice must have a single acknowledged ticket"
+    );
+
+    let channel_balance_before_redeem = channel_alice_bob.balance;
+    let channel_bob_alice = alice_node
+        .db
+        .read()
+        .await
+        .get_channel_from(&bob_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel from Bob");
+
+    let (on_chain_channel_bob_alice_balance, _, _, _, _) = instances
+        .channels
+        .channels(channel_bob_alice.get_id().into())
+        .call()
+        .await
+        .unwrap();
+    let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
+        .channels
+        .channels(channel_alice_bob.get_id().into())
+        .call()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        channel_alice_bob.balance.amount(),
+        on_chain_channel_alice_bob_balance.into(),
+        "channel alice->bob balance (before ticket redemption) must match"
+    );
+    assert_eq!(
+        100, on_chain_channel_alice_bob_balance,
+        "channel alice->bob balance (before ticket redemption) must be 100"
+    );
+    assert_eq!(
+        100, on_chain_channel_bob_alice_balance,
+        "channel bob->alice balance (before ticket redemption) must be 100"
+    );
+
+    // Alice redeems ticket
+    let confirmations = futures::future::try_join_all(
+        alice_node
+            .actions
+            .redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
+            .await
+            .expect("should submit redeem action"),
+    )
+    .await
+    .expect("should redeem all tickets");
+
+    assert_eq!(1, confirmations.len(), "Alice should redeem a single ticket");
+
+    let alice_ack_tickets = alice_node
+        .db
+        .read()
+        .await
+        .get_acknowledged_tickets(Some(channel_bob_alice))
+        .await
+        .expect("get ack ticket call on Alice's db must not fail");
+
+    assert_eq!(
+        0,
+        alice_ack_tickets.len(),
+        "Alice must have no acknowledged tickets after redeeming"
+    );
+
+    let channel_bob_alice = alice_node
+        .db
+        .read()
+        .await
+        .get_channel_from(&bob_chain_key.public().to_address())
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel from Bob");
+
+    let (on_chain_channel_bob_alice_balance, _, _, _, _) = instances
+        .channels
+        .channels(channel_bob_alice.get_id().into())
+        .call()
+        .await
+        .unwrap();
+    let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
+        .channels
+        .channels(channel_alice_bob.get_id().into())
+        .call()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        101, on_chain_channel_alice_bob_balance,
+        "channel alice->bob balance (before ticket redemption) must be 101"
+    );
+    assert_eq!(
+        99, on_chain_channel_bob_alice_balance,
+        "channel bob->alice balance (after ticket redemption) must be 99"
+    );
+    assert_eq!(
+        channel_bob_alice.balance.amount(),
+        on_chain_channel_bob_alice_balance.into(),
+        "channel bob->alice balance (after ticket redemption) must match"
+    );
+    assert_eq!(
+        channel_balance_before_redeem - ticket_price,
+        channel_bob_alice.balance,
+        "channel balance must decrease after redeem"
     );
 
     // Close channel
