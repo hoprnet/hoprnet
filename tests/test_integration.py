@@ -769,6 +769,9 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     packets = await dest_peer.api.messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
 
+    # ts_for_query set right before (1ms before) the first message of the second batch.
+    # This is to ensure that the first message of the second batch will be returned by the query.
+    # It's a workaround, it should work properly without the -1, however randmly fails.
     ts_for_query = timestamps[split_index] - 1
 
     packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
