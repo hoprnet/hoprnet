@@ -116,7 +116,7 @@ pub struct InternalState {
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
+            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
             messages::MessagePopAllResponse,
@@ -1124,7 +1124,7 @@ mod channels {
         "amount": "10",
         "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
-    pub(crate) struct OpenChannelRequest {
+    pub(crate) struct OpenChannelBodyRequest {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
@@ -1169,7 +1169,7 @@ mod channels {
     pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let open_req: OpenChannelRequest = req.body_json().await?;
+        let open_req: OpenChannelBodyRequest = req.body_json().await?;
 
         match hopr
             .open_channel(
