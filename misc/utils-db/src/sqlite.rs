@@ -296,7 +296,7 @@ mod tests {
         let expected = vec![value_1.as_bytes().into(), value_3.as_bytes().into()];
 
         let mut received = Vec::new();
-        let mut data_stream = kv_storage
+        let data_stream = kv_storage
             .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
             .await
             .unwrap();

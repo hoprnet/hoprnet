@@ -38,21 +38,13 @@ jobs:
         env:
           USER: runner
 
-      - name: Install nightly Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Build bindings
-        run: nix develop -c make build-solidity-types
-
       - name: Build docs
-        env:
-          RUSTDOCFLAGS: --enable-index-page -Z unstable-options
-        run: cargo +nightly doc --no-deps
+        run: nix build .#docs
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./target/doc/
+          publish_dir: ./result/share/doc/
           force_orphan: true

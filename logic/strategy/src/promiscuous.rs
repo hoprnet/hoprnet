@@ -2,8 +2,6 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
-use rand::rngs::OsRng;
-use rand::seq::SliceRandom;
 use std::collections::HashMap;
 
 use async_lock::RwLock;
@@ -11,12 +9,16 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_crypto_random::OsRng;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Sub;
+use std::str::FromStr;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -40,7 +42,7 @@ lazy_static::lazy_static! {
 
 /// Config of promiscuous strategy.
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
@@ -72,6 +74,11 @@ pub struct PromiscuousStrategyConfig {
     /// `max_channels` limit.
     /// Defaults to true
     pub enforce_max_channels: bool,
+
+    /// Specifies minimum version of the peer the strategy should open a channel to.
+    /// Default is ">=2.0.0"
+    #[serde_as(as = "DisplayFromStr")]
+    pub minimum_peer_version: semver::VersionReq,
 }
 
 impl Default for PromiscuousStrategyConfig {
@@ -83,6 +90,7 @@ impl Default for PromiscuousStrategyConfig {
             minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             max_channels: None,
             enforce_max_channels: true,
+            minimum_peer_version: ">=2.0.0".parse().unwrap(),
         }
     }
 }
@@ -144,12 +152,29 @@ where
         self.network
             .read()
             .await
-            .all_peers_with_avg_quality()
-            .iter()
-            .filter_map(|(peer, q)| match OffchainPublicKey::try_from(peer) {
-                Ok(offchain_key) => Some((offchain_key, q)),
+            .all_peers()
+            .into_iter()
+            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
+                Ok(offchain_key) => {
+                    // Do peer version matching against minimum required version by this strategy
+                    let reported_version = status.metadata().get(PEER_METADATA_PROTOCOL_VERSION);
+                    match reported_version.and_then(|v| semver::Version::from_str(v).ok()) {
+                        Some(v) => self
+                            .cfg
+                            .minimum_peer_version
+                            .matches(&v)
+                            .then_some((offchain_key, status.get_average_quality())),
+                        None => {
+                            debug!(
+                                "peer {} has invalid or missing version info: {:?}",
+                                status.id, reported_version
+                            );
+                            None
+                        }
+                    }
+                }
                 Err(_) => {
-                    error!("encountered invalid peer id: {peer}");
+                    error!("encountered invalid peer id: {}", status.id);
                     None
                 }
             })
@@ -163,7 +188,7 @@ where
                     .await
                     .and_then(|addr| addr.ok_or(utils_db::errors::DbError::NotFound))
                 {
-                    Ok(addr) => Some((addr, *q)),
+                    Ok(addr) => Some((addr, q)),
                     Err(_) => {
                         error!("could not find on-chain address for {k_clone}");
                         None
@@ -320,7 +345,7 @@ where
     A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", Strategy::Promiscuous(self.cfg))
+        write!(f, "{:?}", Strategy::Promiscuous(self.cfg.clone()))
     }
 }
 
@@ -331,7 +356,7 @@ where
     A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::Promiscuous(self.cfg))
+        write!(f, "{}", Strategy::Promiscuous(self.cfg.clone()))
     }
 }
 
@@ -409,9 +434,7 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
     use hopr_platform::time::native::current_timestamp;
-    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
@@ -481,7 +504,8 @@ mod tests {
             net.add(peer, PeerOrigin::Initialization);
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                net.update(peer, Ok(current_timestamp().as_millis() as u64));
+                let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
+                net.update_with_metadata(peer, Ok(current_timestamp().as_millis() as u64), Some(metadata.into()));
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
@@ -551,10 +575,9 @@ mod tests {
             MockNetworkExternalActions {},
         )));
 
-        let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 1.0, 0.1, 0.3, 0.1, 0.2, 0.3];
+        let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
-        let balance = Balance::new_from_str("100000000000000000000", BalanceType::HOPR); // 11 HOPR
-                                                                                         //let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
+        let balance = Balance::new_from_str("100000000000000000000", BalanceType::HOPR);
 
         init_db(db.clone(), balance).await;
         prepare_network(network.clone(), qualities_that_alice_sees).await;
@@ -562,6 +585,13 @@ mod tests {
         mock_channel(db.clone(), PEERS[1].0, balance).await;
         mock_channel(db.clone(), PEERS[2].0, balance).await;
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
+
+        // Peer 10 has an old node version
+        network.write().await.update_with_metadata(
+            &PEERS[9].1,
+            Ok(current_timestamp().as_millis() as u64),
+            Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
+        );
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels
@@ -572,8 +602,9 @@ mod tests {
             - There are max 3 channels.
             - Strategy will close channel to peer 5, because it has quality 0.1
             - Because of the closure, this means there can be 1 additional channel opened
-                - Strategy can open channel either to peer 3 or 4 (quality 0.8 and 1.0 respectively)
-                - It will prefer peer 4 because it has higher quality
+                - Strategy can open channel either to peer 3, 4 or 10 (with qualities 0.8, 0.98 and 1.0 respectively)
+                - It will ignore peer 9 even though it is highest quality, but does not meet minimum node version
+                - It will prefer peer 4 because it has higher quality than node 3
         */
 
         let mut actions = MockChannelAct::new();
@@ -590,7 +621,7 @@ mod tests {
             .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
-        let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
+        let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, network, actions);
 
         for _ in 0..strat_cfg.min_network_size_samples - 1 {
             strat

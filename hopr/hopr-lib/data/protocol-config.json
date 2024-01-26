@@ -29,7 +29,7 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29521261,
-      "logs_page_size": 2000,
+      "max_block_range": 2000,
       "tags": ["development"],
       "tx_polling_interval": 3000,
       "version_range": "*"
@@ -50,7 +50,7 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 29706814,
-      "logs_page_size": 2000,
+      "max_block_range": 2000,
       "tags": ["etherscan"],
       "tx_polling_interval": 3000,
       "version_range": "2.*"
@@ -71,7 +71,7 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 24097267,
-      "logs_page_size": 2000,
+      "max_block_range": 2000,
       "tags": ["etherscan"],
       "tx_polling_interval": 3000,
       "version_range": "1.89||1.90||1.91||1.92||1.93"
@@ -92,7 +92,7 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29690361,
-      "logs_page_size": 2000,
+      "max_block_range": 2000,
       "tags": ["etherscan"],
       "tx_polling_interval": 3000,
       "version_range": "2.*"

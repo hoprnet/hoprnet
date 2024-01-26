@@ -45,14 +45,21 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
-                        // If on first iteration the start block is in the future, just set it to latest
-                        if from_block == start_block_number && from_block > latest_block {
-                            from_block = latest_block;
+                        if from_block > latest_block {
+                            if from_block == start_block_number {
+                                // If on first iteration the start block is in the future, just set it to latest
+                                from_block = latest_block;
+                            } else if from_block - 1 == latest_block {
+                                // If we came here early (we tolerate only off-by one), wait some more
+                                futures_timer::Delay::new(self.cfg.expected_block_time / 3).await;
+                                continue;
+                            } else {
+                                // This is a hard-failure on subsequent iterations which is unrecoverable
+                                panic!("indexer start block number {from_block} is greater than the chain latest block number {latest_block} =>
+                                possible causes: chain reorg, RPC provider out of sync, corrupted DB =>
+                                possible solutions: change the RPC provider, reinitialize the DB");
+                            }
                         }
-
-                        // This is a hard-failure on subsequent iterations which is unrecoverable
-                        // (e.g. Anvil restart in the background when testing and `latest_block` jumps below `from_block`)
-                        assert!(latest_block >= from_block, "indexer start block number is greater than the chain latest block number");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
@@ -65,11 +72,15 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         if from_block != latest_block {
                             debug!("polling logs from blocks #{from_block} - #{latest_block}");
                         } else {
-                             debug!("polling logs from block #{from_block}");
+                            debug!("polling logs from block #{from_block}");
                         }
 
+                        // Range of blocks to fetch is always bounded
+                        let page_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
+                        debug!("block range fetch size: {page_size}");
+
                         // The provider internally performs retries on timeouts and errors.
-                        let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
+                        let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, page_size);
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {

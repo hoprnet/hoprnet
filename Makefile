@@ -41,8 +41,7 @@ deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
-	$(MAKE) build-solidity-types
-# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	# $(MAKE) cargo-update
 
@@ -55,14 +54,8 @@ cargo-download: ## download vendored Cargo dependencies
 	$(cargo) vendor --versioned-dirs vendor/cargo
 	$(cargo) fetch
 
-.PHONY: build-solidity-types
-build-solidity-types: ## generate Solidity typings
-	echo "Foundry create binding"
-	$(MAKE) -C ethereum/contracts/ generate-bindings
-
 .PHONY: build
 build: ## build all packages
-build: build-solidity-types
 	$(cargo) build
 
 .PHONY: build-yellowpaper
@@ -87,14 +80,8 @@ clean: # Cleanup build directories
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 	$(cargo) test
 
-.PHONY: smoke-test
-smoke-test: suite=integration
-smoke-test: ## run smoke test suite defained via parameter suite=
-	echo "Only run suite=$(suite)"
-	source .venv/bin/activate && python3 -m pytest tests/test_$(suite).py
-
-.PHONY: smoke-test-full
-smoke-test-full: ## run smoke testss
+.PHONY: smoke-tests
+smoke-tests: ## run smoke tests
 	source .venv/bin/activate && python3 -m pytest tests/
 
 .PHONY: smart-contract-test
@@ -177,8 +164,8 @@ run-local: ## run HOPRd from local repo
 	hoprd --init --api \
 		--password="local" --identity="${id_path}" \
 		--network "${network}" --announce \
-		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication \
+		--testAnnounceLocalAddresses --testPreferLocalAddresses \
+		--disableApiAuthentication \
 		--protocolConfig $(mydir)scripts/protocol-config-anvil.json \
 		--data /tmp/ \
 		$(args)
@@ -422,15 +409,19 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
-	hoprd-api-schema >| openapi.spec.json
+	hoprd-api-schema >| /tmp/openapi.spec.json
 
+	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
+    
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
-		-o /local/hoprd-sdk-python -i /local/openapi.spec.json \
-		-c /local/scripts/python-sdk-config.json
+	
+	swagger-codegen3 generate \
+		-l python \
+		-o hoprd-sdk-python \
+		-i /tmp/openapi.spec.json \
+		-c /tmp/python-sdk-config.json
 
-	rm openapi.spec.json
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
 
 .PHONY: help

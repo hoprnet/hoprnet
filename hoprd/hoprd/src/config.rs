@@ -17,7 +17,9 @@ fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
         Ok(())
     } else {
-        Err(ValidationError::new("Invalid file path specified"))
+        Err(ValidationError::new(
+            "Invalid file path specified, the file does not exist or is not a file",
+        ))
     }
 }
 
@@ -46,10 +48,13 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
     #[validate(custom = "validate_file_path")]
+    #[serde(default)]
     pub file: String,
     #[validate(custom = "validate_password")]
+    #[serde(default)]
     pub password: String,
     #[validate(custom = "validate_optional_private_key")]
+    #[serde(default)]
     pub private_key: Option<String>,
 }
 
@@ -65,11 +70,6 @@ impl std::fmt::Debug for Identity {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct Testing {
-    pub use_weak_crypto: bool,
-}
-
 /// The main configuration object of the entire node.
 ///
 /// The configuration is composed of individual configuration of corresponding
@@ -77,91 +77,24 @@ pub struct Testing {
 ///
 /// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
 ///
-/// The default configuration as it would appear from the configuration YAML file.
-/// ```yaml
-/// ---
-///
-/// host:
-///   address: !IPv4 127.0.0.1
-///   port: 47462
-/// identity:
-///   file: identity
-///   password: ''
-///   private_key: ''
-/// db:
-///   data: /tmp/db
-///   initialize: false
-///   force_initialize: false
-/// inbox:
-///   capacity: 512
-///   max_age: 900
-///   excluded_tags:
-///   - 0
-/// api:
-///   enable: true
-///   auth: !Token sdjkghsfg
-/// host:
-///   address: !IPv4 127.0.0.1
-///   port: 1233
-/// strategy:
-///   on_fail_continue: true
-///   allow_recursive: true
-///   strategies: []
-/// heartbeat:
-///   variance: 0
-///   interval: 0
-///   threshold: 0
-/// network_options:
-///   min_delay: 1
-///   max_delay: 300
-///   quality_bad_threshold: 0.2
-///   quality_offline_threshold: 0.0
-///   quality_step: 0.1
-///   ignore_timeframe: 600
-///   backoff_exponent: 1.5
-///   backoff_min: 2.0
-///   backoff_max: 300.0
-/// protocol:
-///   ack:
-///     timeout: 15
-///   heartbeat:
-///     timeout: 15
-///   msg:
-///     timeout: 15
-///   ticket_aggregation:
-///     timeout: 15
-/// network: anvil-localhost
-/// chain:
-///   announce: false
-///   provider: null
-///   check_unrealized_balance: true
-/// safe_module:
-///   safe_transaction_service_provider: null
-///   safe_address: null
-///   module_address: null
-/// test:
-///   announce_local_addresses: false
-///   prefer_local_addresses: false
-///   use_weak_crypto: false
-/// ```
-///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
     #[validate]
+    #[serde(default)]
     pub hopr: HoprLibConfig,
     /// Configuration regarding the identity of the node
     #[validate]
+    #[serde(default)]
     pub identity: Identity,
     /// Configuration of the underlying database engine
     #[validate]
+    #[serde(default)]
     pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
     #[validate]
+    #[serde(default)]
     pub api: Api,
-    /// Testing configurations
-    #[validate]
-    pub test: Testing,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
@@ -195,15 +128,23 @@ impl HoprdConfig {
         };
 
         // hopr.transport
-        cfg.hopr.transport.announce_local_addresses = cli_args.test_announce_local_addresses;
-        cfg.hopr.transport.prefer_local_addresses = cli_args.test_prefer_local_addresses;
+        if cli_args.test_announce_local_addresses > 0 {
+            cfg.hopr.transport.announce_local_addresses = true;
+        }
+        if cli_args.test_prefer_local_addresses > 0 {
+            cfg.hopr.transport.prefer_local_addresses = true;
+        }
 
         // db
         if let Some(data) = cli_args.data {
             cfg.hopr.db.data = data
         }
-        cfg.hopr.db.initialize = cli_args.init;
-        cfg.hopr.db.force_initialize = cli_args.force_init;
+        if cli_args.init > 0 {
+            cfg.hopr.db.initialize = true;
+        }
+        if cli_args.force_init > 0 {
+            cfg.hopr.db.force_initialize = true;
+        }
 
         // inbox
         if let Some(x) = cli_args.inbox_capacity {
@@ -211,8 +152,10 @@ impl HoprdConfig {
         }
 
         // api
-        cfg.api.enable = cli_args.api;
-        if cli_args.disable_api_authentication && cfg.api.auth != Auth::None {
+        if cli_args.api > 0 {
+            cfg.api.enable = true;
+        }
+        if cli_args.disable_api_authentication > 0 && cfg.api.auth != Auth::None {
             cfg.api.auth = Auth::None;
         };
         if let Some(x) = cli_args.api_token {
@@ -259,12 +202,14 @@ impl HoprdConfig {
             cfg.hopr.strategy.strategies.push(x);
         }
 
-        if cli_args.auto_redeem_tickets {
+        if cli_args.auto_redeem_tickets == 0 {
             cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
         }
 
         // chain
-        cfg.hopr.chain.announce = cli_args.announce;
+        if cli_args.announce > 0 {
+            cfg.hopr.chain.announce = true;
+        }
         if let Some(network) = cli_args.network {
             cfg.hopr.chain.network = network;
         }
@@ -281,7 +226,9 @@ impl HoprdConfig {
         if let Some(x) = cli_args.provider {
             cfg.hopr.chain.provider = Some(x)
         };
-        cfg.hopr.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
+        if cli_args.check_unrealized_balance == 0 {
+            cfg.hopr.chain.check_unrealized_balance = true;
+        }
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
@@ -295,9 +242,6 @@ impl HoprdConfig {
             cfg.hopr.safe_module.module_address =
                 Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
         };
-
-        // test
-        cfg.test.use_weak_crypto = cli_args.test_use_weak_crypto;
 
         // additional updates
         let home_symbol = '~';
@@ -425,7 +369,7 @@ pub const EXAMPLE_YAML: &str = r#"hopr:
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
           tx_polling_interval: 1000
-          logs_page_size: 200
+          max_block_range: 200
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
@@ -459,8 +403,6 @@ api:
   host:
     address: !IPv4 127.0.0.1
     port: 1233
-test:
-  use_weak_crypto: false
 "#;
 
 #[cfg(test)]
@@ -518,7 +460,7 @@ mod tests {
                             "confirmations": 2,
                             "tags": [],
                             "tx_polling_interval": 1000,
-                            "logs_page_size": 200
+                            "max_block_range": 200
                           }
                         },
                         "chains": {
@@ -560,7 +502,6 @@ mod tests {
                 auth: Auth::None,
                 host: hopr_lib::config::HostConfig::from_str(format!("127.0.0.1:1233").as_str()).unwrap(),
             },
-            test: Testing { use_weak_crypto: false },
         }
     }
 

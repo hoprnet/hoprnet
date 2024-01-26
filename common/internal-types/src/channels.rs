@@ -12,6 +12,7 @@ use serde_repr::*;
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    sync::OnceLock,
 };
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -284,16 +285,31 @@ impl ChannelChange {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq)]
 pub struct Ticket {
     pub channel_id: Hash,
-    pub amount: Balance,
-    pub index: u64,
-    pub index_offset: u32,
-    pub encoded_win_prob: EncodedWinProb,
-    pub channel_epoch: u32,
+    pub amount: Balance,                  // 92 ---
+    pub index: u64,                       // 48
+    pub index_offset: u32,                // 32
+    pub encoded_win_prob: EncodedWinProb, // 56
+    pub channel_epoch: u32,               // 24
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+    signer: OnceLock<PublicKey>,
+}
+
+impl PartialEq for Ticket {
+    fn eq(&self, other: &Self) -> bool {
+        // Exclude cached properties
+        self.channel_id == other.channel_id
+            && self.amount == other.amount
+            && self.index == other.index
+            && self.index_offset == other.index_offset
+            && self.encoded_win_prob == other.encoded_win_prob
+            && self.channel_epoch == other.channel_epoch
+            && self.challenge == other.challenge
+            && self.signature == other.signature
+    }
 }
 
 impl PartialOrd for Ticket {
@@ -304,6 +320,8 @@ impl PartialOrd for Ticket {
 
 impl Ord for Ticket {
     fn cmp(&self, other: &Self) -> Ordering {
+        // Ordering:
+        // [channel_id][channel_epoch][ticket_index]
         match self.channel_id.cmp(&other.channel_id) {
             Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
                 Ordering::Equal => self.index.cmp(&other.index),
@@ -364,6 +382,7 @@ impl Default for Ticket {
             channel_epoch: 1u32,
             challenge: EthereumChallenge::default(),
             signature: None,
+            signer: OnceLock::new(),
         }
     }
 }
@@ -421,7 +440,7 @@ impl Ticket {
 
         let channel_id = generate_channel_id(&own_address, counterparty);
 
-        let mut ret = Ticket {
+        let mut ret = Self {
             channel_id,
             amount: amount.to_owned(),
             index: index.as_u64(),
@@ -430,6 +449,7 @@ impl Ticket {
             challenge,
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
+            signer: OnceLock::new(),
         };
         ret.sign(signing_key, domain_separator);
 
@@ -471,6 +491,7 @@ impl Ticket {
             challenge,
             encoded_win_prob,
             signature: Some(signature),
+            signer: OnceLock::new(),
         };
 
         ret.verify(own_address, domain_separator)
@@ -511,6 +532,7 @@ impl Ticket {
             challenge: EthereumChallenge::default(),
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
+            signer: OnceLock::new(),
         })
     }
 
@@ -682,10 +704,16 @@ impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<PublicKey> {
-        PublicKey::from_signature_hash(
-            &self.get_hash(domain_separator).to_bytes(),
-            self.signature.as_ref().expect("ticket not signed"),
-        )
+        // OnceLock::get_or_try_insert fits better, but it is unstable
+        if let Some(signer) = self.signer.get() {
+            Ok(signer.clone())
+        } else {
+            let signer = PublicKey::from_signature_hash(
+                &self.get_hash(domain_separator).to_bytes(),
+                self.signature.as_ref().expect("ticket not signed"),
+            )?;
+            Ok(self.signer.get_or_init(|| signer).clone())
+        }
     }
 
     /// Verifies the signature of this ticket.
@@ -748,6 +776,7 @@ impl BinarySerializable for Ticket {
                 channel_epoch: u32::from_be_bytes(channel_epoch),
                 challenge,
                 signature: Some(signature),
+                signer: OnceLock::new(),
             })
         } else {
             // TODO: make Error a generic

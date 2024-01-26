@@ -10,7 +10,7 @@ use hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_primitive_types::traits::ToHex;
-use log::{error, info};
+use log::{error, info, warn};
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
@@ -39,6 +39,12 @@ const V2_PRIVKEYS_LENGTH: usize = 172;
 // Current version, deviates from pre 2.0
 const VERSION: u32 = 2;
 
+#[cfg(any(debug_assertions, test))]
+const USE_WEAK_CRYPTO: bool = true;
+
+#[cfg(all(not(debug_assertions), not(test)))]
+const USE_WEAK_CRYPTO: bool = false;
+
 struct Aes128Ctr {
     inner: ctr::CtrCore<Aes128, ctr::flavors::Ctr128BE>,
 }
@@ -59,7 +65,6 @@ pub struct IdentityOptions {
     pub initialize: bool,
     pub id_path: String,
     pub password: String,
-    pub use_weak_crypto: Option<bool>,
     pub private_key: Option<Box<[u8]>>,
 }
 
@@ -227,7 +232,7 @@ impl HoprKeys {
             } else {
                 HoprKeys::random()
             };
-            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password)?;
 
             return Ok(keys);
         }
@@ -237,7 +242,7 @@ impl HoprKeys {
                 Ok((keys, needs_migration)) => {
                     info!("migration needed = {}", needs_migration);
                     if needs_migration {
-                        keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?
+                        keys.write_eth_keystore(&opts.id_path, &opts.password)?
                     }
                     return Ok(keys);
                 }
@@ -253,7 +258,7 @@ impl HoprKeys {
                 &opts.id_path
             );
             let keys = HoprKeys::random();
-            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password)?;
 
             return Ok(keys);
         }
@@ -358,14 +363,17 @@ impl HoprKeys {
     /// Writes a keystore file using custom FS operation and custom entropy source
     ///
     /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
-    pub fn write_eth_keystore(&self, path: &str, password: &str, use_weak_crypto: bool) -> Result<()> {
+    pub fn write_eth_keystore(&self, path: &str, password: &str) -> Result<()> {
+        if USE_WEAK_CRYPTO {
+            warn!("USING WEAK CRYPTO -> this build is not meant for production!");
+        }
         // Generate a random salt.
         let salt: [u8; HOPR_KEY_SIZE] = random_bytes();
 
         // Derive the key.
         let mut key = [0u8; HOPR_KDF_PARAMS_DKLEN as usize];
         let scrypt_params = ScryptParams::new(
-            if use_weak_crypto { 1 } else { HOPR_KDF_PARAMS_LOG_N },
+            if USE_WEAK_CRYPTO { 1 } else { HOPR_KDF_PARAMS_LOG_N },
             HOPR_KDF_PARAMS_R,
             HOPR_KDF_PARAMS_P,
             HOPR_KDF_PARAMS_DKLEN.into(),
@@ -403,7 +411,7 @@ impl HoprKeys {
                 kdf: KdfType::Scrypt,
                 kdfparams: KdfparamsType::Scrypt {
                     dklen: HOPR_KDF_PARAMS_DKLEN,
-                    n: 2u32.pow(if use_weak_crypto { 1 } else { HOPR_KDF_PARAMS_LOG_N } as u32),
+                    n: 2u32.pow(if USE_WEAK_CRYPTO { 1 } else { HOPR_KDF_PARAMS_LOG_N } as u32),
                     p: HOPR_KDF_PARAMS_P,
                     r: HOPR_KDF_PARAMS_R,
                     salt: salt.to_vec(),
@@ -460,7 +468,7 @@ mod tests {
 
         let keys = HoprKeys::random();
 
-        keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD, true)
+        keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD)
             .unwrap();
 
         let (deserialized, needs_migration) =
@@ -502,7 +510,6 @@ mod tests {
             initialize: false,
             id_path: identity_dir.to_str().unwrap().into(),
             password: "local".into(),
-            use_weak_crypto: None,
             private_key: None,
         })
         .is_ok());

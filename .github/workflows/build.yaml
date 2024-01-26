@@ -5,6 +5,7 @@
 name: Build
 
 on:
+  merge_group:
   pull_request:
     types:
       - synchronize

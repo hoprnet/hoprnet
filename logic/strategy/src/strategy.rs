@@ -195,7 +195,7 @@ impl MultiStrategy {
         for strategy in cfg.strategies.iter() {
             match strategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
-                    *sub_cfg,
+                    sub_cfg.clone(),
                     db.clone(),
                     network.clone(),
                     chain_actions.clone(),

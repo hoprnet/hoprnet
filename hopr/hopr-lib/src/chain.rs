@@ -111,8 +111,8 @@ pub struct Network {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch while indexing logs
+    pub max_block_range: u64,
 }
 
 #[serde_as]
@@ -189,8 +189,8 @@ pub struct ChainNetworkConfig {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch when indexing logs
+    pub max_block_range: u64,
 }
 
 /// Check whether the version is allowed
@@ -242,7 +242,7 @@ impl ChainNetworkConfig {
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
-                logs_page_size: network.logs_page_size,
+                max_block_range: network.max_block_range,
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
@@ -345,13 +345,13 @@ pub fn build_chain_components<Db>(
 where
     Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
 {
-    let rpc_client = JsonRpcClient::new(
-        &chain_config.chain.default_provider,
-        DefaultHttpPostRequestor::default(),
-        SimpleJsonRpcRetryPolicy::default(),
-    );
+    // TODO: extract this from the global config type
+    let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
 
-    // TODO: extract these configs from the global config type
+    // TODO: extract this from the global config type
+    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
+
+    // TODO: extract this from the global config type
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_config.chain.chain_id as u64,
         contract_addrs,
@@ -359,28 +359,45 @@ where
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
         tx_confirmations: chain_config.confirmations as usize,
-        logs_page_size: chain_config.logs_page_size,
+        max_block_range_fetch_size: chain_config.max_block_range,
     };
+
+    // TODO: extract this from the global config type
     let rpc_client_cfg = RpcEthereumClientConfig::default();
+
+    // TODO: extract this from the global config type
     let action_queue_cfg = ActionQueueConfig::default();
 
+    // --- Configs done ---
+
+    // Build JSON RPC client
+    let rpc_client = JsonRpcClient::new(
+        &chain_config.chain.default_provider,
+        DefaultHttpPostRequestor::new(rpc_http_config),
+        rpc_http_retry_policy,
+    );
+
+    // Build RPC operations
     let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg).expect("failed to initialize RPC");
 
+    // Build the Ethereum Transaction Executor that uses RpcOperations as backend
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
         SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
     );
 
-    let tx_queue = ActionQueue::new(
+    // Build the Action Queue
+    let action_queue = ActionQueue::new(
         db.clone(),
         IndexerActionTracker::default(),
         ethereum_tx_executor,
         action_queue_cfg,
     );
 
-    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
+    // Instantiate Chain Actions
+    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, action_queue.new_sender());
 
-    (tx_queue, chain_actions, rpc_operations)
+    (action_queue, chain_actions, rpc_operations)
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected

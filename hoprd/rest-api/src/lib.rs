@@ -225,8 +225,11 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+            // We're not interested on metrics for other endpoints
+            if path.starts_with("/api/v3/") {
+                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
+            }
         }
 
         log::log!(
@@ -269,7 +272,7 @@ enum WebSocketInput {
 pub async fn run_hopr_api(
     host: &str,
     cfg: &crate::config::Api,
-    hopr: hopr_lib::Hopr,
+    hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     websocket_rx: async_broadcast::InactiveReceiver<TransportOutput>,
     msg_encoder: Option<MessageEncoder>,
@@ -279,7 +282,7 @@ pub async fn run_hopr_api(
     aliases.write().await.insert("me".to_owned(), hopr.me_peer_id());
 
     let state = State {
-        hopr: Arc::new(hopr),
+        hopr,
         config: Arc::new(Config::from("/api-docs/openapi.json")),
     };
 
@@ -436,7 +439,9 @@ pub async fn run_hopr_api(
         api
     });
 
-    app.listen(host).await.expect("the server should run successfully")
+    app.listen(host)
+        .await
+        .expect("the REST API server should run successfully")
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -2515,7 +2520,7 @@ mod checks {
 
     async fn is_running(req: Request<State<'_>>) -> tide::Result<Response> {
         match req.state().hopr.status() {
-            hopr_lib::State::Running => Ok(Response::builder(200).build()),
+            hopr_lib::HoprState::Running => Ok(Response::builder(200).build()),
             _ => Ok(Response::builder(412).build()),
         }
     }

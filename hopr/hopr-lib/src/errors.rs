@@ -5,6 +5,9 @@ pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]
     GeneralError(String),
 
+    #[error("HOPR lib status error: '{0}'")]
+    StatusError(String),
+
     #[error("'{0}'")]
     TransportError(#[from] core_transport::errors::HoprTransportError),
 
