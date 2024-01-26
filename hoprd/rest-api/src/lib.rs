@@ -117,7 +117,7 @@ pub struct InternalState {
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
-            channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
+            channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -1291,7 +1291,7 @@ mod channels {
     #[schema(example = json!({
         "amount": "1000"
     }))]
-    pub(crate) struct FundRequest {
+    pub(crate) struct FundBodyRequest {
         pub amount: String,
     }
 
@@ -1321,7 +1321,7 @@ mod channels {
     pub(super) async fn fund_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let fund_req: FundRequest = req.body_json().await?;
+        let fund_req: FundBodyRequest = req.body_json().await?;
         let amount = Balance::new_from_str(&fund_req.amount, BalanceType::HOPR);
 
         match Hash::from_hex(req.param("channelId")?) {
