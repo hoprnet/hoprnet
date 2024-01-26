@@ -114,7 +114,7 @@ pub struct InternalState {
         schemas(
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerId,
-            account::AccountAddressesResponse, account::AccountBalances, account::WithdrawRequest,
+            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
             peers::NodePeerInfo, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
@@ -696,7 +696,7 @@ mod account {
         "safeNative": "10000000000000000000 Native"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct AccountBalances {
+    pub(crate) struct AccountBalancesResponse {
         pub safe_native: String,
         pub native: String,
         pub safe_hopr: String,
@@ -714,7 +714,7 @@ mod account {
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/balances"),
         responses(
-            (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalances),
+            (status = 200, description = "The node's HOPR and Safe balances", body = AccountBalancesResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -726,7 +726,7 @@ mod account {
     pub(super) async fn balances(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let mut account_balances = AccountBalances::default();
+        let mut account_balances = AccountBalancesResponse::default();
 
         match hopr.get_balance(BalanceType::Native).await {
             Ok(v) => account_balances.native = v.to_string(),
@@ -784,7 +784,7 @@ mod account {
             content = WithdrawRequest,
             content_type = "application/json"),
         responses(
-            (status = 200, description = "The node's funds have been withdrawn", body = AccountBalances),
+            (status = 200, description = "The node's funds have been withdrawn", body = AccountBalancesResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
