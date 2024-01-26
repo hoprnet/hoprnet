@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("RUST_LOG")
             .map_err(|_| ())
             .and_then(|level| log::LevelFilter::from_str(&level).map_err(|_| ()))
-            .unwrap_or(log::LevelFilter::Debug),
+            .unwrap_or(log::LevelFilter::Info),
     );
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
