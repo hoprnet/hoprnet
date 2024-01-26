@@ -159,7 +159,7 @@ pub async fn fund_channel_from_different_client<M: Middleware>(
     let hopr_token_with_new_client = HoprToken::new(hopr_token_address, new_client.clone());
     let hopr_channels_with_new_client = HoprChannels::new(hopr_channels_address, new_client);
     hopr_token_with_new_client
-        .approve(hopr_channels_address.into(), amount.into())
+        .approve(hopr_channels_address.into(), amount)
         .send()
         .await
         .unwrap()
