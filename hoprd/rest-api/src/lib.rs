@@ -122,7 +122,7 @@ pub struct InternalState {
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
-            node::EntryNode, node::NodeInfoResponse, node::NodePeersReqQuery,
+            node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
         )
     ),
@@ -2158,7 +2158,7 @@ mod node {
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
     #[into_params(parameter_in = Query)]
-    pub(crate) struct NodePeersReqQuery {
+    pub(crate) struct NodePeersQueryRequest {
         #[schema(required = false)]
         pub quality: Option<f64>,
     }
@@ -2209,7 +2209,7 @@ mod node {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/peers"),
-        params(NodePeersReqQuery),
+        params(NodePeersQueryRequest),
         responses(
             (status = 200, description = "Successfully returned observed peers", body = NodePeersResponse),
             (status = 400, description = "Failed to extract a valid quality parameter", body = ApiError),
@@ -2221,7 +2221,7 @@ mod node {
         tag = "Node"
     )]
     pub(super) async fn peers(req: Request<InternalState>) -> tide::Result<Response> {
-        let query_params: NodePeersReqQuery = req.query()?;
+        let query_params: NodePeersQueryRequest = req.query()?;
 
         if let Some(quality) = query_params.quality {
             if !(0.0f64..=1.0f64).contains(&quality) {
