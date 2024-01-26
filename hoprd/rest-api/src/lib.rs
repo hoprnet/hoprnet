@@ -115,7 +115,7 @@ pub struct InternalState {
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerId,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
-            peers::NodePeerInfoResponse, peers::PingInfo,
+            peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
@@ -874,7 +874,7 @@ mod peers {
         "reportedVersion": "2.1.0"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct PingInfo {
+    pub(crate) struct PingResponse {
         #[serde_as(as = "DurationMilliSeconds<u64>")]
         #[schema(value_type = u64)]
         pub latency: std::time::Duration,
@@ -888,7 +888,7 @@ mod peers {
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
         responses(
-            (status = 200, description = "Ping successful", body = PingInfo),
+            (status = 200, description = "Ping successful", body = PingResponse),
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -903,7 +903,7 @@ mod peers {
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => match hopr.ping(&peer).await {
                 Ok(latency) => Ok(Response::builder(200)
-                    .body(json!(PingInfo {
+                    .body(json!(PingResponse {
                         latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                         reported_version: hopr
                             .network_peer_info(&peer)
