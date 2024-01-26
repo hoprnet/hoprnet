@@ -11,7 +11,7 @@ use hoprd_inbox::config::MessageInboxConfiguration;
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
+pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 
 fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
