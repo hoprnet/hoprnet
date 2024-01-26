@@ -122,7 +122,7 @@ pub struct InternalState {
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
-            node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
+            node::EntryNode, node::NodeInfoResponse, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
         )
     ),
@@ -2342,7 +2342,7 @@ mod node {
         "network": "anvil-localhost"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct NodeInfoRes {
+    pub(crate) struct NodeInfoResponse {
         network: String,
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
@@ -2382,7 +2382,7 @@ mod node {
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
         responses(
-            (status = 200, description = "Fetched node version", body = NodeInfoRes),
+            (status = 200, description = "Fetched node version", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -2399,7 +2399,7 @@ mod node {
 
         match hopr.get_channel_closure_notice_period().await {
             Ok(channel_closure_notice_period) => {
-                let body = NodeInfoRes {
+                let body = NodeInfoResponse {
                     network,
                     announced_address: hopr.local_multiaddresses(),
                     listening_address: hopr.local_multiaddresses(),
