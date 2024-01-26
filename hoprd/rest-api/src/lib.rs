@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
-            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
+            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1403,7 +1403,7 @@ mod messages {
 
     #[serde_as]
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema)]
-    pub(crate) struct GetMessageReq {
+    pub(crate) struct GetMessageBodyRequest {
         /// The message tag used to filter messages based on application
         #[schema(required = false)]
         #[serde(default)]
@@ -1807,7 +1807,7 @@ mod messages {
     )]
 
     pub async fn peek_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let args: GetMessageReq = req.body_json().await?;
+        let args: GetMessageBodyRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
