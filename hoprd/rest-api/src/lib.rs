@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
+            messages::MessagePopRes, messages::SendMessageResponse, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1392,7 +1392,7 @@ mod messages {
         "challenge": "031916ee5bfc0493f40c353a670fc586a3a28f9fce9cd065ff9d1cbef19b46eeba"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct SendMessageRes {
+    pub(crate) struct SendMessageResponse {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub challenge: HalfKeyChallenge,
@@ -1427,7 +1427,7 @@ mod messages {
             description = "Body of a message to send",
             content_type = "application/json"),
         responses(
-            (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageRes),
+            (status = 202, description = "The message was sent successfully, DOES NOT imply successful delivery.", body = SendMessageResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1467,7 +1467,7 @@ mod messages {
             .await
         {
             Ok(challenge) => Ok(Response::builder(202)
-                .body(json!(SendMessageRes { challenge, timestamp }))
+                .body(json!(SendMessageResponse { challenge, timestamp }))
                 .build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
