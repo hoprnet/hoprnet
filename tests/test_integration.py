@@ -769,7 +769,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     packets = await dest_peer.api.messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
 
-    ts_for_query = timestamps[split_index]
+    ts_for_query = timestamps[split_index] - 1
 
     packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
 
