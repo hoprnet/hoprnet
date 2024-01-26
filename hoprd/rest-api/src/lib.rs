@@ -117,7 +117,7 @@ pub struct InternalState {
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelResponse,
-            channels::NodeChannel, channels::NodeChannelsResponse, channels::NodeTopologyChannel, channels::FundRequest,
+            channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
@@ -970,7 +970,7 @@ mod channels {
         "ticketIndex": 0
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct NodeTopologyChannel {
+    pub(crate) struct ChannelInfoResponse {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_id: Hash,
@@ -1011,11 +1011,11 @@ mod channels {
     pub(crate) struct NodeChannelsResponse {
         pub incoming: Vec<NodeChannel>,
         pub outgoing: Vec<NodeChannel>,
-        pub all: Vec<NodeTopologyChannel>,
+        pub all: Vec<ChannelInfoResponse>,
     }
 
-    async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<NodeTopologyChannel, HoprLibError> {
-        Ok(NodeTopologyChannel {
+    async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<ChannelInfoResponse, HoprLibError> {
+        Ok(ChannelInfoResponse {
             channel_id: channel.get_id(),
             source_address: channel.source,
             destination_address: channel.destination,
@@ -1204,7 +1204,7 @@ mod channels {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel fetched successfully", body = NodeTopologyChannel),
+            (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
