@@ -55,7 +55,6 @@ jobs:
       - name: Run unit tests
         if: matrix.target == 'unit'
         run: |
-          nix develop -c make build-solidity-types
           nix develop -c make -j test
         env:
           HOPR_NETWORK: anvil-localhost

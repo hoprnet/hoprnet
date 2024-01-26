@@ -41,8 +41,7 @@ deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
-	$(MAKE) build-solidity-types
-# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	# $(MAKE) cargo-update
 
@@ -55,14 +54,8 @@ cargo-download: ## download vendored Cargo dependencies
 	$(cargo) vendor --versioned-dirs vendor/cargo
 	$(cargo) fetch
 
-.PHONY: build-solidity-types
-build-solidity-types: ## generate Solidity typings
-	echo "Foundry create binding"
-	$(MAKE) -C ethereum/contracts/ generate-bindings
-
 .PHONY: build
 build: ## build all packages
-build: build-solidity-types
 	$(cargo) build
 
 .PHONY: build-yellowpaper
