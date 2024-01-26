@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
-            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
+            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageReq,
             messages::MessagePopAllResponse,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1346,7 +1346,7 @@ mod messages {
 
     #[derive(Debug, Default, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
     #[into_params(parameter_in = Query)]
-    pub(crate) struct TagQuery {
+    pub(crate) struct TagQueryRequest {
         #[schema(required = false)]
         #[serde(default)]
         pub tag: Option<u16>,
@@ -1593,7 +1593,7 @@ mod messages {
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/messages"),
-        params(TagQuery),
+        params(TagQueryRequest),
         responses(
             (status = 204, description = "Messages successfully deleted."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1604,7 +1604,7 @@ mod messages {
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.query()?;
+        let tag: TagQueryRequest = req.query()?;
         let inbox = req.state().inbox.clone();
 
         inbox.write().await.pop_all(tag.tag).await;
@@ -1615,7 +1615,7 @@ mod messages {
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/messages/size"),
-        params(TagQuery),
+        params(TagQueryRequest),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -1626,7 +1626,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn size(req: Request<InternalState>) -> tide::Result<Response> {
-        let query: TagQuery = req.query()?;
+        let query: TagQueryRequest = req.query()?;
         let inbox = req.state().inbox.clone();
 
         let size = inbox.read().await.size(query.tag).await;
@@ -1688,7 +1688,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.body_json().await?;
+        let tag: TagQueryRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1730,7 +1730,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn pop_all(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.body_json().await?;
+        let tag: TagQueryRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -1769,7 +1769,7 @@ mod messages {
         tag = "Messages"
     )]
     pub async fn peek(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let tag: TagQuery = req.body_json().await?;
+        let tag: TagQueryRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
         let inbox = inbox.write().await;
@@ -2151,7 +2151,9 @@ mod node {
     pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
         let version = req.state().hopr.version();
 
-        Ok(Response::builder(200).body(json!(NodeVersionResponse { version })).build())
+        Ok(Response::builder(200)
+            .body(json!(NodeVersionResponse { version }))
+            .build())
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
