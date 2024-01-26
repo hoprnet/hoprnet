@@ -123,7 +123,7 @@ pub struct InternalState {
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersion
+            node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersionResponse
         )
     ),
     modifiers(&SecurityAddon),
@@ -2131,7 +2131,7 @@ mod node {
     #[schema(example = json!({
         "version": "2.1.0"
     }))]
-    pub(crate) struct NodeVersion {
+    pub(crate) struct NodeVersionResponse {
         pub version: String,
     }
 
@@ -2140,7 +2140,7 @@ mod node {
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/version"),
         responses(
-            (status = 200, description = "Fetched node version", body = NodeVersion),
+            (status = 200, description = "Fetched node version", body = NodeVersionResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -2151,7 +2151,7 @@ mod node {
     pub(super) async fn version(req: Request<InternalState>) -> tide::Result<Response> {
         let version = req.state().hopr.version();
 
-        Ok(Response::builder(200).body(json!(NodeVersion { version })).build())
+        Ok(Response::builder(200).body(json!(NodeVersionResponse { version })).build())
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
