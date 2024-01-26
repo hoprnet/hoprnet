@@ -250,7 +250,7 @@ async fn integration_test_indexer() {
         module_address: Address::default(),
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
-        logs_page_size: 100,
+        max_block_range_fetch_size: 100,
     };
 
     let actions_cfg = ActionQueueConfig {
