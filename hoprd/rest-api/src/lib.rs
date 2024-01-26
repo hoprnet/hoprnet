@@ -729,27 +729,27 @@ mod account {
         let mut account_balances = AccountBalances::default();
 
         match hopr.get_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.native = v.to_string(),
+            Ok(v) => account_balances.native = v.to_formatted_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.hopr = v.to_string(),
+            Ok(v) => account_balances.hopr = v.to_formatted_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.safe_native = v.to_string(),
+            Ok(v) => account_balances.safe_native = v.to_formatted_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.safe_hopr = v.to_string(),
+            Ok(v) => account_balances.safe_hopr = v.to_formatted_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.safe_allowance().await {
-            Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
+            Ok(v) => account_balances.safe_hopr_allowance = v.to_formatted_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
