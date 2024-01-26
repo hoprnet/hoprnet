@@ -115,7 +115,7 @@ pub struct InternalState {
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerId,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
-            peers::NodePeerInfo, peers::PingInfo,
+            peers::NodePeerInfoResponse, peers::PingInfo,
             channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelReceipt,
             channels::NodeChannel, channels::NodeChannels, channels::NodeTopologyChannel, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
@@ -828,7 +828,7 @@ mod peers {
         "/ip4/10.0.2.100/tcp/19093"
         ]
     }))]
-    pub(crate) struct NodePeerInfo {
+    pub(crate) struct NodePeerInfoResponse {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub announced: Vec<Multiaddr>,
@@ -844,7 +844,7 @@ mod peers {
             ("peerId" = String, Path, description = "PeerID of the requested peer")
         ),
         responses(
-            (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfo),
+            (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfoResponse),
             (status = 400, description = "Invalid peer id", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -858,7 +858,7 @@ mod peers {
         let hopr = req.state().hopr.clone();
         match PeerId::from_str(req.param("peerId")?) {
             Ok(peer) => Ok(Response::builder(200)
-                .body(json!(NodePeerInfo {
+                .body(json!(NodePeerInfoResponse {
                     announced: hopr.multiaddresses_announced_to_dht(&peer).await,
                     observed: hopr.network_observed_multiaddresses(&peer).await
                 }))
