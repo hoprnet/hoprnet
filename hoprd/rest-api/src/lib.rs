@@ -118,7 +118,7 @@ pub struct InternalState {
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
-            messages::MessagePopRes, messages::SendMessageResponse, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
+            messages::MessagePopRes, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
             tickets::NodeTicketStatistics, tickets::ChannelTicket,
             network::TicketPriceResponse,
@@ -1353,7 +1353,7 @@ mod messages {
     }
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-    pub(crate) struct Size {
+    pub(crate) struct SizeResponse {
         pub size: usize,
     }
 
@@ -1617,7 +1617,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/size"),
         params(TagQuery),
         responses(
-            (status = 200, description = "Returns the message inbox size filtered by the given tag", body = Size),
+            (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -1631,7 +1631,7 @@ mod messages {
 
         let size = inbox.read().await.size(query.tag).await;
 
-        Ok(Response::builder(200).body(json!(Size { size })).build())
+        Ok(Response::builder(200).body(json!(SizeResponse { size })).build())
     }
 
     #[serde_as]
