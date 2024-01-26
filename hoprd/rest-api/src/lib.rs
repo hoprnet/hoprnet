@@ -120,7 +120,7 @@ pub struct InternalState {
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageReq, messages::SizeResponse, messages::TagQuery, messages::GetMessageReq,
             messages::MessagePopAllResponse,
-            tickets::NodeTicketStatistics, tickets::ChannelTicket,
+            tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoRes, node::NodePeersReqQuery,
             node::HeartbeatInfo, node::PeerInfo, node::NodePeersRes, node::NodeVersion
@@ -1980,7 +1980,7 @@ mod tickets {
         "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct NodeTicketStatistics {
+    pub(crate) struct NodeTicketStatisticsResponse {
         pub win_proportion: f64,
         pub unredeemed: u64,
         pub unredeemed_value: String,
@@ -1993,7 +1993,7 @@ mod tickets {
         pub rejected_value: String,
     }
 
-    impl From<TicketStatistics> for NodeTicketStatistics {
+    impl From<TicketStatistics> for NodeTicketStatisticsResponse {
         fn from(value: TicketStatistics) -> Self {
             Self {
                 win_proportion: value.win_proportion,
@@ -2014,7 +2014,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
         responses(
-            (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatistics),
+            (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatisticsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -2025,7 +2025,7 @@ mod tickets {
     )]
     pub(super) async fn show_ticket_statistics(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
-        match hopr.ticket_statistics().await.map(NodeTicketStatistics::from) {
+        match hopr.ticket_statistics().await.map(NodeTicketStatisticsResponse::from) {
             Ok(stats) => Ok(Response::builder(200).body(json!(stats)).build()),
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
