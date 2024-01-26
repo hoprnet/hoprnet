@@ -116,7 +116,7 @@ pub struct InternalState {
             alias::PeerIdResponse, alias::AliasPeerId,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            channels::ChannelsQuery,channels::CloseChannelReceipt, channels::OpenChannelRequest, channels::OpenChannelResponse,
+            channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
             messages::MessagePopRes, messages::SendMessageRes, messages::SendMessageReq, messages::Size, messages::TagQuery, messages::GetMessageReq,
             messages::InboxMessagesRes,
@@ -1237,7 +1237,7 @@ mod channels {
         "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct CloseChannelReceipt {
+    pub(crate) struct CloseChannelResponse {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub receipt: Hash,
@@ -1253,7 +1253,7 @@ mod channels {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel closed successfully", body = CloseChannelReceipt),
+            (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -1270,7 +1270,7 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.close_channel_by_id(channel_id, false).await {
                 Ok(receipt) => Ok(Response::builder(200)
-                    .body(json!(CloseChannelReceipt {
+                    .body(json!(CloseChannelResponse {
                         channel_status: receipt.status,
                         receipt: receipt.tx_hash
                     }))
