@@ -114,7 +114,7 @@ pub struct InternalState {
         schemas(
             ApiError,
             alias::PeerIdResponse, alias::AliasPeerIdBodyRequest,
-            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawRequest,
+            account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest,
             peers::NodePeerInfoResponse, peers::PingResponse,
             channels::ChannelsQuery,channels::CloseChannelResponse, channels::OpenChannelRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundRequest,
@@ -764,7 +764,7 @@ mod account {
         "currency": "HOPR"
     }))]
     #[serde(rename_all = "camelCase")]
-    pub(crate) struct WithdrawRequest {
+    pub(crate) struct WithdrawBodyRequest {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         currency: BalanceType,
@@ -794,7 +794,7 @@ mod account {
         tag = "Account",
     )]
     pub(super) async fn withdraw(mut req: Request<InternalState>) -> tide::Result<Response> {
-        let withdraw_req_data: WithdrawRequest = req.body_json().await?;
+        let withdraw_req_data: WithdrawBodyRequest = req.body_json().await?;
 
         match req
             .state()
