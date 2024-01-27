@@ -130,51 +130,25 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 #[cfg(test)]
 mod test {
     use async_std::prelude::FutureExt;
+    use ethers::contract::EthEvent;
+    use futures::StreamExt;
     use std::time::Duration;
 
-    use ethers::contract::EthEvent;
-    use ethers_providers::Middleware;
-    use futures::StreamExt;
-
     use bindings::hopr_channels::*;
-    use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
+    use bindings::hopr_token::{ApprovalFilter, TransferFilter};
+    use chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
     use log::debug;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
-
-    async fn fund_channel<M: Middleware + 'static>(
-        counterparty: Address,
-        hopr_token: HoprToken<M>,
-        hopr_channels: HoprChannels<M>,
-    ) {
-        hopr_token
-            .approve(hopr_channels.address(), 1u128.into())
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-
-        hopr_channels
-            .fund_channel(counterparty.into(), 1u128)
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-    }
 
     #[async_std::test]
     async fn test_should_get_block_number() {
         let expected_block_time = Duration::from_secs(1);
-        let anvil = create_anvil(Some(expected_block_time));
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let client = JsonRpcProviderClient::new(
@@ -209,7 +183,7 @@ mod test {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(expected_block_time));
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -221,7 +195,8 @@ mod test {
                 .expect("could not deploy contracts")
         };
 
-        let tokens_minted_at = mint_tokens(contract_instances.token.clone(), 1000_u128, (&chain_key_0).into()).await;
+        let tokens_minted_at =
+            chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -259,10 +234,11 @@ mod test {
 
         // Spawn channel funding
         async_std::task::spawn(async move {
-            fund_channel(
+            chain_types::utils::fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
+                1_u128.into(),
             )
             .delay(expected_block_time * 2)
             .await;
@@ -317,7 +293,7 @@ mod test {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(expected_block_time));
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -329,7 +305,8 @@ mod test {
                 .expect("could not deploy contracts")
         };
 
-        let tokens_minted_at = mint_tokens(contract_instances.token.clone(), 1000_u128, (&chain_key_0).into()).await;
+        let tokens_minted_at =
+            chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -366,10 +343,11 @@ mod test {
 
         // Spawn channel funding
         async_std::task::spawn(async move {
-            fund_channel(
+            chain_types::utils::fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
                 contract_instances.channels,
+                1_u128.into(),
             )
             .delay(expected_block_time * 2)
             .await;
