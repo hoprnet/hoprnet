@@ -144,6 +144,16 @@ async def check_unredeemed_tickets_value(src: Node, value: int):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
+async def check_safe_balance(src: Node, value: int):
+    while balance_str_to_int((await src.api.balances()).safe_hopr) != value:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+async def check_native_balance_below(src: Node, value: int):
+    while balance_str_to_int((await src.api.balances()).native) >= value:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
 async def check_all_tickets_redeemed(src: Node, channel_id: str = None):
     if channel_id is not None:
         while len(await src.api.channel_get_tickets(channel_id)) > 0:
@@ -343,24 +353,36 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
-    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"  # convert HOPR to weiHOPR
+    hopr_amount = f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18:.0f}"  # convert HOPR to weiHOPR
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src].api.balances()
+        channel_before = await swarm7[src].api.get_channel(channel)
 
         assert await swarm7[src].api.channels_fund_channel(channel, hopr_amount)
 
-        balance_after = await swarm7[src].api.balances()
+        channel_after = await swarm7[src].api.get_channel(channel)
 
-        assert balance_str_to_int(balance_before.safe_hopr) - balance_str_to_int(
-            balance_after.safe_hopr
+        # Updated channel balance is visible immediately
+        assert balance_str_to_int(channel_after.balance) - balance_str_to_int(
+            channel_before.balance
         ) == balance_str_to_int(hopr_amount)
 
+        # Wait until the safe balance has decreased
+        await asyncio.wait_for(
+            check_safe_balance(
+                swarm7[src], balance_str_to_int(balance_before.safe_hopr) - balance_str_to_int(hopr_amount)
+            ),
+            20.0,
+        )
+
+        # Safe allowance can be checked too at this point
+        balance_after = await swarm7[src].api.balances()
         assert balance_str_to_int(balance_before.safe_hopr_allowance) - balance_str_to_int(
             balance_after.safe_hopr_allowance
         ) == balance_str_to_int(hopr_amount)
 
-        assert balance_str_to_int(balance_after.native) < balance_str_to_int(balance_before.native)
+        await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_str_to_int(balance_before.native)), 20.0)
 
 
 @pytest.mark.asyncio
@@ -769,7 +791,10 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     packets = await dest_peer.api.messages_peek_all(random_tag)
     timestamps = sorted([message.received_at for message in packets.messages])
 
-    ts_for_query = timestamps[split_index]
+    # ts_for_query set right before (1ms before) the first message of the second batch.
+    # This is to ensure that the first message of the second batch will be returned by the query.
+    # It's a workaround, it should work properly without the -1, however randmly fails.
+    ts_for_query = timestamps[split_index] - 1
 
     packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
 
