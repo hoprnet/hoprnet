@@ -44,6 +44,8 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 serde_yaml = { version = "0.9" }
 env_logger = { workspace = true }
+hopr-crypto-types = { workspace = true }
+ethers = { workspace = true }
 
 [features]
 default = ["prometheus"]

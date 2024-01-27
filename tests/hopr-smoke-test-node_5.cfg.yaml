@@ -98,7 +98,7 @@ hopr:
           tags: []
     check_unrealized_balance: true
   safe_module:
-    safe_transaction_service_provider: 'https://safe-transaction.stage.hoprtech.net/'
+    safe_transaction_service_provider: 'https://safe-transaction.prod.hoprtech.net/'
     safe_address: '0x0000000000000000000000000000000000000000'
     module_address: '0x0000000000000000000000000000000000000000'
 

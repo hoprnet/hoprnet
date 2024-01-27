@@ -180,7 +180,7 @@ where
         pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            info!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
+            debug!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
 
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
@@ -384,7 +384,6 @@ where
         cfg.safe_module.safe_address,
         chain_config.channel_contract_deploy_block as u64,
         tx_indexer_events,
-        chain_config.confirmations as u64,
         chain_actions.clone(),
         rpc_operations.clone(),
         channel_graph.clone(),
