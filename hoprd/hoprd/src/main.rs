@@ -193,6 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Show onboarding information
         let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
+        let my_ethereum_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex();
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
         let version = hopr_lib::constants::APP_VERSION;
 
@@ -209,6 +210,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 Node peerID: {my_peer_id}
                 Node address: {my_address}
+                Node Ethereum address: {my_ethereum_address} <- put this into staking hub
                 Node version: {version}
             "
             );
