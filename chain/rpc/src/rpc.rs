@@ -222,57 +222,15 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 #[cfg(test)]
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
+    use crate::{HoprRpcOperations, PendingTransaction};
     use async_std::task::sleep;
-    use bindings::hopr_token::HoprToken;
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
-    use ethers::types::Eip1559TransactionRequest;
-    use ethers_providers::Middleware;
+    use chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
-    use primitive_types::H160;
     use std::time::Duration;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-
-    pub async fn mint_tokens<M: Middleware + 'static>(
-        hopr_token: HoprToken<M>,
-        amount: u128,
-        deployer: Address,
-    ) -> u64 {
-        hopr_token
-            .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-
-        hopr_token
-            .mint(
-                deployer.into(),
-                amount.into(),
-                ethers::types::Bytes::new(),
-                ethers::types::Bytes::new(),
-            )
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-            .unwrap()
-            .block_number
-            .unwrap()
-            .as_u64()
-    }
-
-    fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
-        let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
-        tx.set_to(H160::from(to));
-        tx.set_value(ethers::types::U256(amount.0));
-        tx
-    }
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
@@ -286,7 +244,7 @@ pub mod tests {
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let anvil = chain_types::utils::create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
@@ -312,7 +270,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(transfer_eth_tx(Address::random(), 1000000_u32.into()))
+            .send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                1000000_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -323,7 +284,7 @@ pub mod tests {
     async fn test_should_send_consecutive_txs() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let anvil = chain_types::utils::create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
@@ -352,11 +313,14 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
-                .await
-                .expect("tx should be sent")
-                .await
-                .expect("tx should resolve")
+            rpc.send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                send_amount.into(),
+            ))
+            .await
+            .expect("tx should be sent")
+            .await
+            .expect("tx should resolve")
         }))
         .await;
 
@@ -375,7 +339,7 @@ pub mod tests {
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let anvil = chain_types::utils::create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
@@ -400,7 +364,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+            .send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                1_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -417,7 +384,7 @@ pub mod tests {
     async fn test_get_balance_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(None);
+        let anvil = chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         // Deploy contracts
@@ -436,12 +403,7 @@ pub mod tests {
         };
 
         let amount = 1024_u64;
-        mint_tokens(
-            contract_instances.token,
-            amount as u128,
-            chain_key_0.public().to_address(),
-        )
-        .await;
+        chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),

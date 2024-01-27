@@ -13,6 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 libp2p-identity = { workspace = true }
+log = { workspace = true }
 multiaddr = { workspace = true }
 ethers = { workspace = true }
 hex-literal = { workspace = true }
@@ -23,10 +24,6 @@ bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-
-[dev-dependencies]
-mockall = "0.11.4"
-hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 hex = { workspace = true }
