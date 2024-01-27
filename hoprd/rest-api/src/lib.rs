@@ -566,7 +566,7 @@ mod alias {
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
         request_body(
-            content = AliasPeerId,
+            content = AliasPeerIdBodyRequest,
             description = "Alias name along with the PeerId to be aliased",
             content_type = "application/json"),
         responses(
@@ -781,7 +781,7 @@ mod account {
         post,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
         request_body(
-            content = WithdrawRequest,
+            content = WithdrawBodyRequest,
             content_type = "application/json"),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = AccountBalancesResponse),
@@ -1151,7 +1151,7 @@ mod channels {
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         request_body(
-            content = OpenChannelRequest,
+            content = OpenChannelBodyRequest,
             description = "Open channel request specification",
             content_type = "application/json"),
         responses(
@@ -1302,7 +1302,7 @@ mod channels {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         request_body(
-            content = FundRequest,
+            content = FundBodyRequest,
             description = "Amount of HOPR to fund the channel",
             content_type = "application/json",
         ),
@@ -1423,7 +1423,7 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages"),
         request_body(
-            content = SendMessageReq,
+            content = SendMessageBodyRequest,
             description = "Body of a message to send",
             content_type = "application/json"),
         responses(
@@ -1672,7 +1672,7 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/pop"),
         request_body(
-            content = TagQuery,
+            content = TagQueryRequest,
             description = "Tag of message queue to pop from",
             content_type = "application/json"
         ),
@@ -1714,7 +1714,7 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
         request_body(
-            content = TagQuery,
+            content = TagQueryRequest,
             description = "Tag of message queue to pop from",
             content_type = "application/json"
         ),
@@ -1753,7 +1753,7 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek"),
         request_body(
-            content = TagQuery,
+            content = TagQueryRequest,
             description = "Tag of message queue to peek from",
             content_type = "application/json"
         ),
@@ -1790,7 +1790,7 @@ mod messages {
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
-            content = GetMessageReq,
+            content = GetMessageBodyRequest,
             description = "Tag of message queue and optionally a timestamp since from to start peeking",
             content_type = "application/json"
         ),
