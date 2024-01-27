@@ -89,8 +89,8 @@ smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
 
 .PHONY: lint
-lint: lint-rust lint-python lint-sol
-lint: ## run linter for TS, Rust, Python, Solidity
+lint: lint-python lint-sol lint-rust 
+lint:
 
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
