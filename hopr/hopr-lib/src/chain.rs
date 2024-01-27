@@ -111,8 +111,8 @@ pub struct Network {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch while indexing logs
+    pub max_block_range: u64,
 }
 
 #[serde_as]
@@ -189,8 +189,8 @@ pub struct ChainNetworkConfig {
     pub confirmations: u32,
     /// milliseconds between polling the RPC for new transactions
     pub tx_polling_interval: u64,
-    /// number of blocks to fetch logs for when indexing
-    pub logs_page_size: u64,
+    /// maximum block range to fetch when indexing logs
+    pub max_block_range: u64,
 }
 
 /// Check whether the version is allowed
@@ -242,7 +242,7 @@ impl ChainNetworkConfig {
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
                 tx_polling_interval: network.tx_polling_interval,
-                logs_page_size: network.logs_page_size,
+                max_block_range: network.max_block_range,
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",
@@ -358,8 +358,8 @@ where
         module_address,
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
-        tx_confirmations: chain_config.confirmations as usize,
-        logs_page_size: chain_config.logs_page_size,
+        finality: chain_config.confirmations,
+        max_block_range_fetch_size: chain_config.max_block_range,
     };
 
     // TODO: extract this from the global config type
@@ -408,14 +408,12 @@ pub fn build_chain_api(
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    confirmations: u64,
     chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {
     let indexer_cfg = chain_indexer::block::IndexerConfig {
         start_block_number: indexer_start_block,
-        finalization: confirmations,
         ..Default::default()
     };
 

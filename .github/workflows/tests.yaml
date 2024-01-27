@@ -20,6 +20,7 @@ concurrency:
 jobs:
   tests:
     strategy:
+      fail-fast: false
       matrix:
         target:
           - unit
@@ -54,7 +55,6 @@ jobs:
       - name: Run unit tests
         if: matrix.target == 'unit'
         run: |
-          nix develop -c make build-solidity-types
           nix develop -c make -j test
         env:
           HOPR_NETWORK: anvil-localhost
@@ -62,7 +62,7 @@ jobs:
       - name: Run smoke tests
         if: matrix.target == 'smoke'
         run: |
-          nix develop .#smoke-tests -c make smoke-test-full
+          nix develop .#smoke-tests -c make smoke-tests
 
       - name: Compress test logs
         if: matrix.target == 'smoke' && always()

@@ -245,6 +245,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let req_duration = start.elapsed();
 
         debug!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc response body: {}", String::from_utf8_lossy(&body));
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -504,7 +505,8 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;

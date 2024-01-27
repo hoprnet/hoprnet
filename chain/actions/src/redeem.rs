@@ -169,7 +169,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
             .await
             .get_acknowledged_tickets(Some(*channel))
             .await?
-            .iter()
+            .into_iter()
             .filter(|t| {
                 t.status == AcknowledgedTicketStatus::Untouched
                     && channel.channel_epoch == U256::from(t.ticket.channel_epoch)

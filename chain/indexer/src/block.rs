@@ -1,5 +1,5 @@
 use async_lock::RwLock;
-use futures::{pin_mut, StreamExt};
+use futures::StreamExt;
 use hopr_crypto_types::types::Hash;
 use log::{debug, error, info};
 use std::{collections::VecDeque, sync::Arc};
@@ -47,13 +47,6 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 /// Configuration for the chain indexer functionality
 #[derive(Debug, Clone, Copy)]
 pub struct IndexerConfig {
-    /// Finalization chain length
-    ///
-    /// The number of blocks including and decreasing from the chain HEAD
-    /// that the logs will be buffered for before being considered
-    /// successfully joined to the chain.
-    /// Default is 8.
-    pub finalization: u64,
     /// The block at which the indexer should start
     ///
     /// It typically makes little sense to start indexing from the beginning
@@ -73,7 +66,6 @@ pub struct IndexerConfig {
 impl Default for IndexerConfig {
     fn default() -> Self {
         Self {
-            finalization: 8,
             start_block_number: 0,
             fetch_token_transactions: true,
         }
@@ -148,16 +140,14 @@ where
         let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let latest_block_in_db = self
-            .db
-            .read()
-            .await
-            .get_latest_block_number()
-            .await?
-            .map(|v| v as u64)
-            .unwrap_or(self.cfg.start_block_number);
+        let db_latest_block = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
 
-        info!("Latest saved block {:?}", latest_block_in_db);
+        let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
+
+        info!(
+            "DB latest block: {:?}, Latest block {:?}",
+            db_latest_block, latest_block_in_db
+        );
 
         let mut topics = vec![];
         topics.extend(crate::constants::topics::announcement());
@@ -166,10 +156,6 @@ where
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
         if self.cfg.fetch_token_transactions {
-            // TODO: Still needed?
-            // Actively query for logs to prevent polling done by Ethers.js
-            // that don't retry on failed attempts and thus makes the indexer
-            // handle errors produced by internal Ethers.js provider calls
             topics.extend(crate::constants::topics::token());
         }
 
@@ -181,9 +167,6 @@ where
         info!("Building indexer background process");
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
-
-        let finalization = self.cfg.finalization;
         spawn(async move {
             let mut tx = Some(tx);
 
@@ -191,21 +174,25 @@ where
                 .try_stream_logs(latest_block_in_db, log_filter)
                 .expect("block stream should be constructible");
 
-            let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
+            let mut events = VecDeque::<Vec<Log>>::new();
             let mut chain_head = 0;
 
             while let Some(block_with_logs) = block_stream.next().await {
-                debug!("Processed block number: {}", block_with_logs.block_id);
+                info!("Processed block number: {}", block_with_logs.block_id);
+
+                let current_block = block_with_logs.block_id;
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_INDEXER_CURRENT_BLOCK.set(block_with_logs.block_id as f64);
+                }
 
                 if !block_with_logs.logs.is_empty() {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
                     let mut logs = block_with_logs.logs;
                     logs.sort_by(log_comparator);
-                    unconfirmed_events.push_back(logs);
+                    events.push_back(logs);
                 }
-
-                let current_block = block_with_logs.block_id;
 
                 match rpc.block_number().await {
                     Ok(current_chain_block_number) => {
@@ -218,26 +205,22 @@ where
                 }
 
                 if tx.is_some() {
-                    let indexing_scope = chain_head - latest_block_in_db;
-                    let progress = 1_f64 - ((chain_head - current_block) as f64 / (indexing_scope as f64));
+                    let progress =
+                        (current_block - latest_block_in_db) as f64 / (chain_head - latest_block_in_db) as f64;
                     info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
-                    if current_block + finalization >= chain_head {
+                    if current_block >= chain_head {
                         info!("Indexer sync successfully completed");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_INDEXER_SYNC_PROGRESS.set(1.00);
-
-                        let _ = tx.take().expect("tx should be present").send(());
+                        let _ = tx.take().expect("index sync finalization should be present").send(());
                     }
                 }
 
-                while let Some(logs) = unconfirmed_events.front() {
+                while let Some(logs) = events.front() {
                     if let Some(log) = logs.first() {
-                        if log.block_number + finalization <= current_block {
+                        if log.block_number <= current_block {
                             if let Err(error) = db
                                 .write()
                                 .await
@@ -247,19 +230,36 @@ where
                                 error!("failed to write the latest block number into the database: {error}");
                             }
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
-                            }
-
                             let bn = log.block_number;
-                            if let Some(logs) = unconfirmed_events.pop_front() {
+                            if let Some(logs) = events.pop_front() {
                                 debug!("processing logs from block #{}: {:?}", bn, logs);
 
                                 for log in logs.into_iter() {
-                                    if let Err(error) = tx_proc.unbounded_send(log) {
-                                        error!("failed to send and process logs: {error}")
-                                    }
+                                    let snapshot = Snapshot::new(
+                                        U256::from(log.block_number),
+                                        U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
+                                        log.log_index,
+                                    );
+
+                                    let tx_hash = log.tx_hash;
+
+                                    match db_processor
+                                        .on_event(log.address, log.block_number as u32, log.into(), snapshot)
+                                        .await
+                                    {
+                                        Ok(Some(event_type)) => {
+                                            // Pair the event type with the TX hash here
+                                            let significant_event = SignificantChainEvent { tx_hash, event_type };
+
+                                            if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
+                                                error!("failed to pass a significant chain event further: {e}");
+                                            }
+                                        }
+                                        Ok(None) => {}
+                                        Err(e) => {
+                                            error!("failed to process logs: {e}");
+                                        }
+                                    };
                                 }
                             }
 
@@ -269,39 +269,6 @@ where
 
                     break;
                 }
-            }
-        });
-
-        spawn(async move {
-            let rx = rx_proc;
-
-            pin_mut!(rx);
-            while let Some(log) = rx.next().await {
-                let snapshot = Snapshot::new(
-                    U256::from(log.block_number),
-                    U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                    log.log_index,
-                );
-
-                let tx_hash = log.tx_hash;
-
-                match db_processor
-                    .on_event(log.address, log.block_number as u32, log.into(), snapshot)
-                    .await
-                {
-                    Ok(Some(event_type)) => {
-                        // Pair the event type with the TX hash here
-                        let significant_event = SignificantChainEvent { tx_hash, event_type };
-
-                        if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
-                            error!("failed to pass a significant chain event further: {}", e);
-                        }
-                    }
-                    Ok(None) => {}
-                    Err(_) => {
-                        error!("failed to process logs");
-                    }
-                };
             }
         });
 
@@ -506,13 +473,8 @@ pub mod tests {
         rpc.expect_block_number().returning(move || Ok(head_block));
 
         let finalized_block = BlockWithLogs {
-            block_id: head_block - cfg.finalization - 1,
-            logs: build_announcement_logs(
-                Address::random(),
-                4,
-                head_block - cfg.finalization - 1,
-                U256::from(23u8),
-            ),
+            block_id: head_block - 1,
+            logs: build_announcement_logs(Address::random(), 4, head_block - 1, U256::from(23u8)),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
@@ -567,11 +529,11 @@ pub mod tests {
         }
 
         let finalized_block = BlockWithLogs {
-            block_id: head_block - cfg.finalization - 1,
+            block_id: head_block - 1,
             logs: build_announcement_logs(
                 Address::random(),
                 expected_finalized_event_count,
-                head_block - cfg.finalization - 1,
+                head_block - 1,
                 U256::from(23u8),
             ),
         };

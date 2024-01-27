@@ -1,6 +1,10 @@
 {
   "editor.formatOnSave": false,
   "git.ignoreLimitWarning": true,
+  "markdown.validate.fileLinks.enabled": "warning",
+  "markdown.validate.fragmentLinks.enabled": "warning",
+  "markdown.validate.fileLinks.markdownFragmentLinks": "warning",
+  "markdown.validate.referenceLinks.enabled": "warning",
   "rust-analyzer.showUnlinkedFileNotification": true,
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer",

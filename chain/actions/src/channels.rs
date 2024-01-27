@@ -70,7 +70,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
         }
 
         let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current node HOPR balance is {hopr_balance}");
+        debug!("current Safe HOPR balance is {hopr_balance}");
         if hopr_balance.lt(&amount) {
             return Err(BalanceTooLow);
         }
@@ -106,7 +106,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
         }
 
         let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current node HOPR balance is {hopr_balance}");
+        debug!("current Safe HOPR balance is {hopr_balance}");
         if hopr_balance.lt(&amount) {
             return Err(BalanceTooLow);
         }

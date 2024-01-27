@@ -582,91 +582,27 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
 
 #[cfg(test)]
 pub mod tests {
-    use bindings::{hopr_channels::HoprChannels, hopr_token::HoprToken};
     use chain_rpc::client::create_rpc_client_to_anvil;
     use chain_rpc::client::native::SurfRequestor;
-    use chain_types::{create_anvil, ContractInstances};
-    use ethers::{
-        providers::Middleware,
-        types::{Bytes, Eip1559TransactionRequest, H160, U256},
-    };
+    use chain_types::ContractInstances;
+    use ethers::providers::Middleware;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
-    async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amount: U256, deployer: Address) {
-        hopr_token
-            .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
-            .send()
-            .await
-            .unwrap();
-        hopr_token
-            .mint(deployer.into(), amount, Bytes::new(), Bytes::new())
-            .send()
-            .await
-            .unwrap();
-    }
-
-    async fn fund_node<M: Middleware>(
-        node: &Address,
-        native_token: &U256,
-        hopr_token: &U256,
-        hopr_token_contract: HoprToken<M>,
-        client: Arc<M>,
-    ) {
-        let node_address = H160::from_slice(&node.to_bytes());
-        let native_transfer_tx = Eip1559TransactionRequest::new().to(node_address).value(native_token);
-        client
-            .send_transaction(native_transfer_tx, None)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-
-        hopr_token_contract
-            .transfer(node_address, *hopr_token)
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-    }
-
-    async fn fund_channel<M: Middleware>(
-        counterparty: Address,
-        hopr_token: HoprToken<M>,
-        hopr_channels: HoprChannels<M>,
-    ) {
-        hopr_token
-            .approve(hopr_channels.address(), 1u128.into())
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-
-        hopr_channels
-            .fund_channel(counterparty.into(), 1u128)
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-    }
-
     #[async_std::test]
     async fn test_announce() {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
 
-        let anvil = create_anvil(None);
+        let anvil = chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
@@ -712,7 +648,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn redeem_ticket() {
-        let anvil = create_anvil(None);
+        let anvil = chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
@@ -723,7 +659,7 @@ pub mod tests {
             .expect("could not deploy contracts");
 
         // Mint 1000 HOPR to Alice
-        mint_tokens(contract_instances.token.clone(), 1000.into(), (&chain_key_alice).into()).await;
+        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
 
         let domain_separator: Hash = contract_instances
             .channels
@@ -734,20 +670,20 @@ pub mod tests {
             .into();
 
         // Open channel Alice -> Bob
-        fund_channel(
+        chain_types::utils::fund_channel(
             (&chain_key_bob).into(),
             contract_instances.token.clone(),
             contract_instances.channels.clone(),
+            1_u128.into(),
         )
         .await;
 
         // Fund Bob's node
-        fund_node(
-            &(&chain_key_bob).into(),
-            &U256::from(1000000000000000000u128),
-            &U256::from(10u64),
+        chain_types::utils::fund_node(
+            (&chain_key_bob).into(),
+            1000000000000000000_u128.into(),
+            10_u128.into(),
             contract_instances.token.clone(),
-            client.clone(),
         )
         .await;
 

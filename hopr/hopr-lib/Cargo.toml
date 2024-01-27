@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 async-lock = { workspace = true }
 async-std = { workspace = true }
+atomic_enum = "0.2.0"
 const_format = "0.2.32"
 futures = { workspace = true }
 lazy_static = { workspace = true }
@@ -43,6 +44,8 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 serde_yaml = { version = "0.9" }
 env_logger = { workspace = true }
+hopr-crypto-types = { workspace = true }
+ethers = { workspace = true }
 
 [features]
 default = ["prometheus"]
