@@ -2,9 +2,9 @@ use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
-use futures::{Stream, TryStreamExt};
-use log::debug;
+use futures::{Stream, StreamExt, TryStreamExt};
 use log::error;
+use log::{debug, warn};
 use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
@@ -26,7 +26,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
-        Ok(self.provider.get_block_number().await?.as_u64())
+        self.get_block_number().await
     }
 
     fn try_stream_logs<'a>(
@@ -69,24 +69,38 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             .from_block(BlockNumber::Number(from_block.into()))
                             .to_block(BlockNumber::Number(latest_block.into()));
 
-                        if from_block != latest_block {
-                            debug!("polling logs from blocks #{from_block} - #{latest_block}");
-                        } else {
-                            debug!("polling logs from block #{from_block}");
-                        }
-
                         // Range of blocks to fetch is always bounded
                         let page_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        debug!("block range fetch size: {page_size}");
 
-                        // The provider internally performs retries on timeouts and errors.
-                        let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, page_size);
+                        // If we're fetching logs from wide block range, we'll use the pagination log query.
+                        // For just a single block, we use the ordinary getLogs call which minimizes RPC calls
+                        let mut retrieved_logs = if page_size > 0 {
+                            debug!("polling logs from blocks #{from_block} - #{latest_block} (page {page_size})");
+                            self.provider.get_logs_paginated(&range_filter, page_size).boxed()
+                        } else {
+                            debug!("polling logs from block #{from_block}");
+                            futures::stream::iter(self.provider.get_logs(&range_filter)
+                                .await
+                                .unwrap_or_else(|e| {
+                                    error!("polling logs from block #{from_block} failed: {e}");
+                                    Vec::new()
+                                })
+                                .into_iter()
+                                .map(Ok)
+                            ).boxed()
+                        };
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {
                             let log = Log::from(log);
 
-                            // This assumes the logs are arriving ordered by blocks
+                            // This in general should not happen, but handle such case to be safe
+                            if log.block_number > latest_block {
+                                warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                break;
+                            }
+
+                            // This assumes the logs are arriving ordered by blocks when fetching a range
                             if current_block_log.block_id != log.block_number {
                                 debug!("completed {current_block_log}");
                                 yield current_block_log;
@@ -99,8 +113,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             current_block_log.logs.push(log);
                         }
 
-                        debug!("retrieved complete {current_block_log}");
-
+                        // Yield everything we've collected until this point
+                        debug!("completed {current_block_log}");
                         yield current_block_log;
                         from_block = latest_block + 1;
                     }
@@ -133,7 +147,8 @@ mod test {
 
     #[async_std::test]
     async fn test_should_get_block_number() {
-        let anvil = chain_types::utils::create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let client = JsonRpcProviderClient::new(
@@ -142,10 +157,21 @@ mod test {
             SimpleJsonRpcRetryPolicy::default(),
         );
 
-        let rpc = RpcOperations::new(client, &chain_key_0, Default::default()).expect("failed to construct rpc");
+        let cfg = RpcOperationsConfig {
+            finality: 2,
+            expected_block_time,
+            ..RpcOperationsConfig::default()
+        };
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
-        async_std::task::sleep(Duration::from_secs(2)).await;
+
+        async_std::task::sleep(expected_block_time * 2).await;
+
         let b2 = rpc.block_number().await.expect("should get block number");
 
         assert!(b2 > b1, "block number should increase");
@@ -155,9 +181,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let block_time = Duration::from_secs(1);
+        let expected_block_time = Duration::from_secs(1);
 
-        let anvil = chain_types::utils::create_anvil(Some(block_time));
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -177,8 +203,8 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs,
-            expected_block_time: block_time,
+            contract_addrs,
+            expected_block_time,
             ..RpcOperationsConfig::default()
         };
 
@@ -187,6 +213,9 @@ mod test {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -211,7 +240,7 @@ mod test {
                 contract_instances.channels,
                 1_u128.into(),
             )
-            .delay(block_time * 2)
+            .delay(expected_block_time * 2)
             .await;
         });
 
@@ -262,9 +291,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let block_time = Duration::from_secs(1);
+        let expected_block_time = Duration::from_secs(1);
 
-        let anvil = chain_types::utils::create_anvil(Some(block_time));
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -284,8 +313,9 @@ mod test {
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
-            contract_addrs: contract_addrs,
-            expected_block_time: block_time,
+            contract_addrs,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -294,6 +324,9 @@ mod test {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -316,7 +349,7 @@ mod test {
                 contract_instances.channels,
                 1_u128.into(),
             )
-            .delay(block_time * 2)
+            .delay(expected_block_time * 2)
             .await;
         });
 

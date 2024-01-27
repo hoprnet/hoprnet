@@ -257,11 +257,14 @@ async fn integration_test_indexer() {
 
     let contract_addrs = ContractAddresses::from(&instances);
 
+    let finality = 2;
+    async_std::task::sleep((1 + finality) * block_time).await;
+
     // ----------------------------------------
 
     let mut rpc_cfg = RpcOperationsConfig {
         chain_id: anvil.chain_id(),
-        tx_confirmations: 3,
+        finality,
         contract_addrs,
         module_address: Address::default(),
         expected_block_time: block_time,
@@ -274,7 +277,6 @@ async fn integration_test_indexer() {
     };
 
     let indexer_cfg = IndexerConfig {
-        finalization: 2,
         start_block_number: 1,
         fetch_token_transactions: true,
     };
