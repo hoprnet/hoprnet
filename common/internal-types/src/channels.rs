@@ -846,16 +846,11 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::channels::{f64_to_win_prob, ChannelEntry, ChannelStatus, Ticket};
+    use crate::channels::{f64_to_win_prob, generate_channel_id, ChannelEntry, ChannelStatus, Ticket};
     use hex_literal::hex;
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair},
-        types::Hash,
-    };
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_crypto_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
+    use std::str::FromStr;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -863,6 +858,14 @@ pub mod tests {
 
         static ref ADDRESS_1: Address = Address::from_bytes(&hex!("3829b806aea42200c623c4d6b9311670577480ed")).unwrap();
         static ref ADDRESS_2: Address = Address::from_bytes(&hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1")).unwrap();
+    }
+
+    #[test]
+    pub fn test_generate_id() {
+        let from = Address::from_str("0xa460f2e47c641b64535f5f4beeb9ac6f36f9d27c").unwrap();
+        let to = Address::from_str("0xb8b75fef7efdf4530cf1688c933d94e4e519ccd1").unwrap();
+        let id = generate_channel_id(&from, &to).to_string();
+        assert_eq!("0x1a410210ce7265f3070bf0e8885705dce452efcfbd90a5467525d136fcefc64a", id);
     }
 
     #[test]

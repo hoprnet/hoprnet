@@ -72,6 +72,7 @@ class Node:
     def setup(self, password: str, config_file: Path, dir: Path):
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
+            "RUST_LOG": "debug",
             "HOPRD_HEARTBEAT_INTERVAL": "2500",
             "HOPRD_HEARTBEAT_THRESHOLD": "2500",
             "HOPRD_HEARTBEAT_VARIANCE": "1000",
