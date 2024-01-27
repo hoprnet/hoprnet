@@ -25,7 +25,7 @@ services:
           memory: 256M
   hoprd:
     # NOTE: change this to the version you'd like to run
-    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest
+    image: europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest@sha256:223209c1ec49ae98e97ef160a4867b71b1d6194a8de41afe7447bb721e96ff60
     restart: unless-stopped
     pull_policy: always
     mem_reservation: 1g
