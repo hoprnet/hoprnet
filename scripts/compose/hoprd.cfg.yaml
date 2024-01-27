@@ -1,0 +1,66 @@
+hopr:
+  host:
+    # NOTE: adapt this to reflect your public IP
+    ip: !IPv4 127.0.0.1
+    port: 9091
+  db:
+    data: /app/hoprd-db/db
+    initialize: true
+    force_initialize: false
+  strategy:
+    on_fail_continue: true
+    allow_recursive: true
+    finalize_channel_closure: true
+    strategies: []
+  heartbeat:
+    variance: 1
+    interval: 20
+    threshold: 60
+  network_options:
+    min_delay: 1
+    max_delay: 300
+    quality_bad_threshold: 0.2
+    quality_offline_threshold: 0.5
+    quality_step: 0.1
+    quality_avg_window_size: 25
+    ignore_timeframe: 600
+    backoff_exponent: 1.5
+    backoff_min: 2.0
+    backoff_max: 300.0
+  protocol:
+    ack:
+      timeout: 15
+    heartbeat:
+      timeout: 15
+    msg:
+      timeout: 15
+    ticket_aggregation:
+      timeout: 15
+  chain:
+    # NOTE: fill in value
+    network:
+    announce: true
+    check_unrealized_balance: true
+  safe_module:
+    # NOTE: fill in value
+    safe_address:
+    # NOTE: fill in value
+    module_address:
+    safe_transaction_service_provider: https://safe-transaction.prod.hoprtech.net/
+  transport:
+    announce_local_addresses: false
+    prefer_local_addresses: false
+identity:
+  file: '/app/hoprd.id'
+  password: 'mySAFEpl4ce'
+api:
+  enable: true
+  auth: !Token ^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^
+  host:
+    address: !IPv4 0.0.0.0
+    port: 3001
+inbox:
+  capacity: 512
+  max_age: 900
+  excluded_tags:
+    - 0

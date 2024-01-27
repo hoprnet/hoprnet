@@ -205,7 +205,8 @@
             pname = "hopr";
             version = hoprdCrateInfo.version;
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // { builder = craneLibNightly.buildDepsOnly;});
-            buildPhaseCargoCommand = "RUSTDOCFLAGS='--enable-index-page -Z unstable-options' cargo doc --offline --no-deps";
+            buildPhaseCargoCommand = "cargo doc --offline --no-deps";
+            RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
