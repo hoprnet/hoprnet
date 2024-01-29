@@ -410,8 +410,7 @@ generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
 	hoprd-api-schema >| /tmp/openapi.spec.json
-
-	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
+	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
     
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
