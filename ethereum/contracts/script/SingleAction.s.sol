@@ -171,6 +171,43 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
+     * @dev Use manager to
+     * - Deregister nodes from Network Registry
+     * - Re-register nodes with the same safe in Network Registry
+     *
+     * @param nodeAddresses array of node addresses
+     */
+    function managerRetryNetworkRegistry(
+        address[] memory nodeAddresses
+    )
+        external
+    {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
+        vm.stopBroadcast();
+        _helperGetDeployerInternalKey();
+
+        // 2. prepare data paylaods for manager
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).nodeRegisterdToAccount(nodeAddresses[m]);
+            eligibilities[m] = true;
+        }
+
+        // 3. remove nodes and safe from network registry, as a manager of network registry
+        HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerDeregister(nodeAddresses);
+
+        // 4. add nodes and safe to network registry, as a manager of network registry
+        HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerRegister(stakingSafeAddresses, nodeAddresses);
+
+        // 8. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
+
+        vm.stopBroadcast();
+    }
+
+    /**
      * @dev create a safe proxy and moodule proxy.
      * Perform the following actions as the owner of safe:
      * - include nodes to the module

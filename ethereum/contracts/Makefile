@@ -241,6 +241,17 @@ endif
 		--broadcast --sig "deregisterNodes(address[])" \
 		$(node_addresses)
 
+# E.g. make manager-retry-register-nodes network=anvil-localhost environment-type=local node_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0x70997970c51812dc3a010c7d01b50e0d17dc79c8]"
+.PHONY: manager-retry-register-nodes
+manager-retry-register-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
+manager-retry-register-nodes: ## owner deregister given nodes from network registry contract
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "managerRetryNetworkRegistry(address[])" \
+		$(node_addresses)
+
 # E.g. make enable-network-registry network=anvil-localhost environment-type=local
 .PHONY: enable-network-registry
 enable-network-registry: ensure-environment-and-network-are-set ensure-privatekey-is-set
