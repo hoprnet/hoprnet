@@ -95,7 +95,7 @@ When this strategy is triggered from the
 
 ### Default parameters
 
-- `aggregation_threshold`: 100 tickets
+- `aggregation_threshold`: 300 tickets
 - `unrealized_balance_ratio`: 0.9 (= 90%)
 - `aggregation_timeout`: 60 seconds
 - `aggregate_on_channel_close`: true

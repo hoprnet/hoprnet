@@ -1,6 +1,6 @@
-ARG HOPRD_IMAGE=${HOPRD_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}
-ARG HOPLI_IMAGE=${HOPLI_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopli:latest}
-ARG ANVIL_IMAGE=${ANVIL_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-anvil:latest}
+ARG HOPRD_IMAGE=${HOPRD_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:2.0.8-pr.5859}
+ARG HOPLI_IMAGE=${HOPLI_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopli:2.0.8-pr.5859}
+ARG ANVIL_IMAGE=${ANVIL_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-anvil:2.0.8-pr.5859}
 
 # import hopli image to copy in files later
 FROM --platform=linux/amd64 ${HOPLI_IMAGE} as hopli

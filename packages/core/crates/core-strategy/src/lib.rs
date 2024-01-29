@@ -44,7 +44,7 @@ pub enum Strategy {
 /// Default HOPR node strategies:
 ///
 /// Aggregation strategy:
-///  - aggregate every 100 tickets on all channels
+///  - aggregate every 300 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
 ///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
 /// Auto-redeem Strategy
@@ -64,7 +64,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
                 funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             }),
             Aggregating(AggregatingStrategyConfig {
-                aggregation_threshold: Some(100),
+                aggregation_threshold: Some(300),
                 unrealized_balance_ratio: Some(0.9),
                 aggregation_timeout: Duration::from_secs(60),
                 aggregate_on_channel_close: true,

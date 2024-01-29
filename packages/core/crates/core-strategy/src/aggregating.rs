@@ -44,7 +44,7 @@ pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
     /// This condition is independent of `unrealized_balance_ratio`.
-    /// Default is 100.
+    /// Default is 300.
     #[validate(range(min = 2))]
     pub aggregation_threshold: Option<u32>,
 
@@ -73,7 +73,7 @@ pub struct AggregatingStrategyConfig {
 impl Default for AggregatingStrategyConfig {
     fn default() -> Self {
         Self {
-            aggregation_threshold: Some(100),
+            aggregation_threshold: Some(300),
             unrealized_balance_ratio: Some(0.9),
             aggregation_timeout: Duration::from_secs(60),
             aggregate_on_channel_close: true,
