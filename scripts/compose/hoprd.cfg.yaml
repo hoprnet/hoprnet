@@ -1,7 +1,9 @@
+---
+
 hopr:
   host:
     # NOTE: adapt this to reflect your public IP
-    ip: !IPv4 127.0.0.1
+    address: !IPv4 127.0.0.1
     port: 9091
   db:
     data: /app/hoprd-db/db
