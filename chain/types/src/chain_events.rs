@@ -17,7 +17,7 @@ pub struct SignificantChainEvent {
 
 impl Display for SignificantChainEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} in tx {}", self.tx_hash, self.event_type)
+        write!(f, "{} @ tx {}", self.event_type, self.tx_hash)
     }
 }
 
