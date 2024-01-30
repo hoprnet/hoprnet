@@ -1,7 +1,7 @@
 use async_lock::RwLock;
 use futures::StreamExt;
 use hopr_crypto_types::types::Hash;
-use log::{debug, error, info};
+use log::{error, info, trace};
 use std::{collections::VecDeque, sync::Arc};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -218,7 +218,7 @@ where
 
                             let bn = log.block_number;
                             if let Some(logs) = events.pop_front() {
-                                debug!("processing logs from block #{}: {:?}", bn, logs);
+                                trace!("processing logs from block #{}: {:?}", bn, logs);
 
                                 for log in logs.into_iter() {
                                     let snapshot = Snapshot::new(
@@ -236,6 +236,7 @@ where
                                         Ok(Some(event_type)) => {
                                             // Pair the event type with the TX hash here
                                             let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                            info!("indexer got {significant_event}");
 
                                             if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
                                                 error!("failed to pass a significant chain event further: {e}");

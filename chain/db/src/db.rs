@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, trace};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
@@ -59,14 +59,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         // }
 
         let mut cached_channel: HashMap<Hash, (u32, u64)> = HashMap::new(); // channel_id: (channel_epoch, ticket_index)
-        debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
+        trace!("Fetching all tickets to calculate the unrealized value in tracked channels...");
 
         // FIXME: Currently a node does not have a way of reconciling unacknowledged
         // tickets with the sender. Therefore, the use of unack tickets could make a
         // channel inoperable. Re-enable the use of unacknowledged tickets in this
         // calculation once a reconciliation mechanism has been implemented
         let tickets = self.get_acknowledged_tickets(None).await?;
-        info!("Calculating unrealized balance for {} tickets...", tickets.len());
+        debug!("Calculating unrealized balance for {} tickets...", tickets.len());
 
         for ack_ticket in tickets.into_iter() {
             let ticket = ack_ticket.ticket;
@@ -825,7 +825,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("start marking {acked_ticket} as redeemed");
+        trace!("start marking {acked_ticket} as redeemed");
 
         let mut ops = utils_db::db::Batch::default();
 
@@ -848,13 +848,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         ops.put(key, new_redeemed_balance);
         self.db.batch(ops, true).await?;
 
-        debug!("stopped marking {acked_ticket} as redeemed");
+        trace!("stopped marking {acked_ticket} as redeemed");
 
         Ok(())
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("marking {acked_ticket} as losing",);
+        trace!("marking {acked_ticket} as losing",);
 
         let mut ops = utils_db::db::Batch::default();
 
