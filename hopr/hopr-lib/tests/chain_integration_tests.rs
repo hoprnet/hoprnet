@@ -270,6 +270,7 @@ async fn integration_test_indexer() {
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
+        min_block_range_fetch_size: 3,
     };
 
     let actions_cfg = ActionQueueConfig {
