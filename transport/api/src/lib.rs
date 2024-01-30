@@ -385,7 +385,7 @@ impl HoprTransport {
 
         match self.pkt_sender.clone().send_packet(app_data, path) {
             Ok(mut awaiter) => {
-                log::debug!("Awaiting the HalfKeyChallenge");
+                log::trace!("Awaiting the HalfKeyChallenge");
                 Ok(awaiter
                     .consume_and_wait(std::time::Duration::from_millis(
                         crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,

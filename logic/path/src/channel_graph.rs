@@ -164,7 +164,10 @@ impl ChannelGraph {
             old_value.channel = channel;
 
             let ret = ChannelChange::diff_channels(&old_channel, &channel);
-            info!("updated {channel}: {} changes", ret.len());
+            info!(
+                "updated {channel}: {}",
+                ret.iter().map(ChannelChange::to_string).collect::<Vec<_>>().join(",")
+            );
             Some(ret)
         } else {
             let weighted = ChannelEdge { channel, quality: None };

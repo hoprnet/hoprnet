@@ -14,7 +14,7 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error};
+use log::{error, info, trace, warn};
 use multiaddr::Multiaddr;
 use std::ops::Sub;
 use std::{str::FromStr, sync::Arc};
@@ -26,7 +26,7 @@ pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     addresses: ContractAddresses,
     /// Safe on-chain address which we are monitoring
     safe_address: Address,
-    /// own address, aka msg.sender
+    /// own address, aka message sender
     chain_key: Address,
     /// callbacks to inform other modules
     db: Arc<RwLock<U>>,
@@ -53,7 +53,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 let maybe_account = db.get_account(&address_announcement.node.into()).await?;
 
-                debug!(
+                trace!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
@@ -106,7 +106,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         db.update_account_and_snapshot(&updated_account, snapshot).await?;
                     }
                     Err(_) => {
-                        debug!(
+                        warn!(
                             "Filtering announcement from {} with invalid signature.",
                             key_binding.chain_key
                         )
@@ -170,7 +170,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
-                debug!(
+                trace!(
                     "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
                     channel_closed.channel_id,
                     maybe_channel.is_some()
@@ -209,7 +209,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                 let maybe_channel = db.get_channel(&channel_id).await?;
                 let is_reopen = maybe_channel.is_some();
-                debug!(
+                trace!(
                     "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}, channel known: {is_reopen}"
                 );
 
@@ -340,7 +340,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let from: Address = transfered.from.into();
                 let to: Address = transfered.to.into();
 
-                debug!(
+                trace!(
                     "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
                     &self.safe_address,
                 );
@@ -359,7 +359,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let owner: Address = approved.owner.into();
                 let spender: Address = approved.spender.into();
 
-                debug!(
+                trace!(
                     "on_token_approval_event - address_to_monitor: {:?} - owner: {owner} - spender: {spender}, allowance: {:?}",
                     &self.safe_address, approved.value
                 );
@@ -507,12 +507,13 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
     {
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
-                debug!(
+                trace!(
                     "on_ticket_price_updated - old: {:?} - new: {:?}",
                     update.0.to_string(),
                     update.1.to_string()
                 );
 
+                info!("ticket price has been set to {}", update.1);
                 db.set_ticket_price(&update.1).await?;
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
@@ -544,7 +545,7 @@ impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler 
         log: RawLog,
         snapshot: Snapshot,
     ) -> Result<Option<ChainEventType>> {
-        debug!(
+        trace!(
             "on_event - address: {:?} - received log: {:?}",
             address.to_string(),
             log

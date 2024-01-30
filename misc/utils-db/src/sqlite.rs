@@ -57,7 +57,7 @@ impl SqliteShim<'_> {
         let count: i64 = sqlx::query_scalar(const_format::formatcp!("SELECT COUNT(*) FROM kv_{SQL_TABLE_LABEL}"))
             .fetch_one(&pool)
             .await?;
-        log::debug!("initialized database with {count} existing entries");
+        log::info!("initialized database with {count} existing entries");
 
         Ok(Self {
             pool,
