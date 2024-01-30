@@ -59,15 +59,19 @@ where
     }
 
     fn from_hex(str: &str) -> Result<Self> {
-        let data = if &str[..2] == "0x" || &str[..2] == "0X" {
-            &str[2..]
-        } else {
-            str
-        };
+        if !str.is_empty() && str.len() % 2 == 0 {
+            let data = if &str[..2] == "0x" || &str[..2] == "0X" {
+                &str[2..]
+            } else {
+                str
+            };
 
-        hex::decode(data)
-            .map_err(|_| ParseError)
-            .and_then(|bytes| T::from_bytes(&bytes))
+            hex::decode(data)
+                .map_err(|_| ParseError)
+                .and_then(|bytes| T::from_bytes(&bytes))
+        } else {
+            Err(ParseError)
+        }
     }
 }
 

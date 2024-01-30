@@ -236,6 +236,7 @@ where
                                         Ok(Some(event_type)) => {
                                             // Pair the event type with the TX hash here
                                             let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                            info!("indexer got {significant_event}");
 
                                             if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
                                                 error!("failed to pass a significant chain event further: {e}");
