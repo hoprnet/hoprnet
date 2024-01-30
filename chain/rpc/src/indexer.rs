@@ -71,7 +71,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                         // Range of blocks to fetch is always bounded
                         let range_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
-                        debug!("polling logs from blocks #{from_block} - #{latest_block} (range size {page_size})");
+                        debug!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
 
                         // If we're fetching logs from wide block range, we'll use the pagination log query.
                         let mut retrieved_logs = if range_size >= self.cfg.min_block_range_fetch_size {
