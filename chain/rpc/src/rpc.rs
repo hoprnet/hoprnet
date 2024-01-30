@@ -34,8 +34,13 @@ pub struct RpcOperationsConfig {
     /// Expected block time of the blockchain
     /// Defaults to 5 seconds
     pub expected_block_time: Duration,
-    /// The largest amount of blocks to fetch at once when fetching a historical range of blocks.
-    /// If the requested block range is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
+    /// Minimum size of the block range where batch fetch query should be used.
+    /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
+    /// Defaults to 3.
+    #[validate(range(min = 1))]
+    pub min_block_range_fetch_size: u64,
+    /// The largest amount of blocks to fetch at once when fetching a range of blocks.
+    /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
     /// Defaults to 2500 blocks
     #[validate(range(min = 1))]
     pub max_block_range_fetch_size: u64,
@@ -59,6 +64,7 @@ impl Default for RpcOperationsConfig {
             chain_id: 100,
             contract_addrs: Default::default(),
             module_address: Default::default(),
+            min_block_range_fetch_size: 3,
             max_block_range_fetch_size: 2500,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),

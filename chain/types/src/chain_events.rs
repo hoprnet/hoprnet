@@ -14,6 +14,12 @@ pub struct SignificantChainEvent {
     pub event_type: ChainEventType,
 }
 
+impl Display for SignificantChainEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} @ tx {}", self.event_type, self.tx_hash)
+    }
+}
+
 /// Status of a node in network registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkRegistryStatus {
