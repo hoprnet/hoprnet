@@ -149,15 +149,7 @@ impl ChannelEntry {
 
 impl Display for ChannelEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} channel {} ({}): {} -> {}",
-            self.status,
-            self.get_id(),
-            self.closure_time,
-            self.source,
-            self.destination,
-        )
+        write!(f, "{} channel {}", self.status, self.get_id(),)
     }
 }
 

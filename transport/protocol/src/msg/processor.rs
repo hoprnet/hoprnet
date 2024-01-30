@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -134,7 +134,7 @@ where
             .get_channels_domain_separator()
             .await?
             .ok_or_else(|| {
-                debug!("Missing domain separator.");
+                warn!("Missing domain separator.");
                 MissingDomainSeparator
             })?;
 
@@ -227,7 +227,7 @@ where
                         .get_channels_domain_separator()
                         .await?
                         .ok_or_else(|| {
-                            debug!("Missing domain separator");
+                            warn!("Missing domain separator");
                             MissingDomainSeparator
                         })?;
 
@@ -379,7 +379,7 @@ where
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
-        debug!("begin creating multihop ticket for destination {destination}");
+        trace!("begin creating multihop ticket for destination {destination}");
 
         let (channel, channel_id, current_ticket_index) = {
             let db = self.db.read().await;

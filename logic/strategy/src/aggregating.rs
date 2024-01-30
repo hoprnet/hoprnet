@@ -6,7 +6,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -139,7 +139,7 @@ where
     A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
-        debug!("starting aggregation in {channel}");
+        trace!("starting aggregation in {channel}");
         // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn
         let tickets_to_agg = self
             .db
