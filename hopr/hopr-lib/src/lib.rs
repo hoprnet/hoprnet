@@ -762,7 +762,13 @@ impl Hopr {
             .await
             .map_err(core_transport::errors::HoprTransportError::from)?;
 
-        info!("Loading initial peers");
+        self.state.store(HoprState::Indexing, Ordering::Relaxed);
+
+        // wait for the indexer sync
+        info!("Starting chain interaction, which will trigger the indexer");
+        self.chain_api.sync_chain().await?;
+
+        info!("Loading initial peers from the storage");
         let index_updater = self.transport_api.index_updater();
         for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
             if self.transport_api.is_allowed_to_access_network(&peer_id).await {
@@ -778,12 +784,6 @@ impl Hopr {
                     .await;
             }
         }
-
-        self.state.store(HoprState::Indexing, Ordering::Relaxed);
-
-        // wait for the indexer sync
-        info!("Starting chain interaction, which will trigger the indexer");
-        self.chain_api.sync_chain().await?;
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.
