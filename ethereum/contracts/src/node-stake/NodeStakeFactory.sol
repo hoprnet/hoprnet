@@ -149,9 +149,6 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
      * @param data The data payload for the transaction.
      */
     function prepareSafeTx(Safe safe, uint256 nonce, bytes memory data) private {
-        bytes32 dataHash =
-            safe.getTransactionHash(address(safe), 0, data, Enum.Operation.Call, 0, 0, 0, address(0), msg.sender, nonce);
-        safe.approveHash(dataHash);
         safe.execTransaction(
             address(safe),
             0,
