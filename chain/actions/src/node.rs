@@ -6,11 +6,11 @@ use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
+use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;
-use hopr_crypto_types::prelude::Keypair;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]
@@ -48,7 +48,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
             .await?
             .into_iter()
             .any(|account| {
-                account.get_multiaddr().is_some_and(|ma| ma.eq(multiaddr)) && account.public_key.eq(offchain_key.public())
+                account.get_multiaddr().is_some_and(|ma| ma.eq(multiaddr))
+                    && account.public_key.eq(offchain_key.public())
             })
         {
             let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;

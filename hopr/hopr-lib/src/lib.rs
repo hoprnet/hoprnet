@@ -837,7 +837,7 @@ impl Hopr {
                 .await
             {
                 Ok(_) => info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]),
-                Err(CoreEthereumActionsError::AlreadyAnnounced) => warn!(
+                Err(CoreEthereumActionsError::AlreadyAnnounced) => info!(
                     "Node already announced on chain as {:?}",
                     &multiaddresses_to_announce[0]
                 ),
