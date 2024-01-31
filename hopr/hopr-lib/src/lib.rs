@@ -59,7 +59,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use log::debug;
+use log::{debug, warn};
 use log::{error, info};
 use utils_db::db::DB;
 use utils_db::CurrentDbShim;
@@ -828,18 +828,23 @@ impl Hopr {
 
             // TODO: allow announcing all addresses once that option is supported
             let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
-            info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-            if self
+
+            // The announcement is intentionally not awaited until confirmation
+            match self
                 .chain_api
                 .actions_ref()
                 .announce(&multiaddresses_to_announce[0], &self.me)
                 .await
-                .is_err()
             {
+                Ok(_) => info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]),
+                Err(CoreEthereumActionsError::AlreadyAnnounced) => warn!(
+                    "Node already announced on chain as {:?}",
+                    &multiaddresses_to_announce[0]
+                ),
                 // If the announcement fails we keep going to prevent the node from retrying
                 // after restart. Functionality is limited and users must check the logs for
                 // errors.
-                error!("Failed to announce a node")
+                Err(e) => error!("Failed to transmit node announcement: {e}"),
             }
         }
 
