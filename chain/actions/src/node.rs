@@ -39,14 +39,14 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
     }
 
     async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction> {
-        if self
+        if !self
             .db
             .read()
             .await
             .get_public_node_accounts()
             .await?
             .into_iter()
-            .none(|account| {
+            .any(|account| {
                 account.get_multiaddr().is_some_and(|ma| ma.eq(multiaddr)) && account.public_key.eq(offchain_key)
             })
         {
