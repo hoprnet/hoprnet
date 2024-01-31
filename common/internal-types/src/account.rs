@@ -62,10 +62,7 @@ impl AccountEntry {
 
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
-        match &self.entry_type {
-            AccountType::NotAnnounced => false,
-            AccountType::Announced { .. } => true,
-        }
+        matches!(self.entry_type, AccountType::Announced { .. })
     }
 
     /// If the node has announced, did it announce with routing information ?
