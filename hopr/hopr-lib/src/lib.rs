@@ -72,7 +72,7 @@ use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
-    hopr_platform::time::native::current_timestamp,
+    hopr_platform::time::native::current_time,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -635,7 +635,7 @@ impl Hopr {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_PROCESS_START_TIME.set(current_timestamp().as_unix_timestamp().as_secs_f64());
+            METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
                 &["version"],
                 f64::from_str(const_format::formatcp!(

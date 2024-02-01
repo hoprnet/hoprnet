@@ -638,7 +638,7 @@ impl PacketInteraction {
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
-                        metadata.start_time = hopr_platform::time::native::current_timestamp();
+                        metadata.start_time = hopr_platform::time::native::current_time();
                     }
 
                     (packet, metadata)
@@ -769,7 +769,7 @@ impl PacketInteraction {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    hopr_platform::time::native::current_timestamp()
+                                    hopr_platform::time::native::current_time()
                                         .duration_since(metadata.start_time)
                                         .unwrap_or_default()
                                         .as_secs_f64(),

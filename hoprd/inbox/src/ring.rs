@@ -33,7 +33,7 @@ where
     /// Creates new backend with default timestamping function from std::time.
     pub fn new(capacity: usize) -> Self {
         Self::new_with_capacity(capacity, || {
-            hopr_platform::time::native::current_timestamp()
+            hopr_platform::time::native::current_time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
         })

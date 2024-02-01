@@ -434,7 +434,7 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_platform::time::native::current_timestamp;
+    use hopr_platform::time::native::current_time;
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
@@ -468,7 +468,7 @@ mod tests {
         }
         fn emit(&self, _: NetworkEvent) {}
         fn create_timestamp(&self) -> u64 {
-            current_timestamp().as_unix_timestamp().as_millis() as u64
+            current_time().as_unix_timestamp().as_millis() as u64
         }
     }
 
@@ -506,7 +506,7 @@ mod tests {
                 let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
                 net.update_with_metadata(
                     peer,
-                    Ok(current_timestamp().as_unix_timestamp().as_millis() as u64),
+                    Ok(current_time().as_unix_timestamp().as_millis() as u64),
                     Some(metadata.into()),
                 );
             }
@@ -591,7 +591,7 @@ mod tests {
         // Peer 10 has an old node version
         network.write().await.update_with_metadata(
             &PEERS[9].1,
-            Ok(current_timestamp().as_unix_timestamp().as_millis() as u64),
+            Ok(current_time().as_unix_timestamp().as_millis() as u64),
             Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
         );
 

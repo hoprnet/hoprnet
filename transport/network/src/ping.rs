@@ -7,7 +7,7 @@ use libp2p_identity::PeerId;
 
 use log::{debug, error, info};
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 use crate::messaging::ControlMessage;
 
@@ -92,12 +92,7 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 
         self.send_ping
             .start_send((*peer, ping_challenge.clone()))
-            .map(move |_| {
-                (
-                    current_timestamp().as_unix_timestamp().as_millis() as u64,
-                    ping_challenge,
-                )
-            })
+            .map(move |_| (current_time().as_unix_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
     }
 }
@@ -114,7 +109,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     async fn ping(&mut self, peers: Vec<PeerId>) {
-        let start_all_peers = current_timestamp();
+        let start_all_peers = current_time();
         let mut peers = peers;
 
         if peers.is_empty() {
@@ -154,7 +149,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
-                            Ok(current_timestamp()
+                            Ok(current_time()
                                 .as_unix_timestamp()
                                 .saturating_sub(std::time::Duration::from_millis(start)))
                         } else {
@@ -186,7 +181,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            if current_timestamp().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
+            if current_time().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
                     if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -414,9 +409,9 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
 
-        let start = current_timestamp();
+        let start = current_time();
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
-        let end = current_timestamp();
+        let end = current_time();
 
         assert_ge!(
             end.duration_since(start).unwrap_or_default(),

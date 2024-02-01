@@ -5,6 +5,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
+use std::time::Duration;
 
 use crate::action_queue::PendingAction;
 use crate::errors::CoreEthereumActionsError::{
@@ -17,7 +18,7 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]
@@ -126,20 +127,19 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cor
                 match channel.status {
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
                     ChannelStatus::PendingToClose(_) => {
-                        info!(
-                            "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp())
-                        );
-                        if channel.closure_time_passed(current_timestamp()) {
-                            info!("initiating finalization of channel closure of {channel} in {direction}");
-                            self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                        } else {
-                            Err(ClosureTimeHasNotElapsed(
+                        let remaining_closure_time = channel.remaining_closure_time(current_time());
+                        info!("{channel} - remaining closure time is {remaining_closure_time:?}");
+                        match remaining_closure_time {
+                            Some(Duration::ZERO) => {
+                                info!("initiating finalization of channel closure of {channel} in {direction}");
+                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                            }
+                            _ => Err(ClosureTimeHasNotElapsed(
                                 channel
-                                    .remaining_closure_time(current_timestamp())
+                                    .remaining_closure_time(current_time())
                                     .expect("impossible: closure time has not passed but no remaining closure time")
                                     .as_secs(),
-                            ))
+                            )),
                         }
                     }
                     ChannelStatus::Open => {

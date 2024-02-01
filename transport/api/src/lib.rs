@@ -68,7 +68,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use {async_std::task::sleep, hopr_platform::time::native::current_timestamp};
+use {async_std::task::sleep, hopr_platform::time::native::current_time};
 
 pub fn build_network(
     peer_id: PeerId,
@@ -320,7 +320,7 @@ impl HoprTransport {
             self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
-        let start = current_timestamp().as_unix_timestamp();
+        let start = current_time().as_unix_timestamp();
 
         match select(timeout, ping).await {
             Either::Left(_) => {

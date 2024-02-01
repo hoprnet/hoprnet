@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
 }
 
 use async_std::task::sleep;
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
@@ -115,7 +115,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             #[cfg(all(feature = "prometheus", not(test)))]
             let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
 
-            let start = current_timestamp();
+            let start = current_time();
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
             info!(
@@ -148,7 +148,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 Either::Right(_) => {
                     info!("Heartbeat round finished for all peers");
 
-                    let this_round_actual_duration = current_timestamp().duration_since(start).unwrap_or_default();
+                    let this_round_actual_duration = current_time().duration_since(start).unwrap_or_default();
 
                     let time_to_wait_for_next_round =
                         this_round_planned_duration.saturating_sub(this_round_actual_duration);
