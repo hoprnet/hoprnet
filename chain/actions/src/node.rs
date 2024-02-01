@@ -76,13 +76,134 @@ mod tests {
     use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
+    use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::actions::Action;
+    use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
+    use futures::FutureExt;
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::OffchainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_crypto_types::types::Hash;
+    use hopr_internal_types::account::AccountType;
+    use hopr_internal_types::prelude::AccountEntry;
     use hopr_primitive_types::prelude::*;
+    use multiaddr::Multiaddr;
+    use std::str::FromStr;
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
+
+    #[async_std::test]
+    async fn test_announce() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let self_addr = Address::random();
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let keypair = OffchainKeypair::random();
+        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(CurrentDbShim::new_in_memory().await),
+            self_addr,
+        )));
+
+        let ma = announce_multiaddr.clone();
+        let pubkey_clone = keypair.public().clone();
+        let mut tx_exec = MockTransactionExecutor::new();
+        tx_exec
+            .expect_announce()
+            .once()
+            .withf(move |ad| {
+                let kb = ad.key_binding.clone().unwrap();
+                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == self_addr
+            })
+            .returning(move |_| Ok(random_hash));
+
+        let ma = announce_multiaddr.clone();
+        let pk = keypair.public().clone();
+        let mut indexer_action_tracker = MockActionState::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::Announcement {
+                        peer: pk.into(),
+                        multiaddresses: vec![ma.clone()],
+                        address: self_addr,
+                    },
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn(async move {
+            tx_queue.action_loop().await;
+        });
+
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let tx_res = actions
+            .announce(&announce_multiaddr, &keypair)
+            .await
+            .expect("announcement call should not fail")
+            .await
+            .expect("announcement should be confirmed");
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(matches!(tx_res.action, Action::Announce(_)), "must be announce action");
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::Announcement { .. })),
+            "must correspond to announcement chain event"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let self_addr = Address::random();
+        let keypair = OffchainKeypair::random();
+        let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(CurrentDbShim::new_in_memory().await),
+            self_addr,
+        )));
+
+        db.write()
+            .await
+            .update_account_and_snapshot(
+                &AccountEntry::new(
+                    *keypair.public(),
+                    self_addr,
+                    AccountType::Announced {
+                        multiaddr: announce_multiaddr.clone(),
+                        updated_block: 0,
+                    },
+                ),
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
+        let tx_sender = tx_queue.new_sender();
+
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+
+        let res = actions.announce(&announce_multiaddr, &keypair).await;
+        assert!(
+            matches!(res, Err(CoreEthereumActionsError::AlreadyAnnounced)),
+            "must not be able to re-announce with same address"
+        );
+    }
 
     #[async_std::test]
     async fn test_withdraw() {
