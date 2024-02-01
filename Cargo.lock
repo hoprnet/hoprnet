@@ -5265,7 +5265,7 @@ dependencies = [
 [[package]]
 name = "rust-stream-ext-concurrent"
 version = "1.0.0"
-source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#70f9b146aa211f0c3e985a73bf432954fc2c9585"
+source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#19d9a67f66eb1c8a6af37572a346dcebd04640b3"
 dependencies = [
  "futures",
  "pin-project",
