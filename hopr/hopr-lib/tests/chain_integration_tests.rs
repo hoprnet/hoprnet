@@ -389,6 +389,9 @@ async fn integration_test_indexer() {
         .await
         .expect("should confirm open channel");
 
+    // Delay the fetch, so that channel increase can be processed first
+    async_std::task::sleep(Duration::from_millis(100)).await;
+
     let channel_alice_bob = alice_node
         .db
         .read()
