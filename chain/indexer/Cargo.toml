@@ -6,7 +6,7 @@ edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+license = "GPL-3.0"
 
 [lib]
 crate-type = ["rlib"]
