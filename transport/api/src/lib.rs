@@ -320,7 +320,7 @@ impl HoprTransport {
             self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
-        let start = current_timestamp();
+        let start = current_timestamp().as_unix_timestamp();
 
         match select(timeout, ping).await {
             Either::Left(_) => {

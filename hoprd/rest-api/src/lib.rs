@@ -926,7 +926,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1031,7 +1031,10 @@ mod channels {
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
             channel_epoch: channel.channel_epoch.as_u32(),
-            closure_time: channel.closure_time.as_u64(),
+            closure_time: channel
+                .closure_time_at()
+                .map(|ct| ct.as_unix_timestamp().as_secs())
+                .unwrap_or_default(),
         })
     }
 

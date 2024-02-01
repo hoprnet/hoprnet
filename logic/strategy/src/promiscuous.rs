@@ -468,7 +468,7 @@ mod tests {
         }
         fn emit(&self, _: NetworkEvent) {}
         fn create_timestamp(&self) -> u64 {
-            current_timestamp().as_millis() as u64
+            current_timestamp().as_unix_timestamp().as_millis() as u64
         }
     }
 
@@ -483,7 +483,6 @@ mod tests {
             balance,
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
             U256::zero(),
         );
         db.write()
@@ -505,7 +504,11 @@ mod tests {
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
                 let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
-                net.update_with_metadata(peer, Ok(current_timestamp().as_millis() as u64), Some(metadata.into()));
+                net.update_with_metadata(
+                    peer,
+                    Ok(current_timestamp().as_unix_timestamp().as_millis() as u64),
+                    Some(metadata.into()),
+                );
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
@@ -554,7 +557,6 @@ mod tests {
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::zero(),
-                U256::zero(),
             ))),
             action: Action::OpenChannel(address, balance),
         }
@@ -589,7 +591,7 @@ mod tests {
         // Peer 10 has an old node version
         network.write().await.update_with_metadata(
             &PEERS[9].1,
-            Ok(current_timestamp().as_millis() as u64),
+            Ok(current_timestamp().as_unix_timestamp().as_millis() as u64),
             Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
         );
 

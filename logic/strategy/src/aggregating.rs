@@ -287,10 +287,11 @@ where
         }
 
         if let ChannelChange::Status { left: old, right: new } = change {
-            if old != ChannelStatus::Open || new != ChannelStatus::PendingToClose {
+            if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
                 debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
+            info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
             let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
 
@@ -456,7 +457,6 @@ mod tests {
             (amount as u32).into(),
             ChannelStatus::Open,
             1u32.into(),
-            0u64.into(),
         );
 
         (acked_tickets, channel)
@@ -765,7 +765,7 @@ mod tests {
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
-        channel.status = ChannelStatus::PendingToClose;
+        channel.status = ChannelStatus::PendingToClose(std::time::SystemTime::now());
 
         dbs[0]
             .write()
@@ -787,7 +787,7 @@ mod tests {
                 ChannelDirection::Incoming,
                 ChannelChange::Status {
                     left: ChannelStatus::Open,
-                    right: ChannelStatus::PendingToClose,
+                    right: ChannelStatus::PendingToClose(std::time::SystemTime::now()),
                 },
             )
             .await

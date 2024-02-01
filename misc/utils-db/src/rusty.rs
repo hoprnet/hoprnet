@@ -466,7 +466,9 @@ mod tests {
         test_env(
             Box::new(MemEnv::new()),
             Path::new("/"),
-            hopr_platform::time::native::current_timestamp().as_millis() as u64,
+            hopr_platform::time::native::current_timestamp()
+                .as_unix_timestamp()
+                .as_millis() as u64,
         )
     }
 }

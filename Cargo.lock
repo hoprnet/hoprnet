@@ -3307,6 +3307,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
+ "humantime",
  "lazy_static",
  "log",
  "multiaddr",

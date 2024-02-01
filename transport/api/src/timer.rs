@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use async_std::task::sleep;
 use hopr_platform::time::native::current_timestamp;
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 fn get_timestamp() -> Duration {
-    current_timestamp()
+    current_timestamp().as_unix_timestamp()
 }
 
 /// Represents a periodically timed ticks in a loop with the given period.

@@ -13,6 +13,7 @@ use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -91,7 +92,12 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 
         self.send_ping
             .start_send((*peer, ping_challenge.clone()))
-            .map(move |_| (current_timestamp().as_millis() as u64, ping_challenge))
+            .map(move |_| {
+                (
+                    current_timestamp().as_unix_timestamp().as_millis() as u64,
+                    ping_challenge,
+                )
+            })
             .map_err(|_| ())
     }
 }
@@ -148,7 +154,9 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
-                            Ok(current_timestamp().saturating_sub(std::time::Duration::from_millis(start)))
+                            Ok(current_timestamp()
+                                .as_unix_timestamp()
+                                .saturating_sub(std::time::Duration::from_millis(start)))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())
@@ -178,7 +186,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            if (current_timestamp() - start_all_peers) < self.config.timeout {
+            if current_timestamp().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
                     if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -410,6 +418,9 @@ mod tests {
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
         let end = current_timestamp();
 
-        assert_ge!(end - start, std::time::Duration::from_millis(ping_delay));
+        assert_ge!(
+            end.duration_since(start).unwrap_or_default(),
+            std::time::Duration::from_millis(ping_delay)
+        );
     }
 }

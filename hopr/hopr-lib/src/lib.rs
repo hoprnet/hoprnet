@@ -635,7 +635,7 @@ impl Hopr {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_PROCESS_START_TIME.set(current_timestamp().as_secs() as f64);
+            METRIC_PROCESS_START_TIME.set(current_timestamp().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
                 &["version"],
                 f64::from_str(const_format::formatcp!(
@@ -1120,9 +1120,9 @@ impl Hopr {
             .event
             .expect("channel close action confirmation must have associated chain event")
         {
-            ChainEventType::ChannelClosureInitiated(_) => Ok(CloseChannelResult {
+            ChainEventType::ChannelClosureInitiated(c) => Ok(CloseChannelResult {
                 tx_hash: confirmation.tx_hash,
-                status: ChannelStatus::PendingToClose,
+                status: c.status, // copy the information about closure time
             }),
             ChainEventType::ChannelClosed(_) => Ok(CloseChannelResult {
                 tx_hash: confirmation.tx_hash,

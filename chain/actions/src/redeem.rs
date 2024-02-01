@@ -325,7 +325,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             channel_epoch,
-            U256::zero(),
         );
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
             .await
