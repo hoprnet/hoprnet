@@ -363,7 +363,7 @@ async fn integration_test_indexer() {
     let offchain_key = OffchainKeypair::random();
     let confirmation = alice_node
         .actions
-        .announce(&maddr, &offchain_key)
+        .announce(&[maddr.clone()], &offchain_key)
         .await
         .expect("should submit announcement tx")
         .await

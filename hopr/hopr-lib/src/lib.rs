@@ -848,21 +848,19 @@ impl Hopr {
             // At this point the node is already registered with Safe, so
             // we can announce via Safe-compliant TX
 
-            // TODO: allow announcing all addresses once that option is supported
             let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
 
             // The announcement is intentionally not awaited until confirmation
             match self
                 .chain_api
                 .actions_ref()
-                .announce(&multiaddresses_to_announce[0], &self.me)
+                .announce(&multiaddresses_to_announce, &self.me)
                 .await
             {
-                Ok(_) => info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]),
-                Err(CoreEthereumActionsError::AlreadyAnnounced) => info!(
-                    "Node already announced on chain as {:?}",
-                    &multiaddresses_to_announce[0]
-                ),
+                Ok(_) => info!("Announcing node on chain: {:?}", multiaddresses_to_announce),
+                Err(CoreEthereumActionsError::AlreadyAnnounced) => {
+                    info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
+                }
                 // If the announcement fails we keep going to prevent the node from retrying
                 // after restart. Functionality is limited and users must check the logs for
                 // errors.

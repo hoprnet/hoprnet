@@ -20,7 +20,7 @@ pub trait NodeActions {
 
     /// Announces node on-chain with key binding.
     /// The operation should also check if such announcement has not been already made on-chain.
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction>;
+    async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction>;
 
     /// Registers the safe address with the node
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction>;
@@ -39,7 +39,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction> {
+    async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
+        // TODO: allow announcing all addresses once that option is supported
+        let announcement_data =
+            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.me, offchain_key)))?;
+
         if !self
             .db
             .read()
@@ -48,12 +52,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
             .await?
             .into_iter()
             .any(|account| {
-                account.get_multiaddr().is_some_and(|ma| ma.eq(multiaddr))
-                    && account.public_key.eq(offchain_key.public())
+                account.public_key.eq(offchain_key.public())
+                    && account
+                        .get_multiaddr()
+                        .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
             })
         {
-            let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
-
             info!("initiating announcement {announcement_data}");
             self.tx_sender.send(Action::Announce(announcement_data)).await
         } else {
