@@ -79,6 +79,12 @@ where
         }
     }
 
+    /// Checks whether the tag is in the exclusion list.
+    /// NOTE: If the `tag` is `None`, it will never be considered as excluded.
+    /// This has the following implication:
+    /// Since [DEFAULT_APPLICATION_TAG](hopr_internal_types::protocol::DEFAULT_APPLICATION_TAG) is also considered as excluded per default,
+    /// all the messages without a tag (= with implicit [DEFAULT_APPLICATION_TAG](hopr_internal_types::protocol::DEFAULT_APPLICATION_TAG))
+    /// will be allowed into the inbox, whereas the messages which explicitly specify that tag, will not make it into the inbox.
     fn is_excluded_tag(&self, tag: &Option<Tag>) -> bool {
         match tag {
             None => false,

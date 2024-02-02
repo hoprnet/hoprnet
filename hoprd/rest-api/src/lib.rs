@@ -1741,7 +1741,13 @@ mod messages {
             .pop_all(tag.tag)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to pop message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -1818,7 +1824,13 @@ mod messages {
             .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to peek message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -2433,7 +2445,7 @@ mod node {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
-        pub is_elligible: bool,
+        pub is_eligible: bool,
     }
 
     /// List all known entry nodes with multiaddrs and eligibility.
@@ -2466,7 +2478,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_elligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await,
                         },
                     );
                 }
