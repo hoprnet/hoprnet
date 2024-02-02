@@ -36,7 +36,6 @@ impl Default for HostType {
 
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
-    #[validate(custom = "validate_host_address")]
     #[serde(default)]
     pub address: HostType,
     #[validate(range(min = 1u16))]
@@ -101,8 +100,9 @@ fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
-    match host {
+/// Validates the HostConfig to be used as an external host
+pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> {
+    match &host.address {
         HostType::IPv4(ip4) => validate_ipv4_address(ip4),
         HostType::Domain(domain) => validate_dns_address(domain),
     }
