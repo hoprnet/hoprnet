@@ -78,10 +78,19 @@ mod tests {
         let ts_1 = Duration::from_millis(1703086927316);
 
         let data = hex!("cd8568656c6c6f86018c87e42dd4");
-        let (b_2, ts_2) = crate::rlp::decode(&data).expect("must decode");
+        assert_eq!(
+            &data,
+            crate::rlp::encode(b_1, ts_1).as_ref(),
+            "encoded data must be equal"
+        );
 
-        assert_eq!(b_1, b_2.as_ref(), "data must be equal");
-        assert_eq!(ts_1, ts_2, "timestamps must be equal up to milliseconds");
+        let (b_2, ts_2) = crate::rlp::decode(&data).expect("must decode");
+        assert_eq!(b_1, b_2.as_ref(), "decoded data must be equal");
+        assert_eq!(
+            ts_1.as_millis(),
+            ts_2.as_millis(),
+            "timestamps must be equal up to milliseconds"
+        );
     }
 
     #[test]
