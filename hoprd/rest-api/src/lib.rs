@@ -944,17 +944,6 @@ mod channels {
         pub balance: String,
     }
 
-    impl From<ChannelEntry> for NodeChannel {
-        fn from(value: ChannelEntry) -> Self {
-            Self {
-                id: value.get_id(),
-                peer_address: value.destination,
-                status: value.status,
-                balance: value.balance.amount().to_string(),
-            }
-        }
-    }
-
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
@@ -1100,12 +1089,22 @@ mod channels {
                         incoming: incoming
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                    id: c.get_id(),
+                                    peer_address: c.source,
+                                    status: c.status,
+                                    balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                id: c.get_id(),
+                                peer_address: c.destination,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         all: vec![],
                     };
@@ -2364,7 +2363,7 @@ mod node {
         hopr_network_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        hopr_node_sage_registry: Address,
+        hopr_node_safe_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         hopr_management_module: Address,
@@ -2409,7 +2408,7 @@ mod node {
                     hopr_token: chain_config.token,
                     hopr_channels: chain_config.channels,
                     hopr_network_registry: chain_config.network_registry,
-                    hopr_node_sage_registry: chain_config.node_safe_registry,
+                    hopr_node_safe_registry: chain_config.node_safe_registry,
                     hopr_management_module: chain_config.module_implementation,
                     hopr_node_safe: safe_config.safe_address,
                     is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
