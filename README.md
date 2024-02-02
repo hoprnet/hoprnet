@@ -84,11 +84,13 @@ $ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:st
 Here is an example of command line to run the docker container. Please note that some parameters should be set customized to your node configuration
 
 ```shell
-$ docker run --pull always --platform linux/amd64 --restart on-failure -m 3g \
+$ alias hoprd='docker run --pull always --platform linux/amd64 --restart on-failure -m 3g \
   --log-driver json-file --log-opt max-size=1000M --log-opt max-file=5 \
   -d -v $HOME/.hoprd-db:/app/hoprd-db --name hoprd \
   -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e RUST_LOG="info" -e RUST_BACKTRACE="full" \
-  europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${RELEASE} \
+  europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${RELEASE}'
+  
+$  hoprd \
   --network dufour \
   --identity /app/hoprd-db/.hopr-id \
   --apiHost "$(curl http://ifconfig.me)" --apiToken '${HOPRD_API_TOKEN}' \
