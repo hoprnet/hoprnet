@@ -163,14 +163,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
 
-                            inbox_clone
+                            if !inbox_clone
                                 .write()
                                 .await
                                 .push(ApplicationData {
                                     application_tag: data.application_tag,
                                     plain_text: msg,
                                 })
-                                .await;
+                                .await {
+                                warn!("received a message with an ignored Inbox tag {:?}", data.application_tag)
+                            }
                         }
                         Err(_) => error!("RLP decoding failed"),
                     }
