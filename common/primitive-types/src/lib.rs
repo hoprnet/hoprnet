@@ -13,8 +13,11 @@ pub mod rlp {
     use std::time::Duration;
 
     pub fn encode(data: &[u8], timestamp: Duration) -> Box<[u8]> {
-        let ts = timestamp.as_millis() as u64;
-        rlp::encode_list::<&[u8], &[u8]>(&[data, &ts.to_be_bytes()])
+        // For compatibility with JS, strip the leading 2 bytes if the timestamp byte array is longer than 6 bytes
+        let ts = (timestamp.as_millis() as u64).to_be_bytes();
+        let ts_encoded = if ts.len() > 6 { &ts[2..] } else { &ts };
+
+        rlp::encode_list::<&[u8], &[u8]>(&[data, ts_encoded])
             .to_vec()
             .into_boxed_slice()
     }
