@@ -2433,7 +2433,7 @@ mod node {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
-        pub is_elligible: bool,
+        pub is_eligible: bool,
     }
 
     /// List all known entry nodes with multiaddrs and eligibility.
