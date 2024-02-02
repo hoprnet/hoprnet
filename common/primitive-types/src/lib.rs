@@ -14,7 +14,8 @@ pub mod rlp {
 
     pub fn encode(data: &[u8], timestamp: Duration) -> Box<[u8]> {
         let ts = timestamp.as_millis() as u64;
-        rlp::encode_list::<&[u8], &[u8]>(&[data, &ts.to_be_bytes()])
+        let ts_a = &ts.to_be_bytes()[2..];
+        rlp::encode_list::<&[u8], &[u8]>(&[data, ts_a])
             .to_vec()
             .into_boxed_slice()
     }
@@ -77,6 +78,7 @@ mod tests {
         let data = hex!("cd8568656c6c6f86018c87e42dd4");
         let (b_2, ts_2) = crate::rlp::decode(&data).expect("must decode");
 
+        assert_eq!(&data, crate::rlp::encode(b_1, ts_1).as_ref());
         assert_eq!(b_1, b_2.as_ref(), "data must be equal");
         assert_eq!(ts_1, ts_2, "timestamps must be equal up to milliseconds");
     }
