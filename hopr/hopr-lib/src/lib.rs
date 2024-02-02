@@ -59,8 +59,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use log::debug;
-use log::{error, info};
+use log::{debug, error, info};
 use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 
@@ -180,7 +179,7 @@ where
         pin_mut!(event_stream);
         while let Some(event) = event_stream.next().await {
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            info!("resolved {} indexer expectations in event {:?}", resolved.len(), event);
+            debug!("resolved {} indexer expectations in {}", resolved.len(), event);
 
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
@@ -310,6 +309,7 @@ pub fn build_components<FSaveTbf>(
     HoprChain,
     HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send + Sync>>>,
     UnboundedReceiver<TransportOutput>,
+    Arc<MultiStrategy>,
 )
 where
     FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
@@ -384,7 +384,6 @@ where
         cfg.safe_module.safe_address,
         chain_config.channel_contract_deploy_block as u64,
         tx_indexer_events,
-        chain_config.confirmations as u64,
         chain_actions.clone(),
         rpc_operations.clone(),
         channel_graph.clone(),
@@ -492,18 +491,6 @@ where
         )),
     );
     processes.insert(
-        HoprLoopComponents::StrategyTick,
-        Box::pin(execute_on_tick(Duration::from_secs(60), move || {
-            let multistrategy_clone = multistrategy_clone.clone();
-
-            async move {
-                info!("doing strategy tick");
-                let _ = multistrategy_clone.on_tick().await;
-                info!("strategy tick done");
-            }
-        })),
-    );
-    processes.insert(
         HoprLoopComponents::BloomFilterSave,
         Box::pin(execute_on_tick(Duration::from_secs(90), move || {
             let tbf_clone = tbf_clone.clone();
@@ -535,7 +522,13 @@ where
     });
 
     // TODO: return join handles for all background running tasks
-    (hopr_transport_api, hopr_chain_api, HashMap::new(), transport_output_rx)
+    (
+        hopr_transport_api,
+        hopr_chain_api,
+        HashMap::new(),
+        transport_output_rx,
+        multistrategy_clone,
+    )
 }
 
 pub struct Hopr {
@@ -548,6 +541,7 @@ pub struct Hopr {
     chain_api: HoprChain,
     chain_cfg: ChainNetworkConfig,
     safe_module_cfg: SafeModule,
+    multistrategy: Arc<MultiStrategy>,
 }
 
 impl Hopr {
@@ -624,7 +618,7 @@ impl Hopr {
             };
         };
 
-        let (transport_api, chain_api, _processes, transport_ingress) = build_components(
+        let (transport_api, chain_api, _processes, transport_ingress, multistrategy) = build_components(
             cfg.clone(),
             resolved_environment.clone(),
             me.clone(),
@@ -659,6 +653,7 @@ impl Hopr {
             chain_api,
             chain_cfg: resolved_environment,
             safe_module_cfg: cfg.safe_module,
+            multistrategy,
         }
     }
 
@@ -764,7 +759,39 @@ impl Hopr {
             .await
             .map_err(core_transport::errors::HoprTransportError::from)?;
 
-        info!("Loading initial peers");
+        self.state.store(HoprState::Indexing, Ordering::Relaxed);
+
+        // wait for the indexer sync
+        info!("Start the indexer and sync the chain");
+        self.chain_api.sync_chain().await?;
+
+        // NOTE: strategy ticks must start after the chain is synced, otherwise
+        // the strategy would react to historical data and drain through the native
+        // balance on chain operations not relevant for the present network state
+        let multi_strategy_clone = self.multistrategy.clone();
+        spawn(async move {
+            execute_on_tick(Duration::from_secs(60), move || {
+                let multistrategy_clone = multi_strategy_clone.clone();
+
+                async move {
+                    info!("doing strategy tick");
+                    let _ = multistrategy_clone.on_tick().await;
+                    info!("strategy tick done");
+                }
+            })
+            .await;
+
+            error!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+            panic!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+        });
+
+        info!("Loading initial peers from the storage");
         let index_updater = self.transport_api.index_updater();
         for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
             if self.transport_api.is_allowed_to_access_network(&peer_id).await {
@@ -780,12 +807,6 @@ impl Hopr {
                     .await;
             }
         }
-
-        self.state.store(HoprState::Indexing, Ordering::Relaxed);
-
-        // wait for the indexer sync
-        info!("Starting chain interaction, which will trigger the indexer");
-        self.chain_api.sync_chain().await?;
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.
@@ -829,18 +850,23 @@ impl Hopr {
 
             // TODO: allow announcing all addresses once that option is supported
             let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
-            info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-            if self
+
+            // The announcement is intentionally not awaited until confirmation
+            match self
                 .chain_api
                 .actions_ref()
                 .announce(&multiaddresses_to_announce[0], &self.me)
                 .await
-                .is_err()
             {
+                Ok(_) => info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]),
+                Err(CoreEthereumActionsError::AlreadyAnnounced) => info!(
+                    "Node already announced on chain as {:?}",
+                    &multiaddresses_to_announce[0]
+                ),
                 // If the announcement fails we keep going to prevent the node from retrying
                 // after restart. Functionality is limited and users must check the logs for
                 // errors.
-                error!("Failed to announce a node")
+                Err(e) => error!("Failed to transmit node announcement: {e}"),
             }
         }
 

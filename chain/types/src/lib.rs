@@ -24,6 +24,7 @@ use std::sync::Arc;
 pub mod actions;
 pub mod chain_events;
 pub mod constants;
+pub mod utils;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;
 
@@ -142,8 +143,8 @@ impl<M: Middleware> ContractInstances<M> {
         {
             // Fund 1820 deployer and deploy ERC1820Registry
             let mut tx = Eip1559TransactionRequest::new();
-            tx = tx.to(H160::from_str("a990077c3205cbDf861e17Fa532eeB069cE9fF96").unwrap());
-            tx = tx.value(80000000000000000u128);
+            tx = tx.to(H160::from_str(crate::utils::ERC_1820_DEPLOYER).unwrap());
+            tx = tx.value(crate::utils::ETH_VALUE_FOR_ERC1820_DEPLOYER);
 
             provider
                 .send_transaction(tx, None)
@@ -234,7 +235,17 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 /// Used for testing. When block time is given, new blocks are mined periodically.
 /// Otherwise, a new block is mined per transaction.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let mut anvil = ethers::utils::Anvil::new();
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
+    let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
+
+    let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());

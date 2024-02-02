@@ -112,7 +112,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
 
-        info!("channel closure finalizer: initiated closure finalization of {to_close} channels");
+        debug!("channel closure finalizer: initiated closure finalization of {to_close} channels");
         Ok(())
     }
 }

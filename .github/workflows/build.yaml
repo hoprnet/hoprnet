@@ -14,15 +14,13 @@ concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
 jobs:
-  build:
-    name: docker
+  build_and_deploy:
     runs-on: ubuntu-8-core
     timeout-minutes: 60
     strategy:
       matrix:
         target:
           - hoprd
-          - hopli
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -40,11 +38,6 @@ jobs:
           registry: europe-west3-docker.pkg.dev
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: kubernetes
 
       - name: Install Nix
         uses: cachix/install-nix-action@v25
@@ -97,6 +90,63 @@ jobs:
             echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
             kubectl rollout restart deployments -n ${namespace} $deployment;
           done
+
+  build:
+    runs-on: ubuntu-latest-4-cores
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        target:
+          - hoprd-debug
+          - hopli
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v14
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        env:
+          USER: runner
+
+      - name: "Update version"
+        id: update
+        run: |
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            docker_tag=$(./scripts/get-current-version.sh docker)
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
+          else
+            next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
+            ./scripts/bump-version.sh ${next_version}
+            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push docker image
+        run: nix run .#${{ matrix.target }}-docker-build-and-upload
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ matrix.target }}:${{ steps.update.outputs.DOCKER_TAG }}
 
   docs:
     name: Docs

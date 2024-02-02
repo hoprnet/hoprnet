@@ -89,8 +89,8 @@ smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
 
 .PHONY: lint
-lint: lint-rust lint-python lint-sol
-lint: ## run linter for TS, Rust, Python, Solidity
+lint: lint-python lint-sol lint-rust 
+lint:
 
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
@@ -410,8 +410,7 @@ generate-python-sdk:
 	$(cargo) build -p hoprd-api
 
 	hoprd-api-schema >| /tmp/openapi.spec.json
-
-	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
+	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
     
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*

@@ -1,20 +1,20 @@
+use std::sync::Arc;
+
 use async_lock::RwLock;
-use futures::{pin_mut, StreamExt};
-use hopr_crypto_types::types::Hash;
-use log::{debug, error, info};
-use std::{collections::VecDeque, sync::Arc};
+use async_std::task::spawn;
+use futures::{stream, StreamExt};
+use log::{debug, error, info, trace};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
+use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
-
-use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -46,13 +46,6 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 
 #[derive(Debug, Clone, Copy)]
 pub struct IndexerConfig {
-    /// Finalization chain length
-    ///
-    /// The number of blocks including and decreasing from the chain HEAD
-    /// that the logs will be buffered for before being considered
-    /// successfully joined to the chain.
-    /// Default is 8.
-    pub finalization: u64,
     /// The block at which the indexer should start
     ///
     /// It typically makes little sense to start indexing from the beginning
@@ -72,7 +65,6 @@ pub struct IndexerConfig {
 impl Default for IndexerConfig {
     fn default() -> Self {
         Self {
-            finalization: 8,
             start_block_number: 0,
             fetch_token_transactions: true,
         }
@@ -95,8 +87,8 @@ where
 
 impl<T, U, V> Indexer<T, U, V>
 where
-    T: HoprIndexerRpcOperations + Send + 'static,
-    U: ChainLogHandler + Send + 'static,
+    T: HoprIndexerRpcOperations + Sync + Send + 'static,
+    U: ChainLogHandler + Send + Sync + 'static,
     V: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     pub fn new(
@@ -150,10 +142,6 @@ where
         topics.extend(crate::constants::topics::network_registry());
         topics.extend(crate::constants::topics::ticket_price_oracle());
         if self.cfg.fetch_token_transactions {
-            // TODO: Still needed?
-            // Actively query for logs to prevent polling done by Ethers.js
-            // that don't retry on failed attempts and thus makes the indexer
-            // handle errors produced by internal Ethers.js provider calls
             topics.extend(crate::constants::topics::token());
         }
 
@@ -163,134 +151,130 @@ where
         };
 
         info!("Building indexer background process");
-        let (tx, rx) = futures::channel::oneshot::channel::<()>();
+        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
-        let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
-
-        let finalization = self.cfg.finalization;
         spawn(async move {
-            let mut tx = Some(tx);
+            let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-            let mut block_stream = rpc
-                .try_stream_logs(latest_block_in_db, log_filter)
-                .expect("block stream should be constructible");
-
-            let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
             let mut chain_head = 0;
 
-            while let Some(block_with_logs) = block_stream.next().await {
-                debug!("Processed block number: {}", block_with_logs.block_id);
+            let block_stream = rpc
+                .try_stream_logs(latest_block_in_db, log_filter)
+                .expect("block stream should be constructible")
+                .then(|block_with_logs| {
+                    let rpc = &rpc;
+                    let mut tx = tx.clone();
+                    let is_synced = is_synced.clone();
 
-                if !block_with_logs.logs.is_empty() {
-                    // Assuming sorted and properly organized blocks,
-                    // the following lines are just a sanity safety mechanism
-                    let mut logs = block_with_logs.logs;
-                    logs.sort_by(log_comparator);
-                    unconfirmed_events.push_back(logs);
-                }
+                    async move {
+                        info!("Processed block number: {}", block_with_logs.block_id);
 
-                let current_block = block_with_logs.block_id;
-
-                match rpc.block_number().await {
-                    Ok(current_chain_block_number) => {
-                        chain_head = current_chain_block_number;
-                    }
-                    Err(error) => {
-                        error!("failed to fetch block number from RPC: {error}");
-                        chain_head = chain_head.max(current_block);
-                    }
-                }
-
-                if tx.is_some() {
-                    let progress =
-                        (current_block - latest_block_in_db) as f64 / (chain_head - latest_block_in_db) as f64;
-                    info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
-
-                    if current_block + finalization >= chain_head {
-                        info!("Indexer sync successfully completed");
-
+                        let current_block = block_with_logs.block_id;
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_INDEXER_SYNC_PROGRESS.set(1.00);
+                        {
+                            METRIC_INDEXER_CURRENT_BLOCK.set(block_with_logs.block_id as f64);
+                        }
 
-                        let _ = tx.take().expect("tx should be present").send(());
-                    }
-                }
-
-                while let Some(logs) = unconfirmed_events.front() {
-                    if let Some(log) = logs.first() {
-                        if log.block_number + finalization <= current_block {
-                            if let Err(error) = db
-                                .write()
-                                .await
-                                .update_latest_block_number(log.block_number as u32)
-                                .await
-                            {
-                                error!("failed to write the latest block number into the database: {error}");
+                        match rpc.block_number().await {
+                            Ok(current_chain_block_number) => {
+                                chain_head = current_chain_block_number;
                             }
+                            Err(error) => {
+                                error!("failed to fetch block number from RPC: {error}");
+                                chain_head = chain_head.max(current_block);
+                            }
+                        }
+
+                        if !is_synced.load(std::sync::atomic::Ordering::Relaxed) {
+                            let progress =
+                                (current_block - latest_block_in_db) as f64 / (chain_head - latest_block_in_db) as f64;
+                            info!("Sync progress {:.2}% @ block {}", progress * 100_f64, current_block);
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            {
-                                METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
-                            }
+                            METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
-                            let bn = log.block_number;
-                            if let Some(logs) = unconfirmed_events.pop_front() {
-                                debug!("processing logs from block #{}: {:?}", bn, logs);
-
-                                for log in logs.into_iter() {
-                                    if let Err(error) = tx_proc.unbounded_send(log) {
-                                        error!("failed to send and process logs: {error}")
-                                    }
+                            if current_block >= chain_head {
+                                info!("Indexer sync successfully completed");
+                                is_synced.store(true, std::sync::atomic::Ordering::Relaxed);
+                                if let Err(e) = tx.try_send(()) {
+                                    error!("failed to notify about achieving index synchronization: {e}")
                                 }
                             }
-
-                            continue;
                         }
+
+                        block_with_logs
+                    }
+                })
+                .flat_map(|mut block_with_logs| {
+                    // Assuming sorted and properly organized blocks,
+                    // the following lines are just a sanity safety mechanism
+                    block_with_logs.logs.sort_by(log_comparator);
+                    stream::iter(block_with_logs.logs)
+                })
+                .then(|log| async {
+                    if let Err(error) = db
+                        .write()
+                        .await
+                        .update_latest_block_number(log.block_number as u32)
+                        .await
+                    {
+                        error!("failed to write the latest block number into the database: {error}");
                     }
 
-                    break;
+                    let snapshot = Snapshot::new(
+                        U256::from(log.block_number),
+                        U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
+                        log.log_index,
+                    );
+
+                    let tx_hash = log.tx_hash;
+
+                    db_processor
+                        .on_event(log.address, log.block_number as u32, log.into(), snapshot)
+                        .await
+                        .map(|v| {
+                            v.map(|event_type| {
+                                // Pair the event type with the TX hash here
+                                let significant_event = SignificantChainEvent { tx_hash, event_type };
+                                debug!("indexer got {significant_event}");
+                                significant_event
+                            })
+                        })
+                        .map_err(|e| {
+                            error!("failed to process logs: {e}");
+                            e
+                        })
+                });
+
+            futures::pin_mut!(block_stream);
+            while let Some(event) = block_stream.next().await {
+                trace!("Processing an onchain event: {event:?}");
+                if is_synced.load(std::sync::atomic::Ordering::Relaxed) {
+                    match event {
+                        Ok(Some(e)) => {
+                            if let Err(e) = tx_significant_events.unbounded_send(e) {
+                                error!("failed to pass a significant chain event further: {e}");
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            error!("failed to process on-chain event into a recognizable chain event: {e}")
+                        }
+                    }
                 }
             }
         });
 
-        spawn(async move {
-            let rx = rx_proc;
-
-            pin_mut!(rx);
-            while let Some(log) = rx.next().await {
-                let snapshot = Snapshot::new(
-                    U256::from(log.block_number),
-                    U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                    log.log_index,
-                );
-
-                let tx_hash = log.tx_hash;
-
-                match db_processor
-                    .on_event(log.address, log.block_number as u32, log.into(), snapshot)
-                    .await
-                {
-                    Ok(Some(event_type)) => {
-                        // Pair the event type with the TX hash here
-                        let significant_event = SignificantChainEvent { tx_hash, event_type };
-
-                        if let Err(e) = tx_significant_events.unbounded_send(significant_event) {
-                            error!("failed to pass a significant chain event further: {e}");
-                        }
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        error!("failed to process logs: {e}");
-                    }
-                };
-            }
-        });
-
-        rx.await
-            .map_err(|_| crate::errors::CoreEthereumIndexerError::ProcessError("Error during indexing start".into()))
+        if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
+            .await
+            .is_some()
+        {
+            Ok(())
+        } else {
+            Err(crate::errors::CoreEthereumIndexerError::ProcessError(
+                "Error during indexing start".into(),
+            ))
+        }
     }
 }
 
@@ -490,13 +474,8 @@ pub mod tests {
         rpc.expect_block_number().returning(move || Ok(head_block));
 
         let finalized_block = BlockWithLogs {
-            block_id: head_block - cfg.finalization - 1,
-            logs: build_announcement_logs(
-                Address::random(),
-                4,
-                head_block - cfg.finalization - 1,
-                U256::from(23u8),
-            ),
+            block_id: head_block - 1,
+            logs: build_announcement_logs(Address::random(), 4, head_block - 1, U256::from(23u8)),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
@@ -534,8 +513,6 @@ pub mod tests {
 
         let cfg = IndexerConfig::default();
 
-        let expected_finalized_event_count = 4;
-
         handlers.expect_contract_addresses().return_const(vec![]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
@@ -545,47 +522,51 @@ pub mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
-        for i in 0..2 {
-            let current_block = head_block + i;
-            rpc.expect_block_number().returning(move || Ok(current_block));
+
+        let blocks = vec![
+            // head - 1 sync block
+            BlockWithLogs {
+                block_id: head_block - 1,
+                logs: build_announcement_logs(Address::random(), 1, head_block - 1, U256::from(23u8)),
+            },
+            // head sync block
+            BlockWithLogs {
+                block_id: head_block,
+                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+            },
+            // post-sync block
+            BlockWithLogs {
+                block_id: head_block,
+                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+            },
+        ];
+
+        for _ in 0..(blocks.len() as u64) {
+            rpc.expect_block_number().returning(move || Ok(head_block));
         }
-
-        let finalized_block = BlockWithLogs {
-            block_id: head_block - cfg.finalization - 1,
-            logs: build_announcement_logs(
-                Address::random(),
-                expected_finalized_event_count,
-                head_block - cfg.finalization - 1,
-                U256::from(23u8),
-            ),
-        };
-
-        let head_allowing_finalization = BlockWithLogs {
-            block_id: head_block,
-            logs: vec![],
-        };
 
         handlers
             .expect_on_event()
-            .times(expected_finalized_event_count)
+            .times(blocks.len())
             .returning(|_, _, _, _| Ok(Some(random_announcement_chain_event())));
 
-        assert!(tx.start_send(finalized_block.clone()).is_ok());
-        assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
+        for block in blocks.iter() {
+            assert!(tx.start_send(block.clone()).is_ok());
+        }
 
         let (tx_events, rx_events) = futures::channel::mpsc::unbounded();
         let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         assert!(indexer.start().await.is_ok());
 
-        tx.close_channel();
+        // tx.close_channel();
 
         let received = async_std::future::timeout(
             std::time::Duration::from_millis(500),
-            rx_events.take(expected_finalized_event_count).collect::<Vec<_>>(),
+            rx_events.take(1).collect::<Vec<_>>(),
         )
         .await;
 
         assert!(received.is_ok());
-        assert_eq!(received.unwrap().len(), expected_finalized_event_count)
+        assert_eq!(received.unwrap().len(), 1)
     }
 }

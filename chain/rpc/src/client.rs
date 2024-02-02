@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -233,8 +233,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        debug!("rpc call {method} took {}ms", req_duration.as_millis());
-        debug!("rpc response body: {}", String::from_utf8_lossy(&body));
+        trace!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -494,7 +493,8 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 
 #[cfg(test)]
 pub mod tests {
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
+    use chain_types::utils::create_anvil;
+    use chain_types::{ContractAddresses, ContractInstances};
     use ethers_providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;

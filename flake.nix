@@ -94,8 +94,8 @@
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
-          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly}: builder (commonArgs // {
-            inherit pname version;
+          rustPackageDeps = { pname, version, builder ? craneLib.buildDepsOnly, CARGO_PROFILE ? "release" }: builder (commonArgs // {
+            inherit pname version CARGO_PROFILE;
             src = depsSrc;
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
@@ -104,15 +104,15 @@
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version, cargoArtifacts}: craneLib.buildPackage (commonArgs // {
-            inherit pname version cargoArtifacts src;
+          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release" }: craneLib.buildPackage (commonArgs // {
+            inherit pname version cargoArtifacts src CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
           });
-          rustPackageTest = { pname, version, cargoArtifacts}: craneLib.cargoTest (commonArgs // {
+          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
@@ -122,10 +122,16 @@
             # this ensures the tests are run as part of the build process
             doCheck = true;
           });
-          hoprd = rustPackage (hoprdCrateInfo // {cargoArtifacts = rustPackageDeps hoprdCrateInfo;});
-          hopli = rustPackage (hopliCrateInfo // {cargoArtifacts = rustPackageDeps hopliCrateInfo;});
-          hoprd-test = rustPackageTest (hoprdCrateInfo // {cargoArtifacts = rustPackageDeps hoprdCrateInfo;});
-          hopli-test = rustPackageTest (hopliCrateInfo // {cargoArtifacts = rustPackageDeps hopliCrateInfo;});
+          hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hoprd-debug = rustPackage (hoprdCrateInfo // {
+            cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
+              CARGO_PROFILE = "dev";
+            });
+            CARGO_PROFILE = "dev";
+          });
+          hopli = rustPackage (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hopli-test = rustPackageTest (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -139,6 +145,10 @@
               Entrypoint = [
                 "/bin/hoprd"
               ];
+              Env = [
+                "RUST_LOG=info"
+                "RUST_BACKTRACE=full"
+              ];
             };
           };
           hopli-docker = pkgs.dockerTools.buildLayeredImage {
@@ -150,6 +160,39 @@
             config = {
               Entrypoint = [
                 "/bin/hopli"
+              ];
+              Env = [
+                "RUST_LOG=info"
+                "RUST_BACKTRACE=full"
+              ];
+            };
+          };
+          hoprd-debug-docker = pkgs.dockerTools.buildLayeredImage {
+            name = "hoprd-debug";
+            tag = "latest";
+            # breaks binary reproducibility, but makes usage easier
+            created = "now";
+            # size ends up being ca. 450MB packed, 1.3GB unpacked
+            contents = with pkgs; [
+              cacert
+              gdb
+              # FIXME: would be useful, but 700MB larger image size (unpacked)
+              # heaptrack
+              hoprd
+              iana-etc
+              bash
+              # FIXME: would be useful, but 1300MB larger image size (unpacked)
+              # lldb
+              rust-bin.stable.latest.minimal
+              valgrind
+            ];
+            config = {
+              Entrypoint = [
+                "/bin/hoprd"
+              ];
+              Env = [
+                "RUST_LOG=debug"
+                "RUST_BACKTRACE=full"
               ];
             };
           };
@@ -197,6 +240,9 @@
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-docker;
           };
+          hoprd-debug-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hoprd-debug-docker;
+          };
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
@@ -204,8 +250,9 @@
             inherit src;
             pname = "hopr";
             version = hoprdCrateInfo.version;
-            cargoArtifacts = rustPackageDeps (hoprdCrateInfo // { builder = craneLibNightly.buildDepsOnly;});
-            buildPhaseCargoCommand = "RUSTDOCFLAGS='--enable-index-page -Z unstable-options' cargo doc --offline --no-deps";
+            cargoArtifacts = null;
+            buildPhaseCargoCommand = "cargo doc --offline --no-deps";
+            RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
@@ -262,6 +309,7 @@
 
               # documentation utilities
               pandoc
+              swagger-codegen3
 
               # docker image inspection and handling
               dive
@@ -292,10 +340,12 @@
         in
         {
           apps = {
-            inherit hoprd-docker-build-and-upload hopli-docker-build-and-upload;
+            inherit hoprd-docker-build-and-upload;
+            inherit hoprd-debug-docker-build-and-upload;
+            inherit hopli-docker-build-and-upload;
           };
           packages = {
-            inherit hoprd hoprd-test hoprd-docker;
+            inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;
             inherit hopli hopli-test hopli-docker;
             inherit anvil-docker;
             inherit smoke-tests docs;

@@ -1,10 +1,12 @@
 use crate::action_queue::PendingAction;
+use crate::errors::CoreEthereumActionsError::AlreadyAnnounced;
 use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
+use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
@@ -16,7 +18,8 @@ pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction>;
 
-    /// Announces node on-chain with key binding
+    /// Announces node on-chain with key binding.
+    /// The operation should also check if such announcement has not been already made on-chain.
     async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction>;
 
     /// Registers the safe address with the node
@@ -37,10 +40,25 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
     }
 
     async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<PendingAction> {
-        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
+        if !self
+            .db
+            .read()
+            .await
+            .get_public_node_accounts()
+            .await?
+            .into_iter()
+            .any(|account| {
+                account.get_multiaddr().is_some_and(|ma| ma.eq(multiaddr))
+                    && account.public_key.eq(offchain_key.public())
+            })
+        {
+            let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
 
-        info!("initiating announcement {announcement_data}");
-        self.tx_sender.send(Action::Announce(announcement_data)).await
+            info!("initiating announcement {announcement_data}");
+            self.tx_sender.send(Action::Announce(announcement_data)).await
+        } else {
+            Err(AlreadyAnnounced)
+        }
     }
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction> {

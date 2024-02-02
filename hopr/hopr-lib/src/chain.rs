@@ -358,7 +358,8 @@ where
         module_address,
         expected_block_time: Duration::from_millis(chain_config.chain.block_time),
         tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
-        tx_confirmations: chain_config.confirmations as usize,
+        finality: chain_config.confirmations,
+        min_block_range_fetch_size: 3,
         max_block_range_fetch_size: chain_config.max_block_range,
     };
 
@@ -408,14 +409,12 @@ pub fn build_chain_api(
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    confirmations: u64,
     chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {
     let indexer_cfg = chain_indexer::block::IndexerConfig {
         start_block_number: indexer_start_block,
-        finalization: confirmations,
         ..Default::default()
     };
 

@@ -34,19 +34,28 @@ pub struct RpcOperationsConfig {
     /// Expected block time of the blockchain
     /// Defaults to 5 seconds
     pub expected_block_time: Duration,
-    /// The largest amount of blocks to fetch at once when fetching a historical range of blocks.
-    /// If the requested block range is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
+    /// Minimum size of the block range where batch fetch query should be used.
+    /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
+    /// Defaults to 3.
+    #[validate(range(min = 1))]
+    pub min_block_range_fetch_size: u64,
+    /// The largest amount of blocks to fetch at once when fetching a range of blocks.
+    /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
     /// Defaults to 2500 blocks
     #[validate(range(min = 1))]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
     pub tx_polling_interval: Duration,
-    /// Number of confirmations to wait when performing
-    /// transaction polling.
+    /// Finalization chain length
+    ///
+    /// The number of blocks including and decreasing from the chain HEAD
+    /// that the logs will be buffered for before being considered
+    /// successfully joined to the chain.
+    ///
     /// Defaults to 8
-    #[validate(range(min = 1))]
-    pub tx_confirmations: usize,
+    #[validate(range(min = 1, max = 100))]
+    pub finality: u32,
 }
 
 impl Default for RpcOperationsConfig {
@@ -55,10 +64,11 @@ impl Default for RpcOperationsConfig {
             chain_id: 100,
             contract_addrs: Default::default(),
             module_address: Default::default(),
+            min_block_range_fetch_size: 3,
             max_block_range_fetch_size: 2500,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
-            tx_confirmations: 8,
+            finality: 8,
         }
     }
 }
@@ -110,18 +120,32 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             provider,
         })
     }
+
+    pub(crate) async fn get_block_number(&self) -> Result<u64> {
+        Ok(self
+            .provider
+            .get_block_number()
+            .await?
+            .as_u64()
+            .saturating_sub(self.cfg.finality as u64))
+    }
+
+    pub(crate) async fn get_block(
+        &self,
+        block_number: u64,
+    ) -> Result<Option<ethers::types::Block<ethers::types::H256>>> {
+        let sanitized_block_number = block_number.saturating_sub(self.cfg.finality as u64);
+        Ok(self
+            .provider
+            .get_block(BlockId::Number(sanitized_block_number.into()))
+            .await?)
+    }
 }
 
 #[async_trait]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        let ts = self
-            .provider
-            .get_block(BlockId::Number(block_number.into()))
-            .await?
-            .map(|b| b.timestamp.as_u64());
-
-        Ok(ts)
+        Ok(self.get_block(block_number).await?.map(|b| b.timestamp.as_u64()))
     }
 
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
@@ -129,7 +153,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             BalanceType::Native => {
                 let native = self
                     .provider
-                    .get_balance(NameOrAddress::Address(address.into()), None)
+                    .get_balance(
+                        NameOrAddress::Address(address.into()),
+                        Some(BlockId::Number(self.get_block_number().await?.into())),
+                    )
                     .await?;
 
                 Ok(Balance::new(native, BalanceType::Native))
@@ -212,7 +239,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .provider
             .send_transaction(tx, None)
             .await?
-            .confirmations(self.cfg.tx_confirmations)
+            .confirmations(self.cfg.finality as usize)
             .interval(self.cfg.tx_polling_interval);
 
         Ok(sent_tx.into())
@@ -222,57 +249,15 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 #[cfg(test)]
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprRpcOperations, PendingTransaction, TypedTransaction};
+    use crate::{HoprRpcOperations, PendingTransaction};
     use async_std::task::sleep;
-    use bindings::hopr_token::HoprToken;
-    use chain_types::{create_anvil, ContractAddresses, ContractInstances};
-    use ethers::types::Eip1559TransactionRequest;
-    use ethers_providers::Middleware;
+    use chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
-    use primitive_types::H160;
     use std::time::Duration;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-
-    pub async fn mint_tokens<M: Middleware + 'static>(
-        hopr_token: HoprToken<M>,
-        amount: u128,
-        deployer: Address,
-    ) -> u64 {
-        hopr_token
-            .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-
-        hopr_token
-            .mint(
-                deployer.into(),
-                amount.into(),
-                ethers::types::Bytes::new(),
-                ethers::types::Bytes::new(),
-            )
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-            .unwrap()
-            .block_number
-            .unwrap()
-            .as_u64()
-    }
-
-    fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
-        let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
-        tx.set_to(H160::from(to));
-        tx.set_value(ethers::types::U256(amount.0));
-        tx
-    }
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
@@ -286,13 +271,15 @@ pub mod tests {
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -301,6 +288,9 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -312,7 +302,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(transfer_eth_tx(Address::random(), 1000000_u32.into()))
+            .send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                1000000_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -323,13 +316,15 @@ pub mod tests {
     async fn test_should_send_consecutive_txs() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -338,6 +333,9 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
@@ -352,11 +350,14 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(transfer_eth_tx(Address::random(), send_amount.into()))
-                .await
-                .expect("tx should be sent")
-                .await
-                .expect("tx should resolve")
+            rpc.send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                send_amount.into(),
+            ))
+            .await
+            .expect("tx should be sent")
+            .await
+            .expect("tx should resolve")
         }))
         .await;
 
@@ -375,13 +376,15 @@ pub mod tests {
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
-            tx_confirmations: 2,
+            expected_block_time,
+            finality: 2,
             ..RpcOperationsConfig::default()
         };
 
@@ -390,6 +393,10 @@ pub mod tests {
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc
@@ -400,7 +407,10 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+            .send_transaction(chain_types::utils::create_native_transfer(
+                Address::random(),
+                1_u32.into(),
+            ))
             .await
             .expect("failed to send tx");
 
@@ -417,7 +427,8 @@ pub mod tests {
     async fn test_get_balance_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(None);
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         // Deploy contracts
@@ -431,23 +442,24 @@ pub mod tests {
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
             tx_polling_interval: Duration::from_millis(10),
+            expected_block_time,
+            finality: 2,
             contract_addrs: ContractAddresses::from(&contract_instances),
             ..RpcOperationsConfig::default()
         };
 
         let amount = 1024_u64;
-        mint_tokens(
-            contract_instances.token,
-            amount as u128,
-            chain_key_0.public().to_address(),
-        )
-        .await;
+        chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
+
+        // Wait until contracts deployments are final
+        async_std::task::sleep((1 + cfg.finality) * expected_block_time).await;
+
         let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await.unwrap();
