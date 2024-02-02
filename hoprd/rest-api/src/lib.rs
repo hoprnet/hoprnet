@@ -1007,18 +1007,18 @@ mod channels {
             source_peer_id: node
                 .chain_key_to_peerid(&channel.source)
                 .await?
-                .map(PeerId::to_string)
-                .unwrap_or_else(|_| {
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
                     warn!("failed to map {} to peerid", channel.source);
-                    "".into()
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
                 }),
             destination_peer_id: node
                 .chain_key_to_peerid(&channel.destination)
                 .await?
-                .map(PeerId::to_string)
-                .unwrap_or_else(|_| {
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
                     warn!("failed to map {} to peerid", channel.destination);
-                    "".into()
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
                 }),
             balance: channel.balance.amount().to_string(),
             status: channel.status,
