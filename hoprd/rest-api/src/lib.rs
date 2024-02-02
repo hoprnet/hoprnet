@@ -1007,18 +1007,18 @@ mod channels {
             source_peer_id: node
                 .chain_key_to_peerid(&channel.source)
                 .await?
-                .map(PeerId::to_string)
-                .unwrap_or_else(|_| {
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
                     warn!("failed to map {} to peerid", channel.source);
-                    "".into()
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
                 }),
             destination_peer_id: node
                 .chain_key_to_peerid(&channel.destination)
                 .await?
-                .map(PeerId::to_string)
-                .unwrap_or_else(|_| {
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
                     warn!("failed to map {} to peerid", channel.destination);
-                    "".into()
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
                 }),
             balance: channel.balance.amount().to_string(),
             status: channel.status,
@@ -1094,10 +1094,10 @@ mod channels {
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                             .map(|c| NodeChannel {
-                                    id: c.get_id(),
-                                    peer_address: c.source,
-                                    status: c.status,
-                                    balance: c.balance.amount().to_string(),
+                                id: c.get_id(),
+                                peer_address: c.source,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
                             })
                             .collect(),
                         outgoing: outgoing
@@ -2445,7 +2445,7 @@ mod node {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
-        pub is_elligible: bool,
+        pub is_eligible: bool,
     }
 
     /// List all known entry nodes with multiaddrs and eligibility.
