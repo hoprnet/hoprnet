@@ -78,6 +78,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
     info!("Node configuration: {}", cfg.as_redacted_string()?);
 
+    if let hopr_lib::HostType::IPv4(address) = &cfg.hopr.host.address {
+        let ipv4 = std::net::Ipv4Addr::from_str(&address)?;
+
+        if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
+            return Err(hopr_lib::errors::HoprLibError::GeneralError(
+                "Cannot announce a loopback address".into(),
+            ))?;
+        }
+    }
+
     // Find or create an identity
     let identity_opts = IdentityOptions {
         initialize: cfg.hopr.db.initialize,

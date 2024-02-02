@@ -1094,10 +1094,10 @@ mod channels {
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                             .map(|c| NodeChannel {
-                                    id: c.get_id(),
-                                    peer_address: c.source,
-                                    status: c.status,
-                                    balance: c.balance.amount().to_string(),
+                                id: c.get_id(),
+                                peer_address: c.source,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
                             })
                             .collect(),
                         outgoing: outgoing
