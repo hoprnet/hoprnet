@@ -88,13 +88,30 @@ fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::er
 
     for proto in ma.iter() {
         match proto {
-            multiaddr::Protocol::Dns4(domain) | multiaddr::Protocol::Dns6(domain) => {
-                let p = format!("{domain}:443")
+            multiaddr::Protocol::Dns4(domain) => {
+                let p = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
                     .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
+                    .filter(|sa| sa.is_ipv4())
                     .collect::<Vec<_>>()
                     .first()
-                    .unwrap()
+                    .ok_or(crate::errors::HoprTransportError::Api(format!(
+                        "Failed to resolve {domain} to an IPv4 address. Does the DNS entry has an A record?"
+                    )))?
+                    .ip();
+
+                out.push(p.into());
+            }
+            multiaddr::Protocol::Dns6(domain) => {
+                let p = format!("{domain}:443") // dummy port, irrevelant at this point
+                    .to_socket_addrs()
+                    .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
+                    .filter(|sa| sa.is_ipv6())
+                    .collect::<Vec<_>>()
+                    .first()
+                    .ok_or(crate::errors::HoprTransportError::Api(format!(
+                        "Failed to resolve {domain} to an IPv6 address. Does the DNS entry has an AAAA record?"
+                    )))?
                     .ip();
 
                 out.push(p.into());
