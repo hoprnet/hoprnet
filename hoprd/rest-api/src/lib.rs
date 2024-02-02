@@ -2478,7 +2478,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_elligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await,
                         },
                     );
                 }
