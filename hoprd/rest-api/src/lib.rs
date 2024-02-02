@@ -969,12 +969,8 @@ mod channels {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub destination_address: Address,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub source_peer_id: PeerId,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub destination_peer_id: PeerId,
+        pub source_peer_id: String,
+        pub destination_peer_id: String,
         pub balance: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -1011,11 +1007,19 @@ mod channels {
             source_peer_id: node
                 .chain_key_to_peerid(&channel.source)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(PeerId::to_string)
+                .unwrap_or_else(|_| {
+                    warn!("failed to map {} to peerid", channel.source);
+                    "".into()
+                }),
             destination_peer_id: node
                 .chain_key_to_peerid(&channel.destination)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(PeerId::to_string)
+                .unwrap_or_else(|_| {
+                    warn!("failed to map {} to peerid", channel.destination);
+                    "".into()
+                }),
             balance: channel.balance.amount().to_string(),
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
