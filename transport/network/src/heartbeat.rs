@@ -23,7 +23,7 @@ lazy_static::lazy_static! {
         SimpleHistogram::new(
             "hopr_heartbeat_round_time_sec",
             "Measures total time in seconds it takes to probe all other nodes",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
         ).unwrap();
 }
 
