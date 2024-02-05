@@ -160,7 +160,6 @@ mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::zero(),
-                    U256::zero(),
                 ),
                 Some(ack.clone()),
             )),

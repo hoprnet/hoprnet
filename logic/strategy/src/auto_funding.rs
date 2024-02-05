@@ -159,7 +159,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c2 = ChannelEntry::new(
@@ -169,7 +168,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c3 = ChannelEntry::new(
@@ -177,8 +175,7 @@ mod tests {
             Address::random(),
             Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
-            ChannelStatus::PendingToClose,
-            0_u32.into(),
+            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
         );
 

@@ -17,7 +17,8 @@ use log::{info, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
-    hopr_platform::time::native::current_timestamp,
+    hopr_platform::time::native::current_time,
+    hopr_primitive_types::prelude::AsUnixTimestamp,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -265,7 +266,13 @@ impl<T: NetworkExternalActions> Network<T> {
         excluded.insert(my_peer_id);
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_NETWORK_HEALTH.set(0.0);
+        {
+            METRIC_NETWORK_HEALTH.set(0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "high"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "low"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
+        }
 
         Network {
             me: my_peer_id,
@@ -282,7 +289,7 @@ impl<T: NetworkExternalActions> Network<T> {
             last_health: Health::Unknown,
             network_actions_api,
             #[cfg(all(feature = "prometheus", not(test)))]
-            started_at: Some(current_timestamp()),
+            started_at: Some(current_time().as_unix_timestamp()),
         }
     }
 
@@ -459,8 +466,8 @@ impl<T: NetworkExternalActions> Network<T> {
 
             #[cfg(all(feature = "prometheus", not(test)))]
             if self.started_at.is_some() {
-                if let Some(ts) = current_timestamp().checked_sub(self.started_at.take().unwrap()) {
-                    METRIC_NETWORK_HEALTH_TIME_TO_GREEN.set(ts.as_secs_f64());
+                if let Some(ts) = current_time().checked_sub(self.started_at.take().unwrap()) {
+                    METRIC_NETWORK_HEALTH_TIME_TO_GREEN.set(ts.as_unix_timestamp().as_secs_f64());
                 }
             }
 
@@ -557,7 +564,8 @@ mod tests {
     use crate::network::{
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
-    use hopr_platform::time::native::current_timestamp;
+    use hopr_platform::time::native::current_time;
+    use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
 
     struct DummyNetworkAction {}
@@ -570,7 +578,7 @@ mod tests {
         fn emit(&self, _: NetworkEvent) {}
 
         fn create_timestamp(&self) -> u64 {
-            current_timestamp().as_millis() as u64
+            current_time().as_unix_timestamp().as_millis() as u64
         }
     }
 
@@ -830,7 +838,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
         mock.expect_create_timestamp()
-            .returning(|| current_timestamp().as_millis() as u64);
+            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -849,7 +857,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
         mock.expect_create_timestamp()
-            .returning(|| current_timestamp().as_millis() as u64);
+            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -873,7 +881,7 @@ mod tests {
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer)))
             .return_const(());
         mock.expect_create_timestamp()
-            .returning(|| current_timestamp().as_millis() as u64);
+            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -896,7 +904,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(x));
         mock.expect_create_timestamp()
-            .returning(|| current_timestamp().as_millis() as u64);
+            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(me, cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -921,7 +929,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(8).returning(move |x| public.contains(x));
         mock.expect_create_timestamp()
-            .returning(|| current_timestamp().as_millis() as u64);
+            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);

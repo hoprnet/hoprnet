@@ -211,7 +211,7 @@ where
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    ChannelStatus::Open | ChannelStatus::PendingToClose => {
+                    ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -235,7 +235,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-                    ChannelStatus::PendingToClose => {
+                    ChannelStatus::PendingToClose(_) => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec

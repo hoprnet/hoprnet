@@ -268,7 +268,6 @@ mod tests {
                 0u32.into(),
                 ChannelStatus::Open,
                 0u32.into(),
-                0u32.into(),
             );
             cg.update_channel(c);
             last_addr = *addr;
