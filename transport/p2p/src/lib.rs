@@ -20,7 +20,7 @@
 pub mod api;
 pub mod errors;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, num::NonZeroU8};
 
 use core_protocol::{
     ack::config::AckProtocolConfig,
@@ -218,7 +218,22 @@ pub async fn build_p2p_network(
             )
         })
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT))
+        .with_swarm_config(|cfg| {
+            cfg.with_dial_concurrency_factor(
+                NonZeroU8::new(
+                    std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
+                        .map(|v| v.trim().parse::<u8>().unwrap_or(u8::MAX))
+                        .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT),
+                )
+                .expect("concurrently dialed peer count must be > 0"),
+            )
+            .with_max_negotiating_inbound_streams(
+                std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
+                    .map(|v| v.trim().parse::<usize>().unwrap_or(128))
+                    .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
+            )
+            .with_idle_connection_timeout(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT)
+        })
         .build())
 }
 

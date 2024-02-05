@@ -7,10 +7,10 @@ global:
 scrape_configs:
   - job_name: 'hoprd'
     scrape_interval: 15s
-    # Uncomment the below lines to provide API Token to prometheus requests
-    # basic_auth:
-    #       username: "<Your Hoprd ApiToken>"
-    #       password: '' # Leave empty
+    authorization:
+      type: Bearer
+      # Replace the below credentials with an API token if changed in the hoprd-config
+      credentials: "^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^"
 
     static_configs:
       - targets: ['hoprd:3001']

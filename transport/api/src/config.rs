@@ -36,7 +36,6 @@ impl Default for HostType {
 
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
-    #[validate(custom = "validate_host_address")]
     #[serde(default)]
     pub address: HostType,
     #[validate(range(min = 1u16))]
@@ -79,6 +78,14 @@ impl ToString for HostConfig {
 
 fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
     if validator::validate_ip(s) {
+        let ipv4 = std::net::Ipv4Addr::from_str(s)
+            .map_err(|_| ValidationError::new("Failed to deserialize the string into an ipv4 address"))?;
+
+        if ipv4.is_private() || ipv4.is_multicast() || ipv4.is_unspecified() {
+            return Err(ValidationError::new(
+                "IPv4 cannot be private, multicast or unspecified (0.0.0.0)",
+            ))?;
+        }
         Ok(())
     } else {
         Err(ValidationError::new("Invalid IPv4 address provided"))
@@ -93,8 +100,9 @@ fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
-    match host {
+/// Validates the HostConfig to be used as an external host
+pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> {
+    match &host.address {
         HostType::IPv4(ip4) => validate_ipv4_address(ip4),
         HostType::Domain(domain) => validate_dns_address(domain),
     }
@@ -140,7 +148,6 @@ mod tests {
         assert!(validate_ipv4_address("1.255.1.1").is_ok());
         assert!(validate_ipv4_address("187.1.1.255").is_ok());
         assert!(validate_ipv4_address("127.0.0.1").is_ok());
-        assert!(validate_ipv4_address("0.0.0.0").is_ok());
     }
 
     #[test]

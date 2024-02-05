@@ -363,7 +363,7 @@ async fn integration_test_indexer() {
     let offchain_key = OffchainKeypair::random();
     let confirmation = alice_node
         .actions
-        .announce(&maddr, &offchain_key)
+        .announce(&[maddr.clone()], &offchain_key)
         .await
         .expect("should submit announcement tx")
         .await
@@ -388,6 +388,9 @@ async fn integration_test_indexer() {
         .expect("should submit channel open tx")
         .await
         .expect("should confirm open channel");
+
+    // Delay the fetch, so that channel increase can be processed first
+    async_std::task::sleep(Duration::from_millis(100)).await;
 
     let channel_alice_bob = alice_node
         .db

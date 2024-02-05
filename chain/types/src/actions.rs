@@ -45,7 +45,7 @@ impl Display for Action {
                 direction, channel.source, channel.destination
             ),
             Action::Withdraw(destination, amount) => write!(f, "withdraw action of {amount} to {destination}"),
-            Action::Announce(data) => write!(f, "announce action of {}", data.to_multiaddress_str()),
+            Action::Announce(data) => write!(f, "announce action of {}", data.multiaddress()),
             Action::RegisterSafe(safe_address) => write!(f, "register safe action {safe_address}"),
         }
     }

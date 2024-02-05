@@ -5,7 +5,10 @@ use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
-pub use core_transport::config::{HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig};
+pub use core_transport::config::{
+    validate_external_host, HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig,
+};
+
 use hopr_primitive_types::prelude::*;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
@@ -127,6 +130,7 @@ impl Default for Db {
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
     #[validate]
+    #[validate(custom = "validate_external_host")]
     #[serde(default = "default_host")]
     pub host: HostConfig,
     /// Configuration of the underlying database engine
