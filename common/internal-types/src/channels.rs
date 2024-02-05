@@ -24,7 +24,8 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, strum::Display)]
+#[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// Channel is closed.
     Closed,
@@ -32,6 +33,7 @@ pub enum ChannelStatus {
     Open,
     /// Channel is pending to be closed.
     /// The timestamp marks the *earliest* possible time when the channel can transition into the `Closed` state.
+    #[strum(serialize = "PendingToClose")]
     PendingToClose(SystemTime),
 }
 
@@ -57,20 +59,6 @@ impl PartialEq for ChannelStatus {
     }
 }
 impl Eq for ChannelStatus {}
-
-impl Display for ChannelStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChannelStatus::Closed => write!(f, "Closed"),
-            ChannelStatus::Open => write!(f, "Open"),
-            ChannelStatus::PendingToClose(ct) => write!(
-                f,
-                "PendingToClose (close by {})",
-                humantime::format_rfc3339_seconds(*ct)
-            ),
-        }
-    }
-}
 
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
@@ -914,6 +902,16 @@ pub mod tests {
         let to = Address::from_str("0xb8b75fef7efdf4530cf1688c933d94e4e519ccd1").unwrap();
         let id = generate_channel_id(&from, &to).to_string();
         assert_eq!("0x1a410210ce7265f3070bf0e8885705dce452efcfbd90a5467525d136fcefc64a", id);
+    }
+
+    #[test]
+    fn channel_status_names() {
+        assert_eq!("Open", ChannelStatus::Open.to_string());
+        assert_eq!("Closed", ChannelStatus::Closed.to_string());
+        assert_eq!(
+            "PendingToClose",
+            ChannelStatus::PendingToClose(SystemTime::now()).to_string()
+        );
     }
 
     #[test]

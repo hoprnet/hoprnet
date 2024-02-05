@@ -16,7 +16,6 @@ async-trait = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 ethers = { workspace = true, default-features = false }
 hex-literal = "0.4.1"
-humantime = "2.1.0"
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"

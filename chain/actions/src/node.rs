@@ -149,7 +149,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
         let tx_res = actions
-            .announce(&announce_multiaddr, &keypair)
+            .announce(&[announce_multiaddr], &keypair)
             .await
             .expect("announcement call should not fail")
             .await
@@ -202,7 +202,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&announce_multiaddr, &keypair).await;
+        let res = actions.announce(&[announce_multiaddr], &keypair).await;
         assert!(
             matches!(res, Err(CoreEthereumActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
