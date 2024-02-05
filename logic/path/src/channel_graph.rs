@@ -63,6 +63,12 @@ impl ChannelGraph {
 
     /// Creates a new instance with the given self `Address`.
     pub fn new(me: Address) -> Self {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 0.0);
+            METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 0.0);
+        }
+
         Self {
             me,
             graph: DiGraphMap::default(),

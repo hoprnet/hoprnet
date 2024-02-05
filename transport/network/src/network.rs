@@ -266,7 +266,13 @@ impl<T: NetworkExternalActions> Network<T> {
         excluded.insert(my_peer_id);
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_NETWORK_HEALTH.set(0.0);
+        {
+            METRIC_NETWORK_HEALTH.set(0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "high"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "low"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], 0.0);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
+        }
 
         Network {
             me: my_peer_id,
