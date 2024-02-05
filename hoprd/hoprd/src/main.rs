@@ -78,6 +78,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
     info!("Node configuration: {}", cfg.as_redacted_string()?);
 
+    if let hopr_lib::HostType::IPv4(address) = &cfg.hopr.host.address {
+        let ipv4 = std::net::Ipv4Addr::from_str(address)?;
+
+        if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
+            return Err(hopr_lib::errors::HoprLibError::GeneralError(
+                "Cannot announce a loopback address".into(),
+            ))?;
+        }
+    }
+
     // Find or create an identity
     let identity_opts = IdentityOptions {
         initialize: cfg.hopr.db.initialize,
@@ -163,14 +173,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
 
-                            inbox_clone
+                            if !inbox_clone
                                 .write()
                                 .await
                                 .push(ApplicationData {
                                     application_tag: data.application_tag,
                                     plain_text: msg,
                                 })
-                                .await;
+                                .await
+                            {
+                                warn!(
+                                    "received a message with an ignored Inbox tag {:?}",
+                                    data.application_tag
+                                )
+                            }
                         }
                         Err(_) => error!("RLP decoding failed"),
                     }
@@ -192,14 +208,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let processes = hopr_clone.run().await.expect("the HOPR node should run without errors");
 
         // Show onboarding information
-        let my_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_hex();
         let my_ethereum_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex();
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
         let version = hopr_lib::constants::APP_VERSION;
 
         while !hopr_clone.is_allowed_to_access_network(&my_peer_id).await {
             info!("
-                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
+                Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
             ");
 
             async_std::task::sleep(ONBOARDING_INFORMATION_INTERVAL).await;
@@ -209,7 +224,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Node information:
 
                 Node peerID: {my_peer_id}
-                Node address: {my_address}
                 Node Ethereum address: {my_ethereum_address} <- put this into staking hub
                 Node version: {version}
             "

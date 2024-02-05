@@ -233,7 +233,7 @@ impl ChainNetworkConfig {
                 channels: network.addresses.channels.to_owned(),
                 confirmations: network.confirmations,
                 environment_type: network.environment_type,
-                id: id.into(),
+                id: network.chain.to_owned(),
                 module_implementation: network.addresses.module_implementation.to_owned(),
                 network_registry: network.addresses.network_registry.to_owned(),
                 network_registry_proxy: network.addresses.network_registry_proxy.to_owned(),

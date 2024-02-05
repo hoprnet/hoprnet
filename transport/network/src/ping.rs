@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
         SimpleHistogram::new(
             "hopr_ping_time_sec",
             "Measures total time it takes to ping a single node (seconds)",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
     static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
             "hopr_heartbeat_pings_count",
@@ -169,7 +169,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             #[cfg(all(feature = "prometheus", not(test)))]
             match result {
                 Ok(duration) => {
-                    METRIC_TIME_TO_PING.observe(duration.as_millis() as f64);
+                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
                     METRIC_PING_COUNT.increment(&["true"]);
                 }
                 Err(_) => {

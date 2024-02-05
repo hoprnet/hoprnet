@@ -1126,6 +1126,7 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
+ "env_logger",
  "ethers",
  "futures",
  "hex-literal",

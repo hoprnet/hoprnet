@@ -944,17 +944,6 @@ mod channels {
         pub balance: String,
     }
 
-    impl From<ChannelEntry> for NodeChannel {
-        fn from(value: ChannelEntry) -> Self {
-            Self {
-                id: value.get_id(),
-                peer_address: value.destination,
-                status: value.status,
-                balance: value.balance.amount().to_string(),
-            }
-        }
-    }
-
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
@@ -980,12 +969,8 @@ mod channels {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub destination_address: Address,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub source_peer_id: PeerId,
-        #[serde_as(as = "DisplayFromStr")]
-        #[schema(value_type = String)]
-        pub destination_peer_id: PeerId,
+        pub source_peer_id: String,
+        pub destination_peer_id: String,
         pub balance: String,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
@@ -1022,11 +1007,19 @@ mod channels {
             source_peer_id: node
                 .chain_key_to_peerid(&channel.source)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
+                    warn!("failed to map {} to peerid", channel.source);
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
+                }),
             destination_peer_id: node
                 .chain_key_to_peerid(&channel.destination)
                 .await?
-                .ok_or(HoprLibError::GeneralError("failed to map to peerid".into()))?,
+                .map(|v| PeerId::to_string(&v))
+                .unwrap_or_else(|| {
+                    warn!("failed to map {} to peerid", channel.destination);
+                    "<FAILED_TO_MAP_THE_PEERID>".into()
+                }),
             balance: channel.balance.amount().to_string(),
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
@@ -1103,12 +1096,22 @@ mod channels {
                         incoming: incoming
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                id: c.get_id(),
+                                peer_address: c.source,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         outgoing: outgoing
                             .into_iter()
                             .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
-                            .map(NodeChannel::from)
+                            .map(|c| NodeChannel {
+                                id: c.get_id(),
+                                peer_address: c.destination,
+                                status: c.status,
+                                balance: c.balance.amount().to_string(),
+                            })
                             .collect(),
                         all: vec![],
                     };
@@ -1741,7 +1744,13 @@ mod messages {
             .pop_all(tag.tag)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to pop message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -1818,7 +1827,13 @@ mod messages {
             .peek_all(args.tag, args.timestamp)
             .await
             .into_iter()
-            .filter_map(|(data, ts)| to_api_message(data, ts).ok())
+            .filter_map(|(data, ts)| match to_api_message(data, ts) {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    error!("failed to peek message: {e}");
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(Response::builder(200)
@@ -2367,7 +2382,7 @@ mod node {
         hopr_network_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
-        hopr_node_sage_registry: Address,
+        hopr_node_safe_registry: Address,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         hopr_management_module: Address,
@@ -2412,7 +2427,7 @@ mod node {
                     hopr_token: chain_config.token,
                     hopr_channels: chain_config.channels,
                     hopr_network_registry: chain_config.network_registry,
-                    hopr_node_sage_registry: chain_config.node_safe_registry,
+                    hopr_node_safe_registry: chain_config.node_safe_registry,
                     hopr_management_module: chain_config.module_implementation,
                     hopr_node_safe: safe_config.safe_address,
                     is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
@@ -2433,7 +2448,7 @@ mod node {
         #[serde_as(as = "Vec<DisplayFromStr>")]
         #[schema(value_type = Vec<String>)]
         pub multiaddrs: Vec<Multiaddr>,
-        pub is_elligible: bool,
+        pub is_eligible: bool,
     }
 
     /// List all known entry nodes with multiaddrs and eligibility.
@@ -2466,7 +2481,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_elligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await,
                         },
                     );
                 }
