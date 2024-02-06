@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
@@ -8,6 +6,7 @@ pub use core_strategy::StrategyConfig;
 pub use core_transport::config::{
     validate_external_host, HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig,
 };
+use core_transport::config::HostType;
 
 use hopr_primitive_types::prelude::*;
 
@@ -172,7 +171,10 @@ pub struct HoprLibConfig {
 
 #[inline]
 fn default_host() -> HostConfig {
-    HostConfig::from_str(format!("{DEFAULT_HOST}:{DEFAULT_PORT}").as_str()).unwrap()
+    HostConfig {
+        address: HostType::IPv4(DEFAULT_HOST.to_owned()),
+        port: DEFAULT_PORT,
+    }
 }
 
 impl Default for HoprLibConfig {
