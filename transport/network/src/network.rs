@@ -135,7 +135,15 @@ pub enum Health {
 
 impl std::fmt::Display for Health {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        let status = match self {
+            Health::Unknown => "Unknown",
+            Health::Red => "Red",
+            Health::Orange => "Orange",
+            Health::Yellow => "Yellow",
+            Health::Green => "Green",
+        };
+
+        write!(f, "{status}")
     }
 }
 
