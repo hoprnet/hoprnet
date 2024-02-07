@@ -3,10 +3,10 @@ use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
+use core_transport::config::HostType;
 pub use core_transport::config::{
     validate_external_host, HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig,
 };
-use core_transport::config::HostType;
 
 use hopr_primitive_types::prelude::*;
 
@@ -169,6 +169,8 @@ pub struct HoprLibConfig {
     pub safe_module: SafeModule,
 }
 
+// NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
+// their external IP.
 #[inline]
 fn default_host() -> HostConfig {
     HostConfig {

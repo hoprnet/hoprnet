@@ -1,43 +1,85 @@
 hopr:
+
   # Specifies host to listen on for the HOPR P2P protocol
   host:
     # Specifies the external IP address of the local interface
     # that is connected to the Internet. This address will be
     # announced on-chain.
     address: !IPv4 1.2.3.4
+
     # Listen TCP port
     port: 9091
 
   # Specifies details for the database used by the HOPR node
   db:
     # Path to the directory with the database
-    data: /tmp/db
+    data: /app/db
+
     # If set, database will be created (if it does not exist).
     # Otherwise, if false is given and database is not present,
     # the node will fail to start.
-    initialize: false
+    initialize: true
+
     # If set, will overwrite and re-initialize any existing database
     # in the given directory.
     force_initialize: false
 
+  # Main node's identity that defined the on-chain and off-chain keys
   identity:
+    # Path to the identity file
     file: identity
+    # Password for the identity file
     password: ''
+    # If specified, the above identity file is ignored and the node
+    # directly uses the provided private key.
     private_key: ''
+
+  # Configuration of node's Safe
+  safe_module:
+    # Node's safe transaction provider
+    # Such as https://safe-transaction.prod.hoprtech.net/
+    safe_transaction_service_provider: https:://provider.com/
+
+    # Node's safe address, this must be provided by the user
+    safe_address: '0x0000000000000000000000000000000000000000'
+
+    # Node's safe module address, this must be provided by the user
+    module_address: '0x0000000000000000000000000000000000000000'
+
+  # Message Inbox configuration
   inbox:
+    # Capacity of messages in the Inbox, per message tag.
     capacity: 512
+
+    # Maximum age of a message in Inbox in seconds
+    # Older messages are automatically purged
     max_age: 900
+
+    # Tags which are not allowed into the Inbox
     excluded_tags: [ 0 ]
-  # Configuration of the 
+
+  # Configuration of the REST API
   api:
+
+    # Indicates whether the REST API should be enabled.
     enable: false
+
+    # What kind of authentication the REST API should use.
+    # Possible value is `None` or `!Token <some token>` which will
+    # enforce Bearer token authentication.
     auth: None
+
+    # Defines the local interface host where the API should
+    # listen on.
     host:
+      # Address of the local interface to listen on
       address: !IPv4 127.0.0.1
+      # REST API TCP listen port
       port: 3001
 
   # Configuration of HOPR channel strategies.
   strategy:
+
     # Will not continue executing the next strategy in the chain
     # if one of them failed.
     on_fail_continue: true
@@ -55,7 +97,6 @@ hopr:
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
     strategies:
-      -
       # Defines a promiscuous strategy that automatically manages HOPR channels
       # based on measured network qualities of HOPR nodes in the network.
       #- !Promiscuous
@@ -147,6 +188,7 @@ hopr:
   # is evaluated and criteria for nodes to be considered of good/bad quality.
   # This is closely related to the heartbeat mechanism.
   network_options:
+
     # Minimum delay (seconds) will be multiplied by backoff, it will be half the actual minimum value.
     min_delay: 1
 
@@ -177,8 +219,14 @@ hopr:
     # Maximum backoff (in seconds) when probing nodes
     backoff_max: 300.0
 
+  # Transport related configuration
   transport:
+    # Should local addresses be announced on chain?
+    # Set to true for testing only
     announce_local_addresses: false
+
+    # Should local addresses be preferred when dialing a peer?
+    # Set to true for testing only
     prefer_local_addresses: false
 
   # Configuration of various HOPR sub-protocols.
@@ -203,11 +251,22 @@ hopr:
     ticket_aggregation:
       # Timeout in seconds
       timeout: 15
+
+  # Blockchain specific configuration
   chain:
-    announce: false
-    network: testing
+    # Indicates whether node should announce itself on-chain
+    announce: true
+
+    # Which blockchain network should be used by the node
+    # Must be one of `protocols.networks`.
+    network: anvil-localhost
+
+    # RPC provider URL to use.
+    # If not given, it will use the network's chain default one.
     provider: null
+
     protocols:
+      # Enumerates different HOPR on-chain network deployments the node can use.
       networks:
         anvil-localhost:
           chain: anvil
@@ -228,6 +287,8 @@ hopr:
           confirmations: 2
           tx_polling_interval: 1000
           max_block_range: 200
+
+      # Lists actual blockchains that HOPR networks can be deployed at
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
@@ -241,8 +302,8 @@ hopr:
           hopr_token_name: wxHOPR
           block_time: 5000
           tags: []
+
+    # Indicates whether node should check channel unrealized balance
+    # when validating acknowledged tickets.
+    # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
-  safe_module:
-    safe_transaction_service_provider: https:://provider.com/
-    safe_address: '0x0000000000000000000000000000000000000000'
-    module_address: '0x0000000000000000000000000000000000000000'

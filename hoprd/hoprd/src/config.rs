@@ -305,19 +305,18 @@ impl HoprdConfig {
 }
 
 /// Used in the testing and documentation
-pub const EXAMPLE_YAML: &str = include_str!("example_cfg.yaml");
+pub const EXAMPLE_YAML: &str = include_str!("../example_cfg.yaml");
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::{Args, Command, FromArgMatches};
+    use hopr_lib::HostType;
     use std::io::{Read, Write};
     use tempfile::NamedTempFile;
 
     pub fn example_cfg() -> HoprdConfig {
         let chain = hopr_lib::config::Chain {
-            announce: false,
-            network: "testing".to_string(),
             protocols: hopr_lib::ProtocolsConfig::from_str(
                 r#"
                     {
@@ -362,15 +361,13 @@ mod tests {
                       }
                     "#,
             )
-                .expect("protocol config should be valid"),
-            provider: None,
-            check_unrealized_balance: true,
+            .expect("protocol config should be valid"),
+            ..hopr_lib::config::Chain::default()
         };
 
-        let db =  hopr_lib::config::Db {
-            data: "/tmp/db".to_owned(),
-            initialize: false,
-            force_initialize: false,
+        let db = hopr_lib::config::Db {
+            data: "/app/db".to_owned(),
+            ..hopr_lib::config::Db::default()
         };
 
         let safe_module = hopr_lib::config::SafeModule {
@@ -380,21 +377,26 @@ mod tests {
         };
 
         let identity = Identity {
-            file: "identity".to_string(),
+            file: "".to_string(),
             password: "".to_owned(),
-            private_key: Some("".to_owned()),
+            private_key: None,
         };
 
+        let host = HostConfig {
+            address: HostType::IPv4("1.2.3.4".into()),
+            port: 9091,
+        };
 
         HoprdConfig {
             hopr: HoprLibConfig {
+                host,
                 db,
                 chain,
                 safe_module,
                 ..HoprLibConfig::default()
             },
             identity,
-            .. HoprdConfig::default()
+            ..HoprdConfig::default()
         }
     }
 
