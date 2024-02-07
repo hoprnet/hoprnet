@@ -1,60 +1,207 @@
 hopr:
+  # Specifies host to listen on for the HOPR P2P protocol
   host:
-    address: !IPv4 0.0.0.0
+    # Specifies the external IP address of the local interface
+    # that is connected to the Internet. This address will be
+    # announced on-chain.
+    address: !IPv4 1.2.3.4
+    # Listen TCP port
     port: 9091
+
+  # Specifies details for the database used by the HOPR node
   db:
+    # Path to the directory with the database
     data: /tmp/db
+    # If set, database will be created (if it does not exist).
+    # Otherwise, if false is given and database is not present,
+    # the node will fail to start.
     initialize: false
+    # If set, will overwrite and re-initialize any existing database
+    # in the given directory.
     force_initialize: false
+
+  identity:
+    file: identity
+    password: ''
+    private_key: ''
+  inbox:
+    capacity: 512
+    max_age: 900
+    excluded_tags: [ 0 ]
+  # Configuration of the 
+  api:
+    enable: false
+    auth: None
+    host:
+      address: !IPv4 127.0.0.1
+      port: 3001
+
+  # Configuration of HOPR channel strategies.
   strategy:
+    # Will not continue executing the next strategy in the chain
+    # if one of them failed.
     on_fail_continue: true
+
+    # Allows nesting strategy chains via !MultiStrategy
     allow_recursive: false
+
+    # Activates a strategy which will issue channel closure transaction
+    # whenever a channel transitions to `PendingToClose` state.
+    # Otherwise, the user must manually issue such transaction manually
+    # on `PendingToClose` channels.
     finalize_channel_closure: false
+
+    # Contains the actual chain of strategies to execute in the given order.
+    # If left empty, the node will behave as if only `!Passive` strategy
+    # was given.
     strategies:
+      -
+      # Defines a promiscuous strategy that automatically manages HOPR channels
+      # based on measured network qualities of HOPR nodes in the network.
       #- !Promiscuous
-      #  max_channels: 10
-      #  network_quality_threshold: 0.5
-      #  new_channel_stake: "1000000 HOPR"
-      #  minimum_node_balance: "10000000 HOPR"
-      #  min_network_size_samples: 20
-      #  enforce_max_channels: true
-      #  minimum_peer_version: ">=2.0.0"
+      #
+      # # Maximum number of opened channels the strategy should maintain.
+      # max_channels: 10
+      #
+      # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+      # network_quality_threshold: 0.5
+      #
+      # # A stake of tokens that should be allocated to a channel opened by the strategy.
+      # new_channel_stake: "1000000 HOPR"
+      #
+      # # Minimum token balance of the node. When reached, the strategy will not open any new channels.
+      # minimum_node_balance: "10000000 HOPR"
+      #
+      # # Minimum number of network quality samples before the strategy can start making decisions.
+      # min_network_size_samples: 20
+      #
+      # # If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
+      # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
+      # enforce_max_channels: true
+      #
+      # # Specifies minimum version of the peer the strategy should open a channel to.
+      # # Accepts semver syntax.
+      # minimum_peer_version: ">=2.0.0"
+
+      # Channel auto-funding strategy.
+      # Automatically funds channels with the given funding amount
+      # if the stake on any channel drops below the given threshold
       - !AutoFunding
+        # Amount to automatically fund a channel that dropped
+        # below the threshold
         funding_amount: "10000000000000000000 HOPR"
+
+        # Auto funding threshold
         min_stake_threshold: "1000000000000000000 HOPR"
+
+      # Strategy performing automatic ticket aggregation
+      # once the amount of unredeemed tickets in a channel goes
+      # over the given threshold.
       - !Aggregating
+
+        # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
+        # in that channel when exceeded.
+        # This condition is independent of `unrealized_balance_ratio`.
         aggregation_threshold: 100
+
+        # Percentage of unrealized balance in unaggregated tickets in a channel
+        # that triggers the ticket aggregation when exceeded.
+        # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
+        # This condition is independent of `aggregation_threshold`.
         unrealized_balance_ratio: 0.9
+
+        # Maximum time to wait for the ticket aggregation to complete.
+        # This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
         aggregation_timeout: 60
+
+        # If set, the strategy will automatically aggregate tickets in channel that has transitioned
+        # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
+        # or `unrealized_balance_ratio` thresholds are met on that channel.
+        # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
         aggregate_on_channel_close: true
+
+      # Channel strategy that performs automatic redemption of
+      # a winning acknowledged ticket
       - !AutoRedeeming
-        redeem_only_aggregated: True
+
+        # If set, the strategy will redeem only aggregated tickets.
+        redeem_only_aggregated: true
+
+      # Passive strategy does nothing. This is equivalent as leaving
+      # the `strategies` array empty.
+      #- !Passive
+
+  # Configuration of the heartbeat mechanism for probing
+  # other nodes in the HOPR network.
   heartbeat:
-    variance: 2
+    # Interval in which the heartbeat is triggered in seconds
     interval: 60
+
+    # The time interval for which to consider peer heartbeat renewal in seconds
     threshold: 60
+
+    # Round-to-round variance to complicate network sync in seconds
+    variance: 2
+
+  # Defines how quality of nodes in the HOPR network
+  # is evaluated and criteria for nodes to be considered of good/bad quality.
+  # This is closely related to the heartbeat mechanism.
   network_options:
+    # Minimum delay (seconds) will be multiplied by backoff, it will be half the actual minimum value.
     min_delay: 1
+
+    # Maximum delay in seconds
     max_delay: 300
+
+    # Quality threshold since a node is considered having "bad" connectivity
     quality_bad_threshold: 0.2
+
+    # Quality threshold from which a node is considered available enough to be used
     quality_offline_threshold: 0.5
+
+    # Quality step on failed/successful ping probe
     quality_step: 0.1
+
+    # Size of the quality moving average window.
     quality_avg_window_size: 25
+
+    # Indicates how long (in seconds) a node is considered "ignored"
     ignore_timeframe: 600
+
+    # Backoff exponent when probing nodes
     backoff_exponent: 1.5
+
+    # Minimum backoff (in seconds) when probing nodes
     backoff_min: 2.0
+
+    # Maximum backoff (in seconds) when probing nodes
     backoff_max: 300.0
+
   transport:
     announce_local_addresses: false
     prefer_local_addresses: false
+
+  # Configuration of various HOPR sub-protocols.
   protocol:
+
+    # Message acknowledgement sub-protocol configuration.
     ack:
+      # Timeout in seconds
       timeout: 15
+
+    # Heartbeat sub-protocol configuration
     heartbeat:
+      # Timeout in seconds
       timeout: 15
+
+    # Message sub-protocol configuration
     msg:
+      # Timeout in seconds
       timeout: 15
+
+    # Ticket aggregation sub-protocol configuration
     ticket_aggregation:
+      # Timeout in seconds
       timeout: 15
   chain:
     announce: false
@@ -99,18 +246,3 @@ hopr:
     safe_transaction_service_provider: https:://provider.com/
     safe_address: '0x0000000000000000000000000000000000000000'
     module_address: '0x0000000000000000000000000000000000000000'
-identity:
-  file: identity
-  password: ''
-  private_key: ''
-inbox:
-  capacity: 512
-  max_age: 900
-  excluded_tags:
-    - 0
-api:
-  enable: false
-  auth: None
-  host:
-    address: !IPv4 127.0.0.1
-    port: 3001

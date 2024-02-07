@@ -44,9 +44,11 @@ impl Default for HostType {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
     /// Host on which to listen
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub address: HostType,
     /// Listening TCP or UDP port (mandatory).
     #[validate(range(min = 1u16))]
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub port: u16,
 }
 

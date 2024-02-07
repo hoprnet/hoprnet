@@ -76,6 +76,7 @@ pub struct PromiscuousStrategyConfig {
     pub enforce_max_channels: bool,
 
     /// Specifies minimum version of the peer the strategy should open a channel to.
+    /// Accepts semver syntax.
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
     pub minimum_peer_version: semver::VersionReq,
