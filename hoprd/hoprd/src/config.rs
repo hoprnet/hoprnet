@@ -75,7 +75,8 @@ impl std::fmt::Debug for Identity {
 /// The configuration is composed of individual configuration of corresponding
 /// component configuration objects.
 ///
-/// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
+/// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/example_cfg.yaml)
+/// which is always in the root of this crate.
 ///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
@@ -304,9 +305,6 @@ impl HoprdConfig {
     }
 }
 
-/// Used in the testing and documentation
-pub const EXAMPLE_YAML: &str = include_str!("../example_cfg.yaml");
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,7 +402,7 @@ mod tests {
     fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
         let cfg = example_cfg();
 
-        let from_yaml: HoprdConfig = serde_yaml::from_str(EXAMPLE_YAML)?;
+        let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
 
         assert_eq!(cfg, from_yaml);
 
