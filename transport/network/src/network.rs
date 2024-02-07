@@ -37,6 +37,8 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Defines how quality of nodes in the HOPR network
+/// is evaluated and criteria for nodes to be considered of good/bad quality.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
 pub struct NetworkConfig {

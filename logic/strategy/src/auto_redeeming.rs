@@ -23,6 +23,7 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
+    ///
     /// Defaults to true.
     pub redeem_only_aggregated: bool,
 }
