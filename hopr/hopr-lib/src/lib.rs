@@ -633,7 +633,7 @@ impl Hopr {
         {
             METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
-                &["version"],
+                &[const_format::formatcp!("{}", constants::APP_VERSION)],
                 f64::from_str(const_format::formatcp!(
                     "{}.{}",
                     env!("CARGO_PKG_VERSION_MAJOR"),
