@@ -1,3 +1,36 @@
+# Main node's identity that defined the on-chain and off-chain keys
+identity:
+  # Path to the identity file
+  # A new identity file will be created if it does not exist
+  file: path/to/identity.file
+
+  # Password for the identity file
+  password: 'change_me'
+
+  # If specified, the above identity file is ignored and the node
+  # directly uses the provided private key.
+  # private_key: ''
+
+# Configuration of the REST API
+api:
+
+  # Indicates whether the REST API should be enabled.
+  enable: false
+
+  # What kind of authentication the REST API should use.
+  # Possible value is `None` or `!Token <some token>` which will
+  # enforce Bearer token authentication.
+  auth: None
+
+  # Defines the local interface host where the API should
+  # listen on.
+  host:
+    # Address of the local interface to listen on
+    address: !IPv4 127.0.0.1
+    # REST API TCP listen port
+    port: 3001
+
+# Configuration of the HOPR protocol
 hopr:
 
   # Specifies host to listen on for the HOPR P2P protocol
@@ -24,16 +57,6 @@ hopr:
     # in the given directory.
     force_initialize: false
 
-  # Main node's identity that defined the on-chain and off-chain keys
-  identity:
-    # Path to the identity file
-    file: identity
-    # Password for the identity file
-    password: ''
-    # If specified, the above identity file is ignored and the node
-    # directly uses the provided private key.
-    private_key: ''
-
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
@@ -45,37 +68,6 @@ hopr:
 
     # Node's safe module address, this must be provided by the user
     module_address: '0x0000000000000000000000000000000000000000'
-
-  # Message Inbox configuration
-  inbox:
-    # Capacity of messages in the Inbox, per message tag.
-    capacity: 512
-
-    # Maximum age of a message in Inbox in seconds
-    # Older messages are automatically purged
-    max_age: 900
-
-    # Tags which are not allowed into the Inbox
-    excluded_tags: [ 0 ]
-
-  # Configuration of the REST API
-  api:
-
-    # Indicates whether the REST API should be enabled.
-    enable: false
-
-    # What kind of authentication the REST API should use.
-    # Possible value is `None` or `!Token <some token>` which will
-    # enforce Bearer token authentication.
-    auth: None
-
-    # Defines the local interface host where the API should
-    # listen on.
-    host:
-      # Address of the local interface to listen on
-      address: !IPv4 127.0.0.1
-      # REST API TCP listen port
-      port: 3001
 
   # Configuration of HOPR channel strategies.
   strategy:
@@ -307,3 +299,15 @@ hopr:
     # when validating acknowledged tickets.
     # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
+
+# HOPRd Message Inbox configuration
+inbox:
+  # Capacity of messages in the Inbox, per message tag.
+  capacity: 512
+
+  # Maximum age of a message in Inbox in seconds
+  # Older messages are automatically purged
+  max_age: 900
+
+  # Tags which are not allowed into the Inbox
+  excluded_tags: [ 0 ]

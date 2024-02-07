@@ -3,9 +3,8 @@ use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
-use core_transport::config::HostType;
 pub use core_transport::config::{
-    validate_external_host, HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig,
+    validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
 };
 
 use hopr_primitive_types::prelude::*;

@@ -377,8 +377,8 @@ mod tests {
         };
 
         let identity = Identity {
-            file: "".to_string(),
-            password: "".to_owned(),
+            file: "path/to/identity.file".to_string(),
+            password: "change_me".to_owned(),
             private_key: None,
         };
 
