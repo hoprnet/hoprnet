@@ -41,7 +41,6 @@ scrape_configs:
 - `hopr_peers_by_quality`: Number different peer types by quality
 - `hopr_peer_count`: Number of all peers
 - `hopr_time_to_green_sec`: Total number of pings by result, keys: `success`
-- `hopr_channels_count`: Number of channels per direction, keys: `direction`
 - `hopr_channel_balance`: Balances on channels per counterparty, keys: `counterparty`, `direction`
 - `hopr_path_length`: Distribution of number of hops of sent messages, buckets: 0, 1, 2, 3, 4
 - `hopr_strategy_closure_auto_finalization_count`: Count of channels where closure finalizing was initiated automatically

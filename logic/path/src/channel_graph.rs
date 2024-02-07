@@ -18,11 +18,6 @@ use {
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NUMBER_OF_CHANNELS: MultiGauge = MultiGauge::new(
-        "hopr_channels_count",
-        "Number of channels per direction",
-        &["direction"]
-    ).unwrap();
     static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
         "hopr_channel_balances",
         "Balances on channels per counterparty",
@@ -63,12 +58,6 @@ impl ChannelGraph {
 
     /// Creates a new instance with the given self `Address`.
     pub fn new(me: Address) -> Self {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 0.0);
-            METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 0.0);
-        }
-
         Self {
             me,
             graph: DiGraphMap::default(),
@@ -111,45 +100,40 @@ impl ChannelGraph {
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            if let Some(direction) = channel.direction(&self.me) {
-                match direction {
-                    ChannelDirection::Outgoing => match channel.status {
-                        ChannelStatus::Closed => {
-                            METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.destination.to_hex().as_str(), "out"], 0.0);
-                        }
-                        ChannelStatus::Open => {
-                            METRIC_NUMBER_OF_CHANNELS.increment(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &[channel.destination.to_hex().as_str(), "out"],
-                                channel
-                                    .balance
-                                    .amount_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
-                        }
-                        ChannelStatus::PendingToClose(_) => {}
-                    },
-                    ChannelDirection::Incoming => match channel.status {
-                        ChannelStatus::Closed => {
-                            METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], 0.0);
-                        }
-                        ChannelStatus::Open => {
-                            METRIC_NUMBER_OF_CHANNELS.increment(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &[channel.source.to_hex().as_str(), "in"],
-                                channel
-                                    .balance
-                                    .amount_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
-                        }
-                        ChannelStatus::PendingToClose(_) => {}
-                    },
-                }
+            match channel.direction(&self.me) {
+                Some(ChannelDirection::Outgoing) => match channel.status {
+                    ChannelStatus::Closed => {
+                        METRIC_CHANNEL_BALANCES.set(&[channel.destination.to_hex().as_str(), "out"], -1.0);
+                    }
+                    ChannelStatus::Open => {
+                        METRIC_CHANNEL_BALANCES.set(
+                            &[channel.destination.to_hex().as_str(), "out"],
+                            channel
+                                .balance
+                                .amount_base_units()
+                                .parse::<f64>()
+                                .unwrap_or(f64::INFINITY),
+                        );
+                    }
+                    ChannelStatus::PendingToClose(_) => {}
+                },
+                Some(ChannelDirection::Incoming) => match channel.status {
+                    ChannelStatus::Closed => {
+                        METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], -1.0);
+                    }
+                    ChannelStatus::Open => {
+                        METRIC_CHANNEL_BALANCES.set(
+                            &[channel.source.to_hex().as_str(), "in"],
+                            channel
+                                .balance
+                                .amount_base_units()
+                                .parse::<f64>()
+                                .unwrap_or(f64::INFINITY),
+                        );
+                    }
+                    ChannelStatus::PendingToClose(_) => {}
+                },
+                _ => {}
             }
         }
 
