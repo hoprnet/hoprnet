@@ -654,6 +654,8 @@ mod alias {
 }
 
 mod account {
+    use hopr_lib::U256;
+
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -773,7 +775,9 @@ mod account {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         currency: BalanceType,
-        amount: u128,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        amount: U256,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
