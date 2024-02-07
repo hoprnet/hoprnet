@@ -45,26 +45,31 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+    ///
     /// Defaults to 0.5
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub network_quality_threshold: f64,
 
     /// Minimum number of network quality samples before the strategy can start making decisions.
+    ///
     /// Defaults to 10
     #[validate(range(min = 1_u32))]
     pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
+    ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
+    ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
+    ///
     /// Defaults to square-root of the sampled network size.
     #[validate(range(min = 1))]
     pub max_channels: Option<usize>,
@@ -72,10 +77,12 @@ pub struct PromiscuousStrategyConfig {
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
+    ///
     /// Defaults to true
     pub enforce_max_channels: bool,
 
-    /// Specifies minimum version of the peer the strategy should open a channel to.
+    /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
+    ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
     pub minimum_peer_version: semver::VersionReq,

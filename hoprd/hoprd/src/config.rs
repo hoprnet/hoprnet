@@ -75,7 +75,8 @@ impl std::fmt::Debug for Identity {
 /// The configuration is composed of individual configuration of corresponding
 /// component configuration objects.
 ///
-/// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
+/// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/example_cfg.yaml)
+/// which is always in the root of this crate.
 ///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
@@ -315,141 +316,18 @@ impl HoprdConfig {
     }
 }
 
-/// Used in the testing and documentation
-pub const EXAMPLE_YAML: &str = r#"hopr:
-  host:
-    address: !IPv4 127.0.0.1
-    port: 47462
-  db:
-    data: /tmp/db
-    initialize: false
-    force_initialize: false
-  strategy:
-    on_fail_continue: true
-    allow_recursive: true
-    finalize_channel_closure: false
-    strategies: []
-  heartbeat:
-    variance: 0
-    interval: 0
-    threshold: 0
-  network_options:
-    min_delay: 1
-    max_delay: 300
-    quality_bad_threshold: 0.2
-    quality_offline_threshold: 0.0
-    quality_step: 0.1
-    quality_avg_window_size: 25
-    ignore_timeframe: 600
-    backoff_exponent: 1.5
-    backoff_min: 2.0
-    backoff_max: 300.0
-  transport:
-    announce_local_addresses: false
-    prefer_local_addresses: false
-  protocol:
-    ack:
-      timeout: 15
-    heartbeat:
-      timeout: 15
-    msg:
-      timeout: 15
-    ticket_aggregation:
-      timeout: 15
-  chain:
-    announce: false
-    network: testing
-    provider: null
-    protocols:
-      networks:
-        anvil-localhost:
-          chain: anvil
-          environment_type: local
-          version_range: '*'
-          indexer_start_block_number: 5
-          tags: []
-          addresses:
-            network_registry: 0x3aa5ebb10dc797cac828524e59a333d0a371443c
-            network_registry_proxy: 0x68b1d87f95878fe05b998f19b66f4baba5de1aed
-            channels: 0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae
-            token: 0x9a676e781a523b5d0c0e43731313a708cb607508
-            module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
-            node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
-            ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
-            announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
-            node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
-          confirmations: 2
-          tx_polling_interval: 1000
-          max_block_range: 200
-      chains:
-        anvil:
-          description: Local Ethereum node, akin to Ganache, Hardhat chain
-          chain_id: 31337
-          live: false
-          default_provider: http://127.0.0.1:8545/
-          etherscan_api_url: null
-          max_fee_per_gas: 1 gwei
-          max_priority_fee_per_gas: 0.2 gwei
-          native_token_name: ETH
-          hopr_token_name: wxHOPR
-          block_time: 5000
-          tags: []
-    check_unrealized_balance: true
-  safe_module:
-    safe_transaction_service_provider: https:://provider.com/
-    safe_address: '0x0000000000000000000000000000000000000000'
-    module_address: '0x0000000000000000000000000000000000000000'
-identity:
-  file: identity
-  password: ''
-  private_key: ''
-inbox:
-  capacity: 512
-  max_age: 900
-  excluded_tags:
-  - 0
-api:
-  enable: false
-  auth: None
-  host:
-    address: !IPv4 127.0.0.1
-    port: 1233
-"#;
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::{Args, Command, FromArgMatches};
+    use hopr_lib::HostType;
     use std::io::{Read, Write};
     use tempfile::NamedTempFile;
 
     pub fn example_cfg() -> HoprdConfig {
-        HoprdConfig {
-            hopr: HoprLibConfig {
-                host: hopr_lib::config::HostConfig::from_str(format!("127.0.0.1:47462").as_str()).unwrap(),
-                db: hopr_lib::config::Db {
-                    data: "/tmp/db".to_owned(),
-                    initialize: false,
-                    force_initialize: false,
-                },
-                strategy: hopr_lib::config::StrategyConfig::default(),
-                heartbeat: hopr_lib::config::HeartbeatConfig {
-                    interval: std::time::Duration::from_secs(0),
-                    threshold: std::time::Duration::from_secs(0),
-                    variance: std::time::Duration::from_secs(0),
-                },
-                network_options: {
-                    let mut c = hopr_lib::config::NetworkConfig::default();
-                    c.quality_offline_threshold = 0.0;
-                    c
-                },
-                transport: hopr_lib::config::TransportConfig::default(),
-                protocol: hopr_lib::config::ProtocolConfig::default(),
-                chain: hopr_lib::config::Chain {
-                    announce: false,
-                    network: "testing".to_string(),
-                    protocols: hopr_lib::ProtocolsConfig::from_str(
-                        r#"
+        let chain = hopr_lib::config::Chain {
+            protocols: hopr_lib::ProtocolsConfig::from_str(
+                r#"
                     {
                         "networks": {
                           "anvil-localhost": {
@@ -491,28 +369,43 @@ mod tests {
                         }
                       }
                     "#,
-                    )
-                    .expect("protocol config should be valid"),
-                    provider: None,
-                    check_unrealized_balance: true,
-                },
-                safe_module: hopr_lib::config::SafeModule {
-                    safe_transaction_service_provider: "https:://provider.com/".to_owned(),
-                    safe_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-                    module_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-                },
+            )
+            .expect("protocol config should be valid"),
+            ..hopr_lib::config::Chain::default()
+        };
+
+        let db = hopr_lib::config::Db {
+            data: "/app/db".to_owned(),
+            ..hopr_lib::config::Db::default()
+        };
+
+        let safe_module = hopr_lib::config::SafeModule {
+            safe_transaction_service_provider: "https:://provider.com/".to_owned(),
+            safe_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
+            module_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
+        };
+
+        let identity = Identity {
+            file: "path/to/identity.file".to_string(),
+            password: "change_me".to_owned(),
+            private_key: None,
+        };
+
+        let host = HostConfig {
+            address: HostType::IPv4("1.2.3.4".into()),
+            port: 9091,
+        };
+
+        HoprdConfig {
+            hopr: HoprLibConfig {
+                host,
+                db,
+                chain,
+                safe_module,
+                ..HoprLibConfig::default()
             },
-            identity: Identity {
-                file: "identity".to_string(),
-                password: "".to_owned(),
-                private_key: Some("".to_owned()),
-            },
-            inbox: MessageInboxConfiguration::default(),
-            api: Api {
-                enable: false,
-                auth: Auth::None,
-                host: hopr_lib::config::HostConfig::from_str(format!("127.0.0.1:1233").as_str()).unwrap(),
-            },
+            identity,
+            ..HoprdConfig::default()
         }
     }
 
@@ -520,9 +413,9 @@ mod tests {
     fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
         let cfg = example_cfg();
 
-        let yaml = serde_yaml::to_string(&cfg)?;
+        let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
 
-        assert_eq!(yaml, EXAMPLE_YAML);
+        assert_eq!(cfg, from_yaml);
 
         Ok(())
     }

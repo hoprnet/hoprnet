@@ -10,7 +10,7 @@ mod helpers;
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::CoreEthereumActionsError,
-    core_strategy::{Strategy, Strategy::AutoRedeeming},
+    core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         constants::PEER_METADATA_PROTOCOL_VERSION,
