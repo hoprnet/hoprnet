@@ -130,10 +130,12 @@ pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
+    ///
     /// Default is `true`.
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
+    ///
     /// Default is `true`.
     pub allow_recursive: bool,
 
@@ -141,10 +143,12 @@ pub struct MultiStrategyConfig {
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
     /// is over.
+    ///
     /// Default: false
     pub finalize_channel_closure: bool,
 
     /// Configuration of individual sub-strategies.
+    ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     pub strategies: Vec<Strategy>,
 }
