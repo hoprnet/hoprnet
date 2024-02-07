@@ -172,6 +172,7 @@ mod tests {
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -185,8 +186,16 @@ mod tests {
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref ALICE: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
-        static ref BOB: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(
+            hex!("d3d7c87803928c73ed543d62b30eb93dfba59df1b4991aae50883705c43964c6").as_slice()
+        )
+        .unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(
+            &hex!("0d0a254cd67734512426591293259864d14d27d230571b9031b030987b61b14a").as_slice()
+        )
+        .unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
     }
 
     #[async_std::test]
@@ -198,7 +207,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         db.write()
             .await
@@ -222,12 +231,12 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| BOB_ADDR.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
         let new_channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -247,17 +256,23 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
 
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .open_channel(*BOB, stake)
+            .open_channel(*BOB_ADDR, stake)
             .await
             .unwrap()
             .await
@@ -281,19 +296,20 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
         let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -325,11 +341,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
@@ -344,10 +360,11 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -359,11 +376,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*ALICE, stake).await.err().unwrap(),
+                actions.open_channel(*ALICE_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
@@ -374,15 +391,13 @@ mod tests {
     async fn test_open_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -394,11 +409,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -408,7 +423,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -419,16 +434,15 @@ mod tests {
     async fn test_should_not_open_if_not_enough_allowance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -440,11 +454,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -455,17 +469,16 @@ mod tests {
     async fn test_should_not_open_if_not_enough_token_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
 
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -483,11 +496,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
@@ -498,14 +511,12 @@ mod tests {
     async fn test_fund_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         db.write()
             .await
@@ -520,8 +531,8 @@ mod tests {
             .unwrap();
 
         let channel = ChannelEntry::new(
-            self_addr,
-            bob,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -553,13 +564,19 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -583,16 +600,15 @@ mod tests {
     async fn test_should_not_fund_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -610,7 +626,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -625,16 +641,15 @@ mod tests {
     async fn test_fund_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -646,11 +661,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -670,16 +685,15 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_allowance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -691,7 +705,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -706,16 +720,15 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -733,7 +746,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -753,12 +766,12 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let mut channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -778,14 +791,14 @@ mod tests {
             .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -814,16 +827,22 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -855,7 +874,7 @@ mod tests {
             .unwrap();
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -879,12 +898,12 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let channel = ChannelEntry::new(
-            *BOB,
-            *ALICE,
+            *BOB_ADDR,
+            *ALICE_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -904,7 +923,7 @@ mod tests {
             .expect_close_incoming_channel()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -918,16 +937,22 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Incoming, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Incoming, false)
             .await
             .unwrap()
             .await
@@ -950,12 +975,12 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::PendingToClose,
@@ -976,17 +1001,18 @@ mod tests {
 
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),
@@ -1002,20 +1028,21 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),
@@ -1033,19 +1060,20 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::Closed,
@@ -1061,7 +1089,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),

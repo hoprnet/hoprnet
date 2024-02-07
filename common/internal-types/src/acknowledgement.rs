@@ -3,14 +3,12 @@ use hopr_primitive_types::prelude::*;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::sync::OnceLock;
 
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
-    channels::{generate_channel_id, Ticket},
-    errors::{
-        CoreTypesError::{InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
-        Result as CoreTypesResult,
-    },
+    channels::Ticket,
+    errors::{CoreTypesError::InvalidInputData, Result as CoreTypesResult},
 };
 
 /// Represents packet acknowledgement
@@ -89,14 +87,23 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
+    /// ticket data, including signature and expected payout
     pub ticket: Ticket,
+    /// Proof-Of-Relay response to challenge stated in ticket
     pub response: Response,
-    pub vrf_params: VrfParameters,
-    pub signer: Address,
+    #[serde(skip)]
+    vrf_params: OnceLock<VrfParameters>,
+}
+
+impl PartialEq for AcknowledgedTicket {
+    fn eq(&self, other: &Self) -> bool {
+        // omit cached vrf parameters
+        self.status == other.status && self.ticket == other.ticket && self.response == other.response
+    }
 }
 
 impl PartialOrd for AcknowledgedTicket {
@@ -112,46 +119,22 @@ impl Ord for AcknowledgedTicket {
 }
 
 impl AcknowledgedTicket {
-    pub fn new(
-        ticket: Ticket,
-        response: Response,
-        signer: Address,
-        chain_keypair: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> CoreTypesResult<AcknowledgedTicket> {
-        if signer.eq(&chain_keypair.into()) {
-            return Err(LoopbackTicket);
-        }
-        if generate_channel_id(&signer, &chain_keypair.into()).ne(&ticket.channel_id) {
-            return Err(InvalidTicketRecipient);
-        }
-
-        let vrf_params = derive_vrf_parameters(
-            &ticket.get_hash(domain_separator).into(),
-            chain_keypair,
-            &domain_separator.to_bytes(),
-        )?;
-
-        Ok(Self {
+    /// Creates an acknowledged ticket. Once done, we can check
+    /// if it is a win and if so, it can be redeemed on-chain or
+    /// be sent to the ticket issuer to have it aggregated.
+    pub fn new(ticket: Ticket, response: Response) -> AcknowledgedTicket {
+        Self {
             // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
-            vrf_params,
-            signer,
-        })
+            vrf_params: OnceLock::new(),
+        }
     }
 
-    /// Does a verification of the acknowledged ticket, including:
-    /// - ticket signature
-    /// - ticket challenge (proof-of-relay)
-    /// - VRF values (ticket redemption)
-    pub fn verify(
-        &self,
-        issuer: &Address,
-        recipient: &Address,
-        domain_separator: &Hash,
-    ) -> hopr_crypto_types::errors::Result<()> {
+    /// Checks whether the Proof-Of-Relay challenge is fulfilled and
+    /// whether the signature is valid.
+    pub fn verify(&self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
         if self.ticket.verify(issuer, domain_separator).is_err() {
             return Err(CryptoError::SignatureVerification);
         }
@@ -160,29 +143,43 @@ impl AcknowledgedTicket {
             return Err(CryptoError::InvalidChallenge);
         }
 
-        if self
-            .vrf_params
-            .verify(
-                recipient,
-                &self.ticket.get_hash(domain_separator).into(),
-                &domain_separator.to_bytes(),
-            )
-            .is_err()
-        {
-            return Err(CryptoError::InvalidVrfValues);
-        }
-
         Ok(())
     }
 
-    pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
+    pub fn get_vrf_values(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<&VrfParameters> {
+        if let Some(vrf_params) = self.vrf_params.get() {
+            Ok(vrf_params)
+        } else {
+            let vrf_params = derive_vrf_parameters(
+                &self.ticket.get_hash(domain_separator).into(),
+                chain_key,
+                domain_separator.as_slice(),
+            )?;
+
+            Ok(self.vrf_params.get_or_init(|| vrf_params))
+        }
+    }
+
+    /// Computes the value which is used to determine
+    /// if a ticket is win.
+    ///
+    /// Each ticket specifies a probability, given as an integer in
+    /// [0, 2**56 - 1] where 0 -> 0% and 2*56 - 1 -> 100% win
+    /// probability. If the ticket's luck value is greater than
+    /// the stated probability, it is considered a winning ticket.
+    ///
+    /// Requires access to the private key to compute the VRF values.
+    pub fn get_luck(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
         let mut luck = [0u8; 7];
 
         if let Some(ref signature) = self.ticket.signature {
             luck.copy_from_slice(
                 &Hash::create(&[
                     &self.ticket.get_hash(domain_separator).to_bytes(),
-                    &self.vrf_params.get_decompressed_v()?.to_bytes()[1..], // skip prefix
+                    &self
+                        .get_vrf_values(chain_key, domain_separator)?
+                        .get_decompressed_v()?
+                        .to_bytes()[1..], // skip prefix
                     &self.response.to_bytes(),
                     &signature.to_bytes(),
                 ])
@@ -198,12 +195,20 @@ impl AcknowledgedTicket {
         Ok(luck)
     }
 
-    pub fn is_winning_ticket(&self, domain_separator: &Hash) -> bool {
+    /// Checks if this ticket is considered a win.
+    ///
+    /// Computes the ticket's luck value and compares it against the
+    /// ticket's probability. If luck <= probability, the ticket is
+    /// considered a win.
+    ///
+    /// Requires access to the private key to compute the VRF values.
+    pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> bool {
         let mut signed_ticket_luck = [0u8; 8];
         signed_ticket_luck[1..].copy_from_slice(&self.ticket.encoded_win_prob);
 
         let mut computed_ticket_luck = [0u8; 8];
-        computed_ticket_luck[1..].copy_from_slice(&self.get_luck(domain_separator).expect("unsigned ticket"));
+        computed_ticket_luck[1..]
+            .copy_from_slice(&self.get_luck(chain_key, domain_separator).expect("unsigned ticket"));
 
         u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
     }
@@ -215,7 +220,40 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-impl BinarySerializable for AcknowledgedTicket {
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProvableWinningTicket {
+    #[serde(default)]
+    pub status: AcknowledgedTicketStatus,
+    /// ticket data, including signature and expected payout
+    pub ticket: Ticket,
+    /// Proof-Of-Relay response to challenge stated in ticket
+    pub response: Response,
+    pub vrf_params: VrfParameters,
+    pub signer: Address,
+}
+
+impl ProvableWinningTicket {
+    /// Consumes an acknowledged ticket and stores all values that are
+    /// necessary to provde that it is a win
+    pub fn from_acked_ticket(
+        acked_ticket: AcknowledgedTicket,
+        chain_key: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> CoreTypesResult<Self> {
+        let vrf_params = acked_ticket.get_vrf_values(chain_key, domain_separator)?.to_owned();
+        let signer = acked_ticket.ticket.recover_signer(domain_separator)?;
+
+        Ok(Self {
+            status: acked_ticket.status,
+            ticket: acked_ticket.ticket,
+            response: acked_ticket.response,
+            vrf_params,
+            signer: signer.to_address(),
+        })
+    }
+}
+
+impl BinarySerializable for ProvableWinningTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
 
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
@@ -259,25 +297,20 @@ impl BinarySerializable for AcknowledgedTicket {
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
     pub own_key: HalfKey,
-    pub signer: Address,
 }
 
 impl UnacknowledgedTicket {
-    pub fn new(ticket: Ticket, own_key: HalfKey, signer: Address) -> Self {
-        Self {
-            ticket,
-            own_key,
-            signer,
-        }
+    pub fn new(ticket: Ticket, own_key: HalfKey) -> Self {
+        Self { ticket, own_key }
     }
 
     pub fn get_challenge(&self) -> HalfKeyChallenge {
         self.own_key.to_challenge()
     }
 
-    /// Verifies if signature on the embedded ticket using the embedded public key.
-    pub fn verify_signature(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
-        self.ticket.verify(&self.signer, domain_separator)
+    /// Verifies if signature on the embedded ticket.
+    pub fn verify_signature(&self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
+        self.ticket.verify(&issuer, domain_separator)
     }
 
     /// Verifies if the challenge on the embedded ticket matches the solution
@@ -294,39 +327,32 @@ impl UnacknowledgedTicket {
         }
     }
 
+    /// In the context of the Proof-Of-Relay scheme, combine both key halves,
+    /// the one from the relayer and the one from the next downstream node into
+    /// a response that presumably fulfills the stated challenge.
     pub fn get_response(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<Response> {
         Response::from_half_keys(&self.own_key, acknowledgement)
     }
 
-    /// Turn an unacknowledged ticket into an acknowledged ticket by adding
-    /// VRF output (requires private key) and the received acknowledgement
-    pub fn acknowledge(
-        self,
-        acknowledgement: &HalfKey,
-        chain_keypair: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> CoreTypesResult<AcknowledgedTicket> {
-        let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
+    /// Turn an unacknowledged ticket into an acknowledged ticket by combining
+    /// both Proof-Of-Relay key halves
+    pub fn acknowledge(self, acknowledgement: &HalfKey) -> CoreTypesResult<AcknowledgedTicket> {
+        let response = self.get_response(acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
-        AcknowledgedTicket::new(self.ticket, response, self.signer, chain_keypair, domain_separator)
+        Ok(AcknowledgedTicket::new(self.ticket, response))
     }
 }
 
 impl BinarySerializable for UnacknowledgedTicket {
-    const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + Address::SIZE;
+    const SIZE: usize = Ticket::SIZE + HalfKey::SIZE;
 
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
             let own_key = HalfKey::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
-            let signer =
-                Address::from_bytes(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
-            Ok(Self {
-                ticket,
-                own_key,
-                signer,
-            })
+
+            Ok(Self { ticket, own_key })
         } else {
             Err(GeneralError::ParseError)
         }
@@ -336,7 +362,6 @@ impl BinarySerializable for UnacknowledgedTicket {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.own_key.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
     }
 }

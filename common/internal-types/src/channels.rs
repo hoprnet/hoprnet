@@ -682,6 +682,8 @@ impl Ticket {
             })
     }
 
+    /// Determines the amount of tokens the ticket is worth
+    /// if it were a win and redeemed on-chain.
     pub fn get_expected_payout(&self) -> U256 {
         let mut win_prob = [0u8; 8];
         win_prob[1..].copy_from_slice(&self.encoded_win_prob);
@@ -693,7 +695,8 @@ impl Ticket {
         (self.amount.amount() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
-    /// Recovers the signer public key from the embedded ticket signature.
+    /// Lazily recovers the signer from the embedded ticket signature.
+    ///
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<PublicKey> {
         // OnceLock::get_or_try_insert fits better, but it is unstable

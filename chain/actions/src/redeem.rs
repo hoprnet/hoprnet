@@ -249,8 +249,11 @@ mod tests {
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).unwrap();
+        static ref CHARLIE_ADDR: Address = CHARLIE.public().to_address();
     }
 
     fn generate_random_ack_ticket(idx: u32, counterparty: &ChainKeypair, channel_epoch: U256) -> AcknowledgedTicket {
@@ -292,7 +295,7 @@ mod tests {
 
     async fn set_domain_separator(rdb: CurrentDbShim) {
         let inner_db = DB::new(rdb);
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, *ALICE_ADDR);
 
         db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
             .await
@@ -317,10 +320,10 @@ mod tests {
             input_tickets.push(ack_ticket);
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, *ALICE_ADDR);
         let channel = ChannelEntry::new(
             counterparty.public().to_address(),
-            ALICE.public().to_address(),
+            *ALICE_ADDR,
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
@@ -354,10 +357,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -398,25 +398,31 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_, _| Ok(random_hash));
+            .withf(move |_, t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _, _| Ok(random_hash));
 
         // and then all Charlie's tickets get redeemed
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t, _| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_, _| Ok(random_hash));
+            .withf(move |_, t, _| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -479,10 +485,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -506,17 +509,23 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
-            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_, _| Ok(random_hash));
+            .withf(move |_, t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -576,10 +585,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Make the first ticket unredeemable
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
@@ -595,8 +601,8 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 2)
-            .withf(move |t, _| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
-            .returning(move |_, _| Ok(random_hash));
+            .withf(move |_, t, _| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .returning(move |_, _, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(2).cloned() {
@@ -613,13 +619,19 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -673,10 +685,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Expect only the redeemable tickets get redeemed
         let mut tickets = tickets_from_previous_epoch.clone();
@@ -687,12 +696,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_previous_epoch_count)
-            .withf(move |t, _| {
+            .withf(move |_, t, _| {
                 tickets_clone[ticket_from_previous_epoch_count..]
                     .iter()
                     .any(|tk| tk.ticket.eq(&t.ticket))
             })
-            .returning(move |_, _| Ok(random_hash));
+            .returning(move |_, _, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(ticket_from_previous_epoch_count).cloned() {
@@ -709,13 +718,19 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -756,10 +771,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Expect only the redeemable tickets get redeemed
         let mut tickets = tickets_from_next_epoch.clone();
@@ -770,12 +782,12 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - ticket_from_next_epoch_count)
-            .withf(move |t, _| {
+            .withf(move |_, t, _| {
                 tickets_clone[ticket_from_next_epoch_count..]
                     .iter()
                     .any(|tk| tk.ticket.eq(&t.ticket))
             })
-            .returning(move |_, _| Ok(random_hash));
+            .returning(move |_, _, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         for tkt in tickets.iter().skip(ticket_from_next_epoch_count).cloned() {
@@ -792,13 +804,19 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

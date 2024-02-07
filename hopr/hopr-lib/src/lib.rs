@@ -345,7 +345,7 @@ where
     let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded();
 
     let (action_queue, chain_actions, rpc_operations) = crate::chain::build_chain_components(
-        &me_onchain,
+        me_onchain.clone(),
         chain_config.clone(),
         contract_addrs,
         cfg.safe_module.module_address,

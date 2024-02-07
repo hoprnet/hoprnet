@@ -203,7 +203,13 @@ async fn start_node_chain_logic(
     );
 
     // Actions
-    let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
+    let action_queue = ActionQueue::new(
+        db.clone(),
+        chain_key.clone(),
+        IndexerActionTracker::default(),
+        tx_exec,
+        actions_cfg,
+    );
     let action_state = action_queue.action_state();
     let actions = CoreEthereumActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
 

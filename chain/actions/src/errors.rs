@@ -1,4 +1,5 @@
 use chain_rpc::errors::RpcError;
+use hopr_crypto_types::errors::CryptoError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
@@ -55,6 +56,9 @@ pub enum CoreEthereumActionsError {
 
     #[error(transparent)]
     DbError(#[from] DbError),
+
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),

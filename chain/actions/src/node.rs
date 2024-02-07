@@ -81,47 +81,59 @@ mod tests {
     use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::types::Hash;
+    use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
+    lazy_static::lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("cdb0e2219b75ef23a0167e8f3196f0a292c92699e562a4533df658b8fac196d0")).unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("92019229229fff4c36c52fb1257f3ca710c73502ec7f6111eda4c1b5b8e84810")).unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
+    }
+
     #[async_std::test]
     async fn test_withdraw() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_withdraw()
             .times(1)
-            .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| BOB_ADDR.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker.expect_register_expectation().never();
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            ALICE.clone(),
+            indexer_action_tracker,
+            tx_exec,
+            Default::default(),
+        );
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .withdraw(bob, stake)
+            .withdraw(*BOB_ADDR, stake)
             .await
             .unwrap()
             .await
@@ -142,25 +154,23 @@ mod tests {
     async fn test_should_not_withdraw_zero_amount() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
+            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .withdraw(bob, Balance::zero(BalanceType::HOPR))
+                    .withdraw(*BOB_ADDR, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
                     .unwrap(),

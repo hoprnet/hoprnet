@@ -96,6 +96,12 @@ impl From<Address> for primitive_types::H160 {
     }
 }
 
+impl From<&Address> for primitive_types::H160 {
+    fn from(value: &Address) -> Self {
+        primitive_types::H160::from_slice(value.0.as_slice())
+    }
+}
+
 impl FromStr for Address {
     type Err = GeneralError;
 
