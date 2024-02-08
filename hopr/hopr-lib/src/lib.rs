@@ -1,5 +1,17 @@
-//! HOPR library creating a unified `Hopr` object that can be used on its own, as well as integrated
-//! into other systems and libraries.
+//! HOPR library creating a unified [`Hopr`] object that can be used on its own,
+//! as well as integrated into other systems and libraries.
+//!
+//! The [`Hopr`] object is standalone, meaning that once it is constructed and run,
+//! it will perform its functionality autonomously. The API it offers serves as a
+//! high level integration point for other applications and utilities, but offers
+//! a complete and fulle featured HOPR node stripped from top level functionality
+//! such as the REST API, key management...
+//!
+//! The intended way to use hopr_lib is for a specific tool to be built on top of it,
+//! should the default `hoprd` implementation not be acceptable.
+//!
+//! For most of the practical use cases, the `hoprd` application should be a preferable
+//! choice.
 
 mod chain;
 pub mod config;
@@ -97,6 +109,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// An enum representing the current state of the HOPR node
 #[atomic_enum::atomic_enum]
 #[derive(PartialEq, Eq)]
 pub enum HoprState {
@@ -121,44 +134,30 @@ pub struct CloseChannelResult {
 ///
 /// Used to differentiate the type of the future that exits the loop premateruly
 /// by tagging it as an enum.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum HoprLoopComponents {
+    #[strum(to_string = "libp2p component responsible for the handling of the p2p communication")]
     Swarm,
+    #[strum(to_string = "heartbeat component responsible for maintaining the network quality measurements")]
     Heartbeat,
+    #[strum(to_string = "tick wake up the strategies to perform an action")]
     StrategyTick,
+    #[strum(to_string = "save operation for the bloom filter")]
     BloomFilterSave,
+    #[strum(to_string = "initial indexing operation into the DB")]
     Indexing,
+    #[strum(to_string = "on-chain transaction queue component for outgoing transactions")]
     OutgoingOnchainTxQueue,
 }
 
 impl HoprLoopComponents {
+    /// Identifies whether a loop is allowed to finish or should
+    /// run indefinitely.
     pub fn can_finish(&self) -> bool {
         matches!(self, HoprLoopComponents::Indexing)
     }
 }
 
-impl std::fmt::Display for HoprLoopComponents {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HoprLoopComponents::Swarm => write!(
-                f,
-                "libp2p component responsible for the handling of the p2p communication"
-            ),
-            HoprLoopComponents::Heartbeat => write!(
-                f,
-                "heartbeat component responsible for maintaining the network quality measurements"
-            ),
-            HoprLoopComponents::StrategyTick => write!(f, "tick wake up the strategies to perform an action"),
-            HoprLoopComponents::Indexing => write!(f, "initial indexing operation into the DB"),
-            HoprLoopComponents::BloomFilterSave => write!(f, "initial indexing operation into the DB"),
-            HoprLoopComponents::OutgoingOnchainTxQueue => {
-                write!(f, "on-chain transaction queue component for outgoing transactions")
-            }
-        }
-    }
-}
-
-///
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 pub fn to_chain_events_refresh_process<Db, S>(
     me: PeerId,
@@ -531,6 +530,17 @@ where
     )
 }
 
+/// HOPR main object providing the entire HOPR node functionality
+///
+/// Instantiating this object creates all processes and objects necessary for
+/// running the HOPR node. Once created, the node can be started using the
+/// `run()` method.
+///
+/// Externally offered API should be sufficient to perform all necessary tasks
+/// with the HOPR node manually, but it is advised to create such a configuration
+/// that manual interaction is unnecessary.
+///
+/// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
 pub struct Hopr {
     me: OffchainKeypair,
     is_public: bool,
