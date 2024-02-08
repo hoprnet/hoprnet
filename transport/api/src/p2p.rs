@@ -83,6 +83,7 @@ impl From<IndexerProcessed> for Inputs {
 
 use std::net::ToSocketAddrs;
 
+/// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
 fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
     let mut out = multiaddr::Multiaddr::empty();
 
@@ -97,7 +98,8 @@ fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::error
     Ok(out)
 }
 
-fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
+/// Resolves the DNS parts of a multiaddress and replaces it with the resolved IP address.
+fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
     let mut out = multiaddr::Multiaddr::empty();
 
     for proto in ma.iter() {
@@ -137,7 +139,7 @@ fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::er
     Ok(out)
 }
 
-/// Main p2p loop that will instantiate a new libp2p::Swarm instance and setup listening and reacting pipelines
+/// Main p2p loop that instantiates a new libp2p::Swarm instance and sets up listening and reacting pipelines
 /// running in a neverending loop future.
 ///
 /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
@@ -170,7 +172,7 @@ pub async fn p2p_loop(
         .expect("swarm must be constructible");
 
     for multiaddress in my_multiaddresses.iter() {
-        match alter_multiaddress_to_allow_listening(multiaddress) {
+        match resolve_dns_if_any(multiaddress) {
             Ok(ma) => {
                 if let Err(e) = swarm.listen_on(ma.clone()) {
                     error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
@@ -553,7 +555,7 @@ pub async fn p2p_loop(
                             net.add(&peer_id, PeerOrigin::IncomingConnection)
                         }
                     } else {
-                        debug!("DISCONNECTION (based on network registry) for PEER ID {:?}", peer_id);
+                        info!("DISCONNECTING (based on network registry) Peer ID '{:?}'", peer_id);
                         let _ = swarm.disconnect_peer_id(peer_id);
                     }
                 },

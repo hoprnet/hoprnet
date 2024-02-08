@@ -46,8 +46,19 @@ pub trait PingExternalAPI {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
+    /// The maximum total allowed concurrent heartbeat ping count
     pub max_parallel_pings: usize,
+    /// The timeout duration for an indiviual ping
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
+}
+
+impl Default for PingConfig {
+    fn default() -> Self {
+        Self {
+            max_parallel_pings: 14,
+            timeout: std::time::Duration::from_secs(30),
+        }
+    }
 }
 
 #[async_trait] // not placing the `Send` trait limitations on the trait
