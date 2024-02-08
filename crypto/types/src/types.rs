@@ -912,6 +912,10 @@ impl Response {
                 .expect("response represents an invalid non-zero scalar"),
         }
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.response
+    }
 }
 
 impl Response {

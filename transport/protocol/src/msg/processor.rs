@@ -324,7 +324,6 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             ticket.clone(),
                             own_key.clone(),
-                            previous_hop_addr,
                         )),
                     )
                     .await?;

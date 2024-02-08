@@ -278,9 +278,12 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
 
         let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
 
-        let vrf_parameters = derive_vrf_parameters(&ticket_hash.into(), chain_key, domain_separator.as_slice())?;
-
-        let params = convert_vrf_parameters(&vrf_parameters, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(
+            acked_ticket.get_vrf_values(chain_key, domain_separator)?,
+            &self.me,
+            &ticket_hash,
+            &domain_separator,
+        );
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -483,9 +486,12 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
 
-        let vrf_pararmeters = derive_vrf_parameters(&ticket_hash.into(), &chain_key, &domain_separator.as_slice())?;
-
-        let params = convert_vrf_parameters(&vrf_pararmeters, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(
+            acked_ticket.get_vrf_values(chain_key, domain_separator)?,
+            &self.me,
+            &ticket_hash,
+            &domain_separator,
+        );
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -711,14 +717,7 @@ pub mod tests {
         .unwrap();
 
         // Bob acknowledges the ticket using the HalfKey from the Response
-        let acked_ticket = AcknowledgedTicket::new(
-            ticket,
-            response,
-            (&chain_key_alice).into(),
-            &chain_key_bob,
-            &domain_separator,
-        )
-        .unwrap();
+        let acked_ticket = AcknowledgedTicket::new(ticket, response).unwrap();
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());

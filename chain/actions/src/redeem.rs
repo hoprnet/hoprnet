@@ -279,8 +279,8 @@ mod tests {
         )
         .unwrap();
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
+        unacked_ticket.acknowledge(&hk2).unwrap()
     }
 
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {

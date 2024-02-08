@@ -147,7 +147,6 @@ impl AggregationList {
             return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
         }
 
-        let signer = list[0].signer;
         let channel_id = list[0].ticket.channel_id;
 
         let channel_balance = db
@@ -163,10 +162,7 @@ impl AggregationList {
         let mut total_amount = Balance::zero(BalanceType::HOPR);
 
         for tkt in list.iter() {
-            if tkt.signer != signer
-                || tkt.ticket.channel_id != channel_id
-                || tkt.status != AcknowledgedTicketStatus::BeingAggregated
-            {
+            if tkt.ticket.channel_id != channel_id || tkt.status != AcknowledgedTicketStatus::BeingAggregated {
                 error!("{tkt} does not belong to the aggregation list");
                 return Err(ProtocolTicketAggregation(
                     "invalid list of tickets to aggregate given".into(),
@@ -183,13 +179,61 @@ impl AggregationList {
     }
 }
 
+fn validate_winning_tickets(channel_id: &Hash, winning_tickets: &Vec<ProvableWinningTicket>) -> Result<Balance> {
+    let mut final_value = Balance::zero(BalanceType::HOPR);
+
+    for i in 0..winning_tickets.len() {
+        let current = winn
+    }
+    for (i, acked_ticket) in acked_tickets.iter().enumerate() {
+        if channel_id != acked_ticket.ticket.channel_id {
+            return Err(ProtocolTicketAggregation(format!(
+                "aggregated ticket has an invalid channel id {}",
+                acked_ticket.ticket.channel_id
+            )));
+        }
+
+        if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
+            return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
+        }
+
+        if i + 1 < acked_tickets.len()
+            && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64 > acked_tickets[i + 1].ticket.index
+        {
+            return Err(ProtocolTicketAggregation(
+                "Tickets with overlapping index intervals".to_owned(),
+            ));
+        }
+
+        if acked_ticket
+            .verify(&(&self.chain_key).into(), &destination, &domain_separator)
+            .is_err()
+        {
+            return Err(ProtocolTicketAggregation("Not a valid ticket".to_owned()));
+        }
+
+        if !acked_ticket.is_winning_ticket(&domain_separator) {
+            return Err(ProtocolTicketAggregation("Not a winning ticket".to_owned()));
+        }
+
+        final_value = final_value.add(&acked_ticket.ticket.amount);
+        if final_value.gt(&channel_balance) {
+            return Err(ProtocolTicketAggregation(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
+        }
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_AGGREGATED_TICKETS.increment();
+    }
+
+    Ok(final_value)
+}
 /// The input to the processor background pipeline
 #[allow(clippy::type_complexity)] // TODO: The type needs to be significantly refactored to easily move around
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
-    ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
+    ToProcess(PeerId, Vec<ProvableWinningTicket>, T),
     ToSend(AggregationList, TicketAggregationFinalizer),
 }
 
@@ -199,7 +243,7 @@ pub enum TicketAggregationToProcess<T, U> {
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
-    Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
+    Send(PeerId, Vec<ProvableWinningTicket>, TicketAggregationFinalizer),
 }
 
 /// Implements protocol ticket aggregation logic for acknowledgements
@@ -225,10 +269,21 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         }
     }
 
+    /// Takes a vector of winning tickets, verifies that these are indeed
+    /// a win and issues a new ticket combining all payouts.
+    ///
+    /// The operation is stateless, as long as tickets are valid, they get
+    /// aggregated. This is safe because tickets can get redeemed only once
+    /// and aggregagted ticket invalidate unaggregated tickets once redeemed.
+    ///
+    /// Validations:
+    /// - all tickets must have the same channel_id
+    /// - all tickets must have the same channel_epoch
+    /// - all signatures must be valid
     pub async fn aggregate_tickets(
         &mut self,
         destination: PeerId,
-        mut acked_tickets: Vec<AcknowledgedTicket>,
+        mut acked_tickets: Vec<ProvableWinningTicket>,
     ) -> Result<Ticket> {
         if acked_tickets.is_empty() {
             return Err(ProtocolTicketAggregation("At least one ticket required".to_owned()));
@@ -358,6 +413,8 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         .map_err(|e| e.into())
     }
 
+    /// Consumes an aggregated ticket and replaces unaggregated tickets
+    /// in the database with aggregated tickets.
     pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<AcknowledgedTicket> {
         let channel_id = aggregated_ticket.channel_id;
         debug!("received aggregated {aggregated_ticket}");
@@ -386,7 +443,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         }
 
         // Value of received ticket can be higher (profit for us) but not lower
-        if aggregated_ticket.amount.lt(&stored_value) {
+        if aggregated_ticket.amount < stored_value {
             debug!(
                 "Dropping aggregated ticket in channel {} because its value is lower than sum of stored tickets",
                 channel_id
@@ -426,19 +483,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         let current_ticket_index_from_aggregated_ticket =
             U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
 
-        let acked_aggregated_ticket = AcknowledgedTicket::new(
-            aggregated_ticket,
-            first_stored_ticket.response.clone(),
-            first_stored_ticket.signer,
-            &self.chain_key,
-            &domain_separator,
-        )
-        .map_err(|e| {
-            ProtocolTicketAggregation(format!(
-                "Cannot create acknowledged ticket from aggregated ticket {}",
-                e
-            ))
-        })?;
+        let acked_aggregated_ticket = AcknowledgedTicket::new(aggregated_ticket, first_stored_ticket.response.clone());
 
         if acked_aggregated_ticket
             .verify(
@@ -793,7 +838,7 @@ mod tests {
         )
         .unwrap();
 
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        AcknowledgedTicket::new(ticket, response)
     }
 
     async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {

@@ -4,6 +4,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
+use validator::{Validate, ValidationError};
 
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
@@ -175,12 +176,12 @@ impl AcknowledgedTicket {
         if let Some(ref signature) = self.ticket.signature {
             luck.copy_from_slice(
                 &Hash::create(&[
-                    &self.ticket.get_hash(domain_separator).to_bytes(),
+                    self.ticket.get_hash(domain_separator).as_slice(),
                     &self
                         .get_vrf_values(chain_key, domain_separator)?
                         .get_decompressed_v()?
                         .to_bytes()[1..], // skip prefix
-                    &self.response.to_bytes(),
+                    self.response.as_slice(),
                     &signature.to_bytes(),
                 ])
                 .to_bytes()[0..7],
@@ -220,11 +221,11 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Validate)]
+#[validate(schema)]
 pub struct ProvableWinningTicket {
-    #[serde(default)]
-    pub status: AcknowledgedTicketStatus,
     /// ticket data, including signature and expected payout
+    #[validate]
     pub ticket: Ticket,
     /// Proof-Of-Relay response to challenge stated in ticket
     pub response: Response,
@@ -244,15 +245,29 @@ impl ProvableWinningTicket {
         let signer = acked_ticket.ticket.recover_signer(domain_separator)?;
 
         Ok(Self {
-            status: acked_ticket.status,
             ticket: acked_ticket.ticket,
             response: acked_ticket.response,
             vrf_params,
             signer: signer.to_address(),
         })
     }
+
+    pub fn verify(&self) -> Result<()> {}
 }
 
+impl PartialOrd for ProvableWinningTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ProvableWinningTicket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.ticket.cmp(&other.ticket)
+    }
+}
+
+/// over-the-wire format to be deprecated soon
 impl BinarySerializable for ProvableWinningTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
 
@@ -269,9 +284,6 @@ impl BinarySerializable for ProvableWinningTicket {
             )?;
 
             Ok(Self {
-                // BinarySerializable is only used for over-the-wire encoding,
-                // so acked tickets are always untouched
-                status: AcknowledgedTicketStatus::Untouched,
                 ticket,
                 response,
                 vrf_params,

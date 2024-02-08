@@ -14,6 +14,7 @@ use std::{
     fmt::{Display, Formatter},
     sync::OnceLock,
 };
+use validator::{Validate, ValidationError};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -276,17 +277,64 @@ impl ChannelChange {
     }
 }
 
+/// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
+/// This method checks whether they are met
+fn check_value_boundaries(ticket: &Ticket) -> std::result::Result<(), ValidationError> {
+    // @TODO fail if win_prob > 50%, see
+    // https://github.com/hoprnet/hoprnet/issues/5985
+
+    if ticket.amount.balance_type() != BalanceType::HOPR {
+        return Err(CoreTypesError::InvalidInputData(
+            "Tickets can only have HOPR balance".into(),
+        ));
+    }
+
+    if ticket.amount.amount() >= 10u128.pow(25).into() {
+        return Err(CoreTypesError::InvalidInputData(
+            "Tickets may not have more than 1% of total supply".into(),
+        ));
+    }
+
+    if ticket.index >= 1u64 << 48 {
+        return Err(CoreTypesError::InvalidInputData(
+            "Cannot hold ticket indices larger than 2^48".into(),
+        ));
+    }
+
+    if ticket.index_offset >= 1u64 << 32 {
+        return Err(ValidationError::new(
+            "Cannot hold ticket index offsets larger than 2^32".into(),
+        ));
+    }
+
+    // Not checked by Rust because data is represented in larger structs
+    if ticket.index + ticket.index_offset >= 1u64 << 48 {
+        return Err(ValidationError::new(
+            "Ticket index + ticket index offset exceed smart contract boundaries",
+        ));
+    }
+
+    if ticket.channel_epoch >= 1u64 << 24 {
+        return Err(ValidationError::new(
+            "Cannot hold channel epoch larger than 2^24".into(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Validate)]
+#[validate(schema(function = "check_value_boundaries"))]
 pub struct Ticket {
     pub channel_id: Hash,
-    pub amount: Balance,                  // 92 ---
-    pub index: u64,                       // 48
-    pub index_offset: u32,                // 32
-    pub encoded_win_prob: EncodedWinProb, // 56
-    pub channel_epoch: u32,               // 24
-    pub challenge: EthereumChallenge,
-    pub signature: Option<Signature>,
+    pub amount: Balance,                  // 92 bytes on-chain
+    pub index: u64,                       // 48 bytes on-chain
+    pub index_offset: u32,                // 32 bytes on-chain
+    pub encoded_win_prob: EncodedWinProb, // 56 bytes on-chain
+    pub channel_epoch: u32,               // 24 bytes on-chain
+    pub challenge: EthereumChallenge,     // 32 bytes on-chain
+    pub signature: Option<Signature>,     // 64 bytes on-chain
     signer: OnceLock<PublicKey>,
 }
 
@@ -420,16 +468,6 @@ impl Ticket {
     ) -> Result<Ticket> {
         let own_address = signing_key.public().to_address();
 
-        Ticket::check_value_boundaries(
-            &own_address,
-            counterparty,
-            amount,
-            index,
-            index_offset,
-            win_prob,
-            channel_epoch,
-        )?;
-
         let channel_id = generate_channel_id(&own_address, counterparty);
 
         let mut ret = Self {
@@ -443,6 +481,8 @@ impl Ticket {
             signature: None,
             signer: OnceLock::new(),
         };
+
+        ret.validate()?;
         ret.sign(signing_key, domain_separator);
 
         Ok(ret)
@@ -462,16 +502,6 @@ impl Ticket {
         signature: Signature,
         domain_separator: &Hash,
     ) -> Result<Ticket> {
-        Ticket::check_value_boundaries(
-            own_address,
-            counterparty,
-            amount,
-            index,
-            index_offset,
-            win_prob_to_f64(&encoded_win_prob),
-            channel_epoch,
-        )?;
-
         let channel_id = generate_channel_id(own_address, counterparty);
 
         let ret = Ticket {
@@ -485,6 +515,8 @@ impl Ticket {
             signature: Some(signature),
             signer: OnceLock::new(),
         };
+
+        ret.validate()?;
 
         ret.verify(own_address, domain_separator)
             .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
@@ -503,19 +535,9 @@ impl Ticket {
         win_prob: f64,
         channel_epoch: U256,
     ) -> Result<Ticket> {
-        Ticket::check_value_boundaries(
-            own_address,
-            counterparty,
-            amount,
-            index,
-            index_offset,
-            win_prob,
-            channel_epoch,
-        )?;
-
         let channel_id = generate_channel_id(own_address, counterparty);
 
-        Ok(Ticket {
+        let ticket = Ticket {
             channel_id,
             amount: amount.to_owned(),
             index: index.as_u64(),
@@ -525,70 +547,9 @@ impl Ticket {
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
             signer: OnceLock::new(),
-        })
-    }
+        };
 
-    /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
-    /// This method checks whether they are met and prevents from unintended
-    /// usage.
-    fn check_value_boundaries(
-        own_address: &Address,
-        counterparty: &Address,
-        amount: &Balance,
-        index: U256,
-        index_offset: U256,
-        win_prob: f64,
-        channel_epoch: U256,
-    ) -> Result<()> {
-        if own_address.eq(counterparty) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Source and destination must be different".into(),
-            ));
-        }
-
-        if amount.balance_type().ne(&BalanceType::HOPR) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets can only have HOPR balance".into(),
-            ));
-        }
-
-        if amount.amount().ge(&10u128.pow(25).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Tickets may not have more than 1% of total supply".into(),
-            ));
-        }
-
-        if index.gt(&(1u64 << 48).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold ticket indices larger than 2^48".into(),
-            ));
-        }
-
-        if index_offset.gt(&(1u64 << 32).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold ticket index offsets larger than 2^32".into(),
-            ));
-        }
-
-        if channel_epoch.gt(&(1u64 << 24).into()) {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot hold channel epoch larger than 2^24".into(),
-            ));
-        }
-
-        if win_prob < 0.0 {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot use negative winning ptobability".into(),
-            ));
-        }
-
-        if win_prob > 1.0 {
-            return Err(CoreTypesError::InvalidInputData(
-                "Cannot use winning ptobabilities larger than 100%".into(),
-            ));
-        }
-
-        Ok(())
+        ticket.validate()
     }
 
     /// Add the challenge property and signs the finished ticket afterwards
@@ -639,14 +600,14 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[&self.to_bytes_internal(false).unwrap()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], &ticket_hash.to_bytes()]);
-        Hash::create(&[&hex!("1901"), &domain_separator.to_bytes(), &hash_struct.to_bytes()])
+        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_slice()]);
+        Hash::create(&[&hex!("1901"), domain_separator.as_slice(), hash_struct.as_slice()])
     }
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
         self.signature = Some(Signature::sign_hash(
-            &self.get_hash(domain_separator).to_bytes(),
+            self.get_hash(domain_separator).as_slice(),
             signing_key,
         ));
     }

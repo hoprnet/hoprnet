@@ -165,12 +165,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_tickets(&self, maybe_signer: Option<Address>) -> Result<Vec<Ticket>> {
+        let maybe_channel_id = maybe_signer.map(|ref signer| generate_channel_id(signer, &self.me));
         let mut acked_tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                Box::new(move |v: &AcknowledgedTicket| maybe_signer.map(|s| v.signer.eq(&s)).unwrap_or(true)),
+                Box::new(move |acked: &AcknowledgedTicket| {
+                    maybe_channel_id.map(|s| acked.ticket.channel_id == s).unwrap_or(true)
+                }),
             )
             .await?
             .into_iter()
@@ -185,10 +188,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 HalfKeyChallenge::SIZE as u32,
                 Box::new(move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => match maybe_signer {
-                        None => true,
-                        Some(signer) => unack.signer.eq(&signer),
-                    },
+                    PendingAcknowledgement::WaitingAsRelayer(unacked) => {
+                        maybe_channel_id.map(|s| unacked.ticket.channel_id == s).unwrap_or(true)
+                    }
                 }),
             )
             .await?
@@ -1515,11 +1517,7 @@ mod tests {
                 Some(Challenge::from(cp_sum).to_ethereum_challenge()),
             );
 
-            let unacked_ticket = UnacknowledgedTicket::new(
-                ticket,
-                HalfKey::from_bytes(&hk1_seed).unwrap(),
-                ALICE_KEYPAIR.public().to_address(),
-            );
+            let unacked_ticket = UnacknowledgedTicket::new(ticket, HalfKey::from_bytes(&hk1_seed).unwrap());
 
             db.store_pending_acknowledgment(
                 HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge(),
@@ -1539,15 +1537,11 @@ mod tests {
             };
 
             let acked_ticket = unacked_ticket
-                .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap(), &BOB_KEYPAIR, &Hash::default())
+                .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap())
                 .unwrap();
 
             assert!(acked_ticket
-                .verify(
-                    &ALICE_KEYPAIR.public().to_address(),
-                    &BOB_KEYPAIR.public().to_address(),
-                    &Hash::default()
-                )
+                .verify(&ALICE_KEYPAIR.public().to_address(), &Hash::default())
                 .is_ok());
 
             acked_tickets.push(acked_ticket.clone());
@@ -1663,14 +1657,7 @@ mod tests {
             Some(acked_tickets[0].ticket.challenge.clone()),
         );
 
-        let aggregated_acked_ticket = AcknowledgedTicket::new(
-            aggregated_ticket,
-            acked_tickets[0].response.to_owned(),
-            acked_tickets[0].signer.to_owned(),
-            &BOB_KEYPAIR,
-            &Hash::default(),
-        )
-        .unwrap();
+        let aggregated_acked_ticket = AcknowledgedTicket::new(aggregated_ticket, acked_tickets[0].response.to_owned());
 
         db.replace_acked_tickets_by_aggregated_ticket(aggregated_acked_ticket)
             .await
@@ -1709,14 +1696,7 @@ mod tests {
 
             total_balance = total_balance.add(&ticket.amount);
 
-            let ack = AcknowledgedTicket::new(
-                ticket,
-                Response::from_bytes(&challenge_seed.clone()).unwrap(),
-                (&*ALICE_KEYPAIR).into(),
-                &BOB_KEYPAIR,
-                &domain_separator,
-            )
-            .unwrap();
+            let ack = AcknowledgedTicket::new(ticket, Response::from_bytes(&challenge_seed.clone()).unwrap());
 
             acked_tickets.push(ack);
         }
