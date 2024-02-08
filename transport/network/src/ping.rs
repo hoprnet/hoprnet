@@ -32,23 +32,33 @@ lazy_static::lazy_static! {
 
 const MAX_PARALLEL_PINGS: usize = 14;
 
-// TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-// in case of faster input than output the memory might run out
+// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
+// in case of faster input than output the memory might run out.
+//
+// The unboundedness relies on the fact that a back pressure mechanism exists on a
+// higher level of the business logic making sure that only a fixed maximum count
+// of pings ever enter the queues at any given time.
 pub type HeartbeatSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, ControlMessage)>;
 pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
+pub type PingResult = std::result::Result<u64, ()>;
+
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PingExternalAPI {
-    async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
+    async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
+    ///
+    /// Default is `14`.
     pub max_parallel_pings: usize,
     /// The timeout duration for an indiviual ping
+    ///
+    /// Default is `30_000` (30 seconds)
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
@@ -61,7 +71,7 @@ impl Default for PingConfig {
     }
 }
 
-#[async_trait] // not placing the `Send` trait limitations on the trait
+#[async_trait]
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
@@ -251,7 +261,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -284,7 +294,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_err()),
+                predicate::function(|x: &PingResult| x.is_err()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -315,7 +325,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_err()),
+                predicate::function(|x: &PingResult| x.is_err()),
                 predicate::eq("unknown".to_owned()),
             )
             .return_const(());
@@ -344,14 +354,14 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -391,14 +401,14 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());

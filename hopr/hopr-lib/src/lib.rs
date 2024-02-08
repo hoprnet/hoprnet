@@ -272,7 +272,7 @@ where
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
                                         let mut net = network.write().await;
                                         if ! net.has(&peer_id) {
-                                            net.add_with_metadata(&peer_id, PeerOrigin::NetworkRegistry, None);
+                                            net.add(&peer_id, PeerOrigin::NetworkRegistry);
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
