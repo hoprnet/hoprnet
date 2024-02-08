@@ -3,8 +3,8 @@ use hopr_primitive_types::prelude::*;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::OnceLock;
-use validator::{Validate, ValidationError};
+use std::sync::{OnceLock, WaitTimeoutResult};
+use validator::{Validate, ValidateArgs, ValidationError};
 
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
@@ -87,8 +87,26 @@ pub enum AcknowledgedTicketStatus {
     BeingAggregated,
 }
 
+fn validate_acknowledged_ticket(
+    acked_ticket: &AcknowledgedTicket,
+    arg: (&Address, &Hash),
+) -> std::result::Result<(), ValidationError> {
+    acked_ticket.ticket.validate_args((arg.0, &Some(arg.1)))?;
+
+    if !acked_ticket
+        .ticket
+        .challenge
+        .eq(&acked_ticket.response.to_challenge().into())
+    {
+        return Err(ValidationError::new("Invalid response"));
+    }
+
+    Ok(())
+}
+
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Serialize, Deserialize, Validate)]
+#[validate(schema(function = "validate_acknowledged_ticket", arg = "(&'v_a Address,&'v_a Hash)"))]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -123,28 +141,23 @@ impl AcknowledgedTicket {
     /// Creates an acknowledged ticket. Once done, we can check
     /// if it is a win and if so, it can be redeemed on-chain or
     /// be sent to the ticket issuer to have it aggregated.
-    pub fn new(ticket: Ticket, response: Response) -> AcknowledgedTicket {
-        Self {
+    pub fn new(
+        ticket: Ticket,
+        response: Response,
+        issuer: &Address,
+        domain_separator: &Hash,
+    ) -> CoreTypesResult<AcknowledgedTicket> {
+        let acked_ticket = Self {
             // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
             vrf_params: OnceLock::new(),
-        }
-    }
+        };
 
-    /// Checks whether the Proof-Of-Relay challenge is fulfilled and
-    /// whether the signature is valid.
-    pub fn verify(&self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
-        if self.ticket.verify(issuer, domain_separator).is_err() {
-            return Err(CryptoError::SignatureVerification);
-        }
+        acked_ticket.validate_args((issuer, Some(domain_separator)))?;
 
-        if !self.ticket.challenge.eq(&self.response.to_challenge().into()) {
-            return Err(CryptoError::InvalidChallenge);
-        }
-
-        Ok(())
+        Ok(acked_ticket)
     }
 
     pub fn get_vrf_values(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<&VrfParameters> {
@@ -221,11 +234,35 @@ impl Display for AcknowledgedTicket {
     }
 }
 
+fn validate_provable_winning_ticket(
+    maybe_winning_ticket: &ProvableWinningTicket,
+    arg: (&Address, &Hash),
+) -> Result<(), ValidationError> {
+    maybe_winning_ticket
+        .ticket
+        .validate_args((arg.0, &Some(*arg.1)))
+        .map_err(|e| ValidationError::new(&format!("Ticket validation errors: {}", e)))?;
+
+    if maybe_winning_ticket.ticket.challenge != maybe_winning_ticket.response.to_challenge().into() {
+        return Err(ValidationError::new("Invalid response"));
+    }
+
+    maybe_winning_ticket
+        .vrf_params
+        .verify(
+            arg.0,
+            &maybe_winning_ticket.ticket.get_hash(arg.1).into(),
+            arg.1.as_slice(),
+        )
+        .map_err(|e| ValidationError::new(&e.to_string()))?;
+
+    Ok(())
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Validate)]
-#[validate(schema)]
+#[validate(schema(function = "validate_provable_winning_ticket", arg = "(&'v_a Address,&'v_a Hash)"))]
 pub struct ProvableWinningTicket {
     /// ticket data, including signature and expected payout
-    #[validate]
     pub ticket: Ticket,
     /// Proof-Of-Relay response to challenge stated in ticket
     pub response: Response,
@@ -251,8 +288,6 @@ impl ProvableWinningTicket {
             signer: signer.to_address(),
         })
     }
-
-    pub fn verify(&self) -> Result<()> {}
 }
 
 impl PartialOrd for ProvableWinningTicket {

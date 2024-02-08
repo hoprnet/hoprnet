@@ -14,7 +14,7 @@ use std::{
     fmt::{Display, Formatter},
     sync::OnceLock,
 };
-use validator::{Validate, ValidationError};
+use validator::{Validate, ValidateArgs, ValidationError};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -279,7 +279,7 @@ impl ChannelChange {
 
 /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
 /// This method checks whether they are met
-fn check_value_boundaries(ticket: &Ticket) -> std::result::Result<(), ValidationError> {
+fn validate_ticket(ticket: &Ticket, arg: (&Address, &Option<Hash>)) -> std::result::Result<(), ValidationError> {
     // @TODO fail if win_prob > 50%, see
     // https://github.com/hoprnet/hoprnet/issues/5985
 
@@ -320,12 +320,26 @@ fn check_value_boundaries(ticket: &Ticket) -> std::result::Result<(), Validation
         ));
     }
 
+    if let Some(signature) = ticket.signature {
+        let recovered_address = ticket
+            .recover_signer(&arg.1.ok_or(ValidationError::new(
+                "Signature verification requires a domain separator.",
+            ))?)?
+            .to_address();
+
+        let computed_channel_id = generate_channel_id(&recovered_address, arg.0);
+
+        if ticket.channel_id != computed_channel_id {
+            return Err(ValidationError::new("Invalid ticket signature"));
+        }
+    }
+
     Ok(())
 }
 
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, Eq, Validate)]
-#[validate(schema(function = "check_value_boundaries"))]
+#[validate(schema(function = "validate_ticket", arg = "(&'v_a Address,&'v_a Option<Hash>)"))]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,                  // 92 bytes on-chain
@@ -482,7 +496,8 @@ impl Ticket {
             signer: OnceLock::new(),
         };
 
-        ret.validate()?;
+        ret.validate_args((&own_address, &Some(domain_separator)))?;
+
         ret.sign(signing_key, domain_separator);
 
         Ok(ret)
@@ -516,10 +531,7 @@ impl Ticket {
             signer: OnceLock::new(),
         };
 
-        ret.validate()?;
-
-        ret.verify(own_address, domain_separator)
-            .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
+        ret.validate_args((&own_address, &Some(domain_separator)))?;
 
         Ok(ret)
     }
@@ -549,7 +561,7 @@ impl Ticket {
             signer: OnceLock::new(),
         };
 
-        ticket.validate()
+        ticket.validate_args((&own_address, &None))?;
     }
 
     /// Add the challenge property and signs the finished ticket afterwards
