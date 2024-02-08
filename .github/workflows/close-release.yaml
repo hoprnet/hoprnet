@@ -25,6 +25,7 @@ on:
           - providence
           - saint-louis
           - singapore
+          - kaunas
 concurrency:
   group: close-release
   cancel-in-progress: true
