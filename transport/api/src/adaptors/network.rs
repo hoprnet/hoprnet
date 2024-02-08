@@ -5,7 +5,8 @@ use core_network::{
 use futures::channel::mpsc::Sender;
 use log::error;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
@@ -30,6 +31,6 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         }
     }
     fn create_timestamp(&self) -> u64 {
-        current_timestamp().as_millis() as u64
+        current_time().as_unix_timestamp().as_millis() as u64
     }
 }

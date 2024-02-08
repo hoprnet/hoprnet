@@ -1,5 +1,5 @@
-use std::collections::hash_map::Entry;
 use std::pin::Pin;
+use std::{collections::hash_map::Entry, ops::Div};
 
 use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
@@ -7,12 +7,13 @@ use libp2p_identity::PeerId;
 
 use log::{debug, error, info};
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -20,7 +21,7 @@ lazy_static::lazy_static! {
         SimpleHistogram::new(
             "hopr_ping_time_sec",
             "Measures total time it takes to ping a single node (seconds)",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
     static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
             "hopr_heartbeat_pings_count",
@@ -91,7 +92,7 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 
         self.send_ping
             .start_send((*peer, ping_challenge.clone()))
-            .map(move |_| (current_timestamp().as_millis() as u64, ping_challenge))
+            .map(move |_| (current_time().as_unix_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
     }
 }
@@ -108,7 +109,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     async fn ping(&mut self, peers: Vec<PeerId>) {
-        let start_all_peers = current_timestamp();
+        let start_all_peers = current_time();
         let mut peers = peers;
 
         if peers.is_empty() {
@@ -148,7 +149,9 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
-                            Ok(current_timestamp().saturating_sub(std::time::Duration::from_millis(start)))
+                            Ok(current_time()
+                                .as_unix_timestamp()
+                                .saturating_sub(std::time::Duration::from_millis(start).div(2u32)))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())
@@ -166,7 +169,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             #[cfg(all(feature = "prometheus", not(test)))]
             match result {
                 Ok(duration) => {
-                    METRIC_TIME_TO_PING.observe(duration.as_millis() as f64);
+                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
                     METRIC_PING_COUNT.increment(&["true"]);
                 }
                 Err(_) => {
@@ -178,7 +181,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            if (current_timestamp() - start_all_peers) < self.config.timeout {
+            if current_time().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
                     if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -406,10 +409,13 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
 
-        let start = current_timestamp();
+        let start = current_time();
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
-        let end = current_timestamp();
+        let end = current_time();
 
-        assert_ge!(end - start, std::time::Duration::from_millis(ping_delay));
+        assert_ge!(
+            end.duration_since(start).unwrap_or_default(),
+            std::time::Duration::from_millis(ping_delay)
+        );
     }
 }

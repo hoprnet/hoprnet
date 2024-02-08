@@ -252,7 +252,7 @@ impl HoprKeys {
             }
         }
 
-        if opts.initialize {
+        if !exists && opts.initialize {
             info!(
                 "identity file {} not found, initializing and writing new identity file",
                 &opts.id_path

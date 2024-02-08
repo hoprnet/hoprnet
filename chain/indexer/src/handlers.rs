@@ -16,7 +16,8 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{error, info, trace, warn};
 use multiaddr::Multiaddr;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
+use std::time::{Duration, SystemTime};
 use std::{str::FromStr, sync::Arc};
 
 #[derive(Debug, Clone)]
@@ -180,7 +181,6 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
-                    channel.closure_time = 0u64.into();
                     channel.ticket_index = 0u64.into();
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
@@ -228,7 +228,6 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         0u64.into(),
                         ChannelStatus::Open,
                         1u64.into(),
-                        0u64.into(),
                     ));
 
                 db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
@@ -297,8 +296,9 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                 let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.status = ChannelStatus::PendingToClose;
-                    channel.closure_time = closure_initiated.closure_time.into();
+                    channel.status = ChannelStatus::PendingToClose(
+                        SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_initiated.closure_time as u64)),
+                    );
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
@@ -593,6 +593,7 @@ impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler 
 #[cfg(test)]
 pub mod tests {
     use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::traits::ChainLogHandler;
 
@@ -1294,7 +1295,6 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::one(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
@@ -1382,7 +1382,6 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::one(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
@@ -1442,7 +1441,6 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::one(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
@@ -1545,7 +1543,6 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     3u64.into(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
@@ -1607,7 +1604,6 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::one(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
@@ -1668,21 +1664,21 @@ pub mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::one(),
-                    U256::zero(),
                 ),
                 &Snapshot::default(),
             )
             .await
             .unwrap();
 
-        let timestamp = U256::from((1u64 << 32) - 1);
+        let timestamp = SystemTime::now();
+        //let timestamp = U256::from((1u64 << 32) - 1);
 
         let closure_initiated_log = RawLog {
             topics: vec![
                 OutgoingChannelClosureInitiatedFilter::signature(),
                 H256::from_slice(&channel_id.to_bytes()),
             ],
-            data: Vec::from(timestamp.to_bytes()),
+            data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_bytes()),
         };
 
         handlers
@@ -1699,8 +1695,7 @@ pub mod tests {
 
         let channel = db.read().await.get_channel(&channel_id).await.unwrap().unwrap();
 
-        assert_eq!(channel.status, ChannelStatus::PendingToClose);
-        assert_eq!(channel.closure_time, timestamp);
+        assert_eq!(channel.status, ChannelStatus::PendingToClose(timestamp));
     }
 
     #[async_std::test]

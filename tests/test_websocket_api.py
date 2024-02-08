@@ -45,11 +45,38 @@ def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(pe
 
 
 @pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_token(
+    peer: str, swarm7: dict[str, Node]
+):
+    ws = websocket.WebSocket()
+    try:
+        ws.connect(
+            url(swarm7[peer].host_addr, swarm7[peer].api_port),
+            header={"Authorization": "Bearer InvAliD_toKeN"},
+        )
+    except websocket.WebSocketBadStatusException as e:
+        assert "401 Unauthorized" in str(e)
+    else:
+        assert False, "Failed to raise 401 on invalid token"
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
 def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(peer: str, swarm7: dict[str, Node]):
     ws = websocket.WebSocket()
     ws.connect(
         url(swarm7[peer].host_addr, swarm7[peer].api_port),
         header={"X-Auth-Token": API_TOKEN},
+    )
+
+    time.sleep(0.5)
+
+
+@pytest.mark.parametrize("peer", random.sample(default_nodes_with_auth(), 1))
+def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_bearer_token(peer: str, swarm7: dict[str, Node]):
+    ws = websocket.WebSocket()
+    ws.connect(
+        url(swarm7[peer].host_addr, swarm7[peer].api_port),
+        header={"Authorization": "Bearer " + API_TOKEN},
     )
 
     time.sleep(0.5)

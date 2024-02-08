@@ -1,12 +1,10 @@
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
 pub use core_transport::config::{
-    validate_external_host, HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig,
+    validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
 };
 
 use hopr_primitive_types::prelude::*;
@@ -170,9 +168,14 @@ pub struct HoprLibConfig {
     pub safe_module: SafeModule,
 }
 
+// NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
+// their external IP.
 #[inline]
 fn default_host() -> HostConfig {
-    HostConfig::from_str(format!("{DEFAULT_HOST}:{DEFAULT_PORT}").as_str()).unwrap()
+    HostConfig {
+        address: HostType::IPv4(DEFAULT_HOST.to_owned()),
+        port: DEFAULT_PORT,
+    }
 }
 
 impl Default for HoprLibConfig {

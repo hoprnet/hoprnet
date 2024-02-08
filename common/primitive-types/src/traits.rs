@@ -82,3 +82,15 @@ pub trait UnitaryFloatOps: Sized {
     /// Divide by float in the interval (0.0, 1.0]
     fn div_f64(&self, rhs: f64) -> Result<Self>;
 }
+
+/// A trait that adds extension method to represent a time object as `Duration` since Unix epoch.
+pub trait AsUnixTimestamp {
+    /// Represents self as `Duration` since Unix epoch.
+    fn as_unix_timestamp(&self) -> std::time::Duration;
+}
+
+impl AsUnixTimestamp for std::time::SystemTime {
+    fn as_unix_timestamp(&self) -> std::time::Duration {
+        self.duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap()
+    }
+}

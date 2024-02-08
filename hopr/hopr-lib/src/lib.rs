@@ -10,7 +10,7 @@ mod helpers;
 pub use {
     chain::{Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::CoreEthereumActionsError,
-    core_strategy::{Strategy, Strategy::AutoRedeeming},
+    core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
         constants::PEER_METADATA_PROTOCOL_VERSION,
@@ -72,7 +72,7 @@ use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
-    hopr_platform::time::native::current_timestamp,
+    hopr_platform::time::native::current_time,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -631,9 +631,9 @@ impl Hopr {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            METRIC_PROCESS_START_TIME.set(current_timestamp().as_secs() as f64);
+            METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
-                &["version"],
+                &[const_format::formatcp!("{}", constants::APP_VERSION)],
                 f64::from_str(const_format::formatcp!(
                     "{}.{}",
                     env!("CARGO_PKG_VERSION_MAJOR"),
@@ -1141,9 +1141,9 @@ impl Hopr {
             .event
             .expect("channel close action confirmation must have associated chain event")
         {
-            ChainEventType::ChannelClosureInitiated(_) => Ok(CloseChannelResult {
+            ChainEventType::ChannelClosureInitiated(c) => Ok(CloseChannelResult {
                 tx_hash: confirmation.tx_hash,
-                status: ChannelStatus::PendingToClose,
+                status: c.status, // copy the information about closure time
             }),
             ChainEventType::ChannelClosed(_) => Ok(CloseChannelResult {
                 tx_hash: confirmation.tx_hash,

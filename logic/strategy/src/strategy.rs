@@ -17,10 +17,12 @@ use hopr_internal_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Sub;
 use std::sync::Arc;
+use std::time::Duration;
 use validator::Validate;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -78,6 +80,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelClo
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
+        // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
+        let ts_limit = current_time().sub(Duration::from_secs(3600));
+
         let to_close = self
             .db
             .read()
@@ -86,8 +91,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose
-                    && channel.closure_time_passed(current_timestamp().as_millis() as u64)
+                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
+                    && channel.closure_time_passed(current_time())
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
@@ -125,10 +130,12 @@ pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
+    ///
     /// Default is `true`.
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
+    ///
     /// Default is `true`.
     pub allow_recursive: bool,
 
@@ -136,10 +143,12 @@ pub struct MultiStrategyConfig {
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
     /// is over.
+    ///
     /// Default: false
     pub finalize_channel_closure: bool,
 
     /// Configuration of individual sub-strategies.
+    ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     pub strategies: Vec<Strategy>,
 }

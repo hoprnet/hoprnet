@@ -5,6 +5,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
+use std::time::Duration;
 
 use crate::action_queue::PendingAction;
 use crate::errors::CoreEthereumActionsError::{
@@ -17,7 +18,7 @@ use crate::errors::{
 use crate::redeem::TicketRedeemActions;
 use crate::CoreEthereumActions;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]
@@ -125,20 +126,20 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cor
             Some(channel) => {
                 match channel.status {
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
-                    ChannelStatus::PendingToClose => {
-                        info!(
-                            "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp().as_millis() as u64)
-                        );
-                        if channel.closure_time_passed(current_timestamp().as_millis() as u64) {
-                            info!("initiating finalization of channel closure of {channel} in {direction}");
-                            self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                        } else {
-                            Err(ClosureTimeHasNotElapsed(
+                    ChannelStatus::PendingToClose(_) => {
+                        let remaining_closure_time = channel.remaining_closure_time(current_time());
+                        info!("{channel} - remaining closure time is {remaining_closure_time:?}");
+                        match remaining_closure_time {
+                            Some(Duration::ZERO) => {
+                                info!("initiating finalization of channel closure of {channel} in {direction}");
+                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                            }
+                            _ => Err(ClosureTimeHasNotElapsed(
                                 channel
-                                    .remaining_closure_time(current_timestamp().as_millis() as u64)
-                                    .unwrap_or(u32::MAX as u64),
-                            ))
+                                    .remaining_closure_time(current_time())
+                                    .expect("impossible: closure time has not passed but no remaining closure time")
+                                    .as_secs(),
+                            )),
                         }
                     }
                     ChannelStatus::Open => {
@@ -180,7 +181,7 @@ mod tests {
     use std::{
         ops::{Add, Sub},
         sync::Arc,
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::{Duration, SystemTime},
     };
     use utils_db::{db::DB, CurrentDbShim};
 
@@ -225,15 +226,7 @@ mod tests {
             .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let new_channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            U256::zero(),
-        );
+        let new_channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
@@ -291,15 +284,7 @@ mod tests {
             Default::default(),
         );
 
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            U256::zero(),
-        );
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         db.write()
             .await
@@ -519,15 +504,7 @@ mod tests {
             .await
             .unwrap();
 
-        let channel = ChannelEntry::new(
-            self_addr,
-            bob,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            U256::zero(),
-        );
+        let channel = ChannelEntry::new(self_addr, bob, stake, U256::zero(), ChannelStatus::Open, U256::zero());
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -756,15 +733,7 @@ mod tests {
             *ALICE,
         )));
 
-        let mut channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            U256::zero(),
-        );
+        let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         db.write()
             .await
@@ -840,13 +809,7 @@ mod tests {
         );
 
         // Transition the channel to the PendingToClose state with the closure time already elapsed
-        channel.status = ChannelStatus::PendingToClose;
-        channel.closure_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .sub(Duration::from_secs(10))
-            .as_secs()
-            .into();
+        channel.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
 
         db.write()
             .await
@@ -882,15 +845,7 @@ mod tests {
             *ALICE,
         )));
 
-        let channel = ChannelEntry::new(
-            *BOB,
-            *ALICE,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            U256::zero(),
-        );
+        let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         db.write()
             .await
@@ -958,14 +913,8 @@ mod tests {
             *BOB,
             stake,
             U256::zero(),
-            ChannelStatus::PendingToClose,
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             U256::zero(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .add(Duration::from_secs(100))
-                .as_secs()
-                .into(),
         );
 
         db.write()
@@ -1043,15 +992,7 @@ mod tests {
         );
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Closed,
-            U256::zero(),
-            U256::zero(),
-        );
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())

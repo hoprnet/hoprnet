@@ -1424,7 +1424,6 @@ mod tests {
             U256::from(0u64),
             ChannelStatus::Open,
             U256::from(1u64),
-            U256::from(0u64),
         );
 
         let serialized = serialize_to_bytes(&channel_entry);
@@ -1582,7 +1581,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            0_u32.into(),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1728,7 +1726,6 @@ mod tests {
             amount.into(),
             ChannelStatus::Open,
             1_u32.into(),
-            0_u32.into(),
         );
 
         let channel_key = utils_db::db::Key::new_with_prefix(&channel.get_id(), CHANNEL_PREFIX).unwrap();
@@ -1886,7 +1883,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1921,7 +1917,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1949,7 +1944,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1965,7 +1959,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             (channel_epoch + 1).into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&newer_channel.get_id(), &channel, &Snapshot::default())
@@ -2000,7 +1993,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2026,7 +2018,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         // redeem the ticket...
@@ -2066,7 +2057,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2114,7 +2104,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2212,7 +2201,6 @@ mod tests {
             current_channel_ticket_index.into(),
             ChannelStatus::Open,
             current_channel_epoch.into(),
-            0_u32.into(),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())

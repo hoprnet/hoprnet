@@ -13,11 +13,15 @@ use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use tide::http::headers::{HeaderName, AUTHORIZATION};
-use tide::http::mime;
-use tide::utils::async_trait;
-use tide::{http::Mime, Request, Response};
-use tide::{Middleware, Next, StatusCode};
+use tide::{
+    http::{
+        headers::{HeaderName, AUTHORIZATION},
+        mime, Mime,
+    },
+    security::{CorsMiddleware, Origin},
+    utils::async_trait,
+    Middleware, Next, Request, Response, StatusCode,
+};
 use tide_websockets::{Message, WebSocket};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -289,6 +293,7 @@ pub async fn run_hopr_api(
     let mut app = tide::with_state(state.clone());
 
     app.with(LogRequestMiddleware(log::Level::Debug));
+    app.with(CorsMiddleware::new().allow_origin(Origin::from("*")));
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
@@ -544,7 +549,8 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -576,7 +582,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -603,7 +610,8 @@ mod alias {
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -634,7 +642,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -649,6 +658,8 @@ mod alias {
 }
 
 mod account {
+    use hopr_lib::U256;
+
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -674,7 +685,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -689,11 +701,11 @@ mod account {
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "hopr": "2000000000000000000000 HOPR",
-        "native": "9999563581204904000 Native",
-        "safeHopr": "2000000000000000000000 HOPR",
-        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935 HOPR",
-        "safeNative": "10000000000000000000 Native"
+        "hopr": "2000000000000000000000",
+        "native": "9999563581204904000",
+        "safeHopr": "2000000000000000000000",
+        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "safeNative": "10000000000000000000"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct AccountBalancesResponse {
@@ -719,7 +731,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -729,27 +742,27 @@ mod account {
         let mut account_balances = AccountBalancesResponse::default();
 
         match hopr.get_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.native = v.to_string(),
+            Ok(v) => account_balances.native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.hopr = v.to_string(),
+            Ok(v) => account_balances.hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.safe_native = v.to_string(),
+            Ok(v) => account_balances.safe_native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.safe_hopr = v.to_string(),
+            Ok(v) => account_balances.safe_hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.safe_allowance().await {
-            Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
+            Ok(v) => account_balances.safe_hopr_allowance = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
@@ -768,7 +781,9 @@ mod account {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         currency: BalanceType,
-        amount: u128,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        amount: U256,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
@@ -789,7 +804,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -850,7 +866,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -894,7 +911,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -926,7 +944,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1024,7 +1042,10 @@ mod channels {
             status: channel.status,
             ticket_index: channel.ticket_index.as_u32(),
             channel_epoch: channel.channel_epoch.as_u32(),
-            closure_time: channel.closure_time.as_u64(),
+            closure_time: channel
+                .closure_time_at()
+                .map(|ct| ct.as_unix_timestamp().as_secs())
+                .unwrap_or_default(),
         })
     }
 
@@ -1050,7 +1071,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1165,7 +1187,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1214,7 +1237,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1263,7 +1287,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1317,7 +1342,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1435,7 +1461,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1581,7 +1608,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1603,7 +1631,8 @@ mod messages {
         ),
         tag = "Messages",
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1624,7 +1653,8 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1686,7 +1716,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1728,7 +1759,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1773,7 +1805,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1810,7 +1843,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1857,7 +1891,8 @@ mod network {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Network"
     )]
@@ -1936,7 +1971,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -1967,7 +2003,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2034,7 +2071,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2055,7 +2093,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2081,7 +2120,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2112,7 +2152,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2159,7 +2200,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2231,7 +2273,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2323,7 +2366,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2403,7 +2447,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2463,7 +2508,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]

@@ -640,9 +640,8 @@ async fn integration_test_indexer() {
         .expect("must get channel")
         .expect("channel to bob must exist");
 
-    assert_eq!(
-        ChannelStatus::PendingToClose,
-        channel_alice_bob.status,
+    assert!(
+        matches!(channel_alice_bob.status, ChannelStatus::PendingToClose(_)),
         "channel must be pending to close"
     );
 

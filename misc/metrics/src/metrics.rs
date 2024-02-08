@@ -3,9 +3,6 @@ use prometheus::{
     Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts,
     TextEncoder,
 };
-use regex::Regex;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
 
 /// Gathers all the global Prometheus metrics.
 pub fn gather_all_metrics() -> prometheus::Result<String> {
@@ -13,31 +10,6 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 
     let encoder = TextEncoder::new();
     encoder.encode_to_string(&families)
-}
-
-/// A naive merging method for two serialized metric registries.
-/// It performs union of the sets, removing those metrics which have the same name and type.
-pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
-    let mut merged_metrics = BTreeMap::new();
-    let metric_expr =
-        Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+").unwrap();
-
-    let merged_texts = metrics1.to_owned() + metrics2;
-
-    // Search for all metrics in the merged texts and skip those with duplicate name and type, first comes first served.
-    for complete_metric in metric_expr.captures_iter(&merged_texts) {
-        let metric_key = format!("{}~{}", &complete_metric["name"], &complete_metric["type"]);
-        if let Entry::Vacant(metric) = merged_metrics.entry(metric_key) {
-            metric.insert(complete_metric[0].to_string());
-        }
-    }
-
-    // Output metrics sorted lexicographically by name
-    merged_metrics.values().fold("".into(), |mut a, b| {
-        a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
-        a.push_str(b);
-        a
-    })
 }
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
@@ -198,10 +170,12 @@ impl SimpleGauge {
 impl SimpleGauge {
     /// Creates a new gauge with given name and description.
     pub fn new(name: &str, description: &str) -> prometheus::Result<Self> {
-        register_metric(name, description, Gauge::with_opts).map(|m| Self {
+        let m = register_metric(name, description, Gauge::with_opts).map(|m| Self {
             name: name.to_string(),
             gg: m,
-        })
+        })?;
+        m.set(0_f64);
+        Ok(m)
     }
 }
 
@@ -609,51 +583,5 @@ mod tests {
 
         let timer = histogram_start_measure!(histogram, &["1.90.0"]).unwrap();
         histogram.cancel_measure(timer);
-    }
-
-    #[test]
-    fn test_merging() {
-        let counter = SimpleCounter::new("b_my_test_ctr", "test counter").unwrap();
-        counter.increment();
-
-        let multi_gauge = MultiGauge::new("c_mgauge", "test mgauge", &["version", "method"]).unwrap();
-        multi_gauge.increment(&["1.10.11", "get"], 3.0);
-        multi_gauge.increment(&["1.10.11", "post"], 1.0);
-
-        let metrics1 = gather_all_metrics().unwrap();
-
-        let counter2 = SimpleCounter::new("a_my_test_ctr_2", "test counter 2").unwrap();
-        counter2.increment_by(2);
-
-        let histogram = SimpleHistogram::new("b_histogram", "test histogram", vec![0.5, 1.0, 5.0]).unwrap();
-        histogram.observe(0.3);
-
-        let metrics2 = gather_all_metrics().unwrap();
-
-        let res1 = merge_encoded_metrics(&metrics1, &metrics2);
-        assert!(res1.contains("b_my_test_ctr"));
-        assert_eq!(3, res1.match_indices("b_my_test_ctr").count());
-
-        assert!(res1.contains("a_my_test_ctr_2"));
-        assert_eq!(3, res1.match_indices("a_my_test_ctr_2").count());
-
-        // Metrics must be sorted lexicographically by their names
-        assert!(res1.find("b_my_test_ctr").unwrap() > res1.find("a_my_test_ctr_2").unwrap());
-        assert!(res1.find("b_my_test_ctr").unwrap() > res1.find("b_histogram").unwrap());
-        assert!(res1.find("c_mgauge").unwrap() > res1.find("b_my_test_ctr").unwrap());
-
-        // Test degenerate cases
-
-        let res2 = merge_encoded_metrics(&metrics1, &metrics1);
-        assert!(res2.contains("b_my_test_ctr"));
-        assert_eq!(3, res2.match_indices("b_my_test_ctr").count());
-
-        let res3 = merge_encoded_metrics(&metrics1, "");
-        assert_eq!(metrics1, res3);
-
-        let res4 = merge_encoded_metrics("", &metrics1);
-        assert_eq!(metrics1, res4);
-
-        assert!(merge_encoded_metrics("", "").trim().is_empty());
     }
 }
