@@ -549,7 +549,8 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -581,7 +582,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -608,7 +610,8 @@ mod alias {
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -639,7 +642,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -681,7 +685,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -726,7 +731,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -798,7 +804,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -859,7 +866,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -903,7 +911,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -1062,7 +1071,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1177,7 +1187,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1226,7 +1237,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1275,7 +1287,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1329,7 +1342,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1447,7 +1461,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1593,7 +1608,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1615,7 +1631,8 @@ mod messages {
         ),
         tag = "Messages",
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1636,7 +1653,8 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1698,7 +1716,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1740,7 +1759,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1785,7 +1805,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1822,7 +1843,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1869,7 +1891,8 @@ mod network {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Network"
     )]
@@ -1948,7 +1971,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -1979,7 +2003,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2046,7 +2071,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2067,7 +2093,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2093,7 +2120,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2124,7 +2152,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2171,7 +2200,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2243,7 +2273,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2335,7 +2366,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2415,7 +2447,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2475,7 +2508,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
