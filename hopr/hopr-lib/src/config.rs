@@ -1,11 +1,12 @@
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::{Validate, ValidationError};
 
 pub use core_strategy::StrategyConfig;
-pub use core_transport::config::{HeartbeatConfig, HostConfig, NetworkConfig, ProtocolConfig, TransportConfig};
+pub use core_transport::config::{
+    validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
+};
+
 use hopr_primitive_types::prelude::*;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
@@ -127,6 +128,7 @@ impl Default for Db {
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
     #[validate]
+    #[validate(custom = "validate_external_host")]
     #[serde(default = "default_host")]
     pub host: HostConfig,
     /// Configuration of the underlying database engine
@@ -166,9 +168,14 @@ pub struct HoprLibConfig {
     pub safe_module: SafeModule,
 }
 
+// NOTE: this intentionally does not validate (0.0.0.0) to force user to specify
+// their external IP.
 #[inline]
 fn default_host() -> HostConfig {
-    HostConfig::from_str(format!("{DEFAULT_HOST}:{DEFAULT_PORT}").as_str()).unwrap()
+    HostConfig {
+        address: HostType::IPv4(DEFAULT_HOST.to_owned()),
+        port: DEFAULT_PORT,
+    }
 }
 
 impl Default for HoprLibConfig {

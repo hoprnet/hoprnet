@@ -63,6 +63,12 @@ impl ChannelGraph {
 
     /// Creates a new instance with the given self `Address`.
     pub fn new(me: Address) -> Self {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 0.0);
+            METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 0.0);
+        }
+
         Self {
             me,
             graph: DiGraphMap::default(),
@@ -123,7 +129,7 @@ impl ChannelGraph {
                                     .unwrap_or(f64::INFINITY),
                             );
                         }
-                        ChannelStatus::PendingToClose => {}
+                        ChannelStatus::PendingToClose(_) => {}
                     },
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
@@ -141,7 +147,7 @@ impl ChannelGraph {
                                     .unwrap_or(f64::INFINITY),
                             );
                         }
-                        ChannelStatus::PendingToClose => {}
+                        ChannelStatus::PendingToClose(_) => {}
                     },
                 }
             }
@@ -164,7 +170,10 @@ impl ChannelGraph {
             old_value.channel = channel;
 
             let ret = ChannelChange::diff_channels(&old_channel, &channel);
-            info!("updated {channel}: {} changes", ret.len());
+            info!(
+                "updated {channel}: {}",
+                ret.iter().map(ChannelChange::to_string).collect::<Vec<_>>().join(",")
+            );
             Some(ret)
         } else {
             let weighted = ChannelEdge { channel, quality: None };
@@ -217,7 +226,9 @@ mod tests {
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use std::ops::Add;
     use std::str::FromStr;
+    use std::time::{Duration, SystemTime};
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
@@ -240,7 +251,6 @@ mod tests {
             1u32.into(),
             status,
             1u32.into(),
-            0u32.into(),
         )
     }
 
@@ -313,8 +323,9 @@ mod tests {
             .expect("must contain channel");
         assert!(c.eq(cr), "channels must be equal");
 
+        let ts = SystemTime::now().add(Duration::from_secs(10));
         c.balance = Balance::zero(BalanceType::HOPR);
-        c.status = ChannelStatus::PendingToClose;
+        c.status = ChannelStatus::PendingToClose(ts);
         let changes = cg.update_channel(c).expect("must contain changes");
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
@@ -322,7 +333,7 @@ mod tests {
             match change {
                 ChannelChange::Status { left, right } => {
                     assert_eq!(ChannelStatus::Open, left, "previous status does not match");
-                    assert_eq!(ChannelStatus::PendingToClose, right, "new status does not match");
+                    assert_eq!(ChannelStatus::PendingToClose(ts), right, "new status does not match");
                 }
                 ChannelChange::CurrentBalance { left, right } => {
                     assert_eq!(
@@ -346,7 +357,8 @@ mod tests {
     fn test_channel_graph_update_changes_on_close() {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
-        let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose);
+        let ts = SystemTime::now().add(Duration::from_secs(10));
+        let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose(ts));
 
         let changes = cg.update_channel(c);
         assert!(changes.is_none(), "must not produce changes for a new channel");
@@ -364,7 +376,11 @@ mod tests {
         for change in changes {
             match change {
                 ChannelChange::Status { left, right } => {
-                    assert_eq!(ChannelStatus::PendingToClose, left, "previous status does not match");
+                    assert_eq!(
+                        ChannelStatus::PendingToClose(ts),
+                        left,
+                        "previous status does not match"
+                    );
                     assert_eq!(ChannelStatus::Closed, right, "new status does not match");
                 }
                 ChannelChange::CurrentBalance { left, right } => {
@@ -396,7 +412,12 @@ mod tests {
     #[test]
     fn test_channel_graph_update_should_allow_pending_to_close_channels() {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        let changes = cg.update_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose));
+        let ts = SystemTime::now().add(Duration::from_secs(10));
+        let changes = cg.update_channel(dummy_channel(
+            ADDRESSES[0],
+            ADDRESSES[1],
+            ChannelStatus::PendingToClose(ts),
+        ));
         assert!(changes.is_none(), "must not produce changes for a closed channel");
 
         cg.get_channel(ADDRESSES[0], ADDRESSES[1])

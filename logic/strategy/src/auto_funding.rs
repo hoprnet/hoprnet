@@ -26,11 +26,13 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
+    ///
     /// Default is 1 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub min_stake_threshold: Balance,
 
     /// Funding amount.
+    ///
     /// Defaults to 10 HOPR.
     #[serde_as(as = "DisplayFromStr")]
     pub funding_amount: Balance,
@@ -159,7 +161,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c2 = ChannelEntry::new(
@@ -169,7 +170,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c3 = ChannelEntry::new(
@@ -177,8 +177,7 @@ mod tests {
             Address::random(),
             Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
-            ChannelStatus::PendingToClose,
-            0_u32.into(),
+            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
         );
 

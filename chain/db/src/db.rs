@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, trace};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
@@ -59,14 +59,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         // }
 
         let mut cached_channel: HashMap<Hash, (u32, u64)> = HashMap::new(); // channel_id: (channel_epoch, ticket_index)
-        debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
+        trace!("Fetching all tickets to calculate the unrealized value in tracked channels...");
 
         // FIXME: Currently a node does not have a way of reconciling unacknowledged
         // tickets with the sender. Therefore, the use of unack tickets could make a
         // channel inoperable. Re-enable the use of unacknowledged tickets in this
         // calculation once a reconciliation mechanism has been implemented
         let tickets = self.get_acknowledged_tickets(None).await?;
-        info!("Calculating unrealized balance for {} tickets...", tickets.len());
+        debug!("Calculating unrealized balance for {} tickets...", tickets.len());
 
         for ack_ticket in tickets.into_iter() {
             let ticket = ack_ticket.ticket;
@@ -825,7 +825,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("start marking {acked_ticket} as redeemed");
+        trace!("start marking {acked_ticket} as redeemed");
 
         let mut ops = utils_db::db::Batch::default();
 
@@ -848,13 +848,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         ops.put(key, new_redeemed_balance);
         self.db.batch(ops, true).await?;
 
-        debug!("stopped marking {acked_ticket} as redeemed");
+        trace!("stopped marking {acked_ticket} as redeemed");
 
         Ok(())
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("marking {acked_ticket} as losing",);
+        trace!("marking {acked_ticket} as losing",);
 
         let mut ops = utils_db::db::Batch::default();
 
@@ -1424,7 +1424,6 @@ mod tests {
             U256::from(0u64),
             ChannelStatus::Open,
             U256::from(1u64),
-            U256::from(0u64),
         );
 
         let serialized = serialize_to_bytes(&channel_entry);
@@ -1582,7 +1581,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            0_u32.into(),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1728,7 +1726,6 @@ mod tests {
             amount.into(),
             ChannelStatus::Open,
             1_u32.into(),
-            0_u32.into(),
         );
 
         let channel_key = utils_db::db::Key::new_with_prefix(&channel.get_id(), CHANNEL_PREFIX).unwrap();
@@ -1886,7 +1883,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1921,7 +1917,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1949,7 +1944,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1965,7 +1959,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             (channel_epoch + 1).into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&newer_channel.get_id(), &channel, &Snapshot::default())
@@ -2000,7 +1993,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2026,7 +2018,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         // redeem the ticket...
@@ -2066,7 +2057,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2114,7 +2104,6 @@ mod tests {
             start_index.into(),
             ChannelStatus::Open,
             channel_epoch.into(),
-            U256::from(1000u128),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -2212,7 +2201,6 @@ mod tests {
             current_channel_ticket_index.into(),
             ChannelStatus::Open,
             current_channel_epoch.into(),
-            0_u32.into(),
         );
 
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())

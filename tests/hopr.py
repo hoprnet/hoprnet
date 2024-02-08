@@ -14,7 +14,14 @@ from hoprd_sdk.api import (
     PeersApi,
     TicketsApi,
 )
-from hoprd_sdk.models import AliasPeerId, FundRequest, GetMessageReq, OpenChannelRequest, SendMessageReq, TagQuery
+from hoprd_sdk.models import (
+    AliasPeerIdBodyRequest,
+    FundBodyRequest,
+    GetMessageBodyRequest,
+    OpenChannelBodyRequest,
+    SendMessageBodyRequest,
+    TagQueryRequest,
+)
 from hoprd_sdk.rest import ApiException
 from urllib3.exceptions import MaxRetryError
 
@@ -88,7 +95,7 @@ class HoprdAPI:
         Returns the aliases recognized by the node.
         :return: bool
         """
-        body = AliasPeerId(alias, peer_id)
+        body = AliasPeerIdBodyRequest(alias, peer_id)
         status, _ = self.__call_api(AliasApi, "set_alias", body=body)
         return status
 
@@ -142,7 +149,7 @@ class HoprdAPI:
         :param: amount: str
         :return: channel id: str | undefined
         """
-        body = OpenChannelRequest(amount, peer_address)
+        body = OpenChannelBodyRequest(amount, peer_address)
 
         status, response = self.__call_api(ChannelsApi, "open_channel", body=body)
         return response.channel_id if status else None
@@ -154,7 +161,7 @@ class HoprdAPI:
         :param: amount: int
         :return: bool
         """
-        body = FundRequest(amount=amount)
+        body = FundBodyRequest(amount=amount)
         status, _ = self.__call_api(ChannelsApi, "fund_channel", body, channel_id)
         return status
 
@@ -319,7 +326,7 @@ class HoprdAPI:
         :param: tag: int = 0x0320
         :return: bool
         """
-        body = SendMessageReq(message, None, hops, destination, tag)
+        body = SendMessageBodyRequest(message, None, hops, destination, tag)
         _, response = self.__call_api(MessagesApi, "send_message", body=body)
         return response
 
@@ -330,7 +337,7 @@ class HoprdAPI:
         :return: dict
         """
 
-        body = TagQuery(tag=tag)
+        body = TagQueryRequest(tag=tag)
         _, response = self.__call_api(MessagesApi, "pop", body=body)
         return response
 
@@ -341,7 +348,7 @@ class HoprdAPI:
         :return: dict
         """
 
-        body = TagQuery(tag=tag)
+        body = TagQueryRequest(tag=tag)
         _, response = self.__call_api(MessagesApi, "peek", body=body)
         return response
 
@@ -352,9 +359,9 @@ class HoprdAPI:
         :return: dict
         """
         if not isinstance(timestamp, int):
-            body = GetMessageReq(tag=tag)
+            body = GetMessageBodyRequest(tag=tag)
         else:
-            body = GetMessageReq(tag=tag, timestamp=timestamp)
+            body = GetMessageBodyRequest(tag=tag, timestamp=timestamp)
 
         _, response = self.__call_api(MessagesApi, "peek_all", body=body)
         return response

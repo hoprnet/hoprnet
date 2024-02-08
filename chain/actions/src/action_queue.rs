@@ -13,7 +13,7 @@ use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::{poll_fn, Future};
@@ -215,7 +215,7 @@ where
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    ChannelStatus::Open | ChannelStatus::PendingToClose => {
+                    ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
                         let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -239,7 +239,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-                    ChannelStatus::PendingToClose => {
+                    ChannelStatus::PendingToClose(_) => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec
@@ -369,7 +369,7 @@ where
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
-                debug!("start executing {act_id} ({act_name})");
+                trace!("start executing {act_id} ({act_name})");
 
                 let db_clone = exec_context.db.clone();
                 let tx_result = exec_context.execute_action(act.clone()).await;

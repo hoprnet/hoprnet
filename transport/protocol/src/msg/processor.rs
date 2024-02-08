@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -134,7 +134,7 @@ where
             .get_channels_domain_separator()
             .await?
             .ok_or_else(|| {
-                debug!("Missing domain separator.");
+                warn!("Missing domain separator.");
                 MissingDomainSeparator
             })?;
 
@@ -227,7 +227,7 @@ where
                         .get_channels_domain_separator()
                         .await?
                         .ok_or_else(|| {
-                            debug!("Missing domain separator");
+                            warn!("Missing domain separator");
                             MissingDomainSeparator
                         })?;
 
@@ -379,7 +379,7 @@ where
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
-        debug!("begin creating multihop ticket for destination {destination}");
+        trace!("begin creating multihop ticket for destination {destination}");
 
         let (channel, channel_id, current_ticket_index) = {
             let db = self.db.read().await;
@@ -572,11 +572,20 @@ impl PacketInteractionConfig {
     }
 }
 
-#[derive(Default)]
 pub struct PacketMetadata {
     pub send_finalizer: Option<PacketSendFinalizer>,
     #[cfg(all(feature = "prometheus", not(test)))]
-    pub start_time: std::time::Duration,
+    pub start_time: std::time::SystemTime,
+}
+
+impl Default for PacketMetadata {
+    fn default() -> Self {
+        Self {
+            send_finalizer: None,
+            #[cfg(all(feature = "prometheus", not(test)))]
+            start_time: std::time::UNIX_EPOCH,
+        }
+    }
 }
 
 /// Sets up processing of packet interactions and returns relevant read and write mechanism.
@@ -629,7 +638,7 @@ impl PacketInteraction {
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
-                        metadata.start_time = hopr_platform::time::native::current_timestamp();
+                        metadata.start_time = hopr_platform::time::native::current_time();
                     }
 
                     (packet, metadata)
@@ -760,8 +769,9 @@ impl PacketInteraction {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    hopr_platform::time::native::current_timestamp()
-                                        .saturating_sub(metadata.start_time)
+                                    hopr_platform::time::native::current_time()
+                                        .duration_since(metadata.start_time)
+                                        .unwrap_or_default()
                                         .as_secs_f64(),
                                 )
                             };
@@ -873,7 +883,6 @@ mod tests {
             ),
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
             U256::zero(),
         )
     }
@@ -1221,7 +1230,6 @@ mod tests {
                 Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
-                0u32.into(),
                 0u32.into(),
             );
             cg.update_channel(c);

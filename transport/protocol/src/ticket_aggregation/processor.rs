@@ -18,7 +18,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};
@@ -245,7 +245,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .get_channels_domain_separator()
             .await?
             .ok_or_else(|| {
-                debug!("Missing domain separator");
+                warn!("Missing domain separator");
                 ProtocolTicketAggregation("Missing domain separator".into())
             })?;
 
@@ -259,7 +259,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             )
             .await?
             .ok_or_else(|| {
-                debug!("Could not find chain key for {}", destination);
+                warn!("Could not find chain key for {}", destination);
                 ProtocolTicketAggregation("Could not find chain key".into())
             })?;
 
@@ -334,7 +334,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_AGGREGATION_COUNT.increment();
 
-        info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
@@ -652,7 +652,7 @@ where
                                 Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                             }
                             Err(e) => {
-                                debug!("Dropping tickets aggregation request due unexpected error {}", e);
+                                error!("Dropping tickets aggregation request due unexpected error {e}");
                                 None
                             }
                         }
@@ -664,12 +664,12 @@ where
                                     Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                 }
                                 Err(e) => {
-                                    debug!("Error while handling aggregated ticket {}", e);
+                                    error!("Error while handling aggregated ticket: {e}");
                                     None
                                 }
                             },
                             Err(e) => {
-                                debug!("Counterparty refused to aggregate tickets. {}", e);
+                                warn!("Counterparty refused to aggregate tickets: {e}");
                                 None
                             }
                         }
@@ -874,7 +874,6 @@ mod tests {
             NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),
-            0u64.into(),
         );
 
         dbs[1]

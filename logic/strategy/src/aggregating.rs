@@ -6,7 +6,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -40,6 +40,7 @@ pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
     /// This condition is independent of `unrealized_balance_ratio`.
+    ///
     /// Default is 100.
     #[validate(range(min = 2))]
     pub aggregation_threshold: Option<u32>,
@@ -48,12 +49,14 @@ pub struct AggregatingStrategyConfig {
     /// that triggers the ticket aggregation when exceeded.
     /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
     /// This condition is independent of `aggregation_threshold`.
+    ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub unrealized_balance_ratio: Option<f32>,
 
     /// Maximum time to wait for the ticket aggregation to complete.
     /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
+    ///
     /// Default is 60 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub aggregation_timeout: Duration,
@@ -62,6 +65,7 @@ pub struct AggregatingStrategyConfig {
     /// to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
     /// or `unrealized_balance_ratio` thresholds are met on that channel.
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
+    ///
     /// Default is true.
     pub aggregate_on_channel_close: bool,
 }
@@ -139,7 +143,7 @@ where
     A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
-        debug!("starting aggregation in {channel}");
+        trace!("starting aggregation in {channel}");
         // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn
         let tickets_to_agg = self
             .db
@@ -287,10 +291,11 @@ where
         }
 
         if let ChannelChange::Status { left: old, right: new } = change {
-            if old != ChannelStatus::Open || new != ChannelStatus::PendingToClose {
+            if old != ChannelStatus::Open || !matches!(new, ChannelStatus::PendingToClose(_)) {
                 debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
+            info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
             let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
 
@@ -456,7 +461,6 @@ mod tests {
             (amount as u32).into(),
             ChannelStatus::Open,
             1u32.into(),
-            0u64.into(),
         );
 
         (acked_tickets, channel)
@@ -765,7 +769,7 @@ mod tests {
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
-        channel.status = ChannelStatus::PendingToClose;
+        channel.status = ChannelStatus::PendingToClose(std::time::SystemTime::now());
 
         dbs[0]
             .write()
@@ -787,7 +791,7 @@ mod tests {
                 ChannelDirection::Incoming,
                 ChannelChange::Status {
                     left: ChannelStatus::Open,
-                    right: ChannelStatus::PendingToClose,
+                    right: ChannelStatus::PendingToClose(std::time::SystemTime::now()),
                 },
             )
             .await

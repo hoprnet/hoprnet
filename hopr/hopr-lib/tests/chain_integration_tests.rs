@@ -270,6 +270,7 @@ async fn integration_test_indexer() {
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
+        min_block_range_fetch_size: 3,
     };
 
     let actions_cfg = ActionQueueConfig {
@@ -362,7 +363,7 @@ async fn integration_test_indexer() {
     let offchain_key = OffchainKeypair::random();
     let confirmation = alice_node
         .actions
-        .announce(&maddr, &offchain_key)
+        .announce(&[maddr.clone()], &offchain_key)
         .await
         .expect("should submit announcement tx")
         .await
@@ -387,6 +388,9 @@ async fn integration_test_indexer() {
         .expect("should submit channel open tx")
         .await
         .expect("should confirm open channel");
+
+    // Delay the fetch, so that channel increase can be processed first
+    async_std::task::sleep(Duration::from_millis(100)).await;
 
     let channel_alice_bob = alice_node
         .db
@@ -636,9 +640,8 @@ async fn integration_test_indexer() {
         .expect("must get channel")
         .expect("channel to bob must exist");
 
-    assert_eq!(
-        ChannelStatus::PendingToClose,
-        channel_alice_bob.status,
+    assert!(
+        matches!(channel_alice_bob.status, ChannelStatus::PendingToClose(_)),
         "channel must be pending to close"
     );
 

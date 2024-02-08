@@ -6,6 +6,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
+use std::fmt::{Display, Formatter};
 
 /// Contains TX hash along with the Chain Event data.
 /// This could be used to pair up some events with [Action](crate::actions::Action).
@@ -16,6 +17,12 @@ pub struct SignificantChainEvent {
     pub tx_hash: Hash,
     /// Chain event of interest
     pub event_type: ChainEventType,
+}
+
+impl Display for SignificantChainEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} @ tx {}", self.event_type, self.tx_hash)
+    }
 }
 
 /// Status of a node in network registry.
@@ -51,10 +58,30 @@ pub enum ChainEventType {
     /// Channel balance has decreased by an amount.
     ChannelBalanceDecreased(ChannelEntry, Balance),
     /// Ticket has been redeemed on a channel.
-    /// If the channel is own, also contains the ticket that has been redeemed.
+    /// If the channel is node's own, also contains the ticket that has been redeemed.
     TicketRedeemed(ChannelEntry, Option<AcknowledgedTicket>),
     /// Safe has been registered with the node.
     NodeSafeRegistered(Address),
     /// Network registry update for a node.
     NetworkRegistryUpdate(Address, NetworkRegistryStatus),
+}
+
+impl Display for ChainEventType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChainEventType::Announcement {
+                peer,
+                address,
+                multiaddresses,
+            } => write!(f, "announcement event of {peer} ({address}): {:?}", multiaddresses),
+            ChainEventType::ChannelOpened(c) => write!(f, "open channel event {}", c.get_id()),
+            ChainEventType::ChannelClosureInitiated(c) => write!(f, "close channel initiation event {}", c.get_id()),
+            ChainEventType::ChannelClosed(c) => write!(f, "close channel event {}", c.get_id()),
+            ChainEventType::ChannelBalanceIncreased(c, _) => write!(f, "channel increase balance event {}", c.get_id()),
+            ChainEventType::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
+            ChainEventType::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
+            ChainEventType::NodeSafeRegistered(s) => write!(f, "safe registered event {s}"),
+            ChainEventType::NetworkRegistryUpdate(a, s) => write!(f, "network registry update event {a}: {:?}", s),
+        }
+    }
 }

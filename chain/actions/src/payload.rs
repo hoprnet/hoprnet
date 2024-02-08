@@ -184,12 +184,12 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
                         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                         ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                        base_multiaddr: announcement.to_multiaddress_str(),
+                        base_multiaddr: announcement.multiaddress().to_string(),
                     }
                     .encode()
                 }
                 None => AnnounceCall {
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode(),
             }
@@ -358,13 +358,13 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                     ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
-                    base_multiaddr: announcement.to_multiaddress_str(),
+                    base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode()
             }
             None => AnnounceSafeCall {
                 self_: self.me.into(),
-                base_multiaddr: announcement.to_multiaddress_str(),
+                base_multiaddr: announcement.multiaddress().to_string(),
             }
             .encode(),
         };
@@ -614,7 +614,7 @@ pub mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
         let ad = AnnouncementData::new(
-            &test_multiaddr,
+            test_multiaddr,
             Some(KeyBinding::new(
                 (&chain_key_0).into(),
                 &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
@@ -634,7 +634,7 @@ pub mod tests {
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
 
-        let ad_reannounce = AnnouncementData::new(&test_multiaddr_reannounce, None).unwrap();
+        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None).unwrap();
         let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
 
         assert!(client
