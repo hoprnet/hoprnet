@@ -1,7 +1,5 @@
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
+    identity::IdentityFileArgs,
     process::{child_process_call_foundry_express_initialization, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
@@ -10,7 +8,6 @@ use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
-use hopr_crypto_types::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
 
@@ -21,10 +18,7 @@ pub struct InitializeNodeArgs {
     network: String,
 
     #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
-
-    #[clap(flatten)]
-    password: PasswordArgs,
+    local_identity: IdentityFileArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -65,7 +59,6 @@ impl InitializeNodeArgs {
         let InitializeNodeArgs {
             network,
             local_identity,
-            password,
             contracts_root,
             hopr_amount,
             native_amount,
@@ -77,13 +70,11 @@ impl InitializeNodeArgs {
         }
 
         // 2. Calculate the peerID and addresses from the identity file
-        let pwd = password.read_password()?;
-
-        // read all the identities from the directory
-        let files = local_identity.get_files();
-        let all_node_addresses: Vec<String> = read_identities(files, &pwd)?
-            .values()
-            .map(|ni| ni.chain_key.public().0.to_address().to_string())
+        let all_node_addresses: Vec<String> = local_identity
+            .to_addresses()
+            .unwrap()
+            .into_iter()
+            .map(|adr| adr.to_string())
             .collect();
 
         log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));

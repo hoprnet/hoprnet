@@ -1,12 +1,9 @@
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
+    identity::IdentityFileArgs,
     process::{child_process_call_foundry_move_node_to_safe_module, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
@@ -19,10 +16,7 @@ pub struct MoveNodeToSafeModuleArgs {
     network: String,
 
     #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
-
-    #[clap(flatten)]
-    password: PasswordArgs,
+    local_identity: IdentityFileArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -49,7 +43,6 @@ impl MoveNodeToSafeModuleArgs {
         let MoveNodeToSafeModuleArgs {
             network,
             local_identity,
-            password,
             contracts_root,
             safe_address,
             module_address,
@@ -61,13 +54,11 @@ impl MoveNodeToSafeModuleArgs {
         }
 
         // 2. Calculate addresses from the identity file
-        let pwd = password.read_password()?;
-
-        // read all the identities from the directory
-        let files = local_identity.get_files();
-        let all_node_addresses: Vec<String> = read_identities(files, &pwd)?
-            .values()
-            .map(|ni| ni.chain_key.public().to_address().to_string())
+        let all_node_addresses: Vec<String> = local_identity
+            .to_addresses()
+            .unwrap()
+            .into_iter()
+            .map(|adr| adr.to_string())
             .collect();
 
         log!(target: "move_node_to_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));

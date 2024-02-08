@@ -1,12 +1,9 @@
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
+    identity::IdentityFileArgs,
     process::{child_process_call_foundry_self_register, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use hopr_crypto_types::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
 
@@ -25,10 +22,7 @@ pub struct RegisterInNetworkRegistryArgs {
     peer_ids: Option<String>,
 
     #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
-
-    #[clap(flatten)]
-    password: PasswordArgs,
+    local_identity: IdentityFileArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -47,7 +41,6 @@ impl RegisterInNetworkRegistryArgs {
             network,
             local_identity,
             peer_ids: chain_addresses,
-            password,
             contracts_root,
         } = self;
 
@@ -63,31 +56,14 @@ impl RegisterInNetworkRegistryArgs {
             all_chain_addrs.push(provided_chain_addrs);
         }
 
-        // read all the identities from the directory
-        let local_files = local_identity.get_files();
-        // get peer ids and stringinfy them
-        if !local_files.is_empty() {
-            // check if password is provided
-            let pwd = match password.read_password() {
-                Ok(read_pwd) => read_pwd,
-                Err(e) => return Err(e),
-            };
-
-            // read all the identities from the directory
-            match read_identities(local_files, &pwd) {
-                Ok(node_identities) => {
-                    all_chain_addrs.extend(
-                        node_identities
-                            .values()
-                            .map(|ni| ni.chain_key.public().0.to_address().to_string()),
-                    );
-                }
-                Err(e) => {
-                    println!("error {:?}", e);
-                    return Err(e);
-                }
-            }
-        }
+        // // read all the identities from the directory
+        all_chain_addrs.extend(
+            local_identity
+                .to_addresses()
+                .unwrap()
+                .into_iter()
+                .map(|adr| adr.to_string()),
+        );
 
         log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_chain_addrs.join(","));
 

@@ -1,13 +1,10 @@
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
+    identity::IdentityFileArgs,
     process::{child_process_call_foundry_faucet, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use ethers::{types::U256, utils::parse_units};
-use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
@@ -28,10 +25,7 @@ pub struct FaucetArgs {
     address: Option<String>,
 
     #[clap(flatten)]
-    password: PasswordArgs,
-
-    #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
+    local_identity: IdentityFileArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -67,7 +61,6 @@ impl FaucetArgs {
         let FaucetArgs {
             network,
             address,
-            password,
             local_identity,
             contracts_root,
             hopr_amount,
@@ -91,26 +84,14 @@ impl FaucetArgs {
             addresses_all.extend(provided_addresses);
         }
 
-        // if local identity dirs/path is provided, read files
-        let local_files = local_identity.get_files();
-        if !local_files.is_empty() {
-            // check if password is provided
-            let pwd = match password.read_password() {
-                Ok(read_pwd) => read_pwd,
-                Err(e) => return Err(e),
-            };
-
-            match read_identities(local_files, &pwd) {
-                Ok(node_identities) => {
-                    addresses_all.extend(
-                        node_identities
-                            .values()
-                            .map(|ni| ni.chain_key.public().0.to_address().to_string()),
-                    );
-                }
-                Err(e) => return Err(e),
-            }
-        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        addresses_all.extend(
+            local_identity
+                .to_addresses()
+                .unwrap()
+                .into_iter()
+                .map(|adr| adr.to_string()),
+        );
 
         log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
 
