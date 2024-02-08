@@ -6,7 +6,6 @@ use chain_actions::channels::ChannelActions;
 use chain_actions::node::NodeActions;
 use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::redeem::TicketRedeemActions;
-use chain_actions::CoreEthereumActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;

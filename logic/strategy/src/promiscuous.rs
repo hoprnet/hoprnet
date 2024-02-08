@@ -474,9 +474,6 @@ mod tests {
             false
         }
         fn emit(&self, _: NetworkEvent) {}
-        fn create_timestamp(&self) -> u64 {
-            current_time().as_unix_timestamp().as_millis() as u64
-        }
     }
 
     async fn mock_channel(

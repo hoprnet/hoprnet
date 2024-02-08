@@ -22,7 +22,8 @@ use multiaddr::Multiaddr;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
-  ChainActionsError::{InvalidArguments, AlreadyAnnounced}, Result
+    ChainActionsError::{AlreadyAnnounced, InvalidArguments},
+    Result,
 };
 use crate::ChainActions;
 
@@ -161,7 +162,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &keypair)
             .await
@@ -214,11 +215,11 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &keypair).await;
         assert!(
-            matches!(res, Err(CoreEthereumActionsError::AlreadyAnnounced)),
+            matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
         );
     }
