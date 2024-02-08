@@ -23,6 +23,9 @@ pub mod actions;
 /// Types related to the chain events processed by the Indexer
 pub mod chain_events;
 
+/// Various (mostly testing related) utility functions
+pub mod utils;
+
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;
 
 /// Short-hand for creating new EIP1559 transaction object.
