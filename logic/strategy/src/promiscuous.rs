@@ -45,26 +45,31 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+    ///
     /// Defaults to 0.5
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub network_quality_threshold: f64,
 
     /// Minimum number of network quality samples before the strategy can start making decisions.
+    ///
     /// Defaults to 10
     #[validate(range(min = 1_u32))]
     pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
+    ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
+    ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
+    ///
     /// Defaults to square-root of the sampled network size.
     #[validate(range(min = 1))]
     pub max_channels: Option<usize>,
@@ -72,10 +77,12 @@ pub struct PromiscuousStrategyConfig {
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
+    ///
     /// Defaults to true
     pub enforce_max_channels: bool,
 
-    /// Specifies minimum version of the peer the strategy should open a channel to.
+    /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
+    ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
     pub minimum_peer_version: semver::VersionReq,
@@ -434,7 +441,7 @@ mod tests {
     use futures::{future::ok, FutureExt};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_platform::time::native::current_timestamp;
+    use hopr_platform::time::native::current_time;
     use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
@@ -468,7 +475,7 @@ mod tests {
         }
         fn emit(&self, _: NetworkEvent) {}
         fn create_timestamp(&self) -> u64 {
-            current_timestamp().as_millis() as u64
+            current_time().as_unix_timestamp().as_millis() as u64
         }
     }
 
@@ -483,7 +490,6 @@ mod tests {
             balance,
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
             U256::zero(),
         );
         db.write()
@@ -505,7 +511,11 @@ mod tests {
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
                 let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
-                net.update_with_metadata(peer, Ok(current_timestamp().as_millis() as u64), Some(metadata.into()));
+                net.update_with_metadata(
+                    peer,
+                    Ok(current_time().as_unix_timestamp().as_millis() as u64),
+                    Some(metadata.into()),
+                );
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
@@ -554,7 +564,6 @@ mod tests {
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::zero(),
-                U256::zero(),
             ))),
             action: Action::OpenChannel(address, balance),
         }
@@ -589,7 +598,7 @@ mod tests {
         // Peer 10 has an old node version
         network.write().await.update_with_metadata(
             &PEERS[9].1,
-            Ok(current_timestamp().as_millis() as u64),
+            Ok(current_time().as_unix_timestamp().as_millis() as u64),
             Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
         );
 

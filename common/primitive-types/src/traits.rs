@@ -59,15 +59,19 @@ where
     }
 
     fn from_hex(str: &str) -> Result<Self> {
-        let data = if &str[..2] == "0x" || &str[..2] == "0X" {
-            &str[2..]
-        } else {
-            str
-        };
+        if !str.is_empty() && str.len() % 2 == 0 {
+            let data = if &str[..2] == "0x" || &str[..2] == "0X" {
+                &str[2..]
+            } else {
+                str
+            };
 
-        hex::decode(data)
-            .map_err(|_| ParseError)
-            .and_then(|bytes| T::from_bytes(&bytes))
+            hex::decode(data)
+                .map_err(|_| ParseError)
+                .and_then(|bytes| T::from_bytes(&bytes))
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
@@ -77,4 +81,16 @@ pub trait UnitaryFloatOps: Sized {
     fn mul_f64(&self, rhs: f64) -> Result<Self>;
     /// Divide by float in the interval (0.0, 1.0]
     fn div_f64(&self, rhs: f64) -> Result<Self>;
+}
+
+/// A trait that adds extension method to represent a time object as `Duration` since Unix epoch.
+pub trait AsUnixTimestamp {
+    /// Represents self as `Duration` since Unix epoch.
+    fn as_unix_timestamp(&self) -> std::time::Duration;
+}
+
+impl AsUnixTimestamp for std::time::SystemTime {
+    fn as_unix_timestamp(&self) -> std::time::Duration {
+        self.duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap()
+    }
 }

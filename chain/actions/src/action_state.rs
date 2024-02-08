@@ -110,7 +110,7 @@ impl ActionState for IndexerActionTracker {
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
 
-        debug!("found {} expectations to match event {:?}", matched_keys.len(), event);
+        debug!("found {} expectations to match {event}", matched_keys.len());
 
         if matched_keys.is_empty() {
             return Vec::new();
@@ -123,13 +123,12 @@ impl ActionState for IndexerActionTracker {
                 db.remove(&key)
                     .and_then(|(exp, sender)| match sender.send(event.clone()) {
                         Ok(_) => {
-                            debug!("expectation resolved in {:?}", event);
+                            debug!("expectation resolved via {event}");
                             Some(exp)
                         }
                         Err(_) => {
                             error!(
-                                "failed to resolve actions in {:?}, because the action confirmation already timed out",
-                                event
+                                "failed to resolve actions via {event}, because the action confirmation already timed out",
                             );
                             None
                         }

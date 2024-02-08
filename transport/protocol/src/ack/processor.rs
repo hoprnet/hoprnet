@@ -11,7 +11,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -256,7 +256,7 @@ impl AcknowledgementInteraction {
                 let processed: Option<AckProcessed> = match event {
                     AckToProcess::ToReceive(peer, mut ack) => {
                         if let Ok(remote_pk) = OffchainPublicKey::try_from(peer) {
-                            debug!("validating incoming acknowledgement from {}", peer);
+                            trace!("validating incoming acknowledgement from {}", peer);
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {
                                     Ok(reply) => Some(AckProcessed::Receive(peer, Ok(reply))),

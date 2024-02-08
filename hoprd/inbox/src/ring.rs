@@ -4,9 +4,7 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::Duration;
-
-use hopr_platform::time::native::current_timestamp;
+use std::time::{Duration, SystemTime};
 
 /// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M: std::marker::Send> {
@@ -34,7 +32,11 @@ where
 {
     /// Creates new backend with default timestamping function from std::time.
     pub fn new(capacity: usize) -> Self {
-        Self::new_with_capacity(capacity, current_timestamp)
+        Self::new_with_capacity(capacity, || {
+            hopr_platform::time::native::current_time()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+        })
     }
 
     /// Counts only the untagged entries.

@@ -79,19 +79,18 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             .to_block(BlockNumber::Number(latest_block.into()));
 
                         // Range of blocks to fetch is always bounded
-                        let page_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
+                        let range_size = self.cfg.max_block_range_fetch_size.min(latest_block - from_block);
+                        debug!("polling logs from blocks #{from_block} - #{latest_block} (range size {range_size})");
 
                         // If we're fetching logs from wide block range, we'll use the pagination log query.
-                        // For just a single block, we use the ordinary getLogs call which minimizes RPC calls
-                        let mut retrieved_logs = if page_size > 0 {
-                            debug!("polling logs from blocks #{from_block} - #{latest_block} (page {page_size})");
-                            self.provider.get_logs_paginated(&range_filter, page_size).boxed()
+                        let mut retrieved_logs = if range_size >= self.cfg.min_block_range_fetch_size {
+                            self.provider.get_logs_paginated(&range_filter, range_size).boxed()
                         } else {
-                            debug!("polling logs from block #{from_block}");
+                            // For smaller block ranges, we use the ordinary getLogs call which minimizes RPC calls
                             futures::stream::iter(self.provider.get_logs(&range_filter)
                                 .await
                                 .unwrap_or_else(|e| {
-                                    error!("polling logs from block #{from_block} failed: {e}");
+                                    error!("polling logs from #{from_block} - #{latest_block} failed: {e}");
                                     Vec::new()
                                 })
                                 .into_iter()

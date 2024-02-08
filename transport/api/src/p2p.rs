@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use crate::{processes::indexer::IndexerProcessed, PeerId};
 use async_lock::RwLock;
@@ -83,21 +83,52 @@ impl From<IndexerProcessed> for Inputs {
 
 use std::net::ToSocketAddrs;
 
+fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
+    let mut out = multiaddr::Multiaddr::empty();
+
+    for proto in ma.iter() {
+        match proto {
+            multiaddr::Protocol::Ip4(_) => out.push(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED).into()),
+            multiaddr::Protocol::Ip6(_) => out.push(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED).into()),
+            _ => out.push(proto),
+        }
+    }
+
+    Ok(out)
+}
+
 fn alter_multiaddress_to_allow_listening(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
     let mut out = multiaddr::Multiaddr::empty();
 
     for proto in ma.iter() {
         match proto {
-            multiaddr::Protocol::Dns4(domain) | multiaddr::Protocol::Dns6(domain) => {
-                let p = format!("{domain}:443")
+            multiaddr::Protocol::Dns4(domain) => {
+                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
                     .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
+                    .filter(|sa| sa.is_ipv4())
                     .collect::<Vec<_>>()
                     .first()
-                    .unwrap()
+                    .ok_or(crate::errors::HoprTransportError::Api(format!(
+                        "Failed to resolve {domain} to an IPv4 address. Does the DNS entry has an A record?"
+                    )))?
                     .ip();
 
-                out.push(p.into());
+                out.push(ip.into())
+            }
+            multiaddr::Protocol::Dns6(domain) => {
+                let ip = format!("{domain}:443") // dummy port, irrevelant at this point
+                    .to_socket_addrs()
+                    .map_err(|e| crate::errors::HoprTransportError::Api(e.to_string()))?
+                    .filter(|sa| sa.is_ipv6())
+                    .collect::<Vec<_>>()
+                    .first()
+                    .ok_or(crate::errors::HoprTransportError::Api(format!(
+                        "Failed to resolve {domain} to an IPv6 address. Does the DNS entry has an AAAA record?"
+                    )))?
+                    .ip();
+
+                out.push(ip.into())
             }
             _ => out.push(proto),
         }
@@ -143,13 +174,37 @@ pub async fn p2p_loop(
             Ok(ma) => {
                 if let Err(e) = swarm.listen_on(ma.clone()) {
                     error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
+
+                    match replace_transport_with_unspecified(&ma) {
+                        Ok(ma) => {
+                            if let Err(e) = swarm.listen_on(ma.clone()) {
+                                error!(
+                                    "Failed to listen_on also using the unspecified multiaddress '{}': {}",
+                                    ma, e
+                                );
+                            } else {
+                                info!("Successfully started listening on {ma} (from {multiaddress})");
+                                swarm.add_external_address(multiaddress.clone());
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to transform the multiaddress '{ma}' to unspecified: {e}")
+                        }
+                    }
                 } else {
-                    info!("Successfully started listening on {ma} (from {multiaddress})")
+                    info!("Successfully started listening on {ma} (from {multiaddress})");
+                    swarm.add_external_address(multiaddress.clone());
                 }
             }
             Err(_) => error!("Failed to transform the multiaddress '{multiaddress}' - skipping"),
         }
     }
+
+    // NOTE: This would be a valid check but is not immediate
+    // assert!(
+    //     swarm.listeners().count() > 0,
+    //     "The node failed to listen on at least one of the specified interfaces"
+    // );
 
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;

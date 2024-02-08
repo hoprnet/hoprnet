@@ -23,6 +23,7 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
+    ///
     /// Defaults to true.
     pub redeem_only_aggregated: bool,
 }
@@ -159,7 +160,6 @@ mod tests {
                     Balance::new_from_str("10", BalanceType::HOPR),
                     U256::zero(),
                     ChannelStatus::Open,
-                    U256::zero(),
                     U256::zero(),
                 ),
                 Some(ack.clone()),

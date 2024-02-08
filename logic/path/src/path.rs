@@ -248,6 +248,8 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::channels::ChannelEntry;
     use hopr_primitive_types::prelude::*;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -265,7 +267,6 @@ mod tests {
             1u32.into(),
             status,
             1u32.into(),
-            0u32.into(),
         )
     }
 
@@ -281,13 +282,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
+        let ts = SystemTime::now().add(Duration::from_secs(10));
+
         // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
         cg.update_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open));
         cg.update_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose));
+        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)));
 
         (cg, addrs)
     }

@@ -18,6 +18,9 @@ pub enum ChainActionsError {
     #[error("channel closure time has not elapsed yet, remaining {0}s")]
     ClosureTimeHasNotElapsed(u64),
 
+    #[error("multiaddress has been already announced on-chain")]
+    AlreadyAnnounced,
+
     #[error("network registry does not allow accessing this peer")]
     PeerAccessDenied,
 

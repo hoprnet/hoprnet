@@ -65,6 +65,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -78,6 +79,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -107,7 +109,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -136,23 +139,35 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "disableTextWrap": false,
+          "editorMode": "builder",
           "exemplar": true,
-          "expr": "sum by(quality) (core_mgauge_peers_by_quality)",
+          "expr": "sum by(quality) (hopr_peers_by_quality)",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "interval": "",
           "legendFormat": "Number of {{quality}} quality peers",
-          "refId": "A"
+          "range": true,
+          "refId": "A",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "exemplar": true,
-          "expr": "core_gauge_num_peers",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(hopr_peers_by_quality)",
+          "fullMetaSearch": false,
           "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
           "interval": "",
           "legendFormat": "Total peers",
-          "refId": "B"
+          "range": true,
+          "refId": "B",
+          "useBackend": false
         }
       ],
       "title": "Peers by quality",
@@ -170,6 +185,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -183,6 +199,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -212,7 +229,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -241,10 +259,12 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "connect_gauge_relayed_conns",
+          "expr": "hopr_peer_count",
           "interval": "",
           "legendFormat": "Number of relayed connections",
+          "range": true,
           "refId": "A"
         },
         {
@@ -254,7 +274,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "connect_gauge_conns_to_relays",
+          "expr": "hopr_peer_count",
           "hide": false,
           "interval": "",
           "legendFormat": "Number of connected PRNs",
@@ -287,7 +307,7 @@
         "content": "This graph separates your peers into low (quality =< 0.5)  and high-quality (> 0.5) connections.\n\nThe quality of your connection to a peer is standardised between 0 to 1, depending on the ratio of successful pings to the total number of pings, regardless of who is sending them. \n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -314,7 +334,7 @@
         "content": "This graph represents the number of public relay nodes (PRN) you are connected to (yellow line) and if you are a PRN, the number of nodes you are connected to.\n\nIf you are not a PRN, the green line should be flat.\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -332,6 +352,12 @@
           },
           "custom": {
             "fillOpacity": 52,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
             "lineWidth": 4,
             "spanNulls": false
           },
@@ -375,7 +401,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -407,10 +434,12 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_gauge_network_health",
+          "expr": "hopr_network_health",
           "interval": "",
           "legendFormat": "Health",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -429,6 +458,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -442,6 +472,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -467,7 +498,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": [
           {
@@ -528,22 +560,30 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "disableTextWrap": false,
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(core_counter_heartbeat_successful_pings[$__rate_interval])",
+          "expr": "rate(hopr_heartbeat_pings_count{success=\"true\"}[$__rate_interval])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "interval": "",
           "legendFormat": "Rate of successful pings",
-          "refId": "A"
+          "range": true,
+          "refId": "A",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(core_counter_heartbeat_failed_pings[$__rate_interval])",
+          "expr": "rate(hopr_heartbeat_pings_count{success=\"false\"}[$__rate_interval])",
           "hide": false,
           "interval": "",
           "legendFormat": "Rate of failed pings",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -572,7 +612,7 @@
         "content": "This displays your network connectivity status over time (x-axis).\n\nYour connection can be one of five states:\n- **Unknown (Grey)**: The network could not assess your node's connection.\n- 🔴 **Red**: You have no connection to the network at all.\n- 🟠 **Orange**: At least one low-quality connection to a public relay node.\n- 🟡 **Yellow**: At least one high-quality connection to a public relay node.\n- 🟢 **Green**: At least one high-quality connection to a public relay node and one non-public node.\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -599,7 +639,7 @@
         "content": "This graph shows the number of successful (blue) and unsuccessful (red) pings your node sends per second.\n\nThese are pings counted from your node's heartbeat.\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -613,22 +653,44 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "thresholds"
           },
-          "decimals": 1,
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
-          "max": 100,
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
-          "unit": "percent"
+          "unitScale": true
         },
         "overrides": []
       },
@@ -640,38 +702,50 @@
       },
       "id": 12,
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "text": {}
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "editorMode": "code",
+          "disableTextWrap": false,
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "100 * core_histogram_heartbeat_time_seconds_bucket / scalar(core_histogram_heartbeat_time_seconds_count)",
+          "expr": "hopr_heartbeat_round_time_sec_bucket",
           "format": "heatmap",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "instant": true,
           "interval": "",
           "legendFormat": "{{le}}",
           "range": false,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Total heartbeat probing time",
-      "type": "bargauge"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -697,7 +771,8 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "unitScale": true
         },
         "overrides": []
       },
@@ -710,18 +785,24 @@
       "id": 14,
       "options": {
         "displayMode": "gradient",
+        "maxVizHeight": 300,
         "minVizHeight": 10,
         "minVizWidth": 0,
+        "namePlacement": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
         "showUnfilled": true,
-        "text": {}
+        "sizing": "auto",
+        "text": {},
+        "valueMode": "color"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
@@ -730,7 +811,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "100 * core_histogram_ping_time_seconds_bucket / scalar(core_histogram_ping_time_seconds_count)",
+          "expr": "100 * (hopr_ping_time_sec_bucket) / scalar(hopr_ping_time_sec_count)",
           "format": "heatmap",
           "instant": true,
           "interval": "",
@@ -764,7 +845,7 @@
         "content": "This shows the total time it takes your node to complete a probing cycle. E.g. how long it takes your node to successfully ping all of its known peers. ",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -791,7 +872,7 @@
         "content": "This shows the spread of the response time for your pings rounded to the nearest interval. \nThis is specifically the response time for pings sent by your node as part of the heartbeat mechanism.\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "title": "Graph description",
       "transparent": true,
       "type": "text"
@@ -842,7 +923,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -859,24 +941,30 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_counter_sent_messages",
+          "expr": "hopr_packets_count{type=\"sent\"}",
           "interval": "",
           "legendFormat": "Sent messages",
+          "range": true,
           "refId": "A"
         },
         {
@@ -884,11 +972,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_counter_received_messages",
+          "expr": "hopr_packets_count{type=\"received\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Received messages",
+          "range": true,
           "refId": "B"
         },
         {
@@ -896,11 +986,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_counter_forwarded_messages",
+          "expr": "hopr_packets_count{type=\"forwarded\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Forwarded  messages",
+          "range": true,
           "refId": "C"
         }
       ],
@@ -931,7 +1023,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -948,24 +1041,30 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_gauge_num_incoming_channels",
+          "expr": "hopr_channels_count{direction=\"in\"}",
           "interval": "",
           "legendFormat": "Number of incoming channels",
+          "range": true,
           "refId": "A"
         },
         {
@@ -973,11 +1072,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_gauge_num_outgoing_channels",
+          "expr": "hopr_channels_count{direction=\"out\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Number of outgoing channels",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -996,6 +1097,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1009,6 +1111,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -1034,7 +1137,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": [
           {
@@ -1110,10 +1214,12 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(core_counter_received_messages[1h])",
+          "expr": "rate(hopr_packets_count{type=\"received\"}[1h])",
           "interval": "",
           "legendFormat": "Rate of received messages",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1121,11 +1227,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(core_counter_sent_messages[1h])",
+          "expr": "rate(hopr_packets_count{type=\"sent\"}[1h])",
           "hide": false,
           "interval": "",
           "legendFormat": "Rate of sent messages",
+          "range": true,
           "refId": "B"
         },
         {
@@ -1133,11 +1241,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(core_counter_forwarded_messages[1h])",
+          "expr": "rate(hopr_packets_count{type=\"forwarded\"}[1h])",
           "hide": false,
           "interval": "",
           "legendFormat": "Rate of forwarded messages",
+          "range": true,
           "refId": "C"
         }
       ],
@@ -1164,7 +1274,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1181,24 +1292,30 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_counter_winning_tickets",
+          "expr": "hopr_winning_tickets_count",
           "interval": "",
           "legendFormat": "Winning tickets",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1206,11 +1323,13 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "core_counter_losing_tickets",
+          "expr": "hopr_losing_tickets_count",
           "hide": false,
           "interval": "",
           "legendFormat": "Losing tickets",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1229,6 +1348,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1243,6 +1363,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -1276,7 +1397,8 @@
                 "value": 5
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1306,11 +1428,15 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "core_gauge_mixer_queue_size",
+          "expr": "hopr_mixer_queue_size",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Mixer Packet Queue",
@@ -1338,7 +1464,8 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "ms",
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1355,24 +1482,32 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "core_gauge_mixer_average_packet_delay",
+          "expr": "hopr_mixer_average_packet_delay",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Mixer average packet delay",
@@ -1409,40 +1544,42 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Amount of heap used by V8 engine in Node.js runtime.",
+      "description": "Timestamped view of node startups and restarts.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
+            "insertNulls": false,
+            "lineInterpolation": "stepBefore",
+            "lineWidth": 3,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": false,
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "line"
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1452,16 +1589,25 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 2097152000
               }
             ]
           },
-          "unit": "decbytes"
+          "unitScale": true
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Node startup timestamp (unix)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -1469,10 +1615,12 @@
         "x": 0,
         "y": 65
       },
-      "id": 28,
+      "id": 34,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "changeCount"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -1488,26 +1636,16 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "hoprd_gauge_nodejs_total_used_heap_bytes",
+          "expr": "hopr_up",
           "interval": "",
-          "legendFormat": "Used heap",
+          "legendFormat": "Node startup timestamp (unix)",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "exemplar": true,
-          "expr": "avg_over_time(hoprd_gauge_nodejs_total_used_heap_bytes[1h])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "Used heap (average over 1hr)",
-          "refId": "B"
         }
       ],
-      "title": "Used heap",
+      "title": "Node startup timestamp",
       "type": "timeseries"
     },
     {
@@ -1534,7 +1672,8 @@
                 "value": 5
               }
             ]
-          }
+          },
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1546,221 +1685,22 @@
       },
       "id": 30,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true,
+        "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "9.3.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "exemplar": true,
-          "expr": "changes(hoprd_gauge_startup_unix_time_seconds[$__range])",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Number of restarts",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Total amount of heap available for V8 engine in Node.js runtime.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 73
-      },
-      "id": 32,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "exemplar": true,
-          "expr": "hoprd_gauge_nodejs_total_available_heap_bytes",
-          "interval": "",
-          "legendFormat": "Total available heap",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "exemplar": true,
-          "expr": "avg_over_time(hoprd_gauge_nodejs_total_available_heap_bytes[1h])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "Total available heap (average over 1hr)",
-          "refId": "B"
-        }
-      ],
-      "title": "Total available heap",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Timestamped view of node startups and restarts.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "stepBefore",
-            "lineWidth": 3,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Node startup timestamp (unix)"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "hidden"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 73
-      },
-      "id": 34,
-      "options": {
-        "legend": {
-          "calcs": ["changeCount"],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
@@ -1769,32 +1709,31 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "hoprd_gauge_startup_unix_time_seconds",
+          "expr": "changes(hopr_up[$__range])",
           "interval": "",
-          "legendFormat": "Node startup timestamp (unix)",
+          "legendFormat": "",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Node startup timestamp",
-      "type": "timeseries"
+      "title": "Number of restarts",
+      "type": "gauge"
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 37,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "HOPR Node Overview",
   "uid": "8KfdzTpVz",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }
