@@ -858,7 +858,7 @@ impl Hopr {
                 .await
             {
                 Ok(_) => info!("Announcing node on chain: {:?}", multiaddresses_to_announce),
-                Err(CoreEthereumActionsError::AlreadyAnnounced) => {
+                Err(ChainActionsError::AlreadyAnnounced) => {
                     info!("Node already announced on chain as {:?}", multiaddresses_to_announce)
                 }
                 // If the announcement fails we keep going to prevent the node from retrying
