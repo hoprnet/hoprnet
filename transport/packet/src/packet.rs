@@ -60,32 +60,78 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     Some(&msg.split_at(pos).1[PADDING_TAG.len()..])
 }
 
+/// An encrypted packet.
+///
+/// A sender can create a new packet via [MetaPacket::new] and send it.
+/// Once received by the recipient, it is parsed first by calling [MetaPacket::from_bytes]
+/// and then it can be transformed into [ForwardedMetaPacket] by calling
+/// the [MetaPacket::forward] method. The [ForwardedMetaPacket] then contains the information
+/// about the next recipient of this packet.
+///
+/// The packet format is directly dependent on the used [SphinxSuite](hopr_crypto_sphinx::shared_keys::SphinxSuite).
 pub struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
     alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
 }
 
+// Needs manual Clone implementation to not impose Clone restriction on S
+impl<S: SphinxSuite> Clone for MetaPacket<S> {
+    fn clone(&self) -> Self {
+        Self {
+            packet: self.packet.clone(),
+            alpha: self.alpha.clone()
+        }
+    }
+}
+
+/// Represent a [MetaPacket] with one layer of encryption removed, exposing the details
+/// about the next hop.
+///
+/// There are two possible states - either the packet is intended for the recipient,
+/// and is thus [Final](ForwardedMetaPacket::FinalPacket), or it is meant to be sent (relayed)
+/// to the next hop - thus it is [Relayed](ForwardedMetaPacket::RelayedPacket).
 #[allow(dead_code)]
 pub enum ForwardedMetaPacket<S: SphinxSuite> {
+    /// The content is another [MetaPacket] meant to be sent to the next hop.
     RelayedPacket {
+        /// Packet for the next hop.
         packet: MetaPacket<S>,
+        /// Public key of the next hop.
         next_node: <S::P as Keypair>::Public,
+        /// Position in the channel path of this packet.
         path_pos: u8,
+        /// Contains the PoR challenge that will be solved when we receive
+        /// the acknowledgement after we forward the inner packet to the next hop.
         additional_info: Box<[u8]>,
+        /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
+        /// Packet checksum.
         packet_tag: PacketTag,
     },
+    /// The content is the actual payload for the packet's destination.
     FinalPacket {
+        /// Decrypted payload
         plain_text: Box<[u8]>,
+        /// Reserved. Currently not used
         additional_data: Box<[u8]>,
+        /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
+        /// Packet checksum.
         packet_tag: PacketTag,
     },
 }
 
 impl<S: SphinxSuite> MetaPacket<S> {
+    /// Fixed length of the Sphinx packet header.
     pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
+    /// Creates a new outgoing packet with given payload `msg`, `path` and `shared_keys` computed along the path.
+    ///
+    /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
+    /// each of the challenges have the same size of `additional_relayer_data_len`.
+    ///
+    /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
+    /// This is reserved for the future use by SURBs.
     pub fn new(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
@@ -155,6 +201,8 @@ impl<S: SphinxSuite> MetaPacket<S> {
         &self.packet[base..base + PAYLOAD_SIZE]
     }
 
+    /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
+    /// This will transform this packet into the [ForwardedMetaPacket].
     pub fn forward(
         &self,
         node_keypair: &S::P,

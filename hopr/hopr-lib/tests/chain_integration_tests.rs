@@ -29,6 +29,7 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
+use chain_actions::ChainActions;
 use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use utils_db::db::DB;
 use utils_db::sqlite::SqliteShim;
@@ -162,7 +163,7 @@ type TestDb = CoreEthereumDb<SqliteShim<'static>>;
 struct ChainNode {
     chain_key: ChainKeypair,
     db: Arc<RwLock<TestDb>>,
-    actions: CoreEthereumActions<TestDb>,
+    actions: ChainActions<TestDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<TestDb>, TestDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
@@ -204,7 +205,7 @@ async fn start_node_chain_logic(
     // Actions
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = CoreEthereumActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
+    let actions = ChainActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
 
     let mut node_tasks = Vec::new();
 

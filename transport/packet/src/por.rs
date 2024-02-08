@@ -59,6 +59,8 @@ impl ProofOfRelayString {
         }
     }
 
+    /// Generates Proof of Relay challenges from the shared secrets of the
+    /// outgoing packet.
     pub fn from_shared_secrets(secrets: &Vec<SharedSecret>) -> Vec<Box<[u8]>> {
         (1..secrets.len())
             .map(|i| ProofOfRelayString::new(&secrets[i], secrets.get(i + 1)).to_bytes())
