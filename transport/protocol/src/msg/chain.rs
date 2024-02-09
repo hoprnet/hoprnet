@@ -12,6 +12,7 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 
 /// Indicates the packet type.
+#[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
 #[derive(Debug, Clone)]
 pub enum ChainPacketComponents {
     /// Packet is intended for us
