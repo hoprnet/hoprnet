@@ -1,7 +1,15 @@
-use crate::action_queue::PendingAction;
-use crate::errors::CoreEthereumActionsError::AlreadyAnnounced;
-use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
-use crate::CoreEthereumActions;
+//! This module contains the [NodeActions](node::NodeActions) trait defining action which relate to HOPR node itself.
+//!
+//! An implementation of this trait is added to [ChainActions] which realizes the redemption
+//! operations via [ActionQueue](action_queue::ActionQueue).
+//!
+//! There are 3 functions that can be used to redeem tickets in the [NodeActions](node::NodeActions) trait:
+//! - [withdraw](node::NodeActions::withdraw)
+//! - [announce](node::NodeActions::announce)
+//! - [register_safe_by_node](node::NodeActions::register_safe_by_node)
+//!
+//! All necessary pre-requisites are checked by the implementation before the respective [Action](chain_types::actions::Action) is submitted
+//! to the [ActionQueue](action_queue::ActionQueue).
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -11,6 +19,13 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
 use multiaddr::Multiaddr;
+
+use crate::action_queue::PendingAction;
+use crate::errors::{
+    ChainActionsError::{AlreadyAnnounced, InvalidArguments},
+    Result,
+};
+use crate::ChainActions;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]
@@ -27,7 +42,7 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainActions<Db> {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
@@ -75,9 +90,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
 mod tests {
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use crate::node::NodeActions;
-    use crate::CoreEthereumActions;
+    use crate::ChainActions;
     use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
@@ -147,7 +162,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &keypair)
             .await
@@ -200,11 +215,11 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &keypair).await;
         assert!(
-            matches!(res, Err(CoreEthereumActionsError::AlreadyAnnounced)),
+            matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
         );
     }
@@ -239,7 +254,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(bob, stake)
@@ -276,7 +291,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -285,7 +300,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"
         );

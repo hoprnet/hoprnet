@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+// use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
@@ -13,11 +14,15 @@ use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use tide::http::headers::{HeaderName, AUTHORIZATION};
-use tide::http::mime;
-use tide::utils::async_trait;
-use tide::{http::Mime, Request, Response};
-use tide::{Middleware, Next, StatusCode};
+use tide::{
+    http::{
+        headers::{HeaderName, AUTHORIZATION},
+        mime, Mime,
+    },
+    security::{CorsMiddleware, Origin},
+    utils::async_trait,
+    Middleware, Next, Request, Response, StatusCode,
+};
 use tide_websockets::{Message, WebSocket};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -169,19 +174,29 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
+        let x_auth_header = HeaderName::from_str("x-auth-token")?;
+        let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol")?;
 
         let is_authorized = match auth.as_ref() {
             Auth::Token(expected_token) => {
                 let auth_headers = request
                     .iter()
-                    .filter_map(|(n, v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .filter_map(|(n, v)| {
+                        (AUTHORIZATION.eq(n) || x_auth_header.eq(n) || websocket_proto_header.eq(n))
+                            .then_some((n, v.as_str()))
+                    })
                     .collect::<Vec<_>>();
 
-                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
-                !auth_headers.is_empty()
+                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
+                (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
                         || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                )
+
+                // TODO: Replace with proper JS compliant solution
+                // The following line would never be needed, if the JavaScript browser was able to properly
+                // pass the x-auth-token or Bearer headers.
+                || request.url().as_str().contains(format!("messages/websocket?apiToken={expected_token}").as_str())
             }
             Auth::None => true,
         };
@@ -289,6 +304,7 @@ pub async fn run_hopr_api(
     let mut app = tide::with_state(state.clone());
 
     app.with(LogRequestMiddleware(log::Level::Debug));
+    app.with(CorsMiddleware::new().allow_origin(Origin::from("*")));
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
@@ -544,7 +560,8 @@ mod alias {
             (status = 401, description = "Invalid authorization token.", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -576,7 +593,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -603,7 +621,8 @@ mod alias {
             (status = 404, description = "PeerId not found", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -634,7 +653,8 @@ mod alias {
             (status = 422, description = "Unknown failure", body = ApiError)   // This can never happen
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Alias",
     )]
@@ -649,6 +669,8 @@ mod alias {
 }
 
 mod account {
+    use hopr_lib::U256;
+
     use super::*;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -674,7 +696,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -689,11 +712,11 @@ mod account {
 
     #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "hopr": "2000000000000000000000 HOPR",
-        "native": "9999563581204904000 Native",
-        "safeHopr": "2000000000000000000000 HOPR",
-        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935 HOPR",
-        "safeNative": "10000000000000000000 Native"
+        "hopr": "2000000000000000000000",
+        "native": "9999563581204904000",
+        "safeHopr": "2000000000000000000000",
+        "safeHoprAllowance": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "safeNative": "10000000000000000000"
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct AccountBalancesResponse {
@@ -719,7 +742,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -729,27 +753,27 @@ mod account {
         let mut account_balances = AccountBalancesResponse::default();
 
         match hopr.get_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.native = v.to_string(),
+            Ok(v) => account_balances.native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.hopr = v.to_string(),
+            Ok(v) => account_balances.hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::Native).await {
-            Ok(v) => account_balances.safe_native = v.to_string(),
+            Ok(v) => account_balances.safe_native = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.get_safe_balance(BalanceType::HOPR).await {
-            Ok(v) => account_balances.safe_hopr = v.to_string(),
+            Ok(v) => account_balances.safe_hopr = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
         match hopr.safe_allowance().await {
-            Ok(v) => account_balances.safe_hopr_allowance = v.to_string(),
+            Ok(v) => account_balances.safe_hopr_allowance = v.to_value_string(),
             Err(e) => return Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
 
@@ -768,7 +792,9 @@ mod account {
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         currency: BalanceType,
-        amount: u128,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        amount: U256,
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         address: Address,
@@ -789,7 +815,8 @@ mod account {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Account",
     )]
@@ -837,6 +864,10 @@ mod peers {
         pub observed: Vec<Multiaddr>,
     }
 
+    /// Returns transport-related information about the given peer.
+    ///
+    /// This includes the peer ids that the given peer has `announced` on-chain
+    /// and peer ids that are actually `observed` by the transport layer.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
@@ -850,7 +881,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -881,6 +913,7 @@ mod peers {
         pub reported_version: String,
     }
 
+    /// Directly pings the given peer.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}/ping"),
@@ -894,7 +927,8 @@ mod peers {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Peers",
     )]
@@ -926,7 +960,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{AsUnixTimestamp, ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -980,6 +1014,7 @@ mod channels {
         pub closure_time: u64,
     }
 
+    /// Listing of channels.
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "all": [],
@@ -994,8 +1029,11 @@ mod channels {
         ]
     }))]
     pub(crate) struct NodeChannelsResponse {
+        /// Channels incoming to this node.
         pub incoming: Vec<NodeChannel>,
+        /// Channels outgoing from this node.
         pub outgoing: Vec<NodeChannel>,
+        /// Complete channel topology as seen by this node.
         pub all: Vec<ChannelInfoResponse>,
     }
 
@@ -1031,18 +1069,23 @@ mod channels {
         })
     }
 
+    /// Parameters for enumerating channels.
     #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[into_params(parameter_in = Query)]
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQueryRequest {
+        /// Should be the closed channels included?
         #[schema(required = false)]
         #[serde(default)]
         pub including_closed: bool,
+        /// Should all channels (not only the ones concerning this node) be enumerated?
         #[schema(required = false)]
         #[serde(default)]
         pub full_topology: bool,
     }
 
+    /// Lists channels opened to/from this node. Alternatively, it can print all
+    /// the channels in the network as this node sees them.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
@@ -1053,7 +1096,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1131,9 +1175,11 @@ mod channels {
         "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
     pub(crate) struct OpenChannelBodyRequest {
+        /// On-chain address of the counterparty.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
+        /// Initial amount of stake in HOPR tokens.
         pub amount: String,
     }
 
@@ -1145,20 +1191,23 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelResponse {
+        /// ID of the new channel.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_id: Hash,
+        /// Receipt of the channel open transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub transaction_receipt: Hash,
     }
 
+    /// Opens a channel to the given on-chain address with the given initial stake of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         request_body(
             content = OpenChannelBodyRequest,
-            description = "Open channel request specification",
+            description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
             content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
@@ -1168,7 +1217,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1190,19 +1240,20 @@ mod channels {
                     transaction_receipt: channel_details.tx_hash
                 }))
                 .build()),
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
                 Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
+    /// Returns information about the given channel.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1217,7 +1268,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1244,14 +1296,21 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelResponse {
+        /// Receipt for the channel close transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub receipt: Hash,
+        /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_status: ChannelStatus,
     }
 
+    /// Closes the given channel.
+    ///
+    /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
+    /// If the channels is in `PendingToClose` and the channel closure period has elapsed,
+    /// it will transition it to `Closed`.
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1266,7 +1325,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1281,10 +1341,10 @@ mod channels {
                         receipt: receipt.tx_hash
                     }))
                     .build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
+                Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1293,14 +1353,17 @@ mod channels {
         }
     }
 
+    /// Specifies the amount of HOPR tokens to fund a channel with.
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "amount": "1000"
     }))]
     pub(crate) struct FundBodyRequest {
+        /// Amount of HOPR tokens to fund the channel with.
         pub amount: String,
     }
 
+    /// Funds the given channel with the given amount of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
@@ -1309,7 +1372,7 @@ mod channels {
         ),
         request_body(
             content = FundBodyRequest,
-            description = "Amount of HOPR to fund the channel",
+            description = "Specifies the amount of HOPR tokens to fund a channel with.",
             content_type = "application/json",
         ),
         responses(
@@ -1320,7 +1383,8 @@ mod channels {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels",
     )]
@@ -1333,7 +1397,7 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
                 Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1421,7 +1485,7 @@ mod messages {
         pub timestamp: Option<std::time::Duration>,
     }
 
-    /// Send a message to another peer using a given path.
+    /// Send a message to another peer using the given path.
     ///
     /// The message can be sent either over a specified path or using a specified
     /// number of HOPS, if no path is given.
@@ -1438,7 +1502,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1584,7 +1649,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages",
     )]
@@ -1606,7 +1672,8 @@ mod messages {
         ),
         tag = "Messages",
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         )
     )]
     pub async fn delete_messages(req: Request<InternalState>) -> tide::Result<Response> {
@@ -1627,7 +1694,8 @@ mod messages {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1689,7 +1757,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1731,7 +1800,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1776,7 +1846,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1813,7 +1884,8 @@ mod messages {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Messages"
     )]
@@ -1848,9 +1920,11 @@ mod network {
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct TicketPriceResponse {
+        /// Price of the ticket in HOPR tokens.
         pub price: String,
     }
 
+    /// Obtains the current ticket price.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/price"),
@@ -1860,7 +1934,8 @@ mod network {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Network"
     )]
@@ -1925,6 +2000,7 @@ mod tickets {
         }
     }
 
+    /// Lists all tickets for the given channel  ID.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
@@ -1939,7 +2015,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -1961,6 +2038,7 @@ mod tickets {
         }
     }
 
+    /// Returns all the tickets in all the channels.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
@@ -1970,7 +2048,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2028,6 +2107,7 @@ mod tickets {
         }
     }
 
+    /// Returns current complete statistics on tickets.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
@@ -2037,7 +2117,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2049,6 +2130,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming of all tickets in all channels.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
@@ -2058,7 +2143,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Tickets"
     )]
@@ -2070,6 +2156,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming all tickets in the given channel.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
@@ -2084,7 +2174,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2101,6 +2192,7 @@ mod tickets {
         }
     }
 
+    /// Starts aggregation of tickets in the given channel.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
@@ -2115,7 +2207,8 @@ mod tickets {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Channels"
     )]
@@ -2162,7 +2255,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2234,7 +2328,8 @@ mod node {
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2272,7 +2367,7 @@ mod node {
                 async move {
                     let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
 
-                    // WARNING: Only in Providence are all peers public
+                    // WARNING: Only in Providence and Saint-Louis are all peers public
                     let multiaddresses = hopr.multiaddresses_announced_to_dht(&peer_id).await;
 
                     Some((address, peer_id, multiaddresses, info))
@@ -2326,7 +2421,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2406,7 +2502,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]
@@ -2466,7 +2563,8 @@ mod node {
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
-            ("api_token" = [])
+            ("api_token" = []),
+            ("bearer_token" = [])
         ),
         tag = "Node"
     )]

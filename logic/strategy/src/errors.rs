@@ -1,4 +1,4 @@
-use chain_actions::errors::CoreEthereumActionsError;
+use chain_actions::errors::ChainActionsError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
@@ -15,7 +15,7 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError),
+    ActionsError(#[from] ChainActionsError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

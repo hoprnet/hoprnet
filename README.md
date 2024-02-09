@@ -72,7 +72,7 @@ All releases and associated changelogs are located in the [official releases](ht
 
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=providence` to track the latest changes on the repository's `release/providence` branch (2.0.X)
+- `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format 
@@ -83,7 +83,7 @@ where:
 Pull the container image with `docker`:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:providence
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.

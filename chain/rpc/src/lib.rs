@@ -1,4 +1,12 @@
-// TODO: docs missing
+//! This crate contains types and traits that ensure correct interfacing with Ethereum RPC providers.
+//!
+//! The most important trait is [HoprRpcOperations] which allows to send arbitrary on-chain transactions
+//! and also to perform the selection of HOPR-related smart contract operations.
+//! Secondly, the [HoprIndexerRpcOperations] is a trait that contains all operations required by the
+//! Indexer to subscribe to the block with logs from the chain.
+//!
+//! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
+//! so this represents the main entry point to all RPC related operations.
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
@@ -8,21 +16,22 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures::{FutureExt, Stream};
 use primitive_types::H256;
+use serde::Serialize;
 
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::{HttpRequestError, Result};
-
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
+use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
+
 pub use ethers::types::transaction::eip2718::TypedTransaction;
-use serde::Serialize;
 
 /// Extended `JsonRpcClient` abstraction
 /// This module contains custom implementation of `ethers::providers::JsonRpcClient`
 /// which allows usage of non-`reqwest` based HTTP clients.
 pub mod client;
+/// Errors specific to this crate.
 pub mod errors;
 
 /// Indexer specific trait implementation (`HoprIndexerRpcOperations`)

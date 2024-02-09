@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Find or create an identity
     let identity_opts = IdentityOptions {
-        initialize: cfg.hopr.db.initialize,
+        initialize: true,
         id_path: cfg.identity.file.clone(),
         password: cfg.identity.password.clone(),
         private_key: cfg
