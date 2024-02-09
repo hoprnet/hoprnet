@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
@@ -185,7 +186,23 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
                 // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
                 !auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
-                        || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                        || auth_headers.contains(&(&x_auth_header, &expected_token))
+                        // The following line would never be needed, if the JavaScript browser was able to properly
+                        // pass the x-auth-token or Bearer headers.
+                        //
+                        // But because it does not appear to be able to do so, a trick to reparse a base64 without
+                        // padding encoded Authorization string is used to allow JS to use the websocket endpoint.
+                        || ({
+
+                            if request.url().as_str().contains("messages/websocket") {
+                                let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol").unwrap();
+                                debug!("Reparsing the 'Sec-Websocket-Protocol' to extract the Authorization for JS");
+                                let auth_string = STANDARD_NO_PAD.encode(format!("Authorization:{expected_token}"));
+                                auth_headers.contains(&(&websocket_proto_header, &auth_string))
+                            } else {
+                                false
+                            }
+                        }))
             }
             Auth::None => true,
         };
