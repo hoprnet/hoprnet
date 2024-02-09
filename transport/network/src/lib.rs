@@ -17,11 +17,17 @@
 //! object should slowly transform into a pollable physical network graph processing
 //! live telemetry from the packet transport process.
 
+/// Global constants published from this crate.
 pub mod constants;
+/// Enumerates all errors in this crate.
 pub mod errors;
+/// Implementation of the main loop for the heartbeat mechanism.
 pub mod heartbeat;
+/// Contains low-level transport protocol messaging definitions for [ping].
 pub mod messaging;
+/// Implements the peer network logic
 pub mod network;
+/// Implements the pinging mechanism used by [heartbeat] and manual pings.
 pub mod ping;
-pub mod types;
+
 pub use libp2p_identity::PeerId;

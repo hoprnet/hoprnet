@@ -25,6 +25,7 @@ use utils_db::CurrentDbShim;
 
 use crate::errors::HoprLibError;
 
+/// Types of HOPR network environments.
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
 #[serde(rename_all(deserialize = "lowercase"))]
 #[strum(serialize_all = "lowercase")]

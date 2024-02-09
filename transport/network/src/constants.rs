@@ -4,7 +4,7 @@ pub const DEFAULT_HEARTBEAT_INTERVAL: std::time::Duration = std::time::Duration:
 /// Time after which the availability of a node gets rechecked
 pub const DEFAULT_HEARTBEAT_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(60);
 /// Randomization of the heartbeat interval to make sure not
-/// all of the nodes start their interval at the same time
+/// all the nodes start their interval at the same time
 pub const DEFAULT_HEARTBEAT_INTERVAL_VARIANCE: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Network quality threshold since which a node is considered
