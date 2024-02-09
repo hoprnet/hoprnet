@@ -3430,7 +3430,6 @@ version = "0.2.0"
 dependencies = [
  "async-broadcast",
  "async-std",
- "base64 0.21.7",
  "const_format",
  "futures",
  "futures-concurrency",
