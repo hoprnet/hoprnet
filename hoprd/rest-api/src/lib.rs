@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+// use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
@@ -173,19 +174,29 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     async fn handle(&self, request: Request<InternalState>, next: Next<'_, InternalState>) -> tide::Result {
         let auth = request.state().auth.clone();
 
-        let x_auth_header = HeaderName::from_str("x-auth-token").unwrap();
+        let x_auth_header = HeaderName::from_str("x-auth-token")?;
+        let websocket_proto_header = HeaderName::from_str("Sec-Websocket-Protocol")?;
 
         let is_authorized = match auth.as_ref() {
             Auth::Token(expected_token) => {
                 let auth_headers = request
                     .iter()
-                    .filter_map(|(n, v)| (AUTHORIZATION.eq(n) || x_auth_header.eq(n)).then_some((n, v.as_str())))
+                    .filter_map(|(n, v)| {
+                        (AUTHORIZATION.eq(n) || x_auth_header.eq(n) || websocket_proto_header.eq(n))
+                            .then_some((n, v.as_str()))
+                    })
                     .collect::<Vec<_>>();
 
-                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers
-                !auth_headers.is_empty()
+                // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
+                (!auth_headers.is_empty()
                     && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
                         || auth_headers.contains(&(&x_auth_header, &expected_token)))
+                )
+
+                // TODO: Replace with proper JS compliant solution
+                // The following line would never be needed, if the JavaScript browser was able to properly
+                // pass the x-auth-token or Bearer headers.
+                || request.url().as_str().contains(format!("messages/websocket?apiToken={expected_token}").as_str())
             }
             Auth::None => true,
         };
