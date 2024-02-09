@@ -73,11 +73,11 @@ impl Default for IndexerConfig {
 }
 
 /// Indexer
-/// 
+///
 /// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
 /// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
 /// streamed outside of the indexer by the unbounded channel.
-/// 
+///
 /// The roles of the indexer:
 /// 1. prime the RPC endpoinnt
 /// 2. request an RPC stream of changes to process

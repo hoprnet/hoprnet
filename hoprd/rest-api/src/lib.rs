@@ -944,7 +944,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{AsUnixTimestamp, ChannelEntry, ChannelStatus, ChainActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

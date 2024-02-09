@@ -1,4 +1,3 @@
-use crate::errors::PacketError::PacketDecodingError;
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
     prp::{PRPParameters, PRP},
@@ -12,11 +11,12 @@ use hopr_crypto_types::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use std::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::{
-    errors::Result,
-    packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket},
+    errors::{PacketError::PacketDecodingError, Result},
+    packet::ForwardedMetaPacket::{Final, Relayed},
     por::POR_SECRET_LENGTH,
 };
 
@@ -65,21 +65,21 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 /// A sender can create a new packet via [MetaPacket::new] and send it.
 /// Once received by the recipient, it is parsed first by calling [MetaPacket::from_bytes]
 /// and then it can be transformed into [ForwardedMetaPacket] by calling
-/// the [MetaPacket::forward] method. The [ForwardedMetaPacket] then contains the information
+/// the [MetaPacket::into_forwarded] method. The [ForwardedMetaPacket] then contains the information
 /// about the next recipient of this packet.
 ///
 /// The packet format is directly dependent on the used [SphinxSuite](hopr_crypto_sphinx::shared_keys::SphinxSuite).
 pub struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
-    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    _s: PhantomData<S>,
 }
 
-// Needs manual Clone implementation to not impose Clone restriction on S
+// Needs manual Clone implementation to not impose Clone restriction on `S`
 impl<S: SphinxSuite> Clone for MetaPacket<S> {
     fn clone(&self) -> Self {
         Self {
             packet: self.packet.clone(),
-            alpha: self.alpha.clone()
+            _s: PhantomData,
         }
     }
 }
@@ -88,12 +88,12 @@ impl<S: SphinxSuite> Clone for MetaPacket<S> {
 /// about the next hop.
 ///
 /// There are two possible states - either the packet is intended for the recipient,
-/// and is thus [Final](ForwardedMetaPacket::FinalPacket), or it is meant to be sent (relayed)
-/// to the next hop - thus it is [Relayed](ForwardedMetaPacket::RelayedPacket).
+/// and is thus [Final](ForwardedMetaPacket::Final), or it is meant to be sent (relayed)
+/// to the next hop - thus it is [Relayed](ForwardedMetaPacket::Relayed).
 #[allow(dead_code)]
 pub enum ForwardedMetaPacket<S: SphinxSuite> {
     /// The content is another [MetaPacket] meant to be sent to the next hop.
-    RelayedPacket {
+    Relayed {
         /// Packet for the next hop.
         packet: MetaPacket<S>,
         /// Public key of the next hop.
@@ -109,10 +109,10 @@ pub enum ForwardedMetaPacket<S: SphinxSuite> {
         packet_tag: PacketTag,
     },
     /// The content is the actual payload for the packet's destination.
-    FinalPacket {
+    Final {
         /// Decrypted payload
         plain_text: Box<[u8]>,
-        /// Reserved. Currently not used
+        /// Reserved for SURBs. Currently not used
         additional_data: Box<[u8]>,
         /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
@@ -127,6 +127,8 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
     /// Creates a new outgoing packet with given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
+    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE](hopr_internal_types::protocol::PAYLOAD_SIZE), otherwise the
+    /// constructor will panic. The caller **must** ensure the size is correct beforehand.
     /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
     /// each of the challenges have the same size of `additional_relayer_data_len`.
     ///
@@ -182,36 +184,45 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
         Self {
             packet: packet.into_boxed_slice(),
-            alpha,
+            _s: PhantomData,
         }
     }
 
-    pub fn routing_info(&self) -> &[u8] {
+    /// Returns the Alpha value subslice from the packet data.
+    fn alpha(&self) -> &[u8] {
+        let len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
+        &self.packet[..len]
+    }
+
+    /// Returns the routing info subslice from the packet data.
+    fn routing_info(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
         &self.packet[base..base + Self::HEADER_LEN]
     }
 
-    pub fn mac(&self) -> &[u8] {
+    /// Returns the packet checksum (MAC) subslice from the packet data.
+    fn mac(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN;
         &self.packet[base..base + SimpleMac::SIZE]
     }
 
-    pub fn payload(&self) -> &[u8] {
+    /// Returns the payload subslice from the packet data.
+    fn payload(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
         &self.packet[base..base + PAYLOAD_SIZE]
     }
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
     /// This will transform this packet into the [ForwardedMetaPacket].
-    pub fn forward(
-        &self,
+    pub fn into_forwarded(
+        self,
         node_keypair: &S::P,
         max_hops: usize,
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket<S>> {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
-            &self.alpha,
+            Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
             &(node_keypair.public().into()),
         )?;
@@ -236,7 +247,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 path_pos,
                 next_node,
                 additional_info,
-            } => RelayedPacket {
+            } => Relayed {
                 packet: Self::new_from_parts(
                     alpha,
                     RoutingInfo {
@@ -252,7 +263,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 path_pos,
                 additional_info,
             },
-            ForwardedHeader::FinalNode { additional_data } => FinalPacket {
+            ForwardedHeader::FinalNode { additional_data } => Final {
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 plain_text: remove_padding(&decrypted)
@@ -273,13 +284,10 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
 
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut ret = Self {
+            Ok(Self {
                 packet: data.into(),
-                alpha: Default::default(),
-            };
-            ret.alpha
-                .copy_from_slice(&data[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
-            Ok(ret)
+                _s: PhantomData,
+            })
         } else {
             Err(GeneralError::ParseError)
         }
@@ -339,15 +347,16 @@ mod tests {
 
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
-                .forward(pair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
+                .clone()
+                .into_forwarded(pair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
                 .unwrap_or_else(|_| panic!("failed to unwrap at {i}"));
 
             match fwd {
-                ForwardedMetaPacket::RelayedPacket { packet, .. } => {
+                ForwardedMetaPacket::Relayed { packet, .. } => {
                     assert!(i < keypairs.len() - 1);
                     mp = packet;
                 }
-                ForwardedMetaPacket::FinalPacket {
+                ForwardedMetaPacket::Final {
                     plain_text,
                     additional_data,
                     ..
