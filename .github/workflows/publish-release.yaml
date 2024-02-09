@@ -10,7 +10,7 @@ on:
       from_tag:
         type: string
         required: true
-        default: 'providence'
+        default: 'saint-louis'
         description: 'Source tag name'
       to_tag:
         type: string

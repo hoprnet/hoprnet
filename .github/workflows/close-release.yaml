@@ -22,9 +22,9 @@ on:
         required: true
         description: 'Name of the release'
         options:
-          - providence
           - saint-louis
           - singapore
+          - kaunas
 concurrency:
   group: close-release
   cancel-in-progress: true
