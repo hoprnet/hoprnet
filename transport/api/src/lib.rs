@@ -422,7 +422,7 @@ impl HoprTransport {
         Ok(self
             .ticket_aggregate_actions
             .clone()
-            .aggregate_tickets(AggregationList::WholeChannel(entry))?
+            .aggregate_tickets(&entry.destination, AggregationList::WholeChannel(entry))?
             .consume_and_wait(std::time::Duration::from_millis(60000))
             .await?)
     }

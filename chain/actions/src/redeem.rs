@@ -8,12 +8,10 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
-use utils_db::errors::DbError;
 
 use crate::action_queue::{ActionSender, PendingAction};
-use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
+    CoreEthereumActionsError::{ChannelDoesNotExist, WrongTicketState},
     Result,
 };
 use crate::CoreEthereumActions;
@@ -52,20 +50,8 @@ async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket
 where
     Db: HoprCoreEthereumDbActions,
 {
-    match ack_ticket.status {
-        AcknowledgedTicketStatus::Untouched => {
-            let dst = db
-                .get_channels_domain_separator()
-                .await
-                .and_then(|separator| separator.ok_or(DbError::NotFound))?;
-
-            // Check if we're going to redeem a winning ticket
-            if !ack_ticket.is_winning_ticket(&dst) {
-                return Err(NotAWinningTicket);
-            }
-        }
-        AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed => {}
+    if let AcknowledgedTicketStatus::BeingAggregated = ack_ticket.status {
+        return Err(WrongTicketState(ack_ticket.to_string()));
     }
 
     ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
@@ -276,8 +262,7 @@ mod tests {
             Challenge::from(cp_sum).to_ethereum_challenge(),
             counterparty,
             &Hash::default(),
-        )
-        .unwrap();
+        );
 
         let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
         unacked_ticket.acknowledge(&hk2).unwrap()

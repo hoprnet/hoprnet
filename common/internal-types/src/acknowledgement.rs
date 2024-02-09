@@ -136,7 +136,7 @@ impl AcknowledgedTicket {
         }
     }
 
-    pub fn is_winning_ticket(&self, chain_key: ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
+    pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
         let vrf_params = self.ticket.get_vrf_values(&chain_key, domain_separator)?;
         if self
             .ticket

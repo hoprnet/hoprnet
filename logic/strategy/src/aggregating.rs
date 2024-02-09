@@ -152,7 +152,12 @@ where
 
         let list = AggregationList::TicketList(tickets_to_agg);
 
-        match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
+        match self
+            .ticket_aggregator
+            .lock()
+            .await
+            .aggregate_tickets(&channel.destination, list.clone())
+        {
             Ok(mut awaiter) => {
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;

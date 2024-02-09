@@ -248,9 +248,8 @@ mod tests {
                 private_key,
                 &Hash::default(),
             )
-            .unwrap()
         } else {
-            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
+            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
         }
     }
     async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
