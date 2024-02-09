@@ -15,7 +15,7 @@ pub enum ControlMessage {
 }
 
 impl ControlMessage {
-    /// Creates ping challenge message
+    /// Creates a ping challenge message
     pub fn generate_ping_request() -> Self {
         let mut ping = PingMessage::default();
         ping.nonce.copy_from_slice(&derive_ping_pong(None));

@@ -1,43 +1,90 @@
-// TODO: docs need updating
 //! Contains high-level Core-Ethereum traits that translate to on-chain transactions
 //!
-//! ## `action_queue`
-//! The `ActionQueue` object acts as general outgoing on-chain action MPSC queue. The queue is picked up
-//! one-by-one in an infinite loop that's executed in `core-transport`. Any component that gets a `ActionSender` type,
-//! can send new action requests to the queue via its `send` method.
-//! A new `ActionSender` can be obtained by calling `new_sender` method on the `ActionQueue` and can be subsequently cloned.
-//! The possible actions that can be sent into the queue are declared in the `Action` enum.
-//! The `send` method of `ActionSender` returns a `ActionComplete` future that can be awaited if the caller
-//! wishes to await the underlying transaction being confirmed.
+//! ## Actions
+//! The main concept is an "action", which a node can perform and results into an on-chain
+//! operation. These actions are all on the external interface of this crate which is represented
+//! by the [ChainActions] type.
+//! There are 3 classes of actions implemented in submodules of this crate:
+//! - [channel actions](channels)
+//! - [ticket redeem actions](redeem)
+//! - [node actions](node)
 //!
-//! ## `redeem`
-//! There are 4 functions that can be used to redeem tickets in the `TicketRedeemActions` trait:
-//! - `redeem_all_tickets`
-//! - `redeem_tickets_in_channel`
-//! - `redeem_tickets_by_counterparty`
-//! - `redeem_ticket`
+//! Each action is represented by a method (or methods) that are imported into the [ChainActions] type
+//! through a trait from the respective module (e.g. [ChannelActions](channels::ChannelActions) trait for channel actions).
+//! Each action will eventually translate to an on-chain transaction.
+//! An action will always return a [PendingAction](action_queue::PendingAction) future. This
+//! future can be awaited or not, depending if the caller wishes to obtain the [ActionConfirmation](action_queue::ActionConfirmation)
+//! of the submitted action.
+//! If the action's caller  wishes to await the confirmation, this process can end in one of 3 possible states:
 //!
-//! The method first checks if the tickets are redeemable (= they are not in `BeingRedeemed` or `BeginAggregated` in the DB),
-//! and if they are, their state is changed to `BeingRedeemed` (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such state is transmitted into the `ActionQueue` so the redemption soon is executed on-chain.
-//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
-//! confirmation of each ticket redemption.
+//! 1. the action gets confirmed, meaning it has been successfully executed.
+//! 2. awaiting the confirmation returns an error, which typically means a failure during action prerequisite checks,
+//! an invalid state to execute the action or invalid arguments given to the action
+//! 3. awaiting the confirmation times out, meaning the execution failed on-chain and the "action expectations"
+//! did not yield (see below for details on how "action expectations work").
 //!
-//! ## `channels`
-//! This submodule adds 4 basic high-level on-chain functions in the `ChannelActions` trait:
-//! - `open_channel`
-//! - `fund_channel`
-//! - `close_channel`
+//! Not awaiting the returned [PendingAction](action_queue::PendingAction) future does not give the caller any guarantees
+//! on how the action has executed, although this might be perfectly fine for certain cases (fire & forget).
 //!
-//! All the functions do the necessary validations using the DB and then post the corresponding transaction
-//! into the `ActionQueue`.
-//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
-//! confirmation of the corresponding operation.
+//! ## How are actions executed and make it on-chain ?
+//! Call to any [ChainAction's](ChainActions<Db>) method is eventually represented as an [Action](chain_types::actions::Action)
+//! enum with parameters that already closely resemble the required on-chain transaction input for that action to be
+//! The [Action](chain_types::actions::Action) enum instance is then passed via
+//! an [ActionSender] into the [ActionQueue](action_queue::ActionQueue).
+//! The [ActionQueue](action_queue::ActionQueue) takes care of ensuring the FIFO order of the
+//! actions which is driven by a standalone [action loop](`action_queue::ActionQueue::action_loop()`) and must be instantiated
+//! before [ChainActions], so that it can provide it with an [ActionSender].
 //!
-//! ## `node`
-//! Submodule containing high-level on-chain actions in the `NodeActions` trait, which related to HOPR node itself.
-//! - `withdraw`
-
+//! ### Queueing of actions
+//! The [ActionQueue](action_queue::ActionQueue) operates a MPSC queue, which picks up the [Actions](chain_types::actions::Action) submitted
+//! to it one by one. With each such action it will:
+//! 1. transform [Action](chain_types::actions::Action) into a [TypedTransaction](chain_types::TypedTransaction)
+//! via a [PayloadGenerator](payload::PayloadGenerator<T>)
+//! 2. submit the [TypedTransaction](chain_types::TypedTransaction) on-chain via a [TransactionExecutor](action_queue::TransactionExecutor)
+//! 3. generate an [IndexerExpectation](action_state::IndexerExpectation) from the submitted action
+//! 4. submit the [IndexerExpectation](action_state::IndexerExpectation) in an [ActionState](action_state::ActionState) implementation
+//! 5. wait for expectation to be resolved (or timeout, see [ActionQueueConfig](action_queue::ActionQueueConfig)
+//! and resolve the action submitter's [PendingAction](action_queue::PendingAction).
+//!
+//! In other words, the [ActionQueue](action_queue::ActionQueue) takes care of two important mappings:
+//! 1. [Action](chain_types::actions::Action) to [TypedTransaction](chain_types::TypedTransaction)
+//! 2. [Action](chain_types::actions::Action) to [IndexerExpectation](action_state::IndexerExpectation)
+//! The first one makes it possible for an action to make it on-chain, the second one allows to
+//! be informed of the action's result and effect.
+//!
+//! See the [action_queue] module for details.
+//!
+//! ### On-chain expectations after an action is submitted
+//! The [action_state] module defines the [ActionState](action_state::ActionState) trait which is responsible
+//! for registering [IndexerExpectation](action_state::IndexerExpectation) done by the [ActionQueue](action_queue::ActionQueue).
+//! The implementor of the [ActionState](action_state::ActionState) should be monitoring the state of the block chain (reading
+//! event logs contained inside newly mined blocks) and with each on-chain event that matches a registered expectation,
+//! mark it as resolved to allow the bound action to be confirmed in the [ActionQueue](action_queue::ActionQueue).
+//! Therefore, the two components which interact with an [ActionState](action_state::ActionState) implementation
+//! are the [ActionQueue](action_queue::ActionQueue) and the on-chain Indexer (see `chain-indexer` crate for details).
+//!
+//! There's an exception on construction of an expectation for the `withdraw` [NodeAction](node::NodeActions):
+//! Since the current implementation of the Indexer does not track native token transfers, but only smart contract
+//! events, it is impossible to detect the native token's transfer confirmation.
+//! Since the `withdraw` action is not very common, its confirmation is tracked via direct polling of the RPC
+//! provider until the transaction is confirmed. The confirmation horizon is set in the [TransactionExecutor](action_queue::TransactionExecutor).
+//!
+//! See the [action_state] module for details.
+//!
+//! ## Payload generators
+//! As described above, the [ActionQueue](action_queue::ActionQueue) needs a [PayloadGenerator](payload::PayloadGenerator<T>)
+//! implementation to be able to translate the [Action](chain_types::actions::Action) into the [TypedTransaction](chain_types::TypedTransaction).
+//! There are currently two possible ways of constructing the action's transaction:
+//! - via plain EIP1559 payload
+//! - via EIP1559 payload containing a SAFE transaction that embeds the actual payload
+//!
+//! The former one is implemented via [BasicPayloadGenerator](payload::BasicPayloadGenerator), the latter
+//! is implemented in [SafePayloadGenerator](payload::SafePayloadGenerator).
+//!
+//! In most situations, the transaction payload an action translates to, typically constitutes a smart contract call
+//! of one of the HOPR smart contracts deployed on-chain.
+//!
+//! See the [payload] module for details.
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_primitive_types::primitives::Address;
@@ -45,23 +92,30 @@ use std::sync::Arc;
 
 use crate::action_queue::ActionSender;
 
+/// Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
 pub mod action_queue;
+/// Adds functionality of tracking the action results via expectations.
 pub mod action_state;
+/// Actions related to HOPR channels.
 pub mod channels;
+/// Contains all errors used in this crate.
 pub mod errors;
+/// Actions related to a HOPR node itself.
 pub mod node;
+/// Ethereum transaction payload generators for the actions.
 pub mod payload;
+/// Ticket redemption related actions.
 pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
-pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions + Clone> {
+pub struct ChainActions<Db: HoprCoreEthereumDbActions + Clone> {
     me: Address,
     db: Arc<RwLock<Db>>,
     tx_sender: ActionSender,
 }
 
-impl<Db: HoprCoreEthereumDbActions + Clone> CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> ChainActions<Db> {
     ///! Creates new instance.
     pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }

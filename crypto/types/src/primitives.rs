@@ -10,7 +10,8 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::utils::SecretValue;
 
-/// Represents a secret key of fixed length
+/// Represents a secret key of fixed length.
+/// The value is auto-zeroized on drop.
 pub type SecretKey = SecretValue<typenum::U32>;
 
 /// Generalization of digest-like operation (MAC, Digest,...)
@@ -51,13 +52,11 @@ where
 /// Use `new`, `update` and `finalize` triplet to produce hash of arbitrary data.
 /// Currently this instance is using Blake2s256.
 #[derive(Default, Clone)]
-pub struct SimpleDigest {
-    instance: Blake2s256,
-}
+pub struct SimpleDigest(Blake2s256);
 
 impl DigestLike<Blake2s256> for SimpleDigest {
     fn internal_state(&mut self) -> &mut Blake2s256 {
-        &mut self.instance
+        &mut self.0
     }
 }
 
@@ -65,35 +64,29 @@ impl DigestLike<Blake2s256> for SimpleDigest {
 /// Use `new`, `update` and `finalize` triplet to produce hash of arbitrary data.
 /// Currently this instance is using Keccak256.
 #[derive(Default, Clone)]
-pub struct EthDigest {
-    instance: Keccak256,
-}
+pub struct EthDigest(Keccak256);
 
 impl DigestLike<Keccak256> for EthDigest {
     fn internal_state(&mut self) -> &mut Keccak256 {
-        &mut self.instance
+        &mut self.0
     }
 }
 
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
 /// Currently instantiated using Blake2s256 MAC.
-pub struct SimpleMac {
-    instance: Blake2sMac256,
-}
+pub struct SimpleMac(Blake2sMac256); // TODO: add derive(ZeroizeOnDrop) once blake2 is updated to 0.11
 
 impl SimpleMac {
     /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &SecretKey) -> Self {
-        Self {
-            instance: Blake2sMac256::new(key.into()),
-        }
+        Self(Blake2sMac256::new(key.into()))
     }
 }
 
 impl DigestLike<Blake2sMac256> for SimpleMac {
     fn internal_state(&mut self) -> &mut Blake2sMac256 {
-        &mut self.instance
+        &mut self.0
     }
 }
 
@@ -101,9 +94,7 @@ impl DigestLike<Blake2sMac256> for SimpleMac {
 /// Use `new` and `apply` (or `apply_copy`) to XOR the keystream on the plaintext or ciphertext.
 /// Currently this instance is using ChaCha20.
 #[derive(ZeroizeOnDrop)]
-pub struct SimpleStreamCipher {
-    instance: ChaCha20,
-}
+pub struct SimpleStreamCipher(ChaCha20);
 
 impl SimpleStreamCipher {
     /// Size of the secret key
@@ -115,25 +106,23 @@ impl SimpleStreamCipher {
     /// Create new instance of the stream cipher initialized
     /// with the given secret key and IV.
     pub fn new(key: [u8; Self::KEY_SIZE], iv: [u8; Self::IV_SIZE]) -> Self {
-        Self {
-            instance: ChaCha20::new(&key.into(), &iv.into()),
-        }
+        Self(ChaCha20::new(&key.into(), &iv.into()))
     }
 
     /// Seeks the keystream to the given block position
     pub fn set_block_counter(&mut self, counter: u32) {
-        self.instance.seek(counter as u64 * 64u64)
+        self.0.seek(counter as u64 * 64u64)
     }
 
     /// Apply keystream to the given data in-place.
     pub fn apply(&mut self, data: &mut [u8]) {
-        self.instance.apply_keystream(data);
+        self.0.apply_keystream(data);
     }
 
     /// Creates copy of the given data and applies the keystream to it.
     pub fn apply_copy(&mut self, data: &[u8]) -> Box<[u8]> {
         let mut ret = Vec::from(data);
-        self.instance.apply_keystream(ret.as_mut_slice());
+        self.0.apply_keystream(ret.as_mut_slice());
         ret.into_boxed_slice()
     }
 }

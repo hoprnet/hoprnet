@@ -7,7 +7,7 @@ use crate::Strategy;
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use chain_actions::CoreEthereumActions;
+use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
@@ -68,7 +68,7 @@ pub trait SingularStrategy: Display {
 /// which have elapsed the grace period
 struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
     db: Arc<RwLock<Db>>,
-    chain_actions: CoreEthereumActions<Db>,
+    chain_actions: ChainActions<Db>,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
@@ -180,7 +180,7 @@ impl MultiStrategy {
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        chain_actions: CoreEthereumActions<Db>,
+        chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where

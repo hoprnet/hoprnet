@@ -864,6 +864,10 @@ mod peers {
         pub observed: Vec<Multiaddr>,
     }
 
+    /// Returns transport-related information about the given peer.
+    ///
+    /// This includes the peer ids that the given peer has `announced` on-chain
+    /// and peer ids that are actually `observed` by the transport layer.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}"),
@@ -909,6 +913,7 @@ mod peers {
         pub reported_version: String,
     }
 
+    /// Directly pings the given peer.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/peers/{{peerId}}/ping"),
@@ -955,7 +960,7 @@ mod channels {
     use super::*;
     use futures::TryFutureExt;
     use hopr_crypto_types::types::Hash;
-    use hopr_lib::{AsUnixTimestamp, ChannelEntry, ChannelStatus, CoreEthereumActionsError, ToHex};
+    use hopr_lib::{AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, ToHex};
 
     #[serde_as]
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -1009,6 +1014,7 @@ mod channels {
         pub closure_time: u64,
     }
 
+    /// Listing of channels.
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "all": [],
@@ -1023,8 +1029,11 @@ mod channels {
         ]
     }))]
     pub(crate) struct NodeChannelsResponse {
+        /// Channels incoming to this node.
         pub incoming: Vec<NodeChannel>,
+        /// Channels outgoing from this node.
         pub outgoing: Vec<NodeChannel>,
+        /// Complete channel topology as seen by this node.
         pub all: Vec<ChannelInfoResponse>,
     }
 
@@ -1060,18 +1069,23 @@ mod channels {
         })
     }
 
+    /// Parameters for enumerating channels.
     #[derive(Debug, Default, Copy, Clone, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
     #[into_params(parameter_in = Query)]
     #[serde(default, rename_all = "camelCase")]
     pub(crate) struct ChannelsQueryRequest {
+        /// Should be the closed channels included?
         #[schema(required = false)]
         #[serde(default)]
         pub including_closed: bool,
+        /// Should all channels (not only the ones concerning this node) be enumerated?
         #[schema(required = false)]
         #[serde(default)]
         pub full_topology: bool,
     }
 
+    /// Lists channels opened to/from this node. Alternatively, it can print all
+    /// the channels in the network as this node sees them.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
@@ -1161,9 +1175,11 @@ mod channels {
         "peerAddress": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
     pub(crate) struct OpenChannelBodyRequest {
+        /// On-chain address of the counterparty.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub peer_address: Address,
+        /// Initial amount of stake in HOPR tokens.
         pub amount: String,
     }
 
@@ -1175,20 +1191,23 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct OpenChannelResponse {
+        /// ID of the new channel.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_id: Hash,
+        /// Receipt of the channel open transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub transaction_receipt: Hash,
     }
 
+    /// Opens a channel to the given on-chain address with the given initial stake of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
         request_body(
             content = OpenChannelBodyRequest,
-            description = "Open channel request specification",
+            description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
             content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
@@ -1221,19 +1240,20 @@ mod channels {
                     transaction_receipt: channel_details.tx_hash
                 }))
                 .build()),
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::BalanceTooLow)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::NotEnoughAllowance)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
                 Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
             }
-            Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelAlreadyExists)) => {
+            Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
                 Ok(Response::builder(409).body(ApiErrorStatus::ChannelAlreadyOpen).build())
             }
             Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
         }
     }
 
+    /// Returns information about the given channel.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1276,14 +1296,21 @@ mod channels {
     }))]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct CloseChannelResponse {
+        /// Receipt for the channel close transaction.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub receipt: Hash,
+        /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
         #[serde_as(as = "DisplayFromStr")]
         #[schema(value_type = String)]
         pub channel_status: ChannelStatus,
     }
 
+    /// Closes the given channel.
+    ///
+    /// If the channel is currently `Open`, it will transition it to `PendingToClose`.
+    /// If the channels is in `PendingToClose` and the channel closure period has elapsed,
+    /// it will transition it to `Closed`.
     #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
@@ -1314,10 +1341,10 @@ mod channels {
                         receipt: receipt.tx_hash
                     }))
                     .build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::InvalidArguments(_))) => {
+                Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                     Ok(Response::builder(422).body(ApiErrorStatus::UnsupportedFeature).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1326,14 +1353,17 @@ mod channels {
         }
     }
 
+    /// Specifies the amount of HOPR tokens to fund a channel with.
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
     #[schema(example = json!({
         "amount": "1000"
     }))]
     pub(crate) struct FundBodyRequest {
+        /// Amount of HOPR tokens to fund the channel with.
         pub amount: String,
     }
 
+    /// Funds the given channel with the given amount of HOPR tokens.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
@@ -1342,7 +1372,7 @@ mod channels {
         ),
         request_body(
             content = FundBodyRequest,
-            description = "Amount of HOPR to fund the channel",
+            description = "Specifies the amount of HOPR tokens to fund a channel with.",
             content_type = "application/json",
         ),
         responses(
@@ -1367,7 +1397,7 @@ mod channels {
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
                 Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
-                Err(HoprLibError::ChainError(CoreEthereumActionsError::ChannelDoesNotExist)) => {
+                Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
@@ -1455,7 +1485,7 @@ mod messages {
         pub timestamp: Option<std::time::Duration>,
     }
 
-    /// Send a message to another peer using a given path.
+    /// Send a message to another peer using the given path.
     ///
     /// The message can be sent either over a specified path or using a specified
     /// number of HOPS, if no path is given.
@@ -1890,9 +1920,11 @@ mod network {
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct TicketPriceResponse {
+        /// Price of the ticket in HOPR tokens.
         pub price: String,
     }
 
+    /// Obtains the current ticket price.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/price"),
@@ -1968,6 +2000,7 @@ mod tickets {
         }
     }
 
+    /// Lists all tickets for the given channel  ID.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
@@ -2005,6 +2038,7 @@ mod tickets {
         }
     }
 
+    /// Returns all the tickets in all the channels.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
@@ -2073,6 +2107,7 @@ mod tickets {
         }
     }
 
+    /// Returns current complete statistics on tickets.
     #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
@@ -2095,6 +2130,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming of all tickets in all channels.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
@@ -2117,6 +2156,10 @@ mod tickets {
         }
     }
 
+    /// Starts redeeming all tickets in the given channel.
+    ///
+    /// **WARNING:** this should almost **never** be used as it can issue a large
+    /// number of on-chain transactions. The tickets should almost always be aggregated first.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
@@ -2149,6 +2192,7 @@ mod tickets {
         }
     }
 
+    /// Starts aggregation of tickets in the given channel.
     #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),

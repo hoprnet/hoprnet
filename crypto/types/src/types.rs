@@ -217,7 +217,7 @@ impl CurvePoint {
 /// Proof-of-Relay challenge is a secp256k1 curve point.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Challenge {
-    pub curve_point: CurvePoint,
+    curve_point: CurvePoint,
 }
 
 impl Challenge {

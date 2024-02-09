@@ -13,7 +13,7 @@ use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
 
-/// Maximum size of the packet payload
+/// Maximum size of the packet payload in bytes.
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Fixed ticket winning probability

@@ -3,8 +3,9 @@ use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 
+/// Enumerates all Chain Actions related errors.
 #[derive(Debug, Error)]
-pub enum CoreEthereumActionsError {
+pub enum ChainActionsError {
     #[error("channel is already opened")]
     ChannelAlreadyExists,
 
@@ -63,4 +64,4 @@ pub enum CoreEthereumActionsError {
     GeneralError(#[from] GeneralError),
 }
 
-pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;
+pub type Result<T> = std::result::Result<T, ChainActionsError>;

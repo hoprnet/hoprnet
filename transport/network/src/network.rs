@@ -3,6 +3,8 @@ use std::collections::hash_set::HashSet;
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::traits::AsUnixTimestamp;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
@@ -12,14 +14,10 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use hopr_primitive_types::sma::{SingleSumSMA, SMA};
-use log::{info, warn};
+use log::{debug, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
-    hopr_platform::time::native::current_time,
-    hopr_primitive_types::prelude::AsUnixTimestamp,
-};
+use hopr_metrics::metrics::{MultiGauge, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -37,8 +35,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Defines how quality of nodes in the HOPR network
-/// is evaluated and criteria for nodes to be considered of good/bad quality.
+/// Configuration for the [`Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
 pub struct NetworkConfig {
@@ -91,37 +88,32 @@ impl Default for NetworkConfig {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+/// Actual origin - first occurence of the peer in the network mechanism
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display)]
 pub enum PeerOrigin {
+    #[strum(to_string = "node initialization")]
     Initialization = 0,
+    #[strum(to_string = "network registry")]
     NetworkRegistry = 1,
+    #[strum(to_string = "incoming connection")]
     IncomingConnection = 2,
+    #[strum(to_string = "outgoing connection attempt")]
     OutgoingConnection = 3,
+    #[strum(to_string = "strategy monitors existing channel")]
     StrategyExistingChannel = 4,
+    #[strum(to_string = "strategy considers opening a channel")]
     StrategyConsideringChannel = 5,
+    #[strum(to_string = "strategy decided to open new channel")]
     StrategyNewChannel = 6,
+    #[strum(to_string = "manual ping")]
     ManualPing = 7,
+    #[strum(to_string = "testing")]
     Testing = 8,
 }
 
-impl std::fmt::Display for PeerOrigin {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let description = match self {
-            PeerOrigin::Initialization => "node initialization",
-            PeerOrigin::NetworkRegistry => "network registry",
-            PeerOrigin::IncomingConnection => "incoming connection",
-            PeerOrigin::OutgoingConnection => "outgoing connection attempt",
-            PeerOrigin::StrategyExistingChannel => "strategy monitors existing channel",
-            PeerOrigin::StrategyConsideringChannel => "strategy considers opening a channel",
-            PeerOrigin::StrategyNewChannel => "strategy decided to open new channel",
-            PeerOrigin::ManualPing => "manual ping",
-            PeerOrigin::Testing => "testing",
-        };
-        write!(f, "{}", description)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/// Network health represented with colors, where green is the best and red
+/// is the worst possible observed nework quality.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, strum::Display, strum::EnumString)]
 pub enum Health {
     /// Unknown health, on application startup
     Unknown = 0,
@@ -135,44 +127,9 @@ pub enum Health {
     Green = 4,
 }
 
-impl std::fmt::Display for Health {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let status = match self {
-            Health::Unknown => "Unknown",
-            Health::Red => "Red",
-            Health::Orange => "Orange",
-            Health::Yellow => "Yellow",
-            Health::Green => "Green",
-        };
-
-        write!(f, "{status}")
-    }
-}
-
-impl std::str::FromStr for Health {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Red" => Ok(Self::Red),
-            "Orange" => Ok(Self::Orange),
-            "Yellow" => Ok(Self::Yellow),
-            "Green" => Ok(Self::Green),
-            "Unknown" => Ok(Self::Unknown),
-            _ => Err(format!("Unsupported Health string '{s}'")),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
-}
-
-impl std::fmt::Display for NetworkEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 #[cfg_attr(test, mockall::automock)]
@@ -180,8 +137,6 @@ pub trait NetworkExternalActions {
     fn is_public(&self, peer: &PeerId) -> bool;
 
     fn emit(&self, event: NetworkEvent);
-
-    fn create_timestamp(&self) -> u64;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -216,9 +171,14 @@ impl PeerStatus {
         }
     }
 
+    // Update both the immediate last quality and the average windowed quality
     pub fn update_quality(&mut self, new_value: f64) {
-        self.quality = new_value;
-        self.quality_avg.push(new_value);
+        if (0.0f64..=1.0f64).contains(&new_value) {
+            self.quality = new_value;
+            self.quality_avg.push(new_value);
+        } else {
+            warn!("Quality failed to update with value outside the [0,1] range")
+        }
     }
 
     /// Gets metadata associated with the peer
@@ -244,6 +204,8 @@ impl std::fmt::Display for PeerStatus {
     }
 }
 
+/// The network object storing information about the running observed state of the network,
+/// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]
 pub struct Network<T: NetworkExternalActions> {
     me: PeerId,
@@ -310,10 +272,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Get all registered multiaddresses for a specific peer
     pub fn get_peer_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        match self.known_multiaddresses.get(peer) {
-            Some(addrs) => addrs.clone(),
-            None => vec![],
-        }
+        self.known_multiaddresses.get(peer).cloned().unwrap_or_default()
     }
 
     /// Check whether the PeerId is present in the network
@@ -332,8 +291,8 @@ impl<T: NetworkExternalActions> Network<T> {
     ///
     /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
-        let now = self.network_actions_api.create_timestamp();
-        log::debug!("Registering peer '{}' with origin {}", peer, origin);
+        let now = current_time().as_unix_timestamp().as_millis() as u64;
+        debug!("Registering peer '{}' with origin {}", peer, origin);
 
         // assumes disjoint sets
         let has_entry = self.entries.contains_key(peer);
@@ -374,7 +333,7 @@ impl<T: NetworkExternalActions> Network<T> {
     }
 
     /// Update the PeerId record in the network
-    pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
+    pub fn update(&mut self, peer: &PeerId, ping_result: crate::ping::PingResult) {
         self.update_with_metadata(peer, ping_result, None);
     }
 
@@ -382,7 +341,7 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn update_with_metadata(
         &mut self,
         peer: &PeerId,
-        ping_result: crate::types::Result,
+        ping_result: crate::ping::PingResult,
         metadata: Option<HashMap<String, String>>,
     ) -> Option<PeerStatus> {
         if let Some(existing) = self.entries.get(peer) {
@@ -403,7 +362,7 @@ impl<T: NetworkExternalActions> Network<T> {
             }
 
             if let Ok(latency) = ping_result {
-                entry.last_seen = self.network_actions_api.create_timestamp();
+                entry.last_seen = current_time().as_unix_timestamp().as_millis() as u64;
                 entry.last_seen_latency = latency;
                 entry.heartbeats_succeeded += 1;
                 entry.backoff = self.cfg.backoff_min;
@@ -419,7 +378,7 @@ impl<T: NetworkExternalActions> Network<T> {
                     return Some(entry);
                 } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored
-                        .insert(entry.id, self.network_actions_api.create_timestamp());
+                        .insert(entry.id, current_time().as_unix_timestamp().as_millis() as u64);
                 }
             }
 
@@ -515,7 +474,7 @@ impl<T: NetworkExternalActions> Network<T> {
     }
 
     /// Perform arbitrary predicate filtering operation on the network entries
-    pub fn filter<F>(&self, f: F) -> Vec<PeerId>
+    fn filter<F>(&self, f: F) -> Vec<PeerId>
     where
         F: FnMut(&&PeerStatus) -> bool,
     {
@@ -558,6 +517,7 @@ impl<T: NetworkExternalActions> Network<T> {
         self.last_health
     }
 
+    #[cfg(test)]
     pub fn debug_output(&self) -> String {
         let mut output = "".to_string();
 
@@ -578,6 +538,17 @@ mod tests {
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
 
+    #[test]
+    fn test_network_health_should_serialize_to_a_proper_string() {
+        assert_eq!(format!("{}", Health::Orange), "Orange".to_owned())
+    }
+
+    #[test]
+    fn test_network_health_should_deserialize_from_proper_string() -> Result<(), Box<dyn std::error::Error>> {
+        let parsed: Health = "Orange".parse()?;
+        Ok(assert_eq!(parsed, Health::Orange))
+    }
+
     struct DummyNetworkAction {}
 
     impl NetworkExternalActions for DummyNetworkAction {
@@ -586,10 +557,6 @@ mod tests {
         }
 
         fn emit(&self, _: NetworkEvent) {}
-
-        fn create_timestamp(&self) -> u64 {
-            current_time().as_unix_timestamp().as_millis() as u64
-        }
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
@@ -673,7 +640,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
 
         assert_eq!(0, peers.length());
         assert!(!peers.has(&peer))
@@ -687,7 +654,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        let ts = peers.network_actions_api.create_timestamp();
+        let ts = current_time().as_unix_timestamp().as_millis() as u64;
 
         peers.update(&peer, Ok(ts));
 
@@ -726,7 +693,7 @@ mod tests {
             assert!(status.metadata().get(&other_metadata_2.0).is_none());
         }
 
-        let ts = peers.network_actions_api.create_timestamp();
+        let ts = current_time().as_unix_timestamp().as_millis() as u64;
 
         {
             let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
@@ -754,8 +721,8 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         peers.update(&peer, Err(())); // should drop to ignored
         peers.update(&peer, Err(())); // should drop from network
 
@@ -774,8 +741,8 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         peers.update(&peer, Err(()));
 
         let actual = peers.debug_output();
@@ -793,7 +760,7 @@ mod tests {
         peers.add(&first, PeerOrigin::IncomingConnection);
         peers.add(&second, PeerOrigin::IncomingConnection);
 
-        let ts = peers.network_actions_api.create_timestamp();
+        let ts = current_time().as_unix_timestamp().as_millis() as u64;
 
         let mut expected = vec![first, second];
         expected.sort();
@@ -847,8 +814,6 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
-        mock.expect_create_timestamp()
-            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -866,13 +831,11 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
-        mock.expect_create_timestamp()
-            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
 
         assert_eq!(peers.health(), Health::Orange);
     }
@@ -890,13 +853,11 @@ mod tests {
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer)))
             .return_const(());
-        mock.expect_create_timestamp()
-            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         peers.update(&peer, Err(()));
 
         assert!(!peers.has(&public));
@@ -913,14 +874,12 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(x));
-        mock.expect_create_timestamp()
-            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(me, cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+            peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         }
 
         assert_eq!(peers.health(), Health::Green);
@@ -938,16 +897,14 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(8).returning(move |x| public.contains(x));
-        mock.expect_create_timestamp()
-            .returning(|| current_time().as_unix_timestamp().as_millis() as u64);
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
         peers.add(&peer2, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer2, Ok(peers.network_actions_api.create_timestamp()));
-            peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+            peers.update(&peer2, Ok(current_time().as_unix_timestamp().as_millis() as u64));
+            peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         }
 
         assert_eq!(peers.health(), Health::Green);

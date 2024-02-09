@@ -5,9 +5,6 @@ use core_network::{
 use futures::channel::mpsc::Sender;
 use log::error;
 
-use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
-
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
     emitter: Sender<NetworkEvent>,
@@ -29,8 +26,5 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)
         }
-    }
-    fn create_timestamp(&self) -> u64 {
-        current_time().as_unix_timestamp().as_millis() as u64
     }
 }

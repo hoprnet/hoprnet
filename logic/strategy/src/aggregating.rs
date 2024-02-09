@@ -1,6 +1,6 @@
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
-use chain_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
