@@ -22,7 +22,7 @@ mapfile -t ssh_hosts <<< "$(<${1})"
 action="${2:-deploy}"
 docker_image="${3:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
-CONTAINER_NAME=hoprd-node-rotsee-providence
+CONTAINER_NAME=hoprd-node-rotsee-saint-louis
 SSH_USER=root
 NETWORK=rotsee
 

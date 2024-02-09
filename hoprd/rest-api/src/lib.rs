@@ -2312,7 +2312,7 @@ mod node {
                 async move {
                     let address = hopr.peerid_to_chain_key(&peer_id).await.ok().flatten();
 
-                    // WARNING: Only in Providence are all peers public
+                    // WARNING: Only in Providence and Saint-Louis are all peers public
                     let multiaddresses = hopr.multiaddresses_announced_to_dht(&peer_id).await;
 
                     Some((address, peer_id, multiaddresses, info))

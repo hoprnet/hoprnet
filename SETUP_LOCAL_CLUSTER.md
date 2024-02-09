@@ -65,5 +65,5 @@ the basic commands. Afterwards, it might also make sense to check the API v2 Swa
 [^4]:
     By using the `master` tag, you are downloading the latest version of `hoprnet` to spin up your nodes, which might be ideal
     to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
-    release. The latest stable release known at the time of writing is [`providence`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/providence.zip).
+    release. The latest stable release known at the time of writing is [`saint-louis`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/saint-louis.zip).
 
