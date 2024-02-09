@@ -173,7 +173,7 @@ impl PeerStatus {
 
     // Update both the immediate last quality and the average windowed quality
     pub fn update_quality(&mut self, new_value: f64) {
-        if new_value >= 0.0f64 && new_value <= 1.0f64 {
+        if (0.0f64..=1.0f64).contains(&new_value) {
             self.quality = new_value;
             self.quality_avg.push(new_value);
         } else {
@@ -272,10 +272,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Get all registered multiaddresses for a specific peer
     pub fn get_peer_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.known_multiaddresses
-            .get(peer)
-            .map(|mas| mas.clone())
-            .unwrap_or(vec![])
+        self.known_multiaddresses.get(peer).cloned().unwrap_or_default()
     }
 
     /// Check whether the PeerId is present in the network
