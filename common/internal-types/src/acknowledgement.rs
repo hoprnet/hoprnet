@@ -3,13 +3,12 @@ use hopr_primitive_types::prelude::*;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::{OnceLock, WaitTimeoutResult};
-use validator::{Validate, ValidateArgs, ValidationError};
 
+use crate::errors::CoreTypesError;
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
     channels::Ticket,
-    errors::{CoreTypesError::InvalidInputData, Result as CoreTypesResult},
+    errors::Result as CoreTypesResult,
 };
 
 /// Represents packet acknowledgement
@@ -87,26 +86,22 @@ pub enum AcknowledgedTicketStatus {
     BeingAggregated,
 }
 
-fn validate_acknowledged_ticket(
-    acked_ticket: &AcknowledgedTicket,
-    arg: (&Address, &Hash),
-) -> std::result::Result<(), ValidationError> {
-    acked_ticket.ticket.validate_args((arg.0, &Some(arg.1)))?;
-
+pub fn validate_acknowledged_ticket(acked_ticket: &AcknowledgedTicket) -> CoreTypesResult<()> {
     if !acked_ticket
         .ticket
         .challenge
         .eq(&acked_ticket.response.to_challenge().into())
     {
-        return Err(ValidationError::new("Invalid response"));
+        return Err(CoreTypesError::InvalidInputData(
+            "Computed challenged does not match signed challenge".into(),
+        ));
     }
 
     Ok(())
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, Eq, Serialize, Deserialize, Validate)]
-#[validate(schema(function = "validate_acknowledged_ticket", arg = "(&'v_a Address,&'v_a Hash)"))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -114,15 +109,6 @@ pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     /// Proof-Of-Relay response to challenge stated in ticket
     pub response: Response,
-    #[serde(skip)]
-    vrf_params: OnceLock<VrfParameters>,
-}
-
-impl PartialEq for AcknowledgedTicket {
-    fn eq(&self, other: &Self) -> bool {
-        // omit cached vrf parameters
-        self.status == other.status && self.ticket == other.ticket && self.response == other.response
-    }
 }
 
 impl PartialOrd for AcknowledgedTicket {
@@ -141,90 +127,27 @@ impl AcknowledgedTicket {
     /// Creates an acknowledged ticket. Once done, we can check
     /// if it is a win and if so, it can be redeemed on-chain or
     /// be sent to the ticket issuer to have it aggregated.
-    pub fn new(
-        ticket: Ticket,
-        response: Response,
-        issuer: &Address,
-        domain_separator: &Hash,
-    ) -> CoreTypesResult<AcknowledgedTicket> {
-        let acked_ticket = Self {
+    pub fn new(ticket: Ticket, response: Response) -> AcknowledgedTicket {
+        Self {
             // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
-            vrf_params: OnceLock::new(),
-        };
-
-        acked_ticket.validate_args((issuer, Some(domain_separator)))?;
-
-        Ok(acked_ticket)
-    }
-
-    pub fn get_vrf_values(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<&VrfParameters> {
-        if let Some(vrf_params) = self.vrf_params.get() {
-            Ok(vrf_params)
-        } else {
-            let vrf_params = derive_vrf_parameters(
-                &self.ticket.get_hash(domain_separator).into(),
-                chain_key,
-                domain_separator.as_slice(),
-            )?;
-
-            Ok(self.vrf_params.get_or_init(|| vrf_params))
         }
     }
 
-    /// Computes the value which is used to determine
-    /// if a ticket is win.
-    ///
-    /// Each ticket specifies a probability, given as an integer in
-    /// [0, 2**56 - 1] where 0 -> 0% and 2*56 - 1 -> 100% win
-    /// probability. If the ticket's luck value is greater than
-    /// the stated probability, it is considered a winning ticket.
-    ///
-    /// Requires access to the private key to compute the VRF values.
-    pub fn get_luck(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
-        let mut luck = [0u8; 7];
-
-        if let Some(ref signature) = self.ticket.signature {
-            luck.copy_from_slice(
-                &Hash::create(&[
-                    self.ticket.get_hash(domain_separator).as_slice(),
-                    &self
-                        .get_vrf_values(chain_key, domain_separator)?
-                        .get_decompressed_v()?
-                        .to_bytes()[1..], // skip prefix
-                    self.response.as_slice(),
-                    &signature.to_bytes(),
-                ])
-                .to_bytes()[0..7],
-            );
+    pub fn is_winning_ticket(&self, chain_key: ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
+        let vrf_params = self.ticket.get_vrf_values(&chain_key, domain_separator)?;
+        if self
+            .ticket
+            .is_winning_ticket(vrf_params, &self.response, domain_separator)
+        {
+            Ok(())
         } else {
-            return Err(InvalidInputData(
-                "Cannot compute ticket luck from unsigned ticket".into(),
-            ));
+            Err(CoreTypesError::GeneralError(GeneralError::NonSpecificError(
+                "Ticket is not a win".into(),
+            )))
         }
-
-        // clone bytes
-        Ok(luck)
-    }
-
-    /// Checks if this ticket is considered a win.
-    ///
-    /// Computes the ticket's luck value and compares it against the
-    /// ticket's probability. If luck <= probability, the ticket is
-    /// considered a win.
-    ///
-    /// Requires access to the private key to compute the VRF values.
-    pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> bool {
-        let mut signed_ticket_luck = [0u8; 8];
-        signed_ticket_luck[1..].copy_from_slice(&self.ticket.encoded_win_prob);
-
-        let mut computed_ticket_luck = [0u8; 8];
-        computed_ticket_luck[1..]
-            .copy_from_slice(&self.get_luck(chain_key, domain_separator).expect("unsigned ticket"));
-
-        u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
     }
 }
 
@@ -234,33 +157,42 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-fn validate_provable_winning_ticket(
+/// Returs Ok(()) if the ticket is considered a win by the smart
+/// contract and is thus considered valid.
+pub fn validate_provable_winning_ticket(
     maybe_winning_ticket: &ProvableWinningTicket,
-    arg: (&Address, &Hash),
-) -> Result<(), ValidationError> {
-    maybe_winning_ticket
-        .ticket
-        .validate_args((arg.0, &Some(*arg.1)))
-        .map_err(|e| ValidationError::new(&format!("Ticket validation errors: {}", e)))?;
-
+    destination: &Address,
+    domain_separator: &Hash,
+) -> CoreTypesResult<()> {
     if maybe_winning_ticket.ticket.challenge != maybe_winning_ticket.response.to_challenge().into() {
-        return Err(ValidationError::new("Invalid response"));
+        return Err(CoreTypesError::InvalidInputData(
+            "Response does not fulfill signed challenge".into(),
+        ));
     }
 
     maybe_winning_ticket
         .vrf_params
         .verify(
-            arg.0,
-            &maybe_winning_ticket.ticket.get_hash(arg.1).into(),
-            arg.1.as_slice(),
+            destination,
+            &maybe_winning_ticket.ticket.get_hash(domain_separator).into(),
+            domain_separator.as_slice(),
         )
-        .map_err(|e| ValidationError::new(&e.to_string()))?;
+        .map_err(|_| CoreTypesError::InvalidInputData("VRF values are invalid".into()))?;
+
+    if !maybe_winning_ticket.ticket.is_winning_ticket(
+        &maybe_winning_ticket.vrf_params,
+        &maybe_winning_ticket.response,
+        domain_separator,
+    ) {
+        return Err(CoreTypesError::InvalidInputData("Ticket is not a win".into()));
+    }
 
     Ok(())
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Validate)]
-#[validate(schema(function = "validate_provable_winning_ticket", arg = "(&'v_a Address,&'v_a Hash)"))]
+/// Data structure that can only hold winning tickets.
+/// Used for aggregating tickets.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvableWinningTicket {
     /// ticket data, including signature and expected payout
     pub ticket: Ticket,
@@ -278,7 +210,10 @@ impl ProvableWinningTicket {
         chain_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<Self> {
-        let vrf_params = acked_ticket.get_vrf_values(chain_key, domain_separator)?.to_owned();
+        let vrf_params = acked_ticket
+            .ticket
+            .get_vrf_values(chain_key, domain_separator)?
+            .to_owned();
         let signer = acked_ticket.ticket.recover_signer(domain_separator)?;
 
         Ok(Self {
@@ -339,6 +274,14 @@ impl BinarySerializable for ProvableWinningTicket {
     }
 }
 
+pub fn validate_unacknowledged_ticket(
+    _unacked_ticket: &UnacknowledgedTicket,
+    _hint: Hash,
+) -> hopr_crypto_types::errors::Result<()> {
+    // TODO: validate hint
+
+    Ok(())
+}
 /// Wrapper for an unacknowledged ticket
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UnacknowledgedTicket {
@@ -355,36 +298,10 @@ impl UnacknowledgedTicket {
         self.own_key.to_challenge()
     }
 
-    /// Verifies if signature on the embedded ticket.
-    pub fn verify_signature(&self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
-        self.ticket.verify(&issuer, domain_separator)
-    }
-
-    /// Verifies if the challenge on the embedded ticket matches the solution
-    /// from the given acknowledgement and the embedded half key.
-    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<()> {
-        if self
-            .ticket
-            .challenge
-            .eq(&self.get_response(acknowledgement)?.to_challenge().into())
-        {
-            Ok(())
-        } else {
-            Err(CryptoError::InvalidChallenge)
-        }
-    }
-
-    /// In the context of the Proof-Of-Relay scheme, combine both key halves,
-    /// the one from the relayer and the one from the next downstream node into
-    /// a response that presumably fulfills the stated challenge.
-    pub fn get_response(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<Response> {
-        Response::from_half_keys(&self.own_key, acknowledgement)
-    }
-
     /// Turn an unacknowledged ticket into an acknowledged ticket by combining
     /// both Proof-Of-Relay key halves
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> CoreTypesResult<AcknowledgedTicket> {
-        let response = self.get_response(acknowledgement)?;
+        let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
         Ok(AcknowledgedTicket::new(self.ticket, response))
@@ -461,8 +378,11 @@ impl BinarySerializable for PendingAcknowledgement {
 #[cfg(test)]
 pub mod test {
     use crate::{
-        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket},
+        acknowledgement::{
+            AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, ProvableWinningTicket, UnacknowledgedTicket,
+        },
         channels::Ticket,
+        prelude::validate_ticket,
     };
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -477,7 +397,10 @@ pub mod test {
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
+
     }
 
     fn mock_ticket(
@@ -498,13 +421,12 @@ pub mod test {
             ),
             U256::zero(),
             U256::one(),
-            1.0f64,
+            0.5f64,
             4u64.into(),
             challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
         )
-        .unwrap()
     }
 
     #[test]
@@ -538,11 +460,9 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_serialize_deserialize() {
-        let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
-            HalfKey::default(),
-            ALICE.public().to_address(),
-        );
+        let unacked_ticket = UnacknowledgedTicket::new(mock_ticket(&ALICE, &BOB_ADDR, None, None), HalfKey::default());
+
+        assert!(super::validate_unacknowledged_ticket(&unacked_ticket, Hash::default()).is_ok());
 
         assert_eq!(
             unacked_ticket,
@@ -552,38 +472,9 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_sign_verify() {
-        let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
-            HalfKey::default(),
-            ALICE.public().to_address(),
-        );
+        let unacked_ticket = UnacknowledgedTicket::new(mock_ticket(&ALICE, &BOB_ADDR, None, None), HalfKey::default());
 
-        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
-    }
-
-    #[test]
-    fn test_unacknowledged_ticket_challenge_response() {
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
-
-        let ticket = mock_ticket(
-            &ALICE,
-            &BOB.public().to_address(),
-            None,
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-        );
-
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
-
-        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
-        assert!(unacked_ticket.verify_challenge(&hk2).is_ok())
+        assert!(validate_ticket(&unacked_ticket.ticket, &BOB_ADDR, &Hash::default()).is_ok());
     }
 
     #[test]
@@ -600,59 +491,38 @@ pub mod test {
 
         let ticket = mock_ticket(
             &ALICE,
-            &BOB.public().to_address(),
+            &BOB_ADDR,
             None,
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
         );
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
 
-        let acked_ticket = unacked_ticket.acknowledge(&hk2, &BOB, &Hash::default()).unwrap();
+        let acked_ticket = unacked_ticket.acknowledge(&hk2).unwrap();
 
-        assert!(acked_ticket
-            .verify(
-                &ALICE.public().to_address(),
-                &BOB.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_ok());
     }
 
     #[test]
-    fn test_acknowledged_ticket() {
+    fn test_acknowledged_ticket_bad_examples() {
         let response = Response::from_bytes(&hex!(
             "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
         ))
         .unwrap();
 
-        let ticket = mock_ticket(
-            &ALICE,
-            &BOB.public().to_address(),
-            None,
-            Some(response.to_challenge().into()),
+        let ticket = mock_ticket(&ALICE, &BOB_ADDR, None, Some(response.to_challenge().into()));
+
+        assert!(validate_ticket(&ticket, &BOB_ADDR, &Hash::default()).is_ok());
+
+        let acked_ticket = AcknowledgedTicket::new(
+            ticket,
+            Response::from_bytes(&hex!(
+                "2bce05b81349033c920c8bc61242f650e176f20fe518237d791720454b02bfd5"
+            ))
+            .unwrap(),
         );
 
-        let acked_ticket =
-            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
-
-        let mut deserialized_ticket =
-            bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket).unwrap()).unwrap();
-        assert_eq!(acked_ticket, deserialized_ticket);
-
-        assert!(deserialized_ticket
-            .verify(
-                &ALICE.public().to_address(),
-                &BOB.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
-
-        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated;
-
-        assert_eq!(
-            deserialized_ticket,
-            bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
-        );
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_err());
     }
 
     #[test]
@@ -662,19 +532,88 @@ pub mod test {
         ))
         .unwrap();
 
-        let ticket = mock_ticket(
-            &ALICE,
-            &BOB.public().to_address(),
-            None,
-            Some(response.to_challenge().into()),
-        );
+        let ticket = mock_ticket(&ALICE, &BOB_ADDR, None, Some(response.to_challenge().into()));
 
-        let acked_ticket =
-            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
+        assert!(validate_ticket(&ticket, &BOB_ADDR, &Hash::default()).is_ok());
+
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        let mut deserialized_ticket =
+            bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket).unwrap()).unwrap();
+        assert_eq!(acked_ticket, deserialized_ticket);
+
+        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated;
 
         assert_eq!(
-            acked_ticket,
-            AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
+            deserialized_ticket,
+            bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
         );
+
+        assert!(validate_ticket(&deserialized_ticket.ticket, &BOB_ADDR, &Hash::default()).is_ok());
+        assert!(super::validate_acknowledged_ticket(&deserialized_ticket).is_ok());
+    }
+
+    #[test]
+    fn test_provable_winning_ticket() {
+        let response = Response::from_bytes(&hex!(
+            "c598332ab309e84a40d71a605db03a70876ebfa574191eff1787921ae90f1624"
+        ))
+        .unwrap();
+
+        let ticket = mock_ticket(&ALICE, &BOB_ADDR, None, Some(response.to_challenge().into()));
+
+        assert!(validate_ticket(&ticket, &BOB_ADDR, &Hash::default()).is_ok());
+
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        let winning_ticket = ProvableWinningTicket::from_acked_ticket(acked_ticket, &BOB, &Hash::default()).unwrap();
+
+        assert!(super::validate_provable_winning_ticket(&winning_ticket, &BOB_ADDR, &Hash::default()).is_ok());
+    }
+
+    #[test]
+    fn test_provable_winning_ticket_wrong_creator() {
+        let response = Response::from_bytes(&hex!(
+            "c598332ab309e84a40d71a605db03a70876ebfa574191eff1787921ae90f1624"
+        ))
+        .unwrap();
+
+        let ticket = mock_ticket(&ALICE, &BOB_ADDR, None, Some(response.to_challenge().into()));
+
+        assert!(validate_ticket(&ticket, &BOB_ADDR, &Hash::default()).is_ok());
+
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        let winning_ticket = ProvableWinningTicket::from_acked_ticket(acked_ticket, &BOB, &Hash::default()).unwrap();
+
+        // Wrong creator address
+        assert!(super::validate_provable_winning_ticket(&winning_ticket, &ALICE_ADDR, &Hash::default()).is_err());
+    }
+
+    #[test]
+    fn test_provable_winning_ticket_losing_ticket() {
+        let response = Response::from_bytes(&hex!(
+            "2bce05b81349033c920c8bc61242f650e176f20fe518237d791720454b02bfd5"
+        ))
+        .unwrap();
+
+        let ticket = mock_ticket(&ALICE, &BOB_ADDR, None, Some(response.to_challenge().into()));
+
+        assert!(validate_ticket(&ticket, &BOB_ADDR, &Hash::default()).is_ok());
+
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(super::validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        let winning_ticket = ProvableWinningTicket::from_acked_ticket(acked_ticket, &BOB, &Hash::default()).unwrap();
+
+        // Probabilistic, ticket is not a win
+        assert!(super::validate_provable_winning_ticket(&winning_ticket, &BOB_ADDR, &Hash::default()).is_err());
     }
 }
