@@ -68,7 +68,7 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 /// the [MetaPacket::into_forwarded] method. The [ForwardedMetaPacket] then contains the information
 /// about the next recipient of this packet.
 ///
-/// The packet format is directly dependent on the used [SphinxSuite](hopr_crypto_sphinx::shared_keys::SphinxSuite).
+/// The packet format is directly dependent on the used [SphinxSuite].
 pub struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
     _s: PhantomData<S>,
@@ -88,8 +88,8 @@ impl<S: SphinxSuite> Clone for MetaPacket<S> {
 /// about the next hop.
 ///
 /// There are two possible states - either the packet is intended for the recipient,
-/// and is thus [Final](ForwardedMetaPacket::Final), or it is meant to be sent (relayed)
-/// to the next hop - thus it is [Relayed](ForwardedMetaPacket::Relayed).
+/// and is thus [Final], or it is meant to be sent (relayed)
+/// to the next hop - thus it is [Relayed].
 #[allow(dead_code)]
 pub enum ForwardedMetaPacket<S: SphinxSuite> {
     /// The content is another [MetaPacket] meant to be sent to the next hop.
@@ -127,7 +127,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
     /// Creates a new outgoing packet with given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
-    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE](hopr_internal_types::protocol::PAYLOAD_SIZE), otherwise the
+    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
     /// constructor will panic. The caller **must** ensure the size is correct beforehand.
     /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
     /// each of the challenges have the same size of `additional_relayer_data_len`.

@@ -3,11 +3,14 @@
 
 /// Contains error enum implementation used across other `hopr-crypto-...` crates
 pub mod errors;
-/// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypairs), the important representations of chain key and packet key.
+/// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypair),
+/// the important representations of chain key and packet key.
 pub mod keypairs;
-/// Implements low-level cryptographic primitives, such as [SimpleStreamCipher](primitives::SimpleStreamCipher), [Digest](primitives::Digest) and [SimpleMac](primitives::SimpleMac).
+/// Implements low-level cryptographic primitives, such as [SimpleStreamCipher](primitives::SimpleStreamCipher),
+/// [SimpleDigest](primitives::SimpleDigest) and [SimpleMac](primitives::SimpleMac).
 pub mod primitives;
-/// Implements basic cryptography related types based on [primitives], such as [Hash](types::Hash), [PublicKey](types::PublicKey) and [Signature](types::Signature).
+/// Implements basic cryptography related types based on [primitives], such as [Hash](types::Hash),
+/// [PublicKey](types::PublicKey) and [Signature](types::Signature).
 pub mod types;
 /// Contains small utility functions used in other `hopr-crypto-...` crates
 pub mod utils;
