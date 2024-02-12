@@ -35,7 +35,7 @@ lazy_static::lazy_static! {
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
@@ -43,6 +43,7 @@ pub struct AggregatingStrategyConfig {
     ///
     /// Default is 100.
     #[validate(range(min = 2))]
+    #[default(Some(100))]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
@@ -52,6 +53,7 @@ pub struct AggregatingStrategyConfig {
     ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[default(Some(0.9))]
     pub unrealized_balance_ratio: Option<f32>,
 
     /// Maximum time to wait for the ticket aggregation to complete.
@@ -59,6 +61,7 @@ pub struct AggregatingStrategyConfig {
     ///
     /// Default is 60 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[default(Duration::from_secs(60))]
     pub aggregation_timeout: Duration,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
@@ -67,18 +70,8 @@ pub struct AggregatingStrategyConfig {
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
+    #[default = true]
     pub aggregate_on_channel_close: bool,
-}
-
-impl Default for AggregatingStrategyConfig {
-    fn default() -> Self {
-        Self {
-            aggregation_threshold: Some(100),
-            unrealized_balance_ratio: Some(0.9),
-            aggregation_timeout: Duration::from_secs(60),
-            aggregate_on_channel_close: true,
-        }
-    }
 }
 
 /// Represents a strategy that starts aggregating tickets in a certain

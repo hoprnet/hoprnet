@@ -125,43 +125,30 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
-    ///
-    /// Default is `true`.
+    #[default = true]
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
-    ///
-    /// Default is `true`.
+    #[default = true]
     pub allow_recursive: bool,
 
     /// Indicates if the strategy should check for `PendingToClose` channels which have
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
     /// is over.
-    ///
-    /// Default: false
+    #[default = false]
     pub finalize_channel_closure: bool,
 
     /// Configuration of individual sub-strategies.
     ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
+    #[default(_code = "vec![]")]
     pub strategies: Vec<Strategy>,
-}
-
-impl Default for MultiStrategyConfig {
-    fn default() -> Self {
-        Self {
-            on_fail_continue: true,
-            allow_recursive: true,
-            finalize_channel_closure: false,
-            strategies: Vec::new(),
-        }
-    }
 }
 
 /// Defines an execution chain of `SingularStrategies`.

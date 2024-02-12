@@ -21,6 +21,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
 semver = "1.0"
+smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }

@@ -42,30 +42,30 @@ lazy_static::lazy_static! {
 
 /// Config of promiscuous strategy.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-    ///
-    /// Defaults to 0.5
     #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[default = 0.5]
     pub network_quality_threshold: f64,
 
     /// Minimum number of network quality samples before the strategy can start making decisions.
-    ///
-    /// Defaults to 10
     #[validate(range(min = 1_u32))]
+    #[default = 10]
     pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
@@ -77,29 +77,15 @@ pub struct PromiscuousStrategyConfig {
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
-    ///
-    /// Defaults to true
+    #[default = true]
     pub enforce_max_channels: bool,
 
     /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
+    #[default(">=2.0.0".parse().unwrap())]
     pub minimum_peer_version: semver::VersionReq,
-}
-
-impl Default for PromiscuousStrategyConfig {
-    fn default() -> Self {
-        PromiscuousStrategyConfig {
-            network_quality_threshold: 0.5,
-            min_network_size_samples: 10,
-            new_channel_stake: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            max_channels: None,
-            enforce_max_channels: true,
-            minimum_peer_version: ">=2.0.0".parse().unwrap(),
-        }
-    }
 }
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.

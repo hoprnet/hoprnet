@@ -24,7 +24,7 @@ pub fn is_reachable_domain(host: &str) -> bool {
 }
 
 /// Enumerates possible host types.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HostType {
     /// IPv4 based host
     IPv4(String),

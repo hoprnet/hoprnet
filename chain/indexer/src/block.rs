@@ -45,7 +45,7 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 }
 
 /// Configuration for the chain indexer functionality
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, smart_default::SmartDefault)]
 pub struct IndexerConfig {
     /// The block at which the indexer should start
     ///
@@ -54,22 +54,16 @@ pub struct IndexerConfig {
     /// relevant smart contracts were introduced into the chain.
     ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
+    ///
     /// Default is 0.
     pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
+    ///
     /// Default is true.
+    #[default = true]
     pub fetch_token_transactions: bool,
-}
-
-impl Default for IndexerConfig {
-    fn default() -> Self {
-        Self {
-            start_block_number: 0,
-            fetch_token_transactions: true,
-        }
-    }
 }
 
 /// Indexer
