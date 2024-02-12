@@ -14,6 +14,7 @@ use libp2p_identity::PeerId;
 use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use tide::http::headers::HeaderValue;
 use tide::{
     http::{
         headers::{HeaderName, AUTHORIZATION},
@@ -304,7 +305,11 @@ pub async fn run_hopr_api(
     let mut app = tide::with_state(state.clone());
 
     app.with(LogRequestMiddleware(log::Level::Debug));
-    app.with(CorsMiddleware::new().allow_origin(Origin::from("*")));
+    app.with(
+        CorsMiddleware::new()
+            .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())
+            .allow_origin(Origin::from("*")),
+    );
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });

@@ -172,7 +172,8 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                             info!("Successfully pinged peer {}", peer);
                             Ok(current_time()
                                 .as_unix_timestamp()
-                                .saturating_sub(std::time::Duration::from_millis(start).div(2u32)))
+                                .saturating_sub(std::time::Duration::from_millis(start))
+                                .div(2u32))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())

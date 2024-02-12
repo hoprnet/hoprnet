@@ -802,21 +802,7 @@ impl Hopr {
         });
 
         info!("Loading initial peers from the storage");
-        let index_updater = self.transport_api.index_updater();
-        for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
-            if self.transport_api.is_allowed_to_access_network(&peer_id).await {
-                debug!("Using initial public node '{peer_id}'");
-                index_updater
-                    .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
-                        peer_id,
-                        PeerEligibility::Eligible,
-                    ))
-                    .await;
-                index_updater
-                    .emit_indexer_update(core_transport::IndexerToProcess::Announce(peer_id, multiaddresses))
-                    .await;
-            }
-        }
+        self.transport_api.init_from_db().await?;
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.

@@ -63,7 +63,7 @@ use futures::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::sync::Arc;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -317,6 +317,33 @@ impl HoprTransport {
 
     pub fn index_updater(&self) -> IndexerActions {
         self.indexer.clone()
+    }
+
+    pub async fn init_from_db(&self) -> errors::Result<()> {
+        info!("Loading initial peers from the storage");
+
+        let index_updater = self.index_updater();
+
+        for (peer, _address, multiaddresses) in self.get_public_nodes().await? {
+            if self.is_allowed_to_access_network(&peer).await {
+                debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
+                    .await;
+
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
+                    .await;
+
+                let mut net = self.network.write().await;
+                if !net.has(&peer) {
+                    net.add(&peer, PeerOrigin::Initialization);
+                    net.store_peer_multiaddresses(&peer, multiaddresses);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
