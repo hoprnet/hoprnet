@@ -422,10 +422,9 @@ mod tests {
             response.to_challenge().into(),
             signer,
             &domain_separator,
-        )
-        .unwrap();
+        );
 
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        AcknowledgedTicket::new(ticket, response)
     }
 
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
@@ -703,7 +702,7 @@ mod tests {
         dbs[1]
             .write()
             .await
-            .update_acknowledged_ticket(&acked_tickets[0])
+            .replace_acked_tickets_by_aggregated_ticket(acked_tickets[0].clone())
             .await
             .unwrap();
 

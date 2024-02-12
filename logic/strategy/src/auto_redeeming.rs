@@ -101,8 +101,12 @@ mod tests {
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
     }
 
-    fn generate_random_ack_ticket(idx_offset: u32) -> AcknowledgedTicket {
-        let counterparty = &BOB;
+    /// Generate tickets
+    fn generate_random_ack_ticket(
+        idx_offset: u32,
+        issuer: &ChainKeypair,
+        recipient: &ChainKeypair,
+    ) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -113,20 +117,19 @@ mod tests {
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
         let ticket = Ticket::new(
-            &ALICE.public().to_address(),
+            &recipient.public().to_address(),
             &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             0_u32.into(),
             idx_offset.into(),
             1.0f64,
             4u64.into(),
             Challenge::from(cp_sum).to_ethereum_challenge(),
-            counterparty,
+            issuer,
             &Hash::default(),
-        )
-        .unwrap();
+        );
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
+        unacked_ticket.acknowledge(&hk2).unwrap()
     }
 
     mock! {
@@ -148,8 +151,13 @@ mod tests {
         }
     }
 
-    fn mock_action_confirmation(ack: AcknowledgedTicket) -> ActionConfirmation {
+    fn mock_action_confirmation(ack: AcknowledgedTicket, recipient: &ChainKeypair) -> ActionConfirmation {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
+        let cloned_acked_ticket = ack.clone();
+
+        let maybe_winning_ticket = ProvableWinningTicket::from_acked_ticket(ack, recipient, &Hash::default()).unwrap();
+
         ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::TicketRedeemed(
@@ -162,15 +170,15 @@ mod tests {
                     U256::zero(),
                     U256::zero(),
                 ),
-                Some(ack.clone()),
+                Some(cloned_acked_ticket),
             )),
-            action: Action::RedeemTicket(ack.clone()),
+            action: Action::RedeemTicket(maybe_winning_ticket),
         }
     }
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_redeem() {
-        let ack_ticket = generate_random_ack_ticket(1);
+        let ack_ticket = generate_random_ack_ticket(1, &ALICE, &BOB);
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();
 
@@ -179,7 +187,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(1)
             .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_2)).boxed()));
+            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_2, &BOB)).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -191,8 +199,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_redeem_agg_only() {
-        let ack_ticket_unagg = generate_random_ack_ticket(1);
-        let ack_ticket_agg = generate_random_ack_ticket(3);
+        let ack_ticket_unagg = generate_random_ack_ticket(1, &ALICE, &BOB);
+        let ack_ticket_agg = generate_random_ack_ticket(3, &ALICE, &BOB);
 
         let ack_clone_agg = ack_ticket_agg.clone();
         let ack_clone_agg_2 = ack_ticket_agg.clone();
@@ -201,7 +209,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(1)
             .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_agg_2)).boxed()));
+            .return_once(|_| Ok(ok(mock_action_confirmation(ack_clone_agg_2, &BOB)).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
