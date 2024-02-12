@@ -1,5 +1,5 @@
 use crate::{
-    identity::IdentityFileArgs,
+    identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_faucet, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
@@ -8,7 +8,7 @@ use ethers::{types::U256, utils::parse_units};
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
-use std::{env, str::FromStr};
+use std::str::FromStr;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
@@ -52,6 +52,9 @@ pub struct FaucetArgs {
         default_value_t = 10.0
     )]
     native_amount: f64,
+
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl FaucetArgs {
@@ -65,12 +68,11 @@ impl FaucetArgs {
             contracts_root,
             hopr_amount,
             native_amount,
+            private_key,
         } = self;
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
+        private_key.read()?;
 
         // Include provided address
         let mut addresses_all = Vec::new();

@@ -1,5 +1,5 @@
 use crate::{
-    identity::IdentityFileArgs,
+    identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_move_node_to_safe_module, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
@@ -7,7 +7,7 @@ use clap::Parser;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use log::{log, Level};
-use std::{env, str::FromStr};
+use std::str::FromStr;
 
 /// CLI arguments for `hopli move-node-to-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -31,6 +31,9 @@ pub struct MoveNodeToSafeModuleArgs {
 
     #[clap(help = "Ethereum address of node management module", long, short)]
     module_address: String,
+
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl MoveNodeToSafeModuleArgs {
@@ -46,12 +49,11 @@ impl MoveNodeToSafeModuleArgs {
             contracts_root,
             safe_address,
             module_address,
+            private_key,
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
+        private_key.read()?;
 
         // 2. Calculate addresses from the identity file
         let all_node_addresses: Vec<String> = local_identity

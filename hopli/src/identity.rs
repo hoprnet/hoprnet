@@ -32,6 +32,37 @@ impl FromStr for IdentityActionType {
 }
 
 #[derive(Debug, Clone, Parser, Default)]
+pub struct PrivateKeyArgs {
+    #[clap(
+        long,
+        help = "Private key to unlock the account that broadcasts the transaction",
+        name = "private_key",
+        value_name = "PRIVATE_KEY"
+    )]
+    pub private_key: Option<String>,
+}
+
+impl PrivateKeyArgs {
+    pub fn read(self) -> Result<String, HelperErrors> {
+        let private_key = if let Some(pk) = self.private_key {
+            info!("reading private key from cli");
+            pk
+        } else {
+            info!("reading private key from env PRIVATE_KEY");
+            env::var("PRIVATE_KEY").map_err(|err| HelperErrors::UnableToReadPrivateKey(err))?
+        };
+
+        // TODO:
+        info!("To validate the private key");
+
+        // FIXME: temporarily set as env variable
+        env::set_var("PRIVATE_KEY", &private_key);
+
+        Ok(private_key)
+    }
+}
+
+#[derive(Debug, Clone, Parser, Default)]
 pub struct PasswordArgs {
     #[clap(
         long,
@@ -287,6 +318,52 @@ impl Cmd for IdentityArgs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::identity;
+
+    const DUMMY_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+    #[test]
+    fn revert_when_no_private_key_is_supplied() {
+        let pk_args = PrivateKeyArgs { private_key: None };
+        env::remove_var("PRIVATE_KEY");
+        match pk_args.read() {
+            Ok(_) => assert!(false),
+            Err(_) => assert!(true),
+        }
+    }
+    #[test]
+    fn ok_when_no_private_key_is_supplied_but_env_is_supplied() {
+        let pk_args = PrivateKeyArgs { private_key: None };
+        env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
+        match pk_args.read() {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn ok_when_no_env_is_supplied_but_private_key_is_supplied() {
+        let pk_args = PrivateKeyArgs {
+            private_key: Some(DUMMY_PRIVATE_KEY.into()),
+        };
+        env::remove_var("PRIVATE_KEY");
+        match pk_args.read() {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn take_cli_private_key_when_both_cli_arg_and_env_are_supplied() {
+        let pk_args = PrivateKeyArgs {
+            private_key: Some(DUMMY_PRIVATE_KEY.into()),
+        };
+        env::set_var("PRIVATE_KEY", "0123");
+        match pk_args.read() {
+            Ok(pk) => assert_eq!(pk, DUMMY_PRIVATE_KEY.to_string()),
+            Err(_) => assert!(false),
+        }
+    }
 
     #[test]
     fn revert_get_dir_from_non_existing_dir() {
@@ -342,7 +419,7 @@ mod tests {
         let path_args: IdentityFileArgs = IdentityFileArgs {
             identity_from_directory: None,
             identity_from_path: Some(id_path),
-            ..
+            password: identity::PasswordArgs { password_path: None },
         };
 
         let vp = path_args.get_files();

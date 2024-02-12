@@ -1,11 +1,10 @@
 use crate::{
-    identity::IdentityFileArgs,
+    identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_self_register, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use log::{log, Level};
-use std::env;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -31,6 +30,9 @@ pub struct RegisterInNetworkRegistryArgs {
         default_value = None
     )]
     contracts_root: Option<String>,
+
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl RegisterInNetworkRegistryArgs {
@@ -42,12 +44,11 @@ impl RegisterInNetworkRegistryArgs {
             local_identity,
             peer_ids: chain_addresses,
             contracts_root,
+            private_key,
         } = self;
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
+        private_key.read()?;
 
         // collect all the peer ids
         let mut all_chain_addrs = Vec::new();

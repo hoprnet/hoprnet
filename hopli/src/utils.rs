@@ -1,5 +1,4 @@
 use hoprd_keypair::errors::KeyPairError;
-use std::time::SystemTimeError;
 use thiserror::Error;
 
 pub trait Cmd: clap::Parser + Sized {
@@ -11,13 +10,14 @@ pub enum HelperErrors {
     /// Error propagated by IO operations
     #[error(transparent)]
     UnableToReadIdentitiesFromPath(#[from] std::io::Error),
-    // UnableToReadIdentitiesFromPath(std::io::Error),
+
     #[error("error parsig address: {0:?}")]
     UnableToParseAddress(String),
+
     /// System time rrror
     #[error(transparent)]
-    SystemTime(#[from] SystemTimeError),
-    // SystemTime(SystemTimeError),
+    SystemTime(#[from] std::time::SystemTimeError),
+
     #[error("unable to create identity")]
     UnableToCreateIdentity,
 
@@ -48,8 +48,8 @@ pub enum HelperErrors {
     #[error("unable read password")]
     UnableToReadPassword,
 
-    #[error("unable read private key")]
-    UnableToReadPrivateKey,
+    #[error("cannot read private key error: {0}")]
+    UnableToReadPrivateKey(#[from] std::env::VarError),
 
     #[error("missing parameter: {0}")]
     MissingParameter(String),

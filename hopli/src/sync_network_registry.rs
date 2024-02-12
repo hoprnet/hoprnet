@@ -1,4 +1,5 @@
 use crate::{
+    identity::PrivateKeyArgs,
     process::{
         child_process_call_foundry_set_eligibility, child_process_call_foundry_sync_eligibility, set_process_path_env,
     },
@@ -8,7 +9,7 @@ use clap::Parser;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use log::{error, log, Level};
-use std::{env, iter, str::FromStr};
+use std::{iter, str::FromStr};
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum SyncNetworkRegistryType {
@@ -56,6 +57,9 @@ pub struct SyncNetworkRegistryArgs {
 
     #[clap(help = "Desired eligibility in forced sync", long)]
     eligibility: Option<bool>,
+
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl SyncNetworkRegistryArgs {
@@ -66,12 +70,11 @@ impl SyncNetworkRegistryArgs {
             sync_type,
             safe_addresses,
             eligibility,
+            private_key,
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
+        private_key.read()?;
 
         // 2. Read addresses of safes
         let all_safes_addresses: Vec<String> = safe_addresses

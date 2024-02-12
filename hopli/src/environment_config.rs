@@ -34,12 +34,12 @@ pub struct NetworkDetail {
     /// Type of environment
     pub environment_type: EnvironmentType,
     /// Contract addresses
-    pub addresses: Addresses,
+    pub addresses: NetworkContractAddresses,
 }
 
 /// Contract addresses (directly from deployment logic)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Addresses {
+pub struct NetworkContractAddresses {
     /// address of contract that manages authorization to access the Hopr network
     pub network_registry: String,
     /// address of contract that maps to the requirements that need to be fulfilled

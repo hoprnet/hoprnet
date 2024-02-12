@@ -1,5 +1,5 @@
 use crate::{
-    identity::IdentityFileArgs,
+    identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_express_initialization, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
@@ -9,7 +9,6 @@ use ethers::{
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use log::{log, Level};
-use std::env;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -45,6 +44,9 @@ pub struct InitializeNodeArgs {
         default_value_t = 10.0
     )]
     native_amount: f64,
+
+    #[clap(flatten)]
+    pub private_key: PrivateKeyArgs,
 }
 
 impl InitializeNodeArgs {
@@ -62,12 +64,11 @@ impl InitializeNodeArgs {
             contracts_root,
             hopr_amount,
             native_amount,
+            private_key,
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
-        }
+        private_key.read()?;
 
         // 2. Calculate the peerID and addresses from the identity file
         let all_node_addresses: Vec<String> = local_identity
