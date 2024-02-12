@@ -183,7 +183,6 @@ impl AggregationList {
 }
 
 /// The input to the processor background pipeline
-#[allow(clippy::type_complexity)] // TODO: The type needs to be significantly refactored to easily move around
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
@@ -193,7 +192,6 @@ pub enum TicketAggregationToProcess<T, U> {
 }
 
 /// Emitted by the processor background pipeline once processed
-#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
@@ -245,7 +243,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         }
 
         if maybe_winning_tickets.len() == 1 {
-            return Ok(maybe_winning_tickets[0].ticket.clone());
+            return Ok(maybe_winning_tickets[0].ticket().clone());
         }
 
         let domain_separator = self
@@ -293,30 +291,30 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         let mut final_value = Balance::zero(BalanceType::HOPR);
 
         for (i, acked_ticket) in maybe_winning_tickets.iter().enumerate() {
-            if channel_id != acked_ticket.ticket.channel_id {
+            if channel_id != acked_ticket.ticket().channel_id {
                 return Err(ProtocolTicketAggregation(format!(
                     "aggregated ticket has an invalid channel id {}",
-                    acked_ticket.ticket.channel_id
+                    acked_ticket.ticket().channel_id
                 )));
             }
 
-            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
+            if U256::from(acked_ticket.ticket().channel_epoch) != channel_epoch {
                 return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
             }
 
             if i + 1 < maybe_winning_tickets.len()
-                && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
-                    > maybe_winning_tickets[i + 1].ticket.index
+                && acked_ticket.ticket().index + acked_ticket.ticket().index_offset as u64
+                    > maybe_winning_tickets[i + 1].ticket().index
             {
                 return Err(ProtocolTicketAggregation(
                     "Tickets with overlapping index intervals".to_owned(),
                 ));
             }
 
-            validate_ticket(&acked_ticket.ticket, &destination, &domain_separator)?;
-            validate_provable_winning_ticket(&acked_ticket, &destination, &domain_separator)?;
+            validate_ticket(acked_ticket.ticket(), &destination, &domain_separator)?;
+            validate_provable_winning_ticket(acked_ticket, &destination, &domain_separator)?;
 
-            final_value = final_value.add(&acked_ticket.ticket.amount);
+            final_value = final_value.add(&acked_ticket.ticket().amount);
             if final_value.gt(&channel_balance) {
                 return Err(ProtocolTicketAggregation(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
             }
@@ -338,7 +336,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket().index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
         self.db
             .write()
@@ -349,11 +347,11 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         Ok(Ticket::new(
             &destination,
             &final_value,
-            first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
+            first_acked_ticket.ticket().index.into(),
+            (last_acked_ticket.ticket().index - first_acked_ticket.ticket().index + 1).into(),
             1.0, // Aggregated tickets have always 100% winning probability
             channel_epoch,
-            first_acked_ticket.ticket.challenge.clone(),
+            first_acked_ticket.ticket().challenge.clone(),
             &self.chain_key,
             &domain_separator,
         ))
@@ -628,7 +626,7 @@ impl<T, U> TicketAggregationActions<T, U> {
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
-            ticket_issuer.clone(),
+            *ticket_issuer,
             ack_tickets,
             TicketAggregationFinalizer::new(tx),
         ))?;

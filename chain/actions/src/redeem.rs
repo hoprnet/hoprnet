@@ -49,7 +49,7 @@ where
 {
     debug!("setting a winning {} as being redeemed with TX hash {tx_hash}", ticket);
     Ok(db
-        .update_acknowledged_ticket_status(&ticket, AcknowledgedTicketStatus::BeingRedeemed)
+        .update_acknowledged_ticket_status(ticket, AcknowledgedTicketStatus::BeingRedeemed)
         .await?)
 }
 
@@ -172,8 +172,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
                     continue;
                 }
 
-                if let Err(e) = set_being_redeemed(&mut *db, &maybe_winning_ticket.ticket, *EMPTY_TX_HASH).await {
-                    error!("failed to update state of {}: {e}", maybe_winning_ticket.ticket.clone())
+                if let Err(e) = set_being_redeemed(&mut *db, maybe_winning_ticket.ticket(), *EMPTY_TX_HASH).await {
+                    error!(
+                        "failed to update state of {}: {e}",
+                        maybe_winning_ticket.ticket().clone()
+                    )
                 } else {
                     to_redeem.push(maybe_winning_ticket);
                 }
@@ -188,7 +191,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
         let mut receivers: Vec<PendingAction> = vec![];
 
         for winning_ticket in to_redeem {
-            let ticket_index = winning_ticket.ticket.index;
+            let ticket_index = winning_ticket.ticket().index;
             match self.tx_sender.send(Action::RedeemTicket(winning_ticket)).await {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
@@ -226,12 +229,13 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
             return Err(WrongTicketState(ack_ticket.to_string()));
         }
 
+        // Expand acknowledged tickets for on-chain redemption
         let maybe_winning_ticket = ProvableWinningTicket::from_acked_ticket(ack_ticket, &self.me, &domain_separator)?;
 
         validate_provable_winning_ticket(&maybe_winning_ticket, &self.self_address(), &domain_separator)
             .or(Err(NotAWinningTicket))?;
 
-        set_being_redeemed(&mut *db, &maybe_winning_ticket.ticket, *EMPTY_TX_HASH).await?;
+        set_being_redeemed(&mut *db, maybe_winning_ticket.ticket(), *EMPTY_TX_HASH).await?;
 
         self.tx_sender.send(Action::RedeemTicket(maybe_winning_ticket)).await
     }
@@ -407,7 +411,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket())))
             .returning(move |_, _| Ok(random_hash));
 
         // and then all Charlie's tickets get redeemed
@@ -415,7 +419,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .in_sequence(&mut seq)
-            .withf(move |t, _| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .withf(move |t, _| charlie_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket())))
             .returning(move |_, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
@@ -512,7 +516,7 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
-            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .withf(move |t, _| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket())))
             .returning(move |_, _| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
@@ -604,7 +608,7 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 2)
-            .withf(move |t, _| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket)))
+            .withf(move |t, _| tickets_clone[2..].iter().any(|tk| tk.ticket.eq(&t.ticket())))
             .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -696,7 +700,7 @@ mod tests {
             .withf(move |t, _| {
                 tickets_clone[ticket_from_previous_epoch_count..]
                     .iter()
-                    .any(|tk| tk.ticket.eq(&t.ticket))
+                    .any(|tk| tk.ticket.eq(&t.ticket()))
             })
             .returning(move |_, _| Ok(random_hash));
 
@@ -776,7 +780,7 @@ mod tests {
             .withf(move |t, _| {
                 tickets_clone[ticket_from_next_epoch_count..]
                     .iter()
-                    .any(|tk| tk.ticket.eq(&t.ticket))
+                    .any(|tk| tk.ticket.eq(&t.ticket()))
             })
             .returning(move |_, _| Ok(random_hash));
 

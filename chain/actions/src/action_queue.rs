@@ -162,7 +162,7 @@ where
     }
 }
 
-impl<'a, Db, S, TxExec> ExecutionContext<Db, S, TxExec>
+impl<Db, S, TxExec> ExecutionContext<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions,
     S: ActionState,
@@ -182,7 +182,7 @@ where
                 let tx_hash = self.tx_exec.redeem_ticket(&winning_ticket, &domain_separator).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if winning_ticket.ticket.channel_id == channel.get_id()),
+                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if winning_ticket.ticket().channel_id == channel.get_id()),
                 )
             }
 
@@ -317,7 +317,7 @@ where
     ctx: ExecutionContext<Db, S, TxExec>,
 }
 
-impl<'a, Db, S, TxExec> ActionQueue<Db, S, TxExec>
+impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
     S: ActionState + Send + Sync + 'static,
@@ -380,7 +380,7 @@ where
                                 .write()
                                 .await
                                 .update_acknowledged_ticket_status(
-                                    &winning_ticket.ticket,
+                                    winning_ticket.ticket(),
                                     AcknowledgedTicketStatus::Untouched,
                                 )
                                 .await

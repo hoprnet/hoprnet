@@ -137,7 +137,7 @@ impl AcknowledgedTicket {
     }
 
     pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
-        let vrf_params = self.ticket.get_vrf_values(&chain_key, domain_separator)?;
+        let vrf_params = self.ticket.get_vrf_values(chain_key, domain_separator)?;
         if self
             .ticket
             .is_winning_ticket(vrf_params, &self.response, domain_separator)
@@ -171,7 +171,7 @@ pub fn validate_provable_winning_ticket(
     }
 
     maybe_winning_ticket
-        .vrf_params
+        .vrf_params()
         .verify(
             destination,
             &maybe_winning_ticket.ticket.get_hash(domain_separator).into(),
@@ -180,7 +180,7 @@ pub fn validate_provable_winning_ticket(
         .map_err(|_| CoreTypesError::InvalidInputData("VRF values are invalid".into()))?;
 
     if !maybe_winning_ticket.ticket.is_winning_ticket(
-        &maybe_winning_ticket.vrf_params,
+        maybe_winning_ticket.vrf_params(),
         &maybe_winning_ticket.response,
         domain_separator,
     ) {
@@ -190,37 +190,58 @@ pub fn validate_provable_winning_ticket(
     Ok(())
 }
 
-/// Data structure that can only hold winning tickets.
-/// Used for aggregating tickets.
+/// Encapsulates all values necessary to prove that the embedded ticket
+/// is a win.
+///
+/// This struct can only be constructed using `from_acked_ticket` and
+/// requires access to the private key to do so. Once done, all values
+/// are cached and no longer require access to the private key.
+///
+/// @dev
+/// Must be constructed using `from_acked_ticket()`
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvableWinningTicket {
     /// ticket data, including signature and expected payout
-    pub ticket: Ticket,
+    ticket: Ticket,
     /// Proof-Of-Relay response to challenge stated in ticket
-    pub response: Response,
-    pub vrf_params: VrfParameters,
-    pub signer: Address,
+    response: Response,
 }
 
 impl ProvableWinningTicket {
-    /// Consumes an acknowledged ticket and stores all values that are
-    /// necessary to provde that it is a win
+    pub fn vrf_params(&self) -> &VrfParameters {
+        self.ticket.vrf_params.get().expect("missing cached VRF values")
+    }
+
+    pub fn signer(&self) -> &Address {
+        self.ticket.signer.get().expect("missing cached signer value")
+    }
+
+    pub fn ticket(&self) -> &Ticket {
+        &self.ticket
+    }
+
+    pub fn response(&self) -> &Response {
+        &self.response
+    }
+
+    /// Consumes an acknowledged ticket and reconstructs all values necessary
+    /// to prove that this ticket is a win. This requires access to the
+    /// private key.
     pub fn from_acked_ticket(
         acked_ticket: AcknowledgedTicket,
         chain_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<Self> {
-        let vrf_params = acked_ticket
+        // populates cached properties which require access to the private key
+        let _ = acked_ticket
             .ticket
             .get_vrf_values(chain_key, domain_separator)?
             .to_owned();
-        let signer = acked_ticket.ticket.recover_signer(domain_separator)?;
+        let _ = acked_ticket.ticket.recover_signer_address(domain_separator)?;
 
         Ok(Self {
             ticket: acked_ticket.ticket,
             response: acked_ticket.response,
-            vrf_params,
-            signer: signer.to_address(),
         })
     }
 }
@@ -254,17 +275,14 @@ impl BinarySerializable for ProvableWinningTicket {
             let vrf_params = VrfParameters::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
             )?;
+            ticket.vrf_params.get_or_init(|| vrf_params);
             let signer = Address::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
                     ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
             )?;
+            ticket.signer.get_or_init(|| signer);
 
-            Ok(Self {
-                ticket,
-                response,
-                vrf_params,
-                signer,
-            })
+            Ok(Self { ticket, response })
         } else {
             Err(GeneralError::ParseError)
         }
@@ -274,8 +292,8 @@ impl BinarySerializable for ProvableWinningTicket {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.response.to_bytes());
-        ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.extend_from_slice(&self.vrf_params().to_bytes());
+        ret.extend_from_slice(&self.signer().to_bytes());
         ret.into_boxed_slice()
     }
 }

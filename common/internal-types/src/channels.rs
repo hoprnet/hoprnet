@@ -320,9 +320,9 @@ pub fn validate_ticket(ticket: &Ticket, destination: &Address, domain_separator:
     }
 
     if ticket.signature.is_some() {
-        let recovered_address = ticket.recover_signer(domain_separator)?.to_address();
+        let recovered_address = ticket.recover_signer_address(domain_separator)?;
 
-        let computed_channel_id = generate_channel_id(&recovered_address, destination);
+        let computed_channel_id = generate_channel_id(recovered_address, destination);
 
         if ticket.channel_id != computed_channel_id {
             return Err(CoreTypesError::InvalidInputData("Invalid ticket signature".into()));
@@ -344,7 +344,7 @@ pub struct Ticket {
     pub challenge: EthereumChallenge,     // 32 bytes on-chain
     pub signature: Option<Signature>,     // 64 bytes on-chain
     /// cached value to prevent from expensive recomputation
-    pub(crate) signer: OnceLock<PublicKey>,
+    pub(crate) signer: OnceLock<Address>,
     /// cached value to prevent from expensive recomputation
     pub(crate) vrf_params: OnceLock<VrfParameters>,
 }
@@ -734,19 +734,20 @@ impl Ticket {
         (self.amount.amount() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
-    /// Lazily recovers the signer from the embedded ticket signature.
+    /// Lazily recovers Ethereum address of the signer from the embedded ticket signature.
     ///
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<PublicKey> {
+    pub fn recover_signer_address(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<&Address> {
         // OnceLock::get_or_try_insert fits better, but it is unstable
         if let Some(signer) = self.signer.get() {
-            Ok(signer.clone())
+            Ok(signer)
         } else {
             let signer = PublicKey::from_signature_hash(
                 &self.get_hash(domain_separator).to_bytes(),
                 self.signature.as_ref().expect("ticket not signed"),
-            )?;
-            Ok(self.signer.get_or_init(|| signer).clone())
+            )?
+            .to_address();
+            Ok(self.signer.get_or_init(|| signer))
         }
     }
 
