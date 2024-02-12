@@ -572,20 +572,13 @@ impl PacketInteractionConfig {
     }
 }
 
+#[derive(Debug, smart_default::SmartDefault)]
 pub struct PacketMetadata {
+    #[default(None)]
     pub send_finalizer: Option<PacketSendFinalizer>,
+    #[default(std::time::UNIX_EPOCH)]
     #[cfg(all(feature = "prometheus", not(test)))]
     pub start_time: std::time::SystemTime,
-}
-
-impl Default for PacketMetadata {
-    fn default() -> Self {
-        Self {
-            send_finalizer: None,
-            #[cfg(all(feature = "prometheus", not(test)))]
-            start_time: std::time::UNIX_EPOCH,
-        }
-    }
 }
 
 /// Sets up processing of packet interactions and returns relevant read and write mechanism.

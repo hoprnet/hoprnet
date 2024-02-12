@@ -50,25 +50,14 @@ pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
-    ///
-    /// Default is `14`.
+    #[default = 14]
     pub max_parallel_pings: usize,
     /// The timeout duration for an indiviual ping
-    ///
-    /// Default is `30_000` (30 seconds)
+    #[default(std::time::Duration::from_secs(30))]
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
-}
-
-impl Default for PingConfig {
-    fn default() -> Self {
-        Self {
-            max_parallel_pings: 14,
-            timeout: std::time::Duration::from_secs(30),
-        }
-    }
 }
 
 #[async_trait]

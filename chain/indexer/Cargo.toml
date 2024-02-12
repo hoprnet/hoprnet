@@ -19,6 +19,7 @@ ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
+smart-default = { workspace = true }
 thiserror = { workspace = true }
 
 bindings = { workspace = true }

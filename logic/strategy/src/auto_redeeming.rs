@@ -20,20 +20,11 @@ lazy_static::lazy_static! {
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
-    ///
-    /// Defaults to true.
+    #[default = true]
     pub redeem_only_aggregated: bool,
-}
-
-impl Default for AutoRedeemingStrategyConfig {
-    fn default() -> Self {
-        Self {
-            redeem_only_aggregated: true,
-        }
-    }
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket

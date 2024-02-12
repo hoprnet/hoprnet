@@ -20,6 +20,7 @@ multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
 serde_bytes = { workspace = true }
+smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = "1.0"
 

@@ -33,31 +33,22 @@ fn just_true() -> bool {
     true
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct Chain {
     #[validate(custom = "validate_announced")]
     #[serde(default = "just_true")]
+    #[default = true]
     pub announce: bool,
     #[serde(default = "default_network")]
+    #[default(default_network())]
     pub network: String,
     #[serde(default)]
     pub provider: Option<String>,
     #[serde(default)]
     pub protocols: crate::chain::ProtocolsConfig,
     #[serde(default = "just_true")]
+    #[default = true]
     pub check_unrealized_balance: bool,
-}
-
-impl Default for Chain {
-    fn default() -> Self {
-        Self {
-            announce: true,
-            network: default_network(),
-            provider: None,
-            protocols: crate::chain::ProtocolsConfig::default(),
-            check_unrealized_balance: true,
-        }
-    }
 }
 
 #[inline]
@@ -71,27 +62,20 @@ fn default_safe_transaction_service_provider() -> String {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct SafeModule {
     #[validate(url)]
     #[serde(default = "default_safe_transaction_service_provider")]
+    #[default(default_safe_transaction_service_provider())]
     pub safe_transaction_service_provider: String,
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_invalid_address")]
+    #[default(default_invalid_address())]
     pub safe_address: Address,
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_invalid_address")]
+    #[default(default_invalid_address())]
     pub module_address: Address,
-}
-
-impl Default for SafeModule {
-    fn default() -> Self {
-        Self {
-            safe_transaction_service_provider: default_safe_transaction_service_provider(),
-            safe_address: default_invalid_address(),
-            module_address: default_invalid_address(),
-        }
-    }
 }
 
 #[allow(dead_code)]
@@ -103,33 +87,25 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct Db {
     /// Path to the directory containing the database
     #[serde(default)]
     pub data: String,
     #[serde(default = "just_true")]
+    #[default = true]
     pub initialize: bool,
     #[serde(default)]
     pub force_initialize: bool,
 }
 
-impl Default for Db {
-    fn default() -> Self {
-        Self {
-            data: "".to_owned(),
-            initialize: true,
-            force_initialize: false,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct HoprLibConfig {
     /// Configuration related to host specifics
     #[validate]
     #[validate(custom = "validate_external_host")]
     #[serde(default = "default_host")]
+    #[default(default_host())]
     pub host: HostConfig,
     /// Configuration of the underlying database engine
     #[validate]
@@ -141,6 +117,7 @@ pub struct HoprLibConfig {
     /// the node given pre-configured triggers.
     #[validate]
     #[serde(default = "core_strategy::hopr_default_strategies")]
+    #[default(core_strategy::hopr_default_strategies())]
     pub strategy: StrategyConfig,
     /// Configuration of the protocol heartbeat mechanism
     #[validate]
@@ -175,22 +152,6 @@ fn default_host() -> HostConfig {
     HostConfig {
         address: HostType::IPv4(DEFAULT_HOST.to_owned()),
         port: DEFAULT_PORT,
-    }
-}
-
-impl Default for HoprLibConfig {
-    fn default() -> Self {
-        Self {
-            host: default_host(),
-            db: Db::default(),
-            strategy: core_strategy::hopr_default_strategies(),
-            heartbeat: HeartbeatConfig::default(),
-            network_options: NetworkConfig::default(),
-            transport: TransportConfig::default(),
-            protocol: ProtocolConfig::default(),
-            chain: Chain::default(),
-            safe_module: SafeModule::default(),
-        }
     }
 }
 

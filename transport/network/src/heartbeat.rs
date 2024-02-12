@@ -36,19 +36,22 @@ use crate::ping::Pinging;
 
 /// Configuration of the Heartbeat
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_variance")]
+    #[default(default_heartbeat_variance())]
     pub variance: std::time::Duration,
     /// Interval in which the heartbeat is triggered in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_interval")]
+    #[default(default_heartbeat_interval())]
     pub interval: std::time::Duration,
     /// The time interval for which to consider peer heartbeat renewal in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_threshold")]
+    #[default(default_heartbeat_threshold())]
     pub threshold: std::time::Duration,
 }
 
@@ -65,16 +68,6 @@ fn default_heartbeat_threshold() -> std::time::Duration {
 #[inline]
 fn default_heartbeat_variance() -> std::time::Duration {
     DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
-}
-
-impl Default for HeartbeatConfig {
-    fn default() -> Self {
-        Self {
-            interval: default_heartbeat_interval(),
-            threshold: default_heartbeat_threshold(),
-            variance: default_heartbeat_variance(),
-        }
-    }
 }
 
 /// API trait for external functionality required by the heartbeat mechanism

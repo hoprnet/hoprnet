@@ -122,19 +122,13 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    ///
     /// Defaults to 150 seconds.
+    #[default(Duration::from_secs(150))]
     pub max_action_confirmation_wait: Duration,
-}
-
-impl Default for ActionQueueConfig {
-    fn default() -> Self {
-        Self {
-            max_action_confirmation_wait: Duration::from_secs(150),
-        }
-    }
 }
 
 struct ExecutionContext<Db, S, TxExec>

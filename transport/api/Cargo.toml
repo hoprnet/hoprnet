@@ -26,6 +26,7 @@ libp2p = { workspace = true, features = ["request-response"] }
 multiaddr = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
+smart-default = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 lazy_static = { workspace = true, optional = true }
