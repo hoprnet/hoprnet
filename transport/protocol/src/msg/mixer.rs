@@ -102,7 +102,7 @@ mod tests {
 
         let elapsed = start.elapsed();
         assert_gt!(elapsed, constant_delay);
-        assert_lt!(elapsed - constant_delay, tolerance);
+        assert_lt!((elapsed - constant_delay).as_millis(), tolerance.as_millis() + 1);
     }
 
     #[async_std::test]

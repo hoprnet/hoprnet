@@ -9,21 +9,25 @@ use hopr_primitive_types::prelude::*;
 use log::{debug, info, trace};
 
 /// Performs validations of the given unacknowledged ticket and channel.
-#[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     db: &T,
     ticket: &Ticket,
     channel: &ChannelEntry,
-    sender: &Address,
     min_ticket_amount: Balance,
     required_win_prob: f64,
     check_unrealized_balance: bool,
     domain_separator: &Hash,
 ) -> Result<()> {
-    debug!("validating unack ticket from {sender}");
+    debug!("validating unack ticket from {}", channel.source);
 
     // ticket signer MUST be the sender
-    validate_ticket(ticket, sender, domain_separator)
+    if channel.get_id() != ticket.channel_id {
+        return Err(TicketValidation(
+            "Invalid channel_id. Ticket has been issued for a different channel".into(),
+        ));
+    }
+
+    validate_ticket(ticket, &channel.destination, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
@@ -45,7 +49,8 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     // channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
         return Err(TicketValidation(format!(
-            "payment channel with {sender} is not opened or pending to close"
+            "payment channel with {} is not opened or pending to close",
+            channel.source
         )));
     }
 
@@ -117,12 +122,19 @@ mod tests {
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
-    const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const TARGET_PRIV_BYTES: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
-
     lazy_static! {
-        static ref SENDER_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&SENDER_PRIV_BYTES).unwrap();
-        static ref TARGET_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&TARGET_PRIV_BYTES).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"
+        ))
+        .unwrap();
+        static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "c90d7add13563f21ecfb9424b37958a814b2f5c07c05c6b47cb0d818f026c537"
+        ))
+        .unwrap();
     }
 
     mock! {
@@ -153,6 +165,12 @@ mod tests {
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> chain_db::errors::Result<()>;
+            async fn get_acknowledged_ticket(
+                &self,
+                channel_id: &Hash,
+                epoch: u32,
+                index: u64,
+            ) -> chain_db::errors::Result<Option<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<usize>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(
@@ -244,24 +262,24 @@ mod tests {
         }
     }
 
-    fn create_valid_ticket() -> Ticket {
+    fn create_valid_ticket(issuer: &ChainKeypair, recipient: &ChainKeypair) -> Ticket {
         Ticket::new(
-            &TARGET_PRIV_KEY.public().to_address(),
+            &recipient.public().to_address(),
             &Balance::new(1_u64, BalanceType::HOPR),
             1u64.into(),
             1u64.into(),
             1.0f64,
             1u64.into(),
             EthereumChallenge::default(),
-            &SENDER_PRIV_KEY,
+            issuer,
             &Hash::default(),
         )
     }
 
-    fn create_channel_entry() -> ChannelEntry {
+    fn create_channel_entry(source: &ChainKeypair, destination: &ChainKeypair) -> ChannelEntry {
         ChannelEntry::new(
-            SENDER_PRIV_KEY.public().to_address(),
-            TARGET_PRIV_KEY.public().to_address(),
+            source.public().to_address(),
+            destination.public().to_address(),
             Balance::new(100_u64, BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
@@ -274,8 +292,8 @@ mod tests {
     async fn test_ticket_validation_should_pass_if_ticket_ok() {
         let mut db = MockDb::new();
 
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
+        let ticket = create_valid_ticket(&*ALICE, &*BOB);
+        let channel = create_channel_entry(&*ALICE, &*BOB);
 
         let more_than_ticket_balance = ticket.amount.add(&Balance::new(U256::from(500u128), BalanceType::HOPR));
         let channel_epoch = U256::from(ticket.channel_epoch);
@@ -288,7 +306,6 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
             true,
@@ -303,14 +320,13 @@ mod tests {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
+        let ticket = create_valid_ticket(&*ALICE, &*&CHARLIE);
+        let channel = create_channel_entry(&*ALICE, &*BOB);
 
         let ret = validate_unacknowledged_ticket(
             &db,
             &ticket,
             &channel,
-            &TARGET_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0f64,
             true,
@@ -330,14 +346,13 @@ mod tests {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
+        let ticket = create_valid_ticket(&*ALICE, &*BOB);
+        let channel = create_channel_entry(&*ALICE, &*BOB);
 
         let ret = validate_unacknowledged_ticket(
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(2_u64, BalanceType::HOPR),
             1.0f64,
             true,
@@ -357,19 +372,18 @@ mod tests {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
-        let mut ticket = create_valid_ticket();
-        ticket.encoded_win_prob = f64_to_win_prob(0.5f64).unwrap();
-        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
+        let mut ticket = create_valid_ticket(&*ALICE, &*BOB);
+        ticket.encoded_win_prob = f64_to_win_prob(0.25f64).unwrap();
+        ticket.sign(&ALICE, &Hash::default());
 
-        let channel = create_channel_entry();
+        let channel = create_channel_entry(&*ALICE, &*BOB);
 
         let ret = validate_unacknowledged_ticket(
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0_f64,
+            0.5_f64,
             true,
             &Hash::default(),
         )
@@ -387,15 +401,14 @@ mod tests {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
-        let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
+        let ticket = create_valid_ticket(&*ALICE, &*BOB);
+        let mut channel = create_channel_entry(&*ALICE, &*BOB);
         channel.status = ChannelStatus::Closed;
 
         let ret = validate_unacknowledged_ticket(
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
             true,
@@ -415,17 +428,16 @@ mod tests {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
-        let mut ticket = create_valid_ticket();
+        let mut ticket = create_valid_ticket(&*ALICE, &*BOB);
         ticket.channel_epoch = 2u32;
-        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
+        ticket.sign(&*ALICE, &Hash::default());
 
-        let channel = create_channel_entry();
+        let channel = create_channel_entry(&*ALICE, &*BOB);
 
         let ret = validate_unacknowledged_ticket(
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
             true,
@@ -444,8 +456,8 @@ mod tests {
     async fn test_ticket_validation_fail_if_does_not_have_funds() {
         let mut db = MockDb::new();
 
-        let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
+        let ticket = create_valid_ticket(&*ALICE, &*BOB);
+        let mut channel = create_channel_entry(&*ALICE, &*BOB);
         channel.balance = Balance::zero(BalanceType::HOPR);
         channel.channel_epoch = U256::from(ticket.channel_epoch);
 
@@ -459,7 +471,6 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
             1.0_f64,
             true,
@@ -471,7 +482,7 @@ mod tests {
         // assert_eq!(ret.unwrap_err().to_string(), "");
         match ret.unwrap_err() {
             PacketError::OutOfFunds(_) => {}
-            _ => panic!("invalid error type"),
+            e => panic!("invalid error type {:?}", e),
         }
     }
 
@@ -479,12 +490,12 @@ mod tests {
     async fn test_ticket_workflow() {
         let mut db = CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
-            create_valid_ticket(),
+            create_valid_ticket(&*ALICE, &*BOB),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
         );
 
@@ -519,7 +530,7 @@ mod tests {
     async fn test_db_should_store_ticket_index() {
         let mut db = CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
@@ -539,7 +550,7 @@ mod tests {
     async fn test_db_should_increase_ticket_index() {
         let mut db = CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
@@ -567,7 +578,7 @@ mod tests {
     async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
         let mut db = CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);

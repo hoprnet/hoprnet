@@ -300,7 +300,7 @@ impl BinarySerializable for ProvableWinningTicket {
 
 pub fn validate_unacknowledged_ticket(
     _unacked_ticket: &UnacknowledgedTicket,
-    _hint: Hash,
+    _hint: &Hash,
 ) -> hopr_crypto_types::errors::Result<()> {
     // TODO: validate hint
 
@@ -486,7 +486,7 @@ pub mod test {
     fn test_unacknowledged_ticket_serialize_deserialize() {
         let unacked_ticket = UnacknowledgedTicket::new(mock_ticket(&ALICE, &BOB_ADDR, None, None), HalfKey::default());
 
-        assert!(super::validate_unacknowledged_ticket(&unacked_ticket, Hash::default()).is_ok());
+        assert!(super::validate_unacknowledged_ticket(&unacked_ticket, &Hash::default()).is_ok());
 
         assert_eq!(
             unacked_ticket,

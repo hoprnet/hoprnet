@@ -532,6 +532,17 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         Ok(tickets)
     }
 
+    async fn get_acknowledged_ticket(
+        &self,
+        channel_id: &Hash,
+        epoch: u32,
+        index: u64,
+    ) -> Result<Option<AcknowledgedTicket>> {
+        self.db
+            .get_or_none(to_acknowledged_ticket_key(channel_id, epoch, index)?)
+            .await
+    }
+
     async fn replace_acked_tickets_by_aggregated_ticket(
         &mut self,
         aggregated_ticket: AcknowledgedTicket,
@@ -1549,7 +1560,7 @@ mod tests {
 
             assert!(validate_ticket(
                 &acked_ticket.ticket,
-                &ALICE_KEYPAIR.public().to_address(),
+                &BOB_KEYPAIR.public().to_address(),
                 &Hash::default()
             )
             .is_ok());
@@ -1623,7 +1634,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(
+            DB::new(CurrentDbShim::new_in_memory().await),
+            BOB_KEYPAIR.public().to_address(),
+        );
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;

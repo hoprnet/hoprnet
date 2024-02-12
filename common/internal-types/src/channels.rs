@@ -1135,12 +1135,12 @@ pub mod tests {
     #[test]
     pub fn test_path_position() {
         let mut ticket = Ticket::new_partial(
-            &ALICE.public().to_address(),
-            &BOB.public().to_address(),
+            &ALICE_ADDR,
+            &BOB_ADDR,
             &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
-            0.5,
+            1.0,
             U256::one(),
         )
         .unwrap();
@@ -1170,7 +1170,7 @@ pub mod tests {
             &Balance::new(256_u64, BalanceType::HOPR),
             U256::zero(),
             U256::one(),
-            0.5,
+            1.0,
             U256::one(),
         )
         .unwrap();

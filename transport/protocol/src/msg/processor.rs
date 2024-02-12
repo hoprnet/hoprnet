@@ -294,7 +294,6 @@ where
                     &*self.db.read().await,
                     &ticket,
                     &channel,
-                    &previous_hop_addr,
                     Balance::new(price_per_packet, BalanceType::HOPR),
                     TICKET_WIN_PROB,
                     self.cfg.check_unrealized_balance,

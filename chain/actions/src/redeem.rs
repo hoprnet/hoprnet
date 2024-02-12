@@ -47,6 +47,19 @@ async fn set_being_redeemed<Db>(db: &mut Db, ticket: &Ticket, tx_hash: Hash) -> 
 where
     Db: HoprCoreEthereumDbActions,
 {
+    if let Some(stored) = db
+        .get_acknowledged_ticket(&ticket.channel_id, ticket.channel_epoch, ticket.index)
+        .await?
+    {
+        if stored.status != AcknowledgedTicketStatus::Untouched {
+            return Err(WrongTicketState(format!(
+                "expected a ticket with state {} but found a ticket in the database with state {}",
+                AcknowledgedTicketStatus::Untouched,
+                stored.status
+            )));
+        }
+    }
+
     debug!("setting a winning {} as being redeemed with TX hash {tx_hash}", ticket);
     Ok(db
         .update_acknowledged_ticket_status(ticket, AcknowledgedTicketStatus::BeingRedeemed)
