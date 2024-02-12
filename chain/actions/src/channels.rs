@@ -40,7 +40,7 @@ pub trait ChannelActions {
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
-        if self.me == destination {
+        if self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
@@ -66,7 +66,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cor
             return Err(PeerAccessDenied);
         }
 
-        let maybe_channel = self.db.read().await.get_channel_x(&self.me, &destination).await?;
+        let maybe_channel = self
+            .db
+            .read()
+            .await
+            .get_channel_x(&self.self_address(), &destination)
+            .await?;
         if let Some(channel) = maybe_channel {
             debug!("already found existing {channel}");
             if channel.status != ChannelStatus::Closed {
@@ -117,8 +122,20 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cor
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
         let maybe_channel = match direction {
-            ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
-            ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
+            ChannelDirection::Incoming => {
+                self.db
+                    .read()
+                    .await
+                    .get_channel_x(&counterparty, &self.self_address())
+                    .await?
+            }
+            ChannelDirection::Outgoing => {
+                self.db
+                    .read()
+                    .await
+                    .get_channel_x(&self.self_address(), &counterparty)
+                    .await?
+            }
         };
 
         match maybe_channel {
@@ -256,20 +273,14 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(
-            db.clone(),
-            ALICE.clone(),
-            indexer_action_tracker,
-            tx_exec,
-            Default::default(),
-        );
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
 
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .open_channel(*BOB_ADDR, stake)
@@ -301,7 +312,6 @@ mod tests {
 
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -341,7 +351,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -364,7 +374,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -376,7 +385,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -397,7 +406,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -409,7 +417,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -442,7 +450,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -454,7 +461,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -478,7 +485,6 @@ mod tests {
 
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -496,7 +502,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -564,19 +570,13 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(
-            db.clone(),
-            ALICE.clone(),
-            indexer_action_tracker,
-            tx_exec,
-            Default::default(),
-        );
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -608,7 +608,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -626,7 +625,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -649,7 +648,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -661,7 +659,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
@@ -693,7 +691,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -705,7 +702,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -728,7 +725,6 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
@@ -746,7 +742,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -827,19 +823,13 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(
-            db.clone(),
-            ALICE.clone(),
-            indexer_action_tracker,
-            tx_exec,
-            Default::default(),
-        );
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
@@ -937,19 +927,13 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(
-            db.clone(),
-            ALICE.clone(),
-            indexer_action_tracker,
-            tx_exec,
-            Default::default(),
-        );
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB_ADDR, ChannelDirection::Incoming, false)
@@ -1001,13 +985,12 @@ mod tests {
 
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1032,12 +1015,11 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1064,12 +1046,11 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(
             *ALICE_ADDR,

@@ -20,7 +20,7 @@ use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{ChainKeypair, Keypair};
+use core_transport::ChainKeypair;
 use hopr_primitive_types::primitives::Address;
 use utils_db::CurrentDbShim;
 
@@ -390,14 +390,13 @@ where
     // Build the Action Queue
     let action_queue = ActionQueue::new(
         db.clone(),
-        me_onchain.clone(),
         IndexerActionTracker::default(),
         ethereum_tx_executor,
         action_queue_cfg,
     );
 
     // Instantiate Chain Actions
-    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, action_queue.new_sender());
+    let chain_actions = CoreEthereumActions::new(me_onchain.clone(), db, action_queue.new_sender());
 
     (action_queue, chain_actions, rpc_operations)
 }

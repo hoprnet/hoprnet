@@ -61,7 +61,7 @@ pub struct HoprNetworkBehavior {
     pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
     pub ticket_aggregation:
-        libp2p::request_response::cbor::Behaviour<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+        libp2p::request_response::cbor::Behaviour<Vec<ProvableWinningTicket>, std::result::Result<Ticket, String>>,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -100,7 +100,7 @@ impl HoprNetworkBehavior {
                 libp2p::request_response::Config::default().with_request_timeout(ack_cfg.timeout),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
-                Vec<AcknowledgedTicket>,
+                Vec<ProvableWinningTicket>,
                 std::result::Result<Ticket, String>,
             >::new(
                 [(
@@ -133,7 +133,7 @@ pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
-    TicketAggregation(libp2p::request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>),
+    TicketAggregation(libp2p::request_response::Event<Vec<ProvableWinningTicket>, std::result::Result<Ticket, String>>),
     KeepAlive(void::Void),
 }
 
@@ -155,11 +155,11 @@ impl From<libp2p::request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehavio
     }
 }
 
-impl From<libp2p::request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>>
+impl From<libp2p::request_response::Event<Vec<ProvableWinningTicket>, std::result::Result<Ticket, String>>>
     for HoprNetworkBehaviorEvent
 {
     fn from(
-        event: libp2p::request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+        event: libp2p::request_response::Event<Vec<ProvableWinningTicket>, std::result::Result<Ticket, String>>,
     ) -> Self {
         Self::TicketAggregation(event)
     }

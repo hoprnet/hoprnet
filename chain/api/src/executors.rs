@@ -6,7 +6,6 @@ use chain_rpc::{HoprRpcOperations, PendingTransaction};
 use chain_types::TypedTransaction;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
-use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -121,13 +120,10 @@ where
 {
     async fn redeem_ticket(
         &self,
-        chain_key: &ChainKeypair,
-        acked_ticket: &AcknowledgedTicket,
+        winning_ticket: &ProvableWinningTicket,
         domain_separator: &Hash,
     ) -> chain_actions::errors::Result<Hash> {
-        let payload = self
-            .payload_generator
-            .redeem_ticket(chain_key, acked_ticket, domain_separator)?;
+        let payload = self.payload_generator.redeem_ticket(winning_ticket, domain_separator)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 

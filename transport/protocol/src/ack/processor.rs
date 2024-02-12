@@ -124,17 +124,28 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
-                // Try to unlock our incentive
-                unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                let domain_separator = self
+                    .db
+                    .read()
+                    .await
+                    .get_channels_domain_separator()
+                    .await
+                    .unwrap()
+                    .ok_or(MissingDomainSeparator)?;
 
-                    AcknowledgementValidation(format!(
-                        "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
-                    ))
-                })?;
-
-                let from_channel = self.db.read().await.get_channel_from(&unacknowledged.signer).await?;
+                let from_channel = self
+                    .db
+                    .read()
+                    .await
+                    .get_channel_from(
+                        &unacknowledged
+                            .ticket
+                            // result is cached due to previous ticket validation
+                            .recover_signer(&domain_separator)
+                            .expect("failed to derive signer from validated ticket")
+                            .to_address(),
+                    )
+                    .await?;
 
                 // Check that the channel with the ticket signer exists and the epoch on the ticket is correct
                 if from_channel.is_none()
@@ -148,16 +159,18 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     ));
                 }
 
-                let domain_separator = self
-                    .db
-                    .read()
-                    .await
-                    .get_channels_domain_separator()
-                    .await
-                    .unwrap()
-                    .ok_or(MissingDomainSeparator)?;
+                // Try to unlock our incentive
+                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share).map_err(|e| {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                    e
+                })?;
 
-                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
+                validate_acknowledged_ticket(&ack_ticket).map_err(|e| {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                    e
+                })?;
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
@@ -170,7 +183,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 METRIC_RECEIVED_ACKS.increment(&["true"]);
 
                 // Check if ticket is a win
-                if ack_ticket.is_winning_ticket(&domain_separator) {
+                if ack_ticket.is_winning_ticket(&self.chain_key, &domain_separator).is_ok() {
                     debug!("{ack_ticket} is a win");
 
                     #[cfg(all(feature = "prometheus", not(test)))]

@@ -7,8 +7,8 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, PartialEq, Debug, strum::EnumVariantNames, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
-    /// Redeem the given acknowledged ticket.
-    RedeemTicket(AcknowledgedTicket),
+    /// Redeem the given winning ticket.
+    RedeemTicket(ProvableWinningTicket),
 
     /// Open channel to the given destination with the given stake
     OpenChannel(Address, Balance),

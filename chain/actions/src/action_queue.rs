@@ -6,7 +6,6 @@ use chain_types::chain_events::ChainEventType;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
-use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -45,12 +44,7 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(
-        &self,
-        chain_key: &ChainKeypair,
-        ticket: &AcknowledgedTicket,
-        domain_separator: &Hash,
-    ) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: &ProvableWinningTicket, domain_separator: &Hash) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
@@ -146,7 +140,6 @@ where
     TxExec: TransactionExecutor,
 {
     db: Arc<RwLock<Db>>,
-    chain_key: ChainKeypair,
     action_state: Arc<S>,
     tx_exec: Arc<TxExec>,
     cfg: ActionQueueConfig,
@@ -162,7 +155,6 @@ where
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
-            chain_key: self.chain_key.clone(),
             action_state: self.action_state.clone(),
             tx_exec: self.tx_exec.clone(),
             cfg: self.cfg,
@@ -178,27 +170,21 @@ where
 {
     pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
-            Action::RedeemTicket(ack) => match ack.status {
-                AcknowledgedTicketStatus::BeingRedeemed { .. } => {
-                    let domain_separator = self
-                        .db
-                        .read()
-                        .await
-                        .get_channels_domain_separator()
-                        .await?
-                        .ok_or(MissingDomainSeparator)?;
+            Action::RedeemTicket(winning_ticket) => {
+                let domain_separator = self
+                    .db
+                    .read()
+                    .await
+                    .get_channels_domain_separator()
+                    .await?
+                    .ok_or(MissingDomainSeparator)?;
 
-                    let tx_hash = self
-                        .tx_exec
-                        .redeem_ticket(&self.chain_key, &ack, &domain_separator)
-                        .await?;
-                    IndexerExpectation::new(
-                        tx_hash,
-                        move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
-                    )
-                }
-                _ => return Err(InvalidState(ack.to_string())),
-            },
+                let tx_hash = self.tx_exec.redeem_ticket(&winning_ticket, &domain_separator).await?;
+                IndexerExpectation::new(
+                    tx_hash,
+                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if winning_ticket.ticket.channel_id == channel.get_id()),
+                )
+            }
 
             Action::OpenChannel(address, stake) => {
                 let tx_hash = self.tx_exec.fund_channel(&address, &stake).await?;
@@ -341,18 +327,11 @@ where
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
     /// Creates a new instance with the given `TransactionExecutor` implementation.
-    pub fn new(
-        db: Arc<RwLock<Db>>,
-        chain_key: ChainKeypair,
-        action_state: S,
-        tx_exec: TxExec,
-        cfg: ActionQueueConfig,
-    ) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
         let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {
             ctx: ExecutionContext {
                 db,
-                chain_key,
                 action_state: Arc::new(action_state),
                 tx_exec: Arc::new(tx_exec),
                 cfg,
@@ -395,11 +374,18 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack) = act {
+                        if let Action::RedeemTicket(winning_ticket) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
-                                error!("cannot mark {ack} as untouched: {e}");
+                            if let Err(e) = db_clone
+                                .write()
+                                .await
+                                .update_acknowledged_ticket_status(
+                                    &winning_ticket.ticket,
+                                    AcknowledgedTicketStatus::Untouched,
+                                )
+                                .await
+                            {
+                                error!("cannot mark {} as untouched: {}", winning_ticket.clone(), e);
                             }
                         }
 

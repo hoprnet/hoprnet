@@ -23,8 +23,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
-    ticket
-        .verify(sender, domain_separator)
+    validate_ticket(ticket, sender, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
@@ -163,7 +162,7 @@ mod tests {
                 index_start: u64,
                 index_end: u64,
             ) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
-            async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> chain_db::errors::Result<()>;
+            async fn update_acknowledged_ticket_status(&mut self, ticket: &Ticket, new_status: AcknowledgedTicketStatus) -> chain_db::errors::Result<()>;
             async fn prepare_aggregatable_tickets(
                 &mut self,
                 channel_id: &Hash,
@@ -257,7 +256,6 @@ mod tests {
             &SENDER_PRIV_KEY,
             &Hash::default(),
         )
-        .unwrap()
     }
 
     fn create_channel_entry() -> ChannelEntry {
@@ -488,7 +486,6 @@ mod tests {
         let unack = UnacknowledgedTicket::new(
             create_valid_ticket(),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PRIV_KEY.public().to_address(),
         );
 
         db.store_pending_acknowledgment(hkc, PendingAcknowledgement::WaitingAsRelayer(unack))
@@ -505,9 +502,7 @@ mod tests {
         match pending {
             PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
             PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-                let ack = ticket
-                    .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
-                    .unwrap();
+                let ack = ticket.acknowledge(&HalfKey::default()).unwrap();
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
                 let num_tickets = db.get_tickets(None).await.unwrap().len();

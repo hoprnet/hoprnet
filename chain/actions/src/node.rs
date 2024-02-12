@@ -41,8 +41,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for CoreEt
 
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
-        let announcement_data =
-            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.me, offchain_key)))?;
+        let announcement_data = AnnouncementData::new(
+            multiaddrs[0].clone(),
+            Some(KeyBinding::new(self.self_address(), offchain_key)),
+        )?;
 
         if !self
             .db
@@ -118,19 +120,13 @@ mod tests {
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker.expect_register_expectation().never();
 
-        let tx_queue = ActionQueue::new(
-            db.clone(),
-            ALICE.clone(),
-            indexer_action_tracker,
-            tx_exec,
-            Default::default(),
-        );
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn(async move {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_sender.clone());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(*BOB_ADDR, stake)
@@ -160,12 +156,11 @@ mod tests {
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
-            ALICE.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(*ALICE_ADDR, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

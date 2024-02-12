@@ -72,7 +72,11 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all unacknowledged tickets within the filter criteria.
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
-    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn update_acknowledged_ticket_status(
+        &mut self,
+        ticket: &Ticket,
+        new_status: AcknowledgedTicketStatus,
+    ) -> Result<()>;
 
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 

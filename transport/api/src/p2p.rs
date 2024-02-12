@@ -262,8 +262,8 @@ pub async fn p2p_loop(
                     }
                 },
                 Inputs::TicketAggregation(task) => match task {
-                    TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
-                        let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
+                    TicketAggregationProcessed::Send(peer, winning_tickets, finalizer) => {
+                        let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, winning_tickets);
                         info!("Ticket aggregation: Sent request (#{request_id}) to {peer}");
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
@@ -399,10 +399,10 @@ pub async fn p2p_loop(
                 },
                 // --------------
                 // ticket aggregation protocol
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::Message {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::Message {
                     peer,
                     message:
-                    libp2p::request_response::Message::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::Request {
+                    libp2p::request_response::Message::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::Request {
                         request_id, request, channel
                     },
                 })) => {
@@ -411,10 +411,10 @@ pub async fn p2p_loop(
                         debug!("Aggregation protocol: Failed to aggregate tickets for {} with an error: {}", peer, e);
                     }
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::Message {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::Message {
                     peer,
                     message:
-                    libp2p::request_response::Message::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::Response {
+                    libp2p::request_response::Message::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::Response {
                         request_id, response
                     },
                 })) => {
@@ -422,16 +422,16 @@ pub async fn p2p_loop(
                         debug!("Aggregation protocol: Error while handling aggregated ticket from {}, error: {}", peer, e);
                     }
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::OutboundFailure {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::OutboundFailure {
                     peer, request_id, error,
                 })) => {
                     info!("Ticket aggregation protocol: Failed to send a Ping message {} to {} with an error: {}", request_id, peer, error);
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::InboundFailure {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::InboundFailure {
                     peer, request_id, error})) => {
                     debug!("Ticket aggregation protocol: Encountered inbound failure for peer {} (#{}): {}", peer, request_id, error)
                 }
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::ResponseSent {..})) => {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::ResponseSent {..})) => {
                     // debug!("Ticket aggregation protocol: Discarded messages not relevant for the protocol!");
                 },
                 // --------------

@@ -237,6 +237,12 @@ impl Ord for ProvableWinningTicket {
     }
 }
 
+impl Display for ProvableWinningTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "winning ticket: {}", self.ticket)
+    }
+}
+
 /// over-the-wire format to be deprecated soon
 impl BinarySerializable for ProvableWinningTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
