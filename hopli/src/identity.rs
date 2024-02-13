@@ -52,11 +52,11 @@ impl PrivateKeyArgs {
             env::var("PRIVATE_KEY").map_err(|err| HelperErrors::UnableToReadPrivateKey(err))?
         };
 
-        // TODO:
-        info!("To validate the private key");
-
         // FIXME: temporarily set as env variable
         env::set_var("PRIVATE_KEY", &private_key);
+
+        // TODO:
+        info!("To validate the private key");
 
         Ok(private_key)
     }
@@ -77,26 +77,36 @@ pub struct PasswordArgs {
 
 impl PasswordArgs {
     pub fn read_password(self) -> Result<String, HelperErrors> {
-        match self.password_path {
-            Some(ref password_path) => {
-                // read password from file
-                if let Ok(pwd_from_file) = fs::read_to_string(password_path) {
-                    Ok(pwd_from_file)
-                } else {
-                    println!("Cannot read from password_path");
-                    Err(HelperErrors::UnableToReadPassword)
-                }
-            }
-            None => {
-                // read password from environment variable
-                if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
-                    Ok(pwd_from_env)
-                } else {
-                    println!("Cannot read from env var");
-                    Err(HelperErrors::UnableToReadPassword)
-                }
-            }
-        }
+        let pwd = if let Some(pwd_path) = self.password_path {
+            info!("reading password from password_path");
+            fs::read_to_string(pwd_path).map_err(|err| HelperErrors::UnableToReadFromPath(err))?
+        } else {
+            info!("reading password from env IDENTITY_PASSWORD");
+            env::var("IDENTITY_PASSWORD").map_err(|_| HelperErrors::UnableToReadPassword)?
+        };
+
+        Ok(pwd)
+
+        // match self.password_path {
+        //     Some(ref password_path) => {
+        //         // read password from file
+        //         if let Ok(pwd_from_file) = fs::read_to_string(password_path) {
+        //             Ok(pwd_from_file)
+        //         } else {
+        //             println!("Cannot read from password_path");
+        //             Err(HelperErrors::UnableToReadPassword)
+        //         }
+        //     }
+        //     None => {
+        //         // read password from environment variable
+        //         if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
+        //             Ok(pwd_from_env)
+        //         } else {
+        //             println!("Cannot read from env var");
+        //             Err(HelperErrors::UnableToReadPassword)
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -331,6 +341,7 @@ mod tests {
             Err(_) => assert!(true),
         }
     }
+
     #[test]
     fn ok_when_no_private_key_is_supplied_but_env_is_supplied() {
         let pk_args = PrivateKeyArgs { private_key: None };
@@ -363,6 +374,58 @@ mod tests {
             Ok(pk) => assert_eq!(pk, DUMMY_PRIVATE_KEY.to_string()),
             Err(_) => assert!(false),
         }
+    }
+
+    #[test]
+    fn revert_when_no_password_path_nor_identity_password_env_is_supplied() {
+        let pwd_args = PasswordArgs { password_path: None };
+        env::remove_var("IDENTITY_PASSWORD");
+        match pwd_args.read() {
+            Ok(_) => assert!(false),
+            Err(_) => assert!(true),
+        }
+    }
+
+    #[test]
+    fn ok_when_no_password_path_is_supplied_but_env_is_supplied() {
+        let pk_args = PrivateKeyArgs { private_key: None };
+        env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
+        match pk_args.read() {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn ok_when_no_env_is_supplied_but_password_path_is_supplied() {
+        let path = "./tmp_exist_1";
+        create_file(path, None, 0);
+
+        let pk_args = PrivateKeyArgs {
+            private_key: Some(DUMMY_PRIVATE_KEY.into()),
+        };
+        env::remove_var("PRIVATE_KEY");
+        match pk_args.read() {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+        remove_file(path);
+    }
+
+    #[test]
+    fn take_cli_password_path_when_both_cli_arg_and_env_are_supplied() {
+        let path = "./tmp_exist_1";
+        create_file(path, None, 0);
+
+        let pk_args = PrivateKeyArgs {
+            private_key: Some(DUMMY_PRIVATE_KEY.into()),
+        };
+        env::set_var("PRIVATE_KEY", "0123");
+        match pk_args.read() {
+            Ok(pk) => assert_eq!(pk, DUMMY_PRIVATE_KEY.to_string()),
+            Err(_) => assert!(false),
+        }
+        remove_file(path);
     }
 
     #[test]

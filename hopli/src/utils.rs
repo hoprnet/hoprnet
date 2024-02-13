@@ -9,7 +9,7 @@ pub trait Cmd: clap::Parser + Sized {
 pub enum HelperErrors {
     /// Error propagated by IO operations
     #[error(transparent)]
-    UnableToReadIdentitiesFromPath(#[from] std::io::Error),
+    UnableToReadFromPath(#[from] std::io::Error),
 
     #[error("error parsig address: {0:?}")]
     UnableToParseAddress(String),
