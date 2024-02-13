@@ -76,7 +76,7 @@ pub struct PasswordArgs {
 }
 
 impl PasswordArgs {
-    pub fn read_password(self) -> Result<String, HelperErrors> {
+    pub fn read(self) -> Result<String, HelperErrors> {
         let pwd = if let Some(pwd_path) = self.password_path {
             info!("reading password from password_path");
             fs::read_to_string(pwd_path).map_err(|err| HelperErrors::UnableToReadFromPath(err))?
@@ -216,7 +216,7 @@ impl IdentityFileArgs {
         // get Ethereum addresses from identity files
         if !files.is_empty() {
             // check if password is provided
-            let pwd = match self.password.read_password() {
+            let pwd = match self.password.read() {
                 Ok(read_pwd) => read_pwd,
                 Err(e) => return Err(e),
             };
@@ -273,7 +273,7 @@ impl IdentityArgs {
         } = self;
 
         // check if password is provided
-        let pwd = match local_identity.clone().password.read_password() {
+        let pwd = match local_identity.clone().password.read() {
             Ok(read_pwd) => read_pwd,
             Err(e) => return Err(e),
         };
