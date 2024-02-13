@@ -329,8 +329,11 @@ where
             .store_peer_multiaddresses(&identity.public().to_peer_id(), my_multiaddresses.clone());
     });
 
-    let addr_resolver =
-        DefaultPeerAddressResolver::new(DbPeerAddressResolver(db.clone()), cfg.transport.peer_map_cache_size);
+    let addr_resolver = DefaultPeerAddressResolver::new(
+        DbPeerAddressResolver(db.clone()),
+        cfg.transport.peer_map_cache_size,
+        cfg.transport.peer_map_ttl,
+    );
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
@@ -408,7 +411,8 @@ where
 
     let tbf = Arc::new(RwLock::new(tbf));
 
-    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone());
+    let (packet_actions, ack_actions) =
+        build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone(), addr_resolver.clone());
 
     let (ping, ping_rx, pong_tx) = build_manual_ping(
         cfg.protocol,

@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use validator::{Validate, ValidationError};
 
 pub use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
@@ -122,6 +123,7 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
 }
 
 /// Configuration of the physical transport mechanism.
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
@@ -143,6 +145,13 @@ pub struct TransportConfig {
     #[validate(range(min = 128))]
     #[default = 512]
     pub peer_map_cache_size: usize,
+
+    /// Time in seconds after which a cached on-chain and off-chain public key mapping is expired.
+    ///
+    /// Default is 600 seconds.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    #[default(std::time::Duration::from_secs(600))]
+    pub peer_map_ttl: std::time::Duration,
 }
 
 #[cfg(test)]

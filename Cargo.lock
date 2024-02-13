@@ -1668,6 +1668,7 @@ dependencies = [
  "multiaddr",
  "proc-macro-regex",
  "serde",
+ "serde_with",
  "smart-default",
  "thiserror",
  "utils-db",

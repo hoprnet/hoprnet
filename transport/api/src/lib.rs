@@ -170,23 +170,24 @@ pub fn build_packet_actions<Db>(
     me_onchain: &ChainKeypair,
     db: Arc<RwLock<Db>>,
     tbf: Arc<RwLock<TagBloomFilter>>,
+    peer_map: DefaultPeerAddressResolver,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
     Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static,
 {
     (
-        PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
+        PacketInteraction::new(db.clone(), tbf, peer_map, PacketInteractionConfig::new(me, me_onchain)),
         AcknowledgementInteraction::new(db, me_onchain),
     )
 }
 
-type HoprHearbeat = Heartbeat<
+type HoprHeartbeat = Heartbeat<
     Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>>,
     adaptors::heartbeat::HeartbeatExternalInteractions,
 >;
 
 type HoprHeartbeatComponents = (
-    HoprHearbeat,
+    HoprHeartbeat,
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
@@ -406,13 +407,12 @@ impl HoprTransport {
     ) -> crate::errors::Result<HalfKeyChallenge> {
         let app_data = ApplicationData::new(application_tag, &msg)?;
 
-        let path: TransportPath = if let Some(intermediate_path) = intermediate_path {
-            let mut full_path = intermediate_path;
-            full_path.push(destination);
+        let path: TransportPath = if let Some(mut path_to_dst) = intermediate_path {
+            path_to_dst.push(destination);
 
             let cg = self.channel_graph.read().await;
 
-            TransportPath::resolve(full_path, &self.peer_map, &cg)
+            TransportPath::resolve(path_to_dst, &self.peer_map, &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {

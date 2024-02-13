@@ -31,6 +31,7 @@ hopr:
     announce_local_addresses: true
     prefer_local_addresses: true
     peer_map_cache_size: 512
+    peer_map_ttl: 600
   protocol:
     ack:
       timeout: 15

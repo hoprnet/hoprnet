@@ -88,40 +88,43 @@ pub enum MsgProcessed {
 }
 
 /// Implements protocol acknowledgement logic for msg packets
-pub struct PacketProcessor<Db>
+pub struct PacketProcessor<Db, R>
 where
     Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    R: PeerAddressResolver + Send + Sync,
 {
     db: Arc<RwLock<Db>>,
+    peer_map: R,
     cfg: PacketInteractionConfig,
 }
 
-impl<Db> Clone for PacketProcessor<Db>
+impl<Db, R> Clone for PacketProcessor<Db, R>
 where
     Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    R: PeerAddressResolver + Send + Sync + Clone,
 {
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
+            peer_map: self.peer_map.clone(),
             cfg: self.cfg.clone(),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
+impl<Db, R> crate::msg::packet::PacketConstructing for PacketProcessor<Db, R>
 where
     Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    R: PeerAddressResolver + Send + Sync,
 {
     type Input = ApplicationData;
 
     async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket> {
         let next_peer = self
-            .db
-            .read()
+            .peer_map
+            .resolve_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
             .await
-            .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
-            .await?
             .ok_or_else(|| {
                 debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
                 PacketConstructionError
@@ -236,21 +239,17 @@ where
 
                 // START: channel = get_channel_from_to(packet_key, packet_key)
                 let previous_hop_addr =
-                    self.db
-                        .read()
+                    self.peer_map
+                        .resolve_chain_key(&previous_hop)
                         .await
-                        .get_chain_key(&previous_hop)
-                        .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {previous_peer} on previous hop"
                         )))?;
 
                 let next_hop_addr = self
-                    .db
-                    .read()
+                    .peer_map
+                    .resolve_chain_key(&next_hop)
                     .await
-                    .get_chain_key(&next_hop)
-                    .await?
                     .ok_or(PacketDecodingError(format!(
                         "failed to find channel key for packet key {next_peer} on next hop",
                     )))?;
@@ -369,13 +368,14 @@ where
     }
 }
 
-impl<Db> PacketProcessor<Db>
+impl<Db, R> PacketProcessor<Db, R>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + Send + Sync,
+    R: PeerAddressResolver + Send + Sync,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
-        Self { db, cfg }
+    pub fn new(db: Arc<RwLock<Db>>, peer_map: R, cfg: PacketInteractionConfig) -> Self {
+        Self { db, peer_map, cfg }
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
@@ -598,17 +598,22 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db, R>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
+        peer_map: R,
         cfg: PacketInteractionConfig,
-    ) -> Self {
+    ) -> Self
+    where
+        Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+        R: PeerAddressResolver + Send + Sync + Clone + 'static,
+    {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
         let mixer_cfg = cfg.mixer;
         let pkt_keypair = cfg.packet_keypair.clone();
-        let processor = PacketProcessor::new(db, cfg);
+        let processor = PacketProcessor::new(db, peer_map, cfg);
 
         let mut processing_stream = to_process_rx
             .then_concurrent(move |event| {
@@ -823,6 +828,7 @@ mod tests {
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
+    use core_path::DbPeerAddressResolver;
     use futures::{
         future::{select, Either},
         pin_mut, StreamExt,
@@ -1095,6 +1101,7 @@ mod tests {
                 let pkt = PacketInteraction::new(
                     db.clone(),
                     Arc::new(RwLock::new(TagBloomFilter::default())),
+                    DbPeerAddressResolver(db.clone()),
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: PEERS[i].clone(),
