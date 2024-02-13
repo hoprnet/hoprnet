@@ -27,23 +27,14 @@ use crate::RetryAction::NoRetry;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 
-/// Extended `JsonRpcClient` abstraction
-/// This module contains custom implementation of `ethers::providers::JsonRpcClient`
-/// which allows usage of non-`reqwest` based HTTP clients.
 pub mod client;
-/// Errors specific to this crate.
 pub mod errors;
-
-/// Indexer specific trait implementation (`HoprIndexerRpcOperations`)
+mod helper;
 pub mod indexer;
-
-/// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
 
-/// Helper types required by `client` module.
-mod helper;
-
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
+///
 /// This is further restricted to already mined blocks.
 #[derive(Debug, Clone)]
 pub struct Log {
@@ -213,6 +204,7 @@ type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send +
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
+///
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,

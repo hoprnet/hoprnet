@@ -35,6 +35,7 @@ pub trait PeerAddressResolver {
 }
 
 /// Bloom filter for packet tags to detect packet replays.
+///
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.

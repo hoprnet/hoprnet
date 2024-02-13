@@ -1,9 +1,11 @@
-//! This Rust crate contains all the path construction and path finding algorithms in the HOPR mixnet.
-//! Most importantly, it exports the `Path` object that contains a fully constructed and validated path through the mixnet.
+//! This Rust crate contains all the path construction and path selection algorithms in the HOPR mixnet.
 
+/// Defines the graph of HOPR payment channels.
 pub mod channel_graph;
 pub mod errors;
+/// Defines the two most important types: [TransportPath](crate::path::TransportPath) and [ChannelPath](crate::path::ChannelPath).
 pub mod path;
+/// Implements different path selectors in the [ChannelGraph](crate::channel_graph::ChannelGraph).
 pub mod selectors;
 
 use async_lock::RwLock;
@@ -17,6 +19,7 @@ use log::error;
 use std::sync::Arc;
 use utils_db::CurrentDbShim;
 
+// TODO: use internally a LRU cache
 /// DB backed packet key to chain key resolver
 #[derive(Debug, Clone)]
 pub struct DbPeerAddressResolver(pub Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>);

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
 
-/// Implements the Control Message sub-protocol, which currently consists of Ping/Pong
+/// Implementation of the Control Message sub-protocol, which currently consists of Ping/Pong
 /// messaging for the HOPR protocol.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ControlMessage {
@@ -15,7 +15,7 @@ pub enum ControlMessage {
 }
 
 impl ControlMessage {
-    /// Creates a ping challenge message
+    /// Creates a ping challenge message.
     pub fn generate_ping_request() -> Self {
         let mut ping = PingMessage::default();
         ping.nonce.copy_from_slice(&derive_ping_pong(None));
@@ -80,7 +80,6 @@ impl hopr_primitive_types::traits::BinarySerializable for PingMessage {
     const SIZE: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
 
     // This implementation is backwards compatible with older HOPR versions
-
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() >= Self::SIZE {
             let mut ret = PingMessage::default();
