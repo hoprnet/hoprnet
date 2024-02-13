@@ -58,6 +58,7 @@ pub struct CreateSafeModuleArgs {
 
     /// Access to the private key, of which the wallet either contains sufficient assets
     /// as the source of funds or it can mint necessary tokens
+    /// This wallet is also the manager of Network Registry contract
     #[clap(flatten)]
     pub private_key: PrivateKeyArgs,
 }

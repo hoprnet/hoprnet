@@ -1,3 +1,15 @@
+//! This module contains arguments and functions to move a node to an existing Safe.
+//!
+//! Note that the Safe should has a node management module attached and configured.
+//!
+//! It performs the following steps:
+//! - Use admin key (of the old Safe) to
+//!   - Deregister node from Node-safe registry
+//! - Use admin key (of the new Safe) to
+//!   - Include node to module
+//! - Use manager to
+//!   - Deregister nodes from Network Registry
+//!   - Re-register nodes with the new safe in Network Registry
 use crate::{
     identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_move_node_to_safe_module, set_process_path_env},
@@ -12,12 +24,15 @@ use std::str::FromStr;
 /// CLI arguments for `hopli move-node-to-safe-module`
 #[derive(Parser, Default, Debug)]
 pub struct MoveNodeToSafeModuleArgs {
+    /// Name of the network that the node is running on
     #[clap(help = "Network name. E.g. monte_rosa", long)]
     network: String,
 
+    /// Arguments to locate identity file(s) of HOPR node(s)
     #[clap(flatten)]
     local_identity: IdentityFileArgs,
 
+    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
     #[clap(
         help = "Specify path pointing to the contracts root",
         long,
@@ -26,17 +41,22 @@ pub struct MoveNodeToSafeModuleArgs {
     )]
     contracts_root: Option<String>,
 
+    /// Address of the safe proxy instance
     #[clap(help = "Ethereum address of safe", long, short)]
     safe_address: String,
 
+    /// Address of the node management module proxy instance
     #[clap(help = "Ethereum address of node management module", long, short)]
     module_address: String,
 
+    /// Access to the private key, of which the wallet is the manager of Network Registry contract
     #[clap(flatten)]
     pub private_key: PrivateKeyArgs,
 }
 
 impl MoveNodeToSafeModuleArgs {
+    /// Execute the command to move a node to an existing Safe and module pair.
+    ///
     /// 1. Include node to the new module
     /// 2. Deregister the old node-safe from node-safe registry
     /// 3. Registerr the new node-safe from node-safe registry

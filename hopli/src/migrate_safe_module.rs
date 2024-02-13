@@ -1,3 +1,11 @@
+//! This module contains arguments and functions to migrate existing HOPR node(s), Safe,
+//! and module to be migrated to a different network.
+//!
+//! It performs the following steps:
+//! - add the Channel contract of the new network to the module as target and set default permissions.
+//! - add the Announcement contract as target to the module
+//! - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+//! - Use the manager wlalet to add nodes and Safes to the Network Registry contract of the new network.
 use crate::{
     identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_migrate_safe_module, set_process_path_env},
@@ -12,12 +20,15 @@ use std::str::FromStr;
 /// CLI arguments for `hopli migrate-safe-module`
 #[derive(Parser, Default, Debug)]
 pub struct MigrateSafeModuleArgs {
+    /// Name of the network that the node is running on
     #[clap(help = "Network name. E.g. monte_rosa", long)]
     network: String,
 
+    /// Arguments to locate identity file(s) of HOPR node(s)
     #[clap(flatten)]
     local_identity: IdentityFileArgs,
 
+    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
     #[clap(
         help = "Specify path pointing to the contracts root",
         long,
@@ -26,20 +37,21 @@ pub struct MigrateSafeModuleArgs {
     )]
     contracts_root: Option<String>,
 
+    /// Address of the safe proxy instance
     #[clap(help = "Ethereum address of safe", long, short)]
     safe_address: String,
 
+    /// Address of the node management module proxy instance
     #[clap(help = "Ethereum address of node management module", long, short)]
     module_address: String,
 
+    /// Access to the private key, of which the wallet is the manager of Network Registry contract
     #[clap(flatten)]
     pub private_key: PrivateKeyArgs,
 }
 
 impl MigrateSafeModuleArgs {
-    /// 1. Scope channels, announcement contracts
-    /// 2. Set approval for channels
-    /// 3. Include node to network registry
+    /// Execute the command to migrate node, safe, and module to the network.
     fn execute_safe_module_migration(self) -> Result<(), HelperErrors> {
         let MigrateSafeModuleArgs {
             network,
