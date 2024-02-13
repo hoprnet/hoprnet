@@ -1,5 +1,6 @@
-//! Types that are related to events that are raised on-chain
-//! in response to actions (transactions, smart contract calls) done by a HOPR node on chain.
+//! Types that are related to events that are raised on-chain and extracted from chain logs.
+//!
+//! These events happen in response to actions (transactions, smart contract calls) done by a HOPR node on chain.
 //!
 //! See `chain-actions` and `chain-indexer` crates for details.
 use hopr_crypto_types::types::Hash;

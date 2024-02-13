@@ -53,7 +53,7 @@ where
 /// [Addresses](Address) that must be known to have open channels between them (at the time of construction).
 /// This path is not useful for transport, because it *does never contain the last hop*
 /// to the destination (which does not require and open channel).
-/// To make it useful for transport, it must be converted to a [TransportPath] via `into_path`.
+/// To make it useful for transport, it must be converted to a [TransportPath] via [`ChannelPath::into_path<R>`].
 /// The `ChannelPath` does not allow simple loops (same adjacent hops)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPath {

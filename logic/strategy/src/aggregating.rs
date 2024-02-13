@@ -21,7 +21,8 @@
 //! If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
 //! This behavior does not have any additional criteria, unlike in the previous event.
 //!
-//! The aggregation on channel closure slightly differs in what happens on failure behaviour.
+//! The aggregation on channel closure slightly differs from the one that happens on a new winning ticket.
+//! The difference lies in the on-failure behaviour.
 //! If the aggregation on channel closure fails, the unaggregated tickets in that channel are automatically send for redeeming.
 //! When this strategy is triggered from the
 //!
