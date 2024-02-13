@@ -1,4 +1,4 @@
-//! This module defines types that are related to events that are raised on-chain
+//! Types that are related to events that are raised on-chain
 //! in response to actions (transactions, smart contract calls) done by a HOPR node on chain.
 //!
 //! See `chain-actions` and `chain-indexer` crates for details.

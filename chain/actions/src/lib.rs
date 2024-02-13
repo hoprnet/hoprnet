@@ -1,4 +1,4 @@
-//! Contains high-level Core-Ethereum traits that translate to on-chain transactions
+//! Contains high-level traits that translate to on-chain transaction interactions
 //!
 //! ## Actions
 //! The main concept is an "action", which a node can perform and results into an on-chain

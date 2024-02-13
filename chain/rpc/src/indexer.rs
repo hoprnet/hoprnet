@@ -1,4 +1,4 @@
-//! This module extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component.
+//! Extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component.
 //!
 //! The functionality required functionality is defined in the [HoprIndexerRpcOperations] trait,
 //! which is implemented for [RpcOperations](rpc::RpcOperations) hereof.

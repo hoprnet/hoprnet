@@ -1,4 +1,7 @@
-//! This module defines HTTP clients for the purpose of interaction with an RPC provider.
+//! Extended `JsonRpcClient` abstraction.
+//!
+//! This module contains custom implementation of `ethers::providers::JsonRpcClient`
+//! which allows usage of non-`reqwest` based HTTP clients.
 //!
 //! The major type implemented in this module is the [JsonRpcProviderClient](client::JsonRpcProviderClient)
 //! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.

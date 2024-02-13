@@ -34,7 +34,7 @@ use hopr_primitive_types::prelude::AsUnixTimestamp;
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
 
-/// Configuration of the Heartbeat
+/// Configuration for the Heartbeat mechanism
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
@@ -70,7 +70,7 @@ fn default_heartbeat_variance() -> std::time::Duration {
     DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
 }
 
-/// API trait for external functionality required by the heartbeat mechanism
+/// API trait for external functionality required by the Heartbeat mechanism
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HeartbeatExternalApi {

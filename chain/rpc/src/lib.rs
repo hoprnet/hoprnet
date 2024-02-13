@@ -28,13 +28,13 @@ use crate::RetryAction::NoRetry;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 
 pub mod client;
-/// Errors specific to this crate.
 pub mod errors;
 mod helper;
 pub mod indexer;
 pub mod rpc;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
+///
 /// This is further restricted to already mined blocks.
 #[derive(Debug, Clone)]
 pub struct Log {
@@ -204,6 +204,7 @@ type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send +
 /// Represents a pending transaction that can be eventually
 /// resolved until confirmation, which is done by polling
 /// the respective RPC provider.
+///
 /// The polling interval and number of confirmations are defined by the underlying provider.
 pub struct PendingTransaction<'a> {
     tx_hash: Hash,
