@@ -592,7 +592,14 @@ impl Hopr {
             me_onchain.public().to_address(),
         )));
 
-        info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
+        if cfg.chain.provider.is_none() {
+            info!("Creating chain components using default provider");
+        } else {
+            info!(
+                "Creating chain components using custom provider: {:?}",
+                cfg.chain.provider.unwrap()
+            );
+        }
         let resolved_environment = crate::chain::ChainNetworkConfig::new(
             &cfg.chain.network,
             cfg.chain.provider.as_deref(),
