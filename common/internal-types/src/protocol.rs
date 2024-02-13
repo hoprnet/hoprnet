@@ -1,16 +1,13 @@
-use async_lock::Mutex;
 use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{trace, warn};
-use lru::LruCache;
+use log::warn;
+use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::sync::Arc;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -42,58 +39,35 @@ pub trait PeerAddressResolver {
 #[derive(Debug, Clone)]
 pub struct CachedPeerAddressResolver<R: PeerAddressResolver + Clone + Send + Sync> {
     inner: R,
-    address_to_key: Arc<Mutex<LruCache<Address, OffchainPublicKey>>>,
-    key_to_address: Arc<Mutex<LruCache<OffchainPublicKey, Address>>>,
+    // Cloning of caches is cheap, as it is represented internally as Arc
+    address_to_key: Cache<Address, OffchainPublicKey>,
+    key_to_address: Cache<OffchainPublicKey, Address>,
 }
 
 impl<R: PeerAddressResolver + Clone + Send + Sync> CachedPeerAddressResolver<R> {
     /// Instantiates a new peer address resolver with the given cache size.
     pub fn new(inner: R, cache_size: usize) -> Self {
-        let s = cache_size.try_into().expect("cache size must not be zero");
         Self {
             inner,
-            address_to_key: Arc::new(Mutex::new(LruCache::new(s))),
-            key_to_address: Arc::new(Mutex::new(LruCache::new(s))),
+            // Expiration policies can be optionally set here by constructing via CacheBuilder
+            address_to_key: Cache::new(cache_size as u64),
+            key_to_address: Cache::new(cache_size as u64),
         }
-    }
-}
-
-async fn resolve_via_cache<K, V, R>(key: &K, cache: &Arc<Mutex<LruCache<K, V>>>, resolver: R) -> Option<V>
-where
-    K: std::hash::Hash + Eq + Clone + Display,
-    V: Clone, // Due to lock guard we need to own the data when returning them from the cache.
-    R: Future<Output = Option<V>>,
-{
-    if let Some(v) = cache.lock().await.get(key) {
-        return Some(v.clone());
-    }
-
-    trace!("cache miss when looking up {key}");
-    let resolved = resolver.await;
-    match resolved {
-        Some(v) => Some(cache.lock().await.get_or_insert(key.to_owned(), || v).clone()),
-        None => None, // Cache only the `Some` results
     }
 }
 
 #[async_trait]
 impl<R: PeerAddressResolver + Clone + Send + Sync> PeerAddressResolver for CachedPeerAddressResolver<R> {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-        resolve_via_cache(
-            onchain_key,
-            &self.address_to_key,
-            self.inner.resolve_packet_key(onchain_key),
-        )
-        .await
+        self.address_to_key
+            .optionally_get_with_by_ref(onchain_key, self.inner.resolve_packet_key(onchain_key))
+            .await
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-        resolve_via_cache(
-            offchain_key,
-            &self.key_to_address,
-            self.inner.resolve_chain_key(offchain_key),
-        )
-        .await
+        self.key_to_address
+            .optionally_get_with_by_ref(offchain_key, self.inner.resolve_chain_key(offchain_key))
+            .await
     }
 }
 

@@ -13,11 +13,10 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 ethers = { workspace = true, default-features = false }
 hex-literal = "0.4.1"
-lru = "0.12.2"
+moka = { version = "0.12.5", features = ["future", "atomic64", "quanta"] }
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
