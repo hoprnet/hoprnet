@@ -920,7 +920,6 @@ mod tests {
             NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),
-            0u64.into(),
         );
 
         dbs[1]

@@ -14,7 +14,7 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets: ['localhost:3001']
-    metrics_path: /api/v2/node/metrics
+    metrics_path: /api/v3/node/metrics
     basic_auth:
       username: ^MYtoken4testing^
       password: ''
@@ -34,7 +34,7 @@ scrape_configs:
 - `hopr_winning_tickets_count`: Number of winning tickets
 - `hopr_losing_tickets_count`: Number of losing tickets
 - `hopr_ping_time_sec`: Measures total time it takes to ping a single node (seconds), buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
-- `hopr_heartbeat_pings_count`: 
+- `hopr_heartbeat_pings_count`: Total number of pings by result, keys: `success`
 - `hopr_heartbeat_round_time_sec`: Measures total time in seconds it takes to probe all other nodes, buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
 - `hopr_network_health`: Connectivity health indicator
 - `hopr_relayed_packet_processing_time_with_mixing_sec`: Histogram of measured processing and mixing time for a relayed packet in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,

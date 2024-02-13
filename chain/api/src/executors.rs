@@ -29,20 +29,15 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
     async fn post_transaction_and_await_confirmation(&self, tx: T) -> chain_rpc::errors::Result<Hash>;
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct RpcEthereumClientConfig {
     /// Maximum time to wait for the TX to get submitted.
+    ///
     /// This must be strictly greater than any timeouts in the underlying `HoprRpcOperations`
+    ///
     /// Defaults to 30 seconds.
+    #[default(Duration::from_secs(30))]
     pub max_tx_submission_wait: Duration,
-}
-
-impl Default for RpcEthereumClientConfig {
-    fn default() -> Self {
-        Self {
-            max_tx_submission_wait: Duration::from_secs(30),
-        }
-    }
 }
 
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.

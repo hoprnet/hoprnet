@@ -1,3 +1,18 @@
+//! This module adds functionality of tracking the action results via expectations.
+//!
+//! It contains implementation of types necessary to perform tracking the
+//! on-chain state of [Actions](chain_types::actions::Action).
+//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation](action_state::IndexerExpectation)
+//! can be created and registered in an object implementing the [ActionState](action_state::ActionState) trait.
+//! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType](chain_types::chain_events::ChainEventType)
+//! that must match on any chain event log in a block containing the given transaction hash.
+//!
+//! ### Example
+//! Once the [RegisterSafe(`0x0123..ef`)](chain_types::actions::Action) action that has been submitted via [ActionQueue](action_queue::ActionQueue)
+//! in a transaction with hash `0xabcd...00`.
+//! The [IndexerExpectation](action_state::IndexerExpectation) is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
+//! a log that matches [NodeSafeRegistered(`0x0123..ef`)](chain_types::chain_events::ChainEventType) event type.
+//! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
@@ -11,14 +26,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::errors::{CoreEthereumActionsError, Result};
+use crate::errors::{ChainActionsError, Result};
 
-/// Future that resolves once an expectation is matched by some `SignificantChainEvent`
+/// Future that resolves once an expectation is matched by some [SignificantChainEvent].
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an `Action` via registering `IndexerExpectation`s on
-/// `SignificantChainEvents` coming from the Indexer and resolving them as they are
+/// Allows tracking state of an [Action](chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
+/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
 /// matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -27,7 +42,7 @@ pub trait ActionState {
     /// Each matched expectation is resolved, unregistered and returned.
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation>;
 
-    /// Registers new `IndexerExpectation`
+    /// Registers new [IndexerExpectation].
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver>;
 
     /// Manually unregisters `IndexerExpectation` given its TX hash.
@@ -69,6 +84,8 @@ impl IndexerExpectation {
 
 type ExpectationTable = HashMap<Hash, (IndexerExpectation, channel::oneshot::Sender<SignificantChainEvent>)>;
 
+/// Implements [action state](ActionState) tracking using a non-persistent in-memory hash table of
+/// assumed [IndexerExpectations](IndexerExpectation).
 #[derive(Debug)]
 pub struct IndexerActionTracker {
     expectations: Arc<RwLock<ExpectationTable>>,
@@ -124,7 +141,7 @@ impl ActionState for IndexerActionTracker {
         match self.expectations.write().await.entry(exp.tx_hash) {
             Entry::Occupied(_) => {
                 // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(CoreEthereumActionsError::InvalidState(format!(
+                return Err(ChainActionsError::InvalidState(format!(
                     "expectation for tx {} already present",
                     exp.tx_hash
                 )));
@@ -132,9 +149,7 @@ impl ActionState for IndexerActionTracker {
             Entry::Vacant(e) => {
                 let (tx, rx) = channel::oneshot::channel();
                 e.insert((exp, tx));
-                Ok(rx
-                    .map_err(|_| CoreEthereumActionsError::ExpectationUnregistered)
-                    .boxed())
+                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
             }
         }
     }
@@ -147,7 +162,7 @@ impl ActionState for IndexerActionTracker {
 #[cfg(test)]
 mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::CoreEthereumActionsError;
+    use crate::errors::ChainActionsError;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
@@ -223,7 +238,7 @@ mod tests {
             .expect_err("should return with error");
 
         assert!(
-            matches!(err, CoreEthereumActionsError::ExpectationUnregistered),
+            matches!(err, ChainActionsError::ExpectationUnregistered),
             "should notify on unregistration"
         );
     }

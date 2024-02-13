@@ -7,7 +7,7 @@ use crate::Strategy;
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use chain_actions::CoreEthereumActions;
+use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
@@ -17,10 +17,12 @@ use hopr_internal_types::prelude::*;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Sub;
 use std::sync::Arc;
+use std::time::Duration;
 use validator::Validate;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -66,7 +68,7 @@ pub trait SingularStrategy: Display {
 /// which have elapsed the grace period
 struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
     db: Arc<RwLock<Db>>,
-    chain_actions: CoreEthereumActions<Db>,
+    chain_actions: ChainActions<Db>,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
@@ -78,6 +80,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelClo
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
+        // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
+        let ts_limit = current_time().sub(Duration::from_secs(3600));
+
         let to_close = self
             .db
             .read()
@@ -86,8 +91,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose
-                    && channel.closure_time_passed(current_timestamp().as_millis() as u64)
+                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
+                    && channel.closure_time_passed(current_time())
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
@@ -120,39 +125,30 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
-    /// Default is `true`.
+    #[default = true]
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
-    /// Default is `true`.
+    #[default = true]
     pub allow_recursive: bool,
 
     /// Indicates if the strategy should check for `PendingToClose` channels which have
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
     /// is over.
-    /// Default: false
+    #[default = false]
     pub finalize_channel_closure: bool,
 
     /// Configuration of individual sub-strategies.
+    ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
+    #[default(_code = "vec![]")]
     pub strategies: Vec<Strategy>,
-}
-
-impl Default for MultiStrategyConfig {
-    fn default() -> Self {
-        Self {
-            on_fail_continue: true,
-            allow_recursive: true,
-            finalize_channel_closure: false,
-            strategies: Vec::new(),
-        }
-    }
 }
 
 /// Defines an execution chain of `SingularStrategies`.
@@ -171,7 +167,7 @@ impl MultiStrategy {
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        chain_actions: CoreEthereumActions<Db>,
+        chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where

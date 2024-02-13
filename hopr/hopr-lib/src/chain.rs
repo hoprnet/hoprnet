@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
@@ -11,7 +10,7 @@ use validator::Validate;
 use chain_actions::action_queue::ActionQueueConfig;
 use chain_actions::action_state::IndexerActionTracker;
 use chain_actions::payload::SafePayloadGenerator;
-use chain_actions::{action_queue::ActionQueue, CoreEthereumActions};
+use chain_actions::{action_queue::ActionQueue, ChainActions};
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -26,44 +25,15 @@ use utils_db::CurrentDbShim;
 
 use crate::errors::HoprLibError;
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
+/// Types of HOPR network environments.
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
 #[serde(rename_all(deserialize = "lowercase"))]
+#[strum(serialize_all = "lowercase")]
 pub enum EnvironmentType {
     Production,
     Staging,
     Development,
     Local,
-}
-
-impl Display for EnvironmentType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Production => "production",
-                Self::Staging => "staging",
-                Self::Development => "development",
-                Self::Local => "local",
-            }
-        )
-    }
-}
-
-impl FromStr for EnvironmentType {
-    type Err = HoprLibError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "production" => Ok(Self::Production),
-            "staging" => Ok(Self::Staging),
-            "development" => Ok(Self::Development),
-            "local" => Ok(Self::Local),
-            _ => Err(HoprLibError::GeneralError(
-                "Failed to recognize environment type".into(),
-            )),
-        }
-    }
 }
 
 /// Holds all information we need about the blockchain network
@@ -278,6 +248,8 @@ impl From<&ChainNetworkConfig> for SmartContractConfig {
     }
 }
 
+/// The entire protocol configuration containing the information about
+/// usable networks and chains.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ProtocolsConfig {
@@ -339,7 +311,7 @@ pub fn build_chain_components<Db>(
     db: Arc<RwLock<Db>>,
 ) -> (
     ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
-    CoreEthereumActions<Db>,
+    ChainActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
@@ -396,7 +368,7 @@ where
     );
 
     // Instantiate Chain Actions
-    let chain_actions = CoreEthereumActions::new(me_onchain.clone(), db, action_queue.new_sender());
+    let chain_actions = ChainActions::new(me_onchain.clone(), db, action_queue.new_sender());
 
     (action_queue, chain_actions, rpc_operations)
 }
@@ -409,7 +381,7 @@ pub fn build_chain_api(
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {

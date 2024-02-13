@@ -1,4 +1,14 @@
-// TODO: docs for crate missing
+//! The crate aggregates and composes individual transport level objects and functionality
+//! into a unified [`HoprTransport`] object with the goal of isolating the transport layer
+//! and defining a fully specified transport API.
+//!
+//! As such, the transport layer components should be only those that are directly needed in
+//! order to:
+//! 1. send and receive a packet, acknowledgement or ticket aggregation request
+//! 2. send and receive a network telemetry request
+//! 3. automate transport level processes
+//! 4. algorithms associated with the transport layer operational management
+//! 5. interface specifications to allow modular behavioral extensions
 
 pub mod adaptors;
 pub mod config;
@@ -53,7 +63,7 @@ use futures::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::sync::Arc;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -68,8 +78,11 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-use {async_std::task::sleep, hopr_platform::time::native::current_timestamp};
+use {async_std::task::sleep, hopr_platform::time::native::current_time};
 
+/// Build the [`core_transport::Network`] object responsible for tracking and holding the
+/// observable state of the network, peers inside the network and telemetry about network
+/// connections.
 pub fn build_network(
     peer_id: PeerId,
     cfg: NetworkConfig,
@@ -89,6 +102,7 @@ pub fn build_network(
     (network, network_events_rx)
 }
 
+/// Build the ticket aggregation mechanism and processes.
 pub fn build_ticket_aggregation<Db>(
     db: Arc<RwLock<Db>>,
     chain_keypair: &ChainKeypair,
@@ -105,6 +119,7 @@ type HoprPingComponents = (
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
 
+/// Build the ping infrastructure to run manual pings from the interface.
 pub fn build_manual_ping(
     cfg: core_protocol::config::ProtocolConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
@@ -116,8 +131,8 @@ pub fn build_manual_ping(
         futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     let ping_cfg = PingConfig {
-        max_parallel_pings: constants::MAX_PARALLEL_PINGS,
         timeout: cfg.heartbeat.timeout,
+        ..PingConfig::default()
     };
 
     // manual ping explicitly called by the API
@@ -131,6 +146,7 @@ pub fn build_manual_ping(
     (ping, ping_rx, pong_tx)
 }
 
+/// Build the index updater mechanism
 pub fn build_index_updater<Db>(
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
@@ -145,6 +161,7 @@ where
     (indexer_updater, indexer_update_rx)
 }
 
+/// Build the interaction object allowing to process messages.
 pub fn build_packet_actions<Db>(
     me: &OffchainKeypair,
     me_onchain: &ChainKeypair,
@@ -171,6 +188,7 @@ type HoprHeartbeatComponents = (
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
 
+/// Build the heartbeat mechanism for network probing.
 pub fn build_heartbeat(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
@@ -185,8 +203,8 @@ pub fn build_heartbeat(
     )>();
 
     let ping_cfg = PingConfig {
-        max_parallel_pings: constants::MAX_PARALLEL_PINGS,
         timeout: proto_cfg.heartbeat.timeout,
+        ..PingConfig::default()
     };
 
     let hb_pinger = Ping::new(
@@ -301,6 +319,33 @@ impl HoprTransport {
         self.indexer.clone()
     }
 
+    pub async fn init_from_db(&self) -> errors::Result<()> {
+        info!("Loading initial peers from the storage");
+
+        let index_updater = self.index_updater();
+
+        for (peer, _address, multiaddresses) in self.get_public_nodes().await? {
+            if self.is_allowed_to_access_network(&peer).await {
+                debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::EligibilityUpdate(peer, PeerEligibility::Eligible))
+                    .await;
+
+                index_updater
+                    .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
+                    .await;
+
+                let mut net = self.network.write().await;
+                if !net.has(&peer) {
+                    net.add(&peer, PeerOrigin::Initialization);
+                    net.store_peer_multiaddresses(&peer, multiaddresses);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
         if !self.is_allowed_to_access_network(peer).await {
             return Err(errors::HoprTransportError::Api(format!(
@@ -320,7 +365,7 @@ impl HoprTransport {
             self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
-        let start = current_timestamp();
+        let start = current_time().as_unix_timestamp();
 
         match select(timeout, ping).await {
             Either::Left(_) => {
@@ -387,9 +432,7 @@ impl HoprTransport {
             Ok(mut awaiter) => {
                 log::trace!("Awaiting the HalfKeyChallenge");
                 Ok(awaiter
-                    .consume_and_wait(std::time::Duration::from_millis(
-                        crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS,
-                    ))
+                    .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
                     .await?)
             }
             Err(e) => Err(crate::errors::HoprTransportError::Api(format!(

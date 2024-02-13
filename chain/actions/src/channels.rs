@@ -1,3 +1,18 @@
+//! This module contains the [ChannelActions](channels::ChannelActions) trait defining HOPR channels operations.
+//!
+//! An implementation of this trait is added to [ChainActions] which realizes the redemption
+//! operations via [ActionQueue](action_queue::ActionQueue).
+//! There are 4 basic high-level on-chain functions in the [ChannelActions](channels::ChannelActions) trait:
+//! - [open_channel](channels::ChannelActions::open_channel)
+//! - [fund_channel](channels::ChannelActions::fund_channel)
+//! - [close_channel](channels::ChannelActions::close_channel)
+//!
+//! All the functions do the necessary validations using the DB and then post the corresponding action
+//! into the [ActionQueue](action_queue::ActionQueue).
+//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
+//! confirmation of the corresponding operation.
+//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
+//! by the Indexer.
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -5,19 +20,20 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info};
+use std::time::Duration;
 
 use crate::action_queue::PendingAction;
-use crate::errors::CoreEthereumActionsError::{
+use crate::errors::ChainActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
 use crate::errors::{
-    CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
+    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
 use crate::redeem::TicketRedeemActions;
-use crate::CoreEthereumActions;
+use crate::ChainActions;
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]
@@ -38,7 +54,7 @@ pub trait ChannelActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for ChainActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
@@ -142,20 +158,20 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cor
             Some(channel) => {
                 match channel.status {
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
-                    ChannelStatus::PendingToClose => {
-                        info!(
-                            "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp().as_millis() as u64)
-                        );
-                        if channel.closure_time_passed(current_timestamp().as_millis() as u64) {
-                            info!("initiating finalization of channel closure of {channel} in {direction}");
-                            self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                        } else {
-                            Err(ClosureTimeHasNotElapsed(
+                    ChannelStatus::PendingToClose(_) => {
+                        let remaining_closure_time = channel.remaining_closure_time(current_time());
+                        info!("{channel} - remaining closure time is {remaining_closure_time:?}");
+                        match remaining_closure_time {
+                            Some(Duration::ZERO) => {
+                                info!("initiating finalization of channel closure of {channel} in {direction}");
+                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                            }
+                            _ => Err(ClosureTimeHasNotElapsed(
                                 channel
-                                    .remaining_closure_time(current_timestamp().as_millis() as u64)
-                                    .unwrap_or(u32::MAX as u64),
-                            ))
+                                    .remaining_closure_time(current_time())
+                                    .expect("impossible: closure time has not passed but no remaining closure time")
+                                    .as_secs(),
+                            )),
                         }
                     }
                     ChannelStatus::Open => {
@@ -180,8 +196,8 @@ mod tests {
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
     use crate::channels::ChannelActions;
-    use crate::errors::CoreEthereumActionsError;
-    use crate::CoreEthereumActions;
+    use crate::errors::ChainActionsError;
+    use crate::ChainActions;
     use async_lock::RwLock;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::actions::Action;
@@ -198,7 +214,7 @@ mod tests {
     use std::{
         ops::{Add, Sub},
         sync::Arc,
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::{Duration, SystemTime},
     };
     use utils_db::{db::DB, CurrentDbShim};
 
@@ -258,7 +274,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            U256::zero(),
         );
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -280,7 +295,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .open_channel(*BOB_ADDR, stake)
@@ -324,7 +339,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            U256::zero(),
         );
 
         db.write()
@@ -351,12 +365,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::ChannelAlreadyExists
+                ChainActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
         );
@@ -385,12 +399,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions.open_channel(*ALICE_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
         );
@@ -417,12 +431,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -432,7 +446,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -461,12 +475,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::NotEnoughAllowance
+                ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
         );
@@ -502,12 +516,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::BalanceTooLow
+                ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
         );
@@ -543,7 +557,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            U256::zero(),
         );
         db.write()
             .await
@@ -576,7 +589,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -625,12 +638,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::ChannelDoesNotExist
+                ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
         );
@@ -659,12 +672,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
                 actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -673,7 +686,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::InvalidArguments(_)
+                ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -702,12 +715,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::NotEnoughAllowance
+                ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
         );
@@ -742,12 +755,12 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::BalanceTooLow
+                ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough balance"
         );
@@ -771,7 +784,6 @@ mod tests {
             stake,
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
             U256::zero(),
         );
 
@@ -829,7 +841,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
@@ -849,13 +861,7 @@ mod tests {
         );
 
         // Transition the channel to the PendingToClose state with the closure time already elapsed
-        channel.status = ChannelStatus::PendingToClose;
-        channel.closure_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .sub(Duration::from_secs(10))
-            .as_secs()
-            .into();
+        channel.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
 
         db.write()
             .await
@@ -898,7 +904,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            U256::zero(),
         );
 
         db.write()
@@ -933,7 +938,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .close_channel(*BOB_ADDR, ChannelDirection::Incoming, false)
@@ -967,14 +972,8 @@ mod tests {
             *BOB_ADDR,
             stake,
             U256::zero(),
-            ChannelStatus::PendingToClose,
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             U256::zero(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .add(Duration::from_secs(100))
-                .as_secs()
-                .into(),
         );
 
         db.write()
@@ -990,7 +989,7 @@ mod tests {
             Default::default(),
         );
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -999,7 +998,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ClosureTimeHasNotElapsed(_)
+                ChainActionsError::ClosureTimeHasNotElapsed(_)
             ),
             "should fail when the channel closure period did not elapse"
         );
@@ -1019,7 +1018,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -1028,7 +1027,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ChannelDoesNotExist
+                ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
         );
@@ -1050,7 +1049,7 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(
             *ALICE_ADDR,
@@ -1058,7 +1057,6 @@ mod tests {
             stake,
             U256::zero(),
             ChannelStatus::Closed,
-            U256::zero(),
             U256::zero(),
         );
         db.write()
@@ -1074,7 +1072,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::ChannelAlreadyClosed
+                ChainActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"
         );

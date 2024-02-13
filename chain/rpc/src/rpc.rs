@@ -1,3 +1,5 @@
+//! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
+//! [RpcOperations](rpc::RpcOperations) type, which is the main API exposed by this crate.
 use async_trait::async_trait;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use chain_types::{ContractAddresses, ContractInstances};
@@ -20,32 +22,46 @@ use crate::errors::RpcError::ContractError;
 use crate::{HoprRpcOperations, PendingTransaction};
 
 /// Configuration of the RPC related parameters.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     /// Blockchain id
+    ///
     /// Default is 100.
+    #[default = 100]
     pub chain_id: u64,
     /// Addresses of all deployed contracts
+    ///
     /// Default contains empty (null) addresses.
     pub contract_addrs: ContractAddresses,
     /// Address of the node's module.
+    ///
     /// Defaults to null address.
     pub module_address: Address,
     /// Expected block time of the blockchain
+    ///
     /// Defaults to 5 seconds
+    #[default(Duration::from_secs(5))]
     pub expected_block_time: Duration,
     /// Minimum size of the block range where batch fetch query should be used.
+    ///
     /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
+    ///
     /// Defaults to 3.
     #[validate(range(min = 1))]
+    #[default = 3]
     pub min_block_range_fetch_size: u64,
     /// The largest amount of blocks to fetch at once when fetching a range of blocks.
+    ///
     /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
+    ///
     /// Defaults to 2500 blocks
     #[validate(range(min = 1))]
+    #[default = 2500]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
+    ///
     /// Defaults to 7 seconds.
+    #[default(Duration::from_secs(7))]
     pub tx_polling_interval: Duration,
     /// Finalization chain length
     ///
@@ -55,22 +71,8 @@ pub struct RpcOperationsConfig {
     ///
     /// Defaults to 8
     #[validate(range(min = 1, max = 100))]
+    #[default = 8]
     pub finality: u32,
-}
-
-impl Default for RpcOperationsConfig {
-    fn default() -> Self {
-        Self {
-            chain_id: 100,
-            contract_addrs: Default::default(),
-            module_address: Default::default(),
-            min_block_range_fetch_size: 3,
-            max_block_range_fetch_size: 2500,
-            expected_block_time: Duration::from_secs(5),
-            tx_polling_interval: Duration::from_secs(7),
-            finality: 8,
-        }
-    }
 }
 
 pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;

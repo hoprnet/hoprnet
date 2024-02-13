@@ -19,6 +19,8 @@ multiaddr = { workspace = true }
 # rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { workspace = true }
 serde_with = { workspace = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = "1.0"
 validator = { workspace = true }
 

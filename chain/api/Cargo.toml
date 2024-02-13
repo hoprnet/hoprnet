@@ -19,6 +19,7 @@ async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
+smart-default = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-crypto-types = { workspace = true }

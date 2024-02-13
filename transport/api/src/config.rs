@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -22,9 +23,12 @@ pub fn is_reachable_domain(host: &str) -> bool {
     host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/// Enumerates possible host types.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HostType {
+    /// IPv4 based host
     IPv4(String),
+    /// DNS based host
     Domain(String),
 }
 
@@ -34,12 +38,17 @@ impl Default for HostType {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+/// Configuration of the listening host.
+/// This is used for the P2P and REST API listeners.
+// NOTE: this intentionally has no default, because it depends on the use case
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HostConfig {
-    #[serde(default)]
+    /// Host on which to listen
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub address: HostType,
+    /// Listening TCP or UDP port (mandatory).
     #[validate(range(min = 1u16))]
-    #[serde(default)]
+    #[serde(default)] // must be defaulted to be mergeable from CLI args
     pub port: u16,
 }
 
@@ -70,9 +79,9 @@ impl FromStr for HostConfig {
     }
 }
 
-impl ToString for HostConfig {
-    fn to_string(&self) -> String {
-        format!("{:?}:{}", self.address, self.port)
+impl Display for HostConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}:{}", self.address, self.port)
     }
 }
 
@@ -111,7 +120,7 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
-    /// not need any connection to nodes outside of the subnet
+    /// not need any connection to nodes outside the subnet
     #[serde(default)]
     pub announce_local_addresses: bool,
     /// When true, assume a testnet with multiple nodes running on the same machine

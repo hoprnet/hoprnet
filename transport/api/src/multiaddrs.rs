@@ -1,9 +1,11 @@
 use multiaddr::Multiaddr;
 
+/// Remove the `p2p/<PeerId>` component from a multiaddress
 pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
     Multiaddr::from_iter(ma.iter().filter(|v| !matches!(v, multiaddr::Protocol::P2p(_))))
 }
 
+/// Check whether the first multiaddress protocol component is a `dns*` component
 pub(crate) fn is_dns(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
@@ -11,6 +13,7 @@ pub(crate) fn is_dns(ma: &Multiaddr) -> bool {
         .unwrap_or(false)
 }
 
+/// Check whether the first multiaddress protocol component represents a private address
 pub(crate) fn is_private(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
@@ -22,6 +25,7 @@ pub(crate) fn is_private(ma: &Multiaddr) -> bool {
         .unwrap_or(false)
 }
 
+/// Check whether the multiaddr protocol component is supported by this library
 pub(crate) fn is_supported(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()

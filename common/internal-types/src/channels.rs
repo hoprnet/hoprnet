@@ -8,7 +8,8 @@ use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-use serde_repr::*;
+use std::ops::Add;
+use std::time::{Duration, SystemTime};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -23,6 +24,7 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 /// convertible to IEEE754 double-precision and vice versa
 const ENCODED_WIN_PROB_LENGTH: usize = 7;
 
+/// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Encodes 100% winning probability
@@ -32,30 +34,36 @@ const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
 const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
 /// Describes status of a channel
-#[repr(u8)]
-#[derive(
-    Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, strum::Display, strum::EnumString,
-)]
+#[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
+    /// Channel is closed.
     #[default]
-    Closed = 0,
-    Open = 1,
-    PendingToClose = 2,
+    Closed,
+    /// Channel is opened.
+    Open,
+    /// Channel is pending to be closed.
+    /// The timestamp marks the *earliest* possible time when the channel can transition into the `Closed` state.
+    #[strum(serialize = "PendingToClose")]
+    PendingToClose(SystemTime),
 }
 
-impl TryFrom<u8> for ChannelStatus {
-    type Error = GeneralError;
-
-    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Closed),
-            1 => Ok(Self::Open),
-            2 => Ok(Self::PendingToClose),
-            _ => Err(GeneralError::ParseError),
+// Manual implementation of PartialEq, because we need only precision up to seconds in PendingToClose
+impl PartialEq for ChannelStatus {
+    fn eq(&self, other: &Self) -> bool {
+        // Use pattern matching to avoid recursion
+        match (self, other) {
+            (Self::Open, Self::Open) => true,
+            (Self::Closed, Self::Closed) => true,
+            (Self::PendingToClose(ct_1), Self::PendingToClose(ct_2)) => {
+                let diff = ct_1.max(ct_2).duration_since(*ct_1.min(ct_2)).unwrap();
+                diff.as_secs() == 0
+            }
+            _ => false,
         }
     }
 }
+impl Eq for ChannelStatus {}
 
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
@@ -78,7 +86,6 @@ pub struct ChannelEntry {
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
-    pub closure_time: U256,
     id: Hash,
 }
 
@@ -90,7 +97,6 @@ impl ChannelEntry {
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
-        closure_time: U256,
     ) -> Self {
         assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
         ChannelEntry {
@@ -100,7 +106,6 @@ impl ChannelEntry {
             ticket_index,
             status,
             channel_epoch,
-            closure_time,
             id: generate_channel_id(&source, &destination),
         }
     }
@@ -111,27 +116,36 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    /// Also returns `false` if the channel closure has not been initiated.
-    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> bool {
-        self.remaining_closure_time(current_timestamp_ms)
-            .map(|remaining| remaining == 0)
-            .unwrap_or(false)
+    /// Also returns `false` if the channel closure has not been initiated (it is in `Open` state).
+    pub fn closure_time_passed(&self, current_time: SystemTime) -> bool {
+        match self.status {
+            ChannelStatus::Open => false,
+            ChannelStatus::PendingToClose(closure_time) => closure_time <= current_time,
+            ChannelStatus::Closed => true,
+        }
     }
 
-    /// Calculates the remaining channel closure grace period in seconds.
-    /// Returns `None` if the channel closure has not been initiated yet.
-    pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
-        assert!(current_timestamp_ms > 0, "invalid timestamp");
-        // round clock ms to seconds
-        let now_seconds = current_timestamp_ms / 1000_u64;
-
-        self.closure_time
-            .gt(&0_u64.into())
-            .then(|| self.closure_time.as_u64().saturating_sub(now_seconds))
+    /// Calculates the remaining channel closure grace period.
+    /// Returns `None` if the channel closure has not been initiated yet (channel is in `Open` state).
+    pub fn remaining_closure_time(&self, current_time: SystemTime) -> Option<Duration> {
+        match self.status {
+            ChannelStatus::Open => None,
+            ChannelStatus::PendingToClose(closure_time) => {
+                Some(closure_time.duration_since(current_time).unwrap_or(Duration::ZERO))
+            }
+            ChannelStatus::Closed => Some(Duration::ZERO),
+        }
     }
-}
 
-impl ChannelEntry {
+    /// Returns the earliest time the channel can transition from `PendingToClose` into `Closed`.
+    /// If the channel is not in `PendingToClose` state, returns `None`.
+    pub fn closure_time_at(&self) -> Option<SystemTime> {
+        match self.status {
+            ChannelStatus::PendingToClose(ct) => Some(ct),
+            _ => None,
+        }
+    }
+
     /// Determines the channel direction given the self address.
     /// Returns `None` if neither source nor destination are equal to `me`.
     pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
@@ -173,9 +187,19 @@ impl BinarySerializable for ChannelEntry {
             let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let balance = Balance::new(U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?, BalanceType::HOPR);
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let status = ChannelStatus::try_from(b.drain(0..1).as_ref()[0])?;
+            let status_byte = b.drain(0..1).as_ref()[0];
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
+
+            let status = match status_byte {
+                0 => ChannelStatus::Open,
+                1 => ChannelStatus::Closed,
+                2 => {
+                    ChannelStatus::PendingToClose(std::time::UNIX_EPOCH.add(Duration::from_secs(closure_time.as_u64())))
+                }
+                _ => return Err(hopr_primitive_types::errors::GeneralError::ParseError),
+            };
+
             Ok(Self::new(
                 source,
                 destination,
@@ -183,7 +207,6 @@ impl BinarySerializable for ChannelEntry {
                 ticket_index,
                 status,
                 channel_epoch,
-                closure_time,
             ))
         } else {
             Err(hopr_primitive_types::errors::GeneralError::ParseError)
@@ -196,9 +219,23 @@ impl BinarySerializable for ChannelEntry {
         ret.extend_from_slice(&self.destination.as_slice());
         ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
-        ret.push(self.status as u8);
+        ret.push(match self.status {
+            ChannelStatus::Closed => 0_u8,
+            ChannelStatus::Open => 1_u8,
+            ChannelStatus::PendingToClose(_) => 2_u8,
+        });
         ret.extend_from_slice(self.channel_epoch.to_bytes().as_ref());
-        ret.extend_from_slice(self.closure_time.to_bytes().as_ref());
+        ret.extend_from_slice(
+            U256::from(match self.status {
+                ChannelStatus::Closed => 0_u64, // We do not store the closure time value anymore once already closed
+                ChannelStatus::Open => 0_u64,
+                ChannelStatus::PendingToClose(closure_time) => {
+                    closure_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
+                }
+            })
+            .to_bytes()
+            .as_ref(),
+        );
         ret.into_boxed_slice()
     }
 }
@@ -954,7 +991,9 @@ pub mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
+    use std::ops::Add;
     use std::str::FromStr;
+    use std::time::{Duration, SystemTime};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -972,28 +1011,28 @@ pub mod tests {
     }
 
     #[test]
+    fn channel_status_names() {
+        assert_eq!("Open", ChannelStatus::Open.to_string());
+        assert_eq!("Closed", ChannelStatus::Closed.to_string());
+        assert_eq!(
+            "PendingToClose",
+            ChannelStatus::PendingToClose(SystemTime::now()).to_string()
+        );
+    }
+
+    #[test]
     pub fn channel_entry_test() {
         let ce1 = ChannelEntry::new(
             *ALICE_ADDR,
             *BOB_ADDR,
             Balance::new(10_u64, BalanceType::HOPR),
             23u64.into(),
-            ChannelStatus::PendingToClose,
+            ChannelStatus::PendingToClose(SystemTime::now()),
             3u64.into(),
-            4u64.into(),
         );
 
         let ce2 = ChannelEntry::from_bytes(&ce1.to_bytes()).unwrap();
         assert_eq!(ce1, ce2, "deserialized channel entry does not match");
-    }
-
-    #[test]
-    pub fn channel_status_test() {
-        let cs1 = ChannelStatus::Open;
-        let cs2 = ChannelStatus::try_from(cs1 as u8).unwrap();
-
-        assert!(ChannelStatus::try_from(231_u8).is_err());
-        assert_eq!(cs1, cs2, "channel status does not match");
     }
 
     #[test]
@@ -1005,19 +1044,38 @@ pub mod tests {
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),
-            0u64.into(),
         );
 
-        assert!(!ce.closure_time_passed(10));
-        assert!(ce.remaining_closure_time(10).is_none());
+        assert!(
+            !ce.closure_time_passed(SystemTime::now()),
+            "opened channel cannot pass closure time"
+        );
+        assert!(
+            ce.remaining_closure_time(SystemTime::now()).is_none(),
+            "opened channel cannot have remaining closure time"
+        );
 
-        ce.closure_time = 12_u32.into();
+        let current_time = SystemTime::now();
+        ce.status = ChannelStatus::PendingToClose(current_time.add(Duration::from_secs(60)));
 
-        assert!(!ce.closure_time_passed(10000));
-        assert_eq!(2, ce.remaining_closure_time(10000).expect("must have closure time"));
+        assert!(
+            !ce.closure_time_passed(current_time),
+            "must not have passed closure time"
+        );
+        assert_eq!(
+            60,
+            ce.remaining_closure_time(current_time)
+                .expect("must have closure time")
+                .as_secs()
+        );
 
-        assert!(ce.closure_time_passed(14000));
-        assert_eq!(0, ce.remaining_closure_time(14000).expect("must have closure time"));
+        let current_time = current_time.add(Duration::from_secs(120));
+
+        assert!(ce.closure_time_passed(current_time), "must have passed closure time");
+        assert_eq!(
+            Duration::ZERO,
+            ce.remaining_closure_time(current_time).expect("must have closure time")
+        );
     }
 
     #[test]

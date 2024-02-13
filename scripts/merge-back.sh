@@ -7,7 +7,7 @@ usage() {
   echo ""
   echo "Usage: $0 <release_name>"
   echo ""
-  echo "$0 providence"
+  echo "$0 saint-louis"
   echo
 }
 

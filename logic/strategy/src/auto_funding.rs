@@ -23,26 +23,21 @@ lazy_static::lazy_static! {
 
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
+    ///
     /// Default is 1 HOPR
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("1000000000000000000", BalanceType::HOPR))]
     pub min_stake_threshold: Balance,
 
     /// Funding amount.
+    ///
     /// Defaults to 10 HOPR.
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
     pub funding_amount: Balance,
-}
-
-impl Default for AutoFundingStrategyConfig {
-    fn default() -> Self {
-        Self {
-            min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
-            funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-        }
-    }
 }
 
 /// The `AutoFundingStrategy` automatically funds channel that
@@ -159,7 +154,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c2 = ChannelEntry::new(
@@ -169,7 +163,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            0_u32.into(),
         );
 
         let c3 = ChannelEntry::new(
@@ -177,8 +170,7 @@ mod tests {
             Address::random(),
             Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
-            ChannelStatus::PendingToClose,
-            0_u32.into(),
+            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
         );
 

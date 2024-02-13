@@ -284,7 +284,7 @@ mod tests {
     }
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
-        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), U256::zero())
+        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
     fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {

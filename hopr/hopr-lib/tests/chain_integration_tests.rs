@@ -6,7 +6,7 @@ use chain_actions::channels::ChannelActions;
 use chain_actions::node::NodeActions;
 use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::redeem::TicketRedeemActions;
-use chain_actions::CoreEthereumActions;
+use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -168,7 +168,7 @@ type TestDb = CoreEthereumDb<SqliteShim<'static>>;
 struct ChainNode {
     chain_key: ChainKeypair,
     db: Arc<RwLock<TestDb>>,
-    actions: CoreEthereumActions<TestDb>,
+    actions: ChainActions<TestDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<TestDb>, TestDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
@@ -210,7 +210,7 @@ async fn start_node_chain_logic(
     // Actions
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = CoreEthereumActions::new(chain_key.clone(), db.clone(), action_queue.new_sender());
+    let actions = ChainActions::new(chain_key.clone(), db.clone(), action_queue.new_sender());
 
     let mut node_tasks = Vec::new();
 
@@ -645,9 +645,8 @@ async fn integration_test_indexer() {
         .expect("must get channel")
         .expect("channel to bob must exist");
 
-    assert_eq!(
-        ChannelStatus::PendingToClose,
-        channel_alice_bob.status,
+    assert!(
+        matches!(channel_alice_bob.status, ChannelStatus::PendingToClose(_)),
         "channel must be pending to close"
     );
 

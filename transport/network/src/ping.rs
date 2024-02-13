@@ -1,5 +1,5 @@
-use std::collections::hash_map::Entry;
 use std::pin::Pin;
+use std::{collections::hash_map::Entry, ops::Div};
 
 use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
@@ -7,12 +7,13 @@ use libp2p_identity::PeerId;
 
 use log::{debug, error, info};
 
-use hopr_platform::time::native::current_timestamp;
+use hopr_platform::time::native::current_time;
 
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -20,7 +21,7 @@ lazy_static::lazy_static! {
         SimpleHistogram::new(
             "hopr_ping_time_sec",
             "Measures total time it takes to ping a single node (seconds)",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
     static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
             "hopr_heartbeat_pings_count",
@@ -31,25 +32,35 @@ lazy_static::lazy_static! {
 
 const MAX_PARALLEL_PINGS: usize = 14;
 
-// TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-// in case of faster input than output the memory might run out
+// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
+// in case of faster input than output the memory might run out.
+//
+// The unboundedness relies on the fact that a back pressure mechanism exists on a
+// higher level of the business logic making sure that only a fixed maximum count
+// of pings ever enter the queues at any given time.
 pub type HeartbeatSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, ControlMessage)>;
 pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
+pub type PingResult = std::result::Result<u64, ()>;
+
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PingExternalAPI {
-    async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
+    async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
+    /// The maximum total allowed concurrent heartbeat ping count
+    #[default = 14]
     pub max_parallel_pings: usize,
+    /// The timeout duration for an indiviual ping
+    #[default(std::time::Duration::from_secs(30))]
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
-#[async_trait] // not placing the `Send` trait limitations on the trait
+#[async_trait]
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
@@ -91,7 +102,7 @@ impl<T: PingExternalAPI + std::marker::Send> Ping<T> {
 
         self.send_ping
             .start_send((*peer, ping_challenge.clone()))
-            .map(move |_| (current_timestamp().as_millis() as u64, ping_challenge))
+            .map(move |_| (current_time().as_unix_timestamp().as_millis() as u64, ping_challenge))
             .map_err(|_| ())
     }
 }
@@ -108,7 +119,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     async fn ping(&mut self, peers: Vec<PeerId>) {
-        let start_all_peers = current_timestamp();
+        let start_all_peers = current_time();
         let mut peers = peers;
 
         if peers.is_empty() {
@@ -148,7 +159,10 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
-                            Ok(current_timestamp().saturating_sub(std::time::Duration::from_millis(start)))
+                            Ok(current_time()
+                                .as_unix_timestamp()
+                                .saturating_sub(std::time::Duration::from_millis(start))
+                                .div(2u32))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())
@@ -166,7 +180,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
             #[cfg(all(feature = "prometheus", not(test)))]
             match result {
                 Ok(duration) => {
-                    METRIC_TIME_TO_PING.observe(duration.as_millis() as f64);
+                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
                     METRIC_PING_COUNT.increment(&["true"]);
                 }
                 Err(_) => {
@@ -178,7 +192,7 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                 .on_finished_ping(&peer, result.map(|v| v.as_millis() as u64), version)
                 .await;
 
-            if (current_timestamp() - start_all_peers) < self.config.timeout {
+            if current_time().duration_since(start_all_peers).unwrap_or_default() < self.config.timeout {
                 while let Some(peer) = waiting.pop_front() {
                     if let Entry::Vacant(e) = active_pings.entry(peer) {
                         match self.initiate_peer_ping(&peer) {
@@ -237,7 +251,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -270,7 +284,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_err()),
+                predicate::function(|x: &PingResult| x.is_err()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -301,7 +315,7 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &crate::types::Result| x.is_err()),
+                predicate::function(|x: &PingResult| x.is_err()),
                 predicate::eq("unknown".to_owned()),
             )
             .return_const(());
@@ -330,14 +344,14 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -377,14 +391,14 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
         mock.expect_on_finished_ping()
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &crate::types::Result| x.is_ok()),
+                predicate::function(|x: &PingResult| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -406,10 +420,13 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
 
-        let start = current_timestamp();
+        let start = current_time();
         futures::join!(pinger.ping(peers), ideal_twice_usable_linearly_delaying_channel);
-        let end = current_timestamp();
+        let end = current_time();
 
-        assert_ge!(end - start, std::time::Duration::from_millis(ping_delay));
+        assert_ge!(
+            end.duration_since(start).unwrap_or_default(),
+            std::time::Duration::from_millis(ping_delay)
+        );
     }
 }

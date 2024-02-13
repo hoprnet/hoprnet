@@ -1,3 +1,27 @@
+//! This module contains the [TicketRedeemActions](redeem::TicketRedeemActions) trait defining actions regarding
+//! ticket redemption.
+//!
+//! An implementation of this trait is added to [ChainActions] which realizes the redemption
+//! operations via [ActionQueue](action_queue::ActionQueue).
+//!
+//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions](redeem::TicketRedeemActions) trait:
+//! - [redeem_all_tickets](redeem::TicketRedeemActions::redeem_all_tickets)
+//! - [redeem_tickets_in_channel](redeem::TicketRedeemActions::redeem_tickets_in_channel)
+//! - [redeem_tickets_with_counterparty](redeem::TicketRedeemActions::redeem_tickets_with_counterparty)
+//! - [redeem_ticket](redeem::TicketRedeemActions::redeem_ticket)
+//!
+//! Each method first checks if the tickets are redeemable.
+//! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or
+//! [BeingAggregated](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingAggregated) in the DB),
+//! If they are redeemable, their state is changed to
+//! [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
+//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](action_queue::ActionQueue) so the redemption is soon executed on-chain.
+//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
+//! confirmation of each ticket redemption.
+//!
+//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
+//! by the Indexer.
+use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -6,12 +30,12 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 
-use crate::action_queue::PendingAction;
+use crate::action_queue::{ActionSender, PendingAction};
 use crate::errors::{
     CoreEthereumActionsError::{ChannelDoesNotExist, MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
     Result,
 };
-use crate::CoreEthereumActions;
+use crate::ChainActions;
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -67,7 +91,7 @@ where
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for ChainActions<Db> {
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(
@@ -351,7 +375,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             channel_epoch,
-            U256::zero(),
         );
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
             .await
@@ -439,7 +462,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -536,7 +559,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -642,7 +665,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -735,7 +758,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -815,7 +838,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = CoreEthereumActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

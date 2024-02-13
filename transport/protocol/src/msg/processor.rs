@@ -571,11 +571,13 @@ impl PacketInteractionConfig {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, smart_default::SmartDefault)]
 pub struct PacketMetadata {
+    #[default(None)]
     pub send_finalizer: Option<PacketSendFinalizer>,
+    #[default(std::time::UNIX_EPOCH)]
     #[cfg(all(feature = "prometheus", not(test)))]
-    pub start_time: std::time::Duration,
+    pub start_time: std::time::SystemTime,
 }
 
 /// Sets up processing of packet interactions and returns relevant read and write mechanism.
@@ -628,7 +630,7 @@ impl PacketInteraction {
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
-                        metadata.start_time = hopr_platform::time::native::current_timestamp();
+                        metadata.start_time = hopr_platform::time::native::current_time();
                     }
 
                     (packet, metadata)
@@ -759,8 +761,9 @@ impl PacketInteraction {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let MsgProcessed::Forward(_, _, _, _) = &processed_msg {
                                 METRIC_RELAYED_PACKET_IN_MIXER_TIME.observe(
-                                    hopr_platform::time::native::current_timestamp()
-                                        .saturating_sub(metadata.start_time)
+                                    hopr_platform::time::native::current_time()
+                                        .duration_since(metadata.start_time)
+                                        .unwrap_or_default()
                                         .as_secs_f64(),
                                 )
                             };
@@ -872,7 +875,6 @@ mod tests {
             ),
             U256::zero(),
             ChannelStatus::Open,
-            U256::zero(),
             U256::zero(),
         )
     }
@@ -1220,7 +1222,6 @@ mod tests {
                 Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
-                0u32.into(),
                 0u32.into(),
             );
             cg.update_channel(c);

@@ -1,5 +1,17 @@
+//! Module defining various Ethereum transaction payload generators for the actions.
+//!
+//! This module defines the basic [PayloadGenerator](payload::PayloadGenerator) trait that describes how an action
+//! is translated into a [TypedTransaction](chain_types::TypedTransaction) that can be submitted on-chain (via an RPC provider)
+//! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
+//!
+//! There are two main implementations:
+//! - [BasicPayloadGenerator](payload::BasicPayloadGenerator) which implements generation of a direct EIP1559 transaction payload. This is currently
+//! not used by a HOPR node.
+//! - [SafePayloadGenerator](payload::SafePayloadGenerator) which implements generation of a payload that embeds the transaction data into the
+//! SAFE transaction. This is currently the main mode of HOPR node operation.
+//!
 use crate::errors::{
-    CoreEthereumActionsError::{InvalidArguments, InvalidState},
+    ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -27,9 +39,9 @@ use hopr_primitive_types::prelude::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Operation {
+enum Operation {
     Call = 0,
-    DelegateCall = 1,
+    // Future use: DelegateCall = 1,
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.

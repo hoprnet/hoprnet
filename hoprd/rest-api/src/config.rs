@@ -21,43 +21,30 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub enum Auth {
+    #[default]
     None,
     Token(String),
 }
 
-#[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct Api {
     /// Selects whether the REST API is enabled
     #[serde(default)]
     pub enable: bool,
     /// Auth enum holding the API auth configuration
     #[validate(custom = "validate_api_auth")]
-    #[serde(default = "default_api_auth_form")]
+    #[serde(default)]
     pub auth: Auth,
     /// Host and port combination where the REST API should be located
     #[validate]
     #[serde(default = "default_api_host")]
+    #[default(default_api_host())]
     pub host: HostConfig,
-}
-
-#[inline]
-fn default_api_auth_form() -> Auth {
-    Auth::None
 }
 
 #[inline]
 fn default_api_host() -> HostConfig {
     HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap()
-}
-
-impl Default for Api {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            auth: default_api_auth_form(),
-            host: default_api_host(),
-        }
-    }
 }

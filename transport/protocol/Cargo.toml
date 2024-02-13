@@ -25,6 +25,7 @@ libp2p = { workspace = true, features = ["noise", "request-response"] }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
+smart-default = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 

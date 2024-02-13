@@ -1071,6 +1071,7 @@ dependencies = [
  "mockall",
  "multiaddr",
  "serde",
+ "smart-default",
  "thiserror",
  "utils-db",
 ]
@@ -1094,6 +1095,7 @@ dependencies = [
  "hopr-primitive-types",
  "log",
  "serde",
+ "smart-default",
  "thiserror",
  "utils-db",
 ]
@@ -1117,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
@@ -1139,6 +1141,7 @@ dependencies = [
  "mockall",
  "multiaddr",
  "primitive-types",
+ "smart-default",
  "thiserror",
  "utils-db",
 ]
@@ -1168,6 +1171,7 @@ dependencies = [
  "primitive-types",
  "serde",
  "serde_json",
+ "smart-default",
  "surf",
  "thiserror",
  "validator",
@@ -1472,6 +1476,8 @@ dependencies = [
  "multiaddr",
  "serde",
  "serde_with",
+ "smart-default",
+ "strum 0.25.0",
  "thiserror",
  "validator",
 ]
@@ -1574,6 +1580,7 @@ dependencies = [
  "serde",
  "serde_with",
  "serial_test",
+ "smart-default",
  "thiserror",
  "utils-db",
  "validator",
@@ -1608,6 +1615,7 @@ dependencies = [
  "semver 1.0.21",
  "serde",
  "serde_with",
+ "smart-default",
  "strum 0.25.0",
  "thiserror",
  "utils-db",
@@ -1641,6 +1649,7 @@ dependencies = [
  "multiaddr",
  "proc-macro-regex",
  "serde",
+ "smart-default",
  "thiserror",
  "utils-db",
  "validator",
@@ -3314,13 +3323,14 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_repr",
+ "smart-default",
  "strum 0.25.0",
  "thiserror",
 ]
 
 [[package]]
 name = "hopr-lib"
-version = "2.1.0-rc.1"
+version = "2.1.0-rc.2"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
@@ -3350,6 +3360,8 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "smart-default",
+ "strum 0.25.0",
  "thiserror",
  "utils-db",
  "validator",
@@ -3443,6 +3455,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "smart-default",
  "strum 0.25.0",
  "tide",
  "tide-websockets",
@@ -3463,6 +3476,7 @@ dependencies = [
  "ringbuffer",
  "serde",
  "serde_with",
+ "smart-default",
  "validator",
 ]
 
@@ -6399,6 +6413,17 @@ name = "smallvec"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2593d31f82ead8df961d8bd23a64c2ccf2eb5dd34b0a34bfb4dd54011c72009e"
+
+[[package]]
+name = "smart-default"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eb01866308440fc64d6c44d9e86c5cc17adfe33c4d6eed55da9145044d0ffc1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
 
 [[package]]
 name = "smol"

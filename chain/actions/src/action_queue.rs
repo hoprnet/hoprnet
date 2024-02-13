@@ -1,3 +1,7 @@
+//! Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
+//!
+//! The [ActionQueue](action_queue::ActionQueue) acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
+//! as they are being popped up from the queue by a runner task.
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
@@ -18,7 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::CoreEthereumActionsError::{
+use crate::errors::ChainActionsError::{
     ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed,
 };
 use crate::errors::Result;
@@ -96,7 +100,7 @@ pub type PendingAction = Pin<Box<dyn Future<Output = Result<ActionConfirmation>>
 /// Future that resolves once the transaction has been confirmed by the Indexer.
 type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmation>>;
 
-/// Sends a future Ethereum transaction into the `TransactionQueue`.
+/// Sends a future Ethereum transaction into the `ActionQueue`.
 #[derive(Debug, Clone)]
 pub struct ActionSender(Sender<(Action, ActionFinisher)>);
 
@@ -118,19 +122,13 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    ///
     /// Defaults to 150 seconds.
+    #[default(Duration::from_secs(150))]
     pub max_action_confirmation_wait: Duration,
-}
-
-impl Default for ActionQueueConfig {
-    fn default() -> Self {
-        Self {
-            max_action_confirmation_wait: Duration::from_secs(150),
-        }
-    }
 }
 
 struct ExecutionContext<Db, S, TxExec>
@@ -208,7 +206,7 @@ where
 
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
-                    ChannelStatus::Open | ChannelStatus::PendingToClose => {
+                    ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
                         let tx_hash = self.tx_exec.close_incoming_channel(&channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -232,7 +230,7 @@ where
                             move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
                         )
                     }
-                    ChannelStatus::PendingToClose => {
+                    ChannelStatus::PendingToClose(_) => {
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec
@@ -303,9 +301,10 @@ where
     }
 }
 
-/// A queue of outgoing Ethereum transactions.
-/// This queue awaits new transactions to arrive and calls the corresponding
-/// method of the `TransactionExecutor` to execute it and await its confirmation.
+/// A queue of [Actions](Action) to be executed.
+/// This queue awaits new Actions to arrive, translates them into Ethereum
+/// transactions via [TransactionExecutor] to execute them and await their confirmation
+/// by registering their corresponding expectations in [ActionState].
 pub struct ActionQueue<Db, S, TxExec>
 where
     Db: HoprCoreEthereumDbActions + Send + Sync,
@@ -326,7 +325,7 @@ where
     /// Number of pending transactions in the queue
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
-    /// Creates a new instance with the given `TransactionExecutor` implementation.
+    /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
     pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
         let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {

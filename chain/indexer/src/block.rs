@@ -44,7 +44,8 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Configuration for the chain indexer functionality
+#[derive(Debug, Clone, Copy, smart_default::SmartDefault)]
 pub struct IndexerConfig {
     /// The block at which the indexer should start
     ///
@@ -53,24 +54,31 @@ pub struct IndexerConfig {
     /// relevant smart contracts were introduced into the chain.
     ///
     /// This value makes sure that indexing is relevant and as minimal as possible.
+    ///
     /// Default is 0.
     pub start_block_number: u64,
     /// Fetch token transactions
     ///
     /// Whether the token transaction topics should also be fetched.
+    ///
     /// Default is true.
+    #[default = true]
     pub fetch_token_transactions: bool,
 }
 
-impl Default for IndexerConfig {
-    fn default() -> Self {
-        Self {
-            start_block_number: 0,
-            fetch_token_transactions: true,
-        }
-    }
-}
-
+/// Indexer
+///
+/// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
+/// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
+/// streamed outside of the indexer by the unbounded channel.
+///
+/// The roles of the indexer:
+/// 1. prime the RPC endpoinnt
+/// 2. request an RPC stream of changes to process
+/// 3. process block and log stream
+/// 4. ensure finalization by postponing processing until the head is far enough
+/// 5. store relevant data into the DB
+/// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
 pub struct Indexer<T, U, V>
 where

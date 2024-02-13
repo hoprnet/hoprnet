@@ -5,7 +5,7 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use futures::Stream;
-use hopr_lib::{ApplicationData, ToHex, TransportOutput};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Find or create an identity
     let identity_opts = IdentityOptions {
-        initialize: cfg.hopr.db.initialize,
+        initialize: true,
         id_path: cfg.identity.file.clone(),
         password: cfg.identity.password.clone(),
         private_key: cfg
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the message inbox
     let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
         hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            hopr_platform::time::native::current_timestamp()
+            hopr_platform::time::native::current_time().as_unix_timestamp()
         }),
     ));
 
@@ -239,7 +239,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Running HOPRd with the API...");
 
         // TODO: remove RLP in 3.0
-        let msg_encoder = |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_timestamp());
+        let msg_encoder =
+            |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
 
         let host_listen = match &cfg.api.host.address {
             hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {

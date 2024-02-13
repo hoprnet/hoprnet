@@ -12,11 +12,11 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 
 /// Indicates the packet type.
+#[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
 #[derive(Debug, Clone)]
 pub enum ChainPacketComponents {
     /// Packet is intended for us
     Final {
-        packet: Box<[u8]>,
         ticket: Ticket,
         packet_tag: PacketTag,
         ack_key: HalfKey,
@@ -109,8 +109,8 @@ impl ChainPacketComponents {
             let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
-            match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
-                ForwardedMetaPacket::RelayedPacket {
+            match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
+                ForwardedMetaPacket::Relayed {
                     packet,
                     derived_secret,
                     additional_info,
@@ -136,7 +136,7 @@ impl ChainPacketComponents {
                         ack_challenge: verification_output.ack_challenge,
                     })
                 }
-                ForwardedMetaPacket::FinalPacket {
+                ForwardedMetaPacket::Final {
                     packet_tag,
                     plain_text,
                     derived_secret,
@@ -146,7 +146,6 @@ impl ChainPacketComponents {
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self::Final {
-                        packet: mp.to_bytes(),
                         ticket,
                         packet_tag,
                         ack_key,
@@ -200,22 +199,6 @@ pub fn forward(
     }
 }
 
-impl ChainPacketComponents {
-    #[allow(dead_code)] // used in tests
-    pub fn to_bytes(&self) -> Box<[u8]> {
-        let (packet, ticket) = match self {
-            Self::Final { packet, ticket, .. } => (packet, ticket),
-            Self::Forwarded { packet, ticket, .. } => (packet, ticket),
-            Self::Outgoing { packet, ticket, .. } => (packet, ticket),
-        };
-
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(packet.as_ref());
-        ret.extend_from_slice(&ticket.to_bytes());
-        ret.into_boxed_slice()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::ChainPacketComponents;
@@ -227,6 +210,21 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
+
+    impl ChainPacketComponents {
+        pub fn to_bytes(&self) -> Box<[u8]> {
+            let (packet, ticket) = match self {
+                Self::Final { plain_text, ticket, .. } => (plain_text, ticket),
+                Self::Forwarded { packet, ticket, .. } => (packet, ticket),
+                Self::Outgoing { packet, ticket, .. } => (packet, ticket),
+            };
+
+            let mut ret = Vec::with_capacity(Self::SIZE);
+            ret.extend_from_slice(packet.as_ref());
+            ret.extend_from_slice(&ticket.to_bytes());
+            ret.into_boxed_slice()
+        }
+    }
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);
@@ -266,7 +264,6 @@ mod tests {
                 Balance::new(1000_u32, BalanceType::HOPR),
                 0u32.into(),
                 ChannelStatus::Open,
-                0u32.into(),
                 0u32.into(),
             );
             cg.update_channel(c);
