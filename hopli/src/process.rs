@@ -1,3 +1,5 @@
+//! This module contains functions to run `forge script`,
+//! which buids and broadcasts on-chain transactions used in hopli
 use std::{
     env,
     ffi::OsStr,
@@ -9,23 +11,11 @@ use std::{
 use crate::environment_config;
 use crate::utils::HelperErrors;
 
-pub fn build_path(network: &str, environment_type: &str) -> String {
-    let new_path = ["./", network, "/", environment_type].concat();
-    match Path::new(&new_path).to_str() {
-        None => panic!("new path is not a valid UTF-8 sequence"),
-        Some(s) => {
-            println!("new path is {}", s);
-            s.to_string()
-        }
-    }
-}
-
-/// Set environment variables
+/// Set environment variables used by `forge script`
 ///
 /// # Arguments
 ///
 /// * `contracts_root` - Directory to the foundry project
-/// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
 /// * `network` - Name of the network that nodes run in
 pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
