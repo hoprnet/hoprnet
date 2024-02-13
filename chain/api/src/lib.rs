@@ -13,8 +13,7 @@ use std::time::Duration;
 
 use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use chain_indexer::block::{Indexer, IndexerConfig};
-use chain_indexer::handlers::ContractEventHandlers;
+use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
 use chain_types::ContractAddresses;
@@ -29,10 +28,17 @@ use crate::errors::{HoprChainError, Result};
 use async_std::task::sleep;
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 
+/// The default HTTP request engine
+///
+/// TODO: Should be an internal type, [hopr_lib::chain] must be moved to this package
 pub type DefaultHttpPostRequestor = chain_rpc::client::native::SurfRequestor;
 
+/// The default JSON RPC provider client
+///
+/// TODO: Should be an internal type, [hopr_lib::chain] must be moved to this package
 pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
+/// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     me: Address,
     safe_address: Address,
@@ -65,7 +71,8 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 }
 
 /// Waits until the given address is funded.
-/// This is done by querying the RPC provider for balance with backoff until `max_delay`
+///
+/// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
     min_balance: Balance,
@@ -96,6 +103,12 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
+/// Repsents all chain interactions exported to be used in the hopr-lib
+///
+/// NOTE: instead of creating a unified interface the [HoprChain] exports
+/// some functionality (e.g. the [ChainActions] as a referentially used)
+/// object. This behavior will be refactored and hidden behind a trait
+/// in the future implementations.
 #[derive(Debug, Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,

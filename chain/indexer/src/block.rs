@@ -11,7 +11,7 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
+use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -42,28 +42,6 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
     } else {
         blocks
     }
-}
-
-/// Configuration for the chain indexer functionality
-#[derive(Debug, Clone, Copy, smart_default::SmartDefault)]
-pub struct IndexerConfig {
-    /// The block at which the indexer should start
-    ///
-    /// It typically makes little sense to start indexing from the beginning
-    /// of the chain, all that is sufficient is to start indexing since the
-    /// relevant smart contracts were introduced into the chain.
-    ///
-    /// This value makes sure that indexing is relevant and as minimal as possible.
-    ///
-    /// Default is 0.
-    pub start_block_number: u64,
-    /// Fetch token transactions
-    ///
-    /// Whether the token transaction topics should also be fetched.
-    ///
-    /// Default is true.
-    #[default = true]
-    pub fetch_token_transactions: bool,
 }
 
 /// Indexer

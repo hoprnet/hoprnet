@@ -1,4 +1,5 @@
-//! This crate contains various on-chain related modules and types:
+//! This crate contains various on-chain related modules and types.
+
 use bindings::hopr_announcements::HoprAnnouncements;
 use bindings::hopr_channels::HoprChannels;
 use bindings::hopr_dummy_proxy_for_network_registry::HoprDummyProxyForNetworkRegistry;
@@ -21,7 +22,7 @@ use std::sync::Arc;
 pub mod actions;
 pub mod chain_events;
 
-/// Various (mostly testing related) utility functions
+// Various (mostly testing related) utility functions
 pub mod utils;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;

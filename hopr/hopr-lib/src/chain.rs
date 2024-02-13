@@ -386,7 +386,7 @@ pub fn build_chain_api(
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {
-    let indexer_cfg = chain_indexer::block::IndexerConfig {
+    let indexer_cfg = chain_indexer::IndexerConfig {
         start_block_number: indexer_start_block,
         ..Default::default()
     };

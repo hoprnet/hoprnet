@@ -1,3 +1,5 @@
+//! General purpose high-level RPC operations implementation (`HoprRpcOperations`).
+//!
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations](rpc::RpcOperations) type, which is the main API exposed by this crate.
 use async_trait::async_trait;

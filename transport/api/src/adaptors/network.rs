@@ -5,6 +5,8 @@ use core_network::{
 use futures::channel::mpsc::Sender;
 use log::error;
 
+/// Implementation of the network interface allowing emitting and querying
+/// the swarm based p2p transport mechanism from the [crate::Network].
 #[derive(Debug, Clone)]
 pub struct ExternalNetworkInteractions {
     emitter: Sender<NetworkEvent>,

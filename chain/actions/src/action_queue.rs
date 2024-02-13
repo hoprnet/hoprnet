@@ -122,6 +122,7 @@ impl ActionSender {
     }
 }
 
+/// Configuration for the [ActionQueue]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed

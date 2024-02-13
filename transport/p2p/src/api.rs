@@ -8,18 +8,29 @@ use log::error;
 
 use crate::errors::{P2PError, Result};
 
+/// Base type of the heartbeat protocol challenge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeartbeatChallenge(pub PeerId, pub ControlMessage);
 
+/// Base type of the manual ping challenge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 
-// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
-// case of faster input than output the memory might run out, but these are protected
-// by a bounded queue managing the request generation.
+/// Heartbeat request RX type.
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
+/// case of faster input than output the memory might run out, but these are protected
+/// by a bounded queue managing the request generation.
 pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
+
+/// Heartbeat response TX type.
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
+/// case of faster input than output the memory might run out, but these are protected
+/// by a bounded queue managing the request generation.
 pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
+/// Heartbeat mechanism API implementations for usage inside the libp2p stack.
 pub struct HeartbeatResponder {
     sender: HeartbeatResponseTx,
 }
@@ -48,6 +59,10 @@ impl HeartbeatResponder {
         }
     }
 
+    /// Generate the response for a given challenge.
+    ///
+    /// In case of an error generates a response to a random challenge leading to a
+    /// failed pong on the receiver side.
     pub fn generate_challenge_response(challenge: &ControlMessage) -> ControlMessage {
         match ControlMessage::generate_pong_response(challenge) {
             Ok(value) => value,
@@ -60,7 +75,7 @@ impl HeartbeatResponder {
     }
 }
 
-/// Requester of heartbeats implementing the `std::future::Stream` trait.
+/// Heartbeat mechanism trigger implementing the `std::future::Stream` trait.
 pub struct HeartbeatRequester {
     receiver: HeartbeaRequestRx,
 }
@@ -94,6 +109,7 @@ impl Stream for HeartbeatRequester {
     }
 }
 
+/// Manual ping mechanism trigger implementing the `std::future::Stream` trait.
 pub struct ManualPingRequester {
     receiver: HeartbeaRequestRx,
 }
