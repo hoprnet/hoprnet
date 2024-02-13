@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn ok_when_no_env_is_supplied_but_password_path_is_supplied() {
-        let path = "./tmp_exist_1";
+        let path = "./tmp_pwd_1";
         create_file(path, None, 0);
 
         let pk_args = PrivateKeyArgs {
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn take_cli_password_path_when_both_cli_arg_and_env_are_supplied() {
-        let path = "./tmp_exist_1";
+        let path = "./tmp_pwd_2";
         create_file(path, None, 0);
 
         let pk_args = PrivateKeyArgs {
