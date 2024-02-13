@@ -617,7 +617,14 @@ impl Hopr {
         };
         let db = async_std::task::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
 
-        info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
+        if cfg.chain.provider.is_none() {
+            info!("Creating chain components using default provider");
+        } else {
+            info!(
+                "Creating chain components using custom provider: {:?}",
+                cfg.chain.provider.unwrap()
+            );
+        }
         let resolved_environment = crate::chain::ChainNetworkConfig::new(
             &cfg.chain.network,
             cfg.chain.provider.as_deref(),
