@@ -3,7 +3,6 @@
 use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
-use crate::initialize_node::InitializeNodeArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
@@ -53,10 +52,6 @@ enum Commands {
     )]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
 
-    ///
-    #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
-    InitializeNode(InitializeNodeArgs),
-
     /// Perform all the necessary steps before staring hopd.
     /// - Create a Safe proxy instance and a node management instance. Include nodes to module
     /// - Configure default permissions (for HOPR- Token, Channels, and Announcement contracts)
@@ -97,9 +92,6 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::RegisterInNetworkRegistry(opt) => {
-            opt.run()?;
-        }
-        Commands::InitializeNode(opt) => {
             opt.run()?;
         }
         Commands::CreateSafeModule(opt) => {
