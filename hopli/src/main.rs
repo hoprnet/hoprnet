@@ -1,4 +1,5 @@
-// TODO: docs are missing
+//! `hopli` is a collection of commands to help with identity creation, funding, registration, etc. for HOPR nodes
+
 use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
@@ -29,6 +30,7 @@ struct Cli {
     pub command: Commands,
 }
 
+/// Helper for running your HOPR nodes
 #[derive(Subcommand, Debug)]
 #[clap(
     name = "HOPR ethereum package helper",
@@ -37,23 +39,50 @@ struct Cli {
     about = "Helper to create node identities, fund nodes, etc."
 )]
 enum Commands {
+    /// Create or read the node's identity file(s)
     #[clap(about = "Create and store identity files")]
     Identity(IdentityArgs),
+
+    /// Fund given address and/or addressed derived from identity files native tokens or HOPR tokens
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
-    #[clap(about = "Registry some nodes peer ids to the network registery contract")]
+
+    /// Use a manager account to registry some nodes Ethereum address with its staking account address onto the network registry contract
+    #[clap(
+        about = "Registry some nodes Ethereum address with its staking account address onto the network registry contract. It requires a manager account to perform this action."
+    )]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
+
+    ///
     #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
     InitializeNode(InitializeNodeArgs),
-    #[clap(about = "Create a safe instance and a node management instance, configure default permissions")]
-    CreateSafeModule(CreateSafeModuleArgs),
+
+    /// Perform all the necessary steps before staring hopd.
+    /// - Create a Safe proxy instance and a node management instance. Include nodes to module
+    /// - Configure default permissions (for HOPR- Token, Channels, and Announcement contracts)
+    /// - Approve token transfer for the Safe proxy
+    /// - Fund Safe with tokens and fund nodes with xDAI
+    /// - Use the manager account to include the created Safe and provided node address to the Network Registry contract.
     #[clap(
-        about = "Migrate an exising set of node(d) with safe and module to a new network, with default permissions"
+        about = "Create a safe proxy instance and a node management module instance, include nodes to the created module, configure default permissions, fund, register it to the Network Registry. It requires access to a manager account."
+    )]
+    CreateSafeModule(CreateSafeModuleArgs),
+
+    /// Given existing node(s), safe and module, migrate them to a different network.
+    /// It requires a manager account to perform this action.
+    #[clap(
+        about = "Migrate an exising set of node(d) with safe and module to a different network, with default permissions. It requires access to a manager account."
     )]
     MigrateSafeModule(MigrateSafeModuleArgs),
-    #[clap(about = "Move a registered node to a new safe and module pair")]
+
+    /// Move nodes that are associated to an old safe to a new safe.
+    /// It requires a manager account to perform this action.
+    #[clap(about = "Move a registered node to a new safe and module pair. It requires access to a manager account.")]
     MoveNodeToSafeModule(MoveNodeToSafeModuleArgs),
-    #[clap(about = "Sync eligibility of safes on network registry")]
+
+    /// Sync eligibility of safes on network registry.
+    /// It requires a manager account to perform this action.
+    #[clap(about = "Sync eligibility of safes on network registry. It requires access to a manager account.")]
     SyncNetworkRegistry(SyncNetworkRegistryArgs),
 }
 
