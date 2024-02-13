@@ -328,6 +328,12 @@ impl HalfKey {
     }
 }
 
+impl From<[u8; Self::SIZE]> for HalfKey {
+    fn from(hkey: [u8; Self::SIZE]) -> Self {
+        Self { hkey }
+    }
+}
+
 impl BinarySerializable for HalfKey {
     const SIZE: usize = 32;
 
@@ -932,7 +938,7 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(first).as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::as_slice(first).as_ref())
             .and_then(|s1| {
                 NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
             })

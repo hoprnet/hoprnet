@@ -407,6 +407,9 @@ pub fn validate_ticket(ticket: &Ticket, destination: &Address, domain_separator:
 /// let vrf_values = Ticket::get_vrf_values(&ticket_hash, &BOB, &DOMAIN_SEPARATOR).unwrap();
 ///
 /// assert!(Ticket::is_winning(&ticket, &vrf_values, &por_response, &DOMAIN_SEPARATOR).unwrap());
+///
+/// // Size-optimized compact representation requires 148 bytes
+/// assert_eq!(ticket.to_bytes().len(), 148);
 /// ```
 #[derive(Clone, PartialEq, Eq)]
 pub struct Ticket {

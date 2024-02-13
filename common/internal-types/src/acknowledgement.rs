@@ -188,15 +188,58 @@ pub fn validate_provable_winning_ticket(
     Ok(())
 }
 
-/// Encapsulates all values necessary to prove that the embedded ticket
-/// is a win.
+/// One-shot struct containing all values to prove to externals, such as the
+/// smart contract that this ticket is indeed a win.
 ///
 /// This struct can only be constructed using `from_acked_ticket` and
 /// requires access to the private key to do so. Once done, all values
-/// are cached and no longer require access to the private key.
+/// are present and no longer require access to the private key.
 ///
-/// @dev
-/// Must be constructed using `from_acked_ticket()`
+/// ```rust
+/// # use hex_literal::hex;
+/// # use hopr_crypto_types::prelude::*;
+/// # use hopr_internal_types::prelude::*;
+/// # use hopr_primitive_types::prelude::*;
+/// # use std::str::FromStr;
+///
+/// let ALICE = ChainKeypair::from_secret(&hex!("65190100ae36f2913c42b159e4ce0f41e8c2d1bfdf0a957e671e6c5bf254413a")).unwrap();
+/// let BOB = ChainKeypair::from_secret(&hex!("1b54924f2b60a60974f7d9d76a0a4aaa5b01a832ff6f5ea77b4c9638aa5fa57a")).unwrap();
+///
+/// let BOB_KEY_HALF: HalfKey = hex!("e4cf15f777f64ff44c0e55836fbd7c1da6b452011d13ce96892a1ca915119cd1").into();
+/// let CHRIS_KEY_HALF: HalfKey = hex!("fa6f75a2553b15db022958ca5d532c7973d1aa1a91ea33355a426885e10a4a5f").into();
+///
+/// let por_response = Response::from_half_keys(&BOB_KEY_HALF, &CHRIS_KEY_HALF).unwrap();
+///
+/// // prevents tickets issued for one smart contract issued being replayed
+/// // on differen smart contract or on a different EVM-compatible blockchain
+/// let DOMAIN_SEPARATOR: Hash = hex!("860ccf41399b5845ff1932c8c6f4293adbbbc89974d109674e4a07c28075e5bd").into();
+///
+/// let ticket = Ticket::new(
+///     &BOB.public().to_address(),
+///     &Balance::from_str("1 HOPR").unwrap(),
+///     1u64.into(),
+///     1u64.into(),
+///     0.5f64, // 50% win probability
+///     1u64.into(),
+///     &por_response.to_challenge().to_ethereum_challenge(),
+///     &ALICE,
+///     &DOMAIN_SEPARATOR  
+/// );
+///
+/// assert!(validate_ticket(&ticket, &BOB.public().to_address(), &DOMAIN_SEPARATOR).is_ok());
+///
+/// let unacked_ticket = UnacknowledgedTicket::new(ticket, BOB_KEY_HALF);
+///
+/// assert!(validate_unacknowledged_ticket(&unacked_ticket, &Hash::default()).is_ok());
+///
+/// let acked_ticket = unacked_ticket.acknowledge(&CHRIS_KEY_HALF).unwrap();
+///
+/// assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+///
+/// let winning_ticket = ProvableWinningTicket::from_acked_ticket(acked_ticket, &BOB, &DOMAIN_SEPARATOR).unwrap();
+///
+/// assert!(validate_provable_winning_ticket(&winning_ticket, &BOB.public().to_address(), &DOMAIN_SEPARATOR).is_ok());
+/// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvableWinningTicket {
     /// ticket data, including signature and expected payout
