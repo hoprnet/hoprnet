@@ -1917,7 +1917,7 @@ mod tickets {
                 index_offset: value.index_offset,
                 win_prob: value.win_prob().to_string(),
                 channel_epoch: value.channel_epoch,
-                signature: value.signature.expect("impossible to have an unsigned ticket").to_hex(),
+                signature: value.signature.to_hex(),
             }
         }
     }

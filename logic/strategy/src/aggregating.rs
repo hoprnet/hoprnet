@@ -419,7 +419,7 @@ mod tests {
             1u64.into(),
             ticket_win_prob,
             1u64.into(),
-            response.to_challenge().into(),
+            &response.to_challenge().into(),
             signer,
             &domain_separator,
         );

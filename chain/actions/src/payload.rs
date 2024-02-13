@@ -270,9 +270,9 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
     ) -> Result<TypedTransaction> {
         let redeemable = convert_winning_ticket(winning_ticket)?;
 
-        let ticket_hash = winning_ticket.ticket().get_hash(domain_separator);
+        let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(winning_ticket.vrf_params(), &self.me, &ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, &self.me, &ticket_hash, domain_separator);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -472,9 +472,9 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
     ) -> Result<TypedTransaction> {
         let redeemable = convert_winning_ticket(winning_ticket)?;
 
-        let ticket_hash = winning_ticket.ticket().get_hash(domain_separator);
+        let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(winning_ticket.vrf_params(), &self.me, &ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, &self.me, &ticket_hash, domain_separator);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -550,30 +550,26 @@ pub fn convert_vrf_parameters(
 ///
 /// Specific for smart contract payload generation
 pub fn convert_winning_ticket(off_chain: &ProvableWinningTicket) -> Result<RedeemableTicket> {
-    if let Some(ref signature) = off_chain.ticket().signature {
-        let serialized_signature = signature.to_bytes();
+    let serialized_signature = off_chain.ticket.signature.to_bytes();
 
-        let mut encoded_win_prob = [0u8; 8];
-        encoded_win_prob[1..].copy_from_slice(&off_chain.ticket().encoded_win_prob);
+    let mut encoded_win_prob = [0u8; 8];
+    encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
 
-        Ok(RedeemableTicket {
-            data: TicketData {
-                channel_id: off_chain.ticket().channel_id.into(),
-                amount: off_chain.ticket().amount.amount().as_u128(),
-                ticket_index: off_chain.ticket().index,
-                index_offset: off_chain.ticket().index_offset,
-                epoch: off_chain.ticket().channel_epoch,
-                win_prob: u64::from_be_bytes(encoded_win_prob),
-            },
-            signature: CompactSignature {
-                r: H256::from_slice(&serialized_signature[0..32]).into(),
-                vs: H256::from_slice(&serialized_signature[32..64]).into(),
-            },
-            por_secret: U256::from_big_endian(off_chain.response().as_slice()),
-        })
-    } else {
-        Err(InvalidArguments("Acknowledged ticket must be signed".into()))
-    }
+    Ok(RedeemableTicket {
+        data: TicketData {
+            channel_id: off_chain.ticket.channel_id.into(),
+            amount: off_chain.ticket.amount.amount().as_u128(),
+            ticket_index: off_chain.ticket.index,
+            index_offset: off_chain.ticket.index_offset,
+            epoch: off_chain.ticket.channel_epoch,
+            win_prob: u64::from_be_bytes(encoded_win_prob),
+        },
+        signature: CompactSignature {
+            r: H256::from_slice(&serialized_signature[0..32]).into(),
+            vs: H256::from_slice(&serialized_signature[32..64]).into(),
+        },
+        por_secret: U256::from_big_endian(off_chain.response.as_slice()),
+    })
 }
 
 #[cfg(test)]
@@ -693,7 +689,7 @@ pub mod tests {
             U256::one(),
             1.0_f64,
             U256::one(),
-            response.to_challenge().to_ethereum_challenge(),
+            &response.to_challenge().to_ethereum_challenge(),
             &chain_key_alice,
             &domain_separator,
         );

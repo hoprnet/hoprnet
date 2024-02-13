@@ -433,16 +433,17 @@ where
                 return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")));
             }
 
-            Ticket::new_partial(
+            Ticket::new_unsigned(
                 &self.cfg.chain_keypair.public().to_address(),
                 &destination,
                 &amount,
                 current_ticket_index,
-                U256::one(),     // unaggregated always have index_offset == 1
+                U256::one(),     // unaggregated tickets always have index_offset == 1
                 TICKET_WIN_PROB, // 100% winning probability
                 channel.channel_epoch,
+                &EthereumChallenge::default(),
             )
-        }?;
+        };
 
         debug!("Creating ticket in channel {channel_id}.",);
 

@@ -322,6 +322,10 @@ impl HalfKey {
             .map(|cp| HalfKeyChallenge::new(&cp.serialize_compressed()))
             .expect("invalid public key")
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.hkey
+    }
 }
 
 impl BinarySerializable for HalfKey {
@@ -873,6 +877,12 @@ impl CompressedPublicKey {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Response {
     response: [u8; Self::SIZE],
+}
+
+impl From<[u8; Self::SIZE]> for Response {
+    fn from(response: [u8; Self::SIZE]) -> Self {
+        Self { response }
+    }
 }
 
 impl Default for Response {

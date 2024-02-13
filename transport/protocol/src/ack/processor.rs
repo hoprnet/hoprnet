@@ -138,10 +138,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .read()
                     .await
                     .get_channel_from(
-                        unacknowledged
-                            .ticket
-                            // result is cached due to previous ticket validation
-                            .recover_signer_address(&domain_separator)
+                        &Ticket::recover_issuer_address(&unacknowledged.ticket, &domain_separator)
                             .expect("failed to derive signer from validated ticket"),
                     )
                     .await?;

@@ -1396,7 +1396,7 @@ mod tests {
             index_offset.unwrap_or(U256::one()),
             1.0f64,
             channel_epoch.unwrap_or(U256::one()),
-            challenge.unwrap_or_default(),
+            &challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
         )

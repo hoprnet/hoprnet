@@ -270,7 +270,7 @@ mod tests {
             1u64.into(),
             1.0f64,
             1u64.into(),
-            EthereumChallenge::default(),
+            &EthereumChallenge::default(),
             issuer,
             &Hash::default(),
         )

@@ -22,7 +22,7 @@ pub struct Acknowledgement {
 impl Acknowledgement {
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
-            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_keypair),
+            ack_signature: OffchainSignature::sign_message(&ack_key_share.as_slice(), node_keypair),
             ack_key_share,
             validated: true,
         }
@@ -33,7 +33,7 @@ impl Acknowledgement {
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature
-            .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
+            .verify_message(&self.ack_key_share.as_slice(), sender_node_key);
 
         self.validated
     }
@@ -67,7 +67,7 @@ impl BinarySerializable for Acknowledgement {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ack_signature.to_bytes());
-        ret.extend_from_slice(&self.ack_key_share.to_bytes());
+        ret.extend_from_slice(&self.ack_key_share.as_slice());
         ret.into_boxed_slice()
     }
 }
@@ -137,11 +137,8 @@ impl AcknowledgedTicket {
     }
 
     pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
-        let vrf_params = self.ticket.get_vrf_values(chain_key, domain_separator)?;
-        if self
-            .ticket
-            .is_winning_ticket(vrf_params, &self.response, domain_separator)
-        {
+        let vrf_params = Ticket::get_vrf_values(&self.ticket.get_hash(domain_separator), chain_key, domain_separator)?;
+        if Ticket::is_winning(&self.ticket, &vrf_params, &self.response, domain_separator)? {
             Ok(())
         } else {
             Err(CoreTypesError::GeneralError(GeneralError::NonSpecificError(
@@ -171,7 +168,7 @@ pub fn validate_provable_winning_ticket(
     }
 
     maybe_winning_ticket
-        .vrf_params()
+        .vrf_params
         .verify(
             destination,
             &maybe_winning_ticket.ticket.get_hash(domain_separator).into(),
@@ -179,11 +176,12 @@ pub fn validate_provable_winning_ticket(
         )
         .map_err(|_| CoreTypesError::InvalidInputData("VRF values are invalid".into()))?;
 
-    if !maybe_winning_ticket.ticket.is_winning_ticket(
-        maybe_winning_ticket.vrf_params(),
+    if !Ticket::is_winning(
+        &maybe_winning_ticket.ticket,
+        &maybe_winning_ticket.vrf_params,
         &maybe_winning_ticket.response,
         domain_separator,
-    ) {
+    )? {
         return Err(CoreTypesError::InvalidInputData("Ticket is not a win".into()));
     }
 
@@ -202,28 +200,16 @@ pub fn validate_provable_winning_ticket(
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvableWinningTicket {
     /// ticket data, including signature and expected payout
-    ticket: Ticket,
+    pub ticket: Ticket,
     /// Proof-Of-Relay response to challenge stated in ticket
-    response: Response,
+    pub response: Response,
+    /// VRF values to prove that embedded ticket is a win (large struct)
+    pub vrf_params: VrfParameters,
+    /// Ethereum address of the issuer of the ticket
+    pub issuer: Address,
 }
 
 impl ProvableWinningTicket {
-    pub fn vrf_params(&self) -> &VrfParameters {
-        self.ticket.vrf_params.get().expect("missing cached VRF values")
-    }
-
-    pub fn signer(&self) -> &Address {
-        self.ticket.signer.get().expect("missing cached signer value")
-    }
-
-    pub fn ticket(&self) -> &Ticket {
-        &self.ticket
-    }
-
-    pub fn response(&self) -> &Response {
-        &self.response
-    }
-
     /// Consumes an acknowledged ticket and reconstructs all values necessary
     /// to prove that this ticket is a win. This requires access to the
     /// private key.
@@ -232,16 +218,19 @@ impl ProvableWinningTicket {
         chain_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<Self> {
-        // populates cached properties which require access to the private key
-        let _ = acked_ticket
-            .ticket
-            .get_vrf_values(chain_key, domain_separator)?
-            .to_owned();
-        let _ = acked_ticket.ticket.recover_signer_address(domain_separator)?;
+        let vrf_params = Ticket::get_vrf_values(
+            &acked_ticket.ticket.get_hash(domain_separator),
+            chain_key,
+            domain_separator,
+        )?;
+
+        let issuer = Ticket::recover_issuer_address(&acked_ticket.ticket, domain_separator)?;
 
         Ok(Self {
             ticket: acked_ticket.ticket,
             response: acked_ticket.response,
+            vrf_params,
+            issuer,
         })
     }
 }
@@ -275,14 +264,17 @@ impl BinarySerializable for ProvableWinningTicket {
             let vrf_params = VrfParameters::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
             )?;
-            ticket.vrf_params.get_or_init(|| vrf_params);
-            let signer = Address::from_bytes(
+            let issuer = Address::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
                     ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
             )?;
-            ticket.signer.get_or_init(|| signer);
 
-            Ok(Self { ticket, response })
+            Ok(Self {
+                ticket,
+                response,
+                vrf_params,
+                issuer,
+            })
         } else {
             Err(GeneralError::ParseError)
         }
@@ -291,9 +283,9 @@ impl BinarySerializable for ProvableWinningTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.response.to_bytes());
-        ret.extend_from_slice(&self.vrf_params().to_bytes());
-        ret.extend_from_slice(&self.signer().to_bytes());
+        ret.extend_from_slice(&self.response.as_slice());
+        ret.extend_from_slice(&self.vrf_params.to_bytes());
+        ret.extend_from_slice(&self.issuer.as_slice());
         ret.into_boxed_slice()
     }
 }
@@ -349,7 +341,7 @@ impl BinarySerializable for UnacknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.own_key.to_bytes());
+        ret.extend_from_slice(&self.own_key.as_slice());
         ret.into_boxed_slice()
     }
 }
@@ -447,7 +439,7 @@ pub mod test {
             U256::one(),
             0.5f64,
             4u64.into(),
-            challenge.unwrap_or_default(),
+            &challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
         )

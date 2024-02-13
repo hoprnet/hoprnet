@@ -58,7 +58,7 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         U256::one(),
         1.0f64,
         U256::one(),
-        Challenge::from(cp_sum).to_ethereum_challenge(),
+        &Challenge::from(cp_sum).to_ethereum_challenge(),
         counterparty,
         &domain_separator,
     );

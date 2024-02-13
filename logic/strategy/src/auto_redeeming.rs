@@ -123,7 +123,7 @@ mod tests {
             idx_offset.into(),
             1.0f64,
             4u64.into(),
-            Challenge::from(cp_sum).to_ethereum_challenge(),
+            &Challenge::from(cp_sum).to_ethereum_challenge(),
             issuer,
             &Hash::default(),
         );

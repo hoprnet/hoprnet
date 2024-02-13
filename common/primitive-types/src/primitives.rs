@@ -328,6 +328,12 @@ pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],
 }
 
+impl From<[u8; Self::SIZE]> for EthereumChallenge {
+    fn from(challenge: [u8; Self::SIZE]) -> Self {
+        Self { challenge }
+    }
+}
+
 impl Default for EthereumChallenge {
     fn default() -> Self {
         Self {
@@ -343,6 +349,10 @@ impl EthereumChallenge {
         let mut ret = Self::default();
         ret.challenge.copy_from_slice(data);
         ret
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.challenge
     }
 }
 
