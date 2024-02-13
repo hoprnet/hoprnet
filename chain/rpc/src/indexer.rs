@@ -10,7 +10,7 @@
 use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
-use ethers_providers::{JsonRpcClient, Middleware};
+use ethers::providers::{JsonRpcClient, Middleware};
 use futures::{Stream, StreamExt, TryStreamExt};
 use log::error;
 use log::{debug, warn};

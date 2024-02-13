@@ -348,8 +348,6 @@ mod tests {
                             },
                             "confirmations": 2,
                             "tags": [],
-                            "tx_polling_interval": 1000,
-                            "max_block_range": 200
                           }
                         },
                         "chains": {
@@ -363,6 +361,8 @@ mod tests {
                             "native_token_name": "ETH",
                             "hopr_token_name": "wxHOPR",
                             "block_time": 5000,
+                            "tx_polling_interval": 1000,
+                            "max_block_range": 200,
                             "tags": [],
                             "etherscan_api_url": null
                           }

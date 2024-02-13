@@ -41,9 +41,11 @@ pub enum EnvironmentType {
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ChainOptions {
+    /// Text description of this chain
     pub description: String,
     /// >= 0
     pub chain_id: u32,
+    /// True only for Anvil
     pub live: bool,
     /// a valid HTTP url pointing at a RPC endpoint
     pub default_provider: String,
@@ -53,11 +55,18 @@ pub struct ChainOptions {
     pub max_fee_per_gas: String,
     /// Tips paid directly to miners, e.g. '2 gwei'
     pub max_priority_fee_per_gas: String,
+    /// Name of the native token on this chain
     pub native_token_name: String,
+    /// HOPR token name on this chain
     pub hopr_token_name: String,
     /// expected block time on the chain in milliseconds
     pub block_time: u64,
+    /// custom tags for this chain
     pub tags: Option<Vec<String>>,
+    /// maximum block range to fetch while indexing logs
+    pub max_block_range: u64,
+    /// interval in ms for transaction polling when needed
+    pub tx_polling_interval: u64,
 }
 
 /// Holds all information about the protocol network
@@ -79,10 +88,6 @@ pub struct Network {
     pub addresses: Addresses,
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
-    /// milliseconds between polling the RPC for new transactions
-    pub tx_polling_interval: u64,
-    /// maximum block range to fetch while indexing logs
-    pub max_block_range: u64,
 }
 
 #[serde_as]
@@ -119,6 +124,7 @@ pub struct Addresses {
     pub node_stake_v2_factory: Address,
 }
 
+// TODO: this needs to be refactored so it directly uses members like RpcOperationsCfg...
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainNetworkConfig {
@@ -174,21 +180,24 @@ fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<boo
     Ok(allowed_versions.matches(&version))
 }
 
+// TODO: this needs refactoring
+
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
     pub fn new(
         id: &str,
         maybe_custom_provider: Option<&str>,
-        protocol_config: &mut ProtocolsConfig,
+        protocol_config: &ProtocolsConfig,
     ) -> Result<Self, String> {
         let network = protocol_config
             .networks
-            .get_mut(id)
+            .get(id)
             .ok_or(format!("Could not find network {} in protocol config", id))?;
 
-        let chain = protocol_config
+        let mut chain = protocol_config
             .chains
-            .get_mut(&network.chain)
+            .get(&network.chain)
+            .cloned()
             .ok_or(format!("Invalid chain {} for network {}", network.chain, id))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
@@ -211,8 +220,8 @@ impl ChainNetworkConfig {
                 node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 token: network.addresses.token.to_owned(),
-                tx_polling_interval: network.tx_polling_interval,
-                max_block_range: network.max_block_range,
+                tx_polling_interval: chain.tx_polling_interval,
+                max_block_range: chain.max_block_range,
             }),
             Ok(false) => Err(format!(
                 "network {id} is not supported, supported networks {:?}",

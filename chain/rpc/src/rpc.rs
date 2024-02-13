@@ -8,13 +8,14 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use ethers_providers::{JsonRpcClient, Middleware, Provider};
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use serde_with::serde_as;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -22,6 +23,7 @@ use crate::errors::RpcError::ContractError;
 use crate::{HoprRpcOperations, PendingTransaction};
 
 /// Configuration of the RPC related parameters.
+#[serde_as]
 #[derive(Clone, Debug, Copy, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     /// Blockchain id
@@ -36,6 +38,7 @@ pub struct RpcOperationsConfig {
     /// Address of the node's module.
     ///
     /// Defaults to null address.
+    #[serde_as(as = "DisplayFromStr")]
     pub module_address: Address,
     /// Expected block time of the blockchain
     ///
@@ -54,9 +57,9 @@ pub struct RpcOperationsConfig {
     ///
     /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
     ///
-    /// Defaults to 2500 blocks
+    /// Defaults to 1000 blocks
     #[validate(range(min = 1))]
-    #[default = 2500]
+    #[default = 1000]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
     ///

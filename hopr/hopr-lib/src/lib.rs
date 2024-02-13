@@ -592,7 +592,7 @@ impl Hopr {
         let resolved_environment = crate::chain::ChainNetworkConfig::new(
             &cfg.chain.network,
             cfg.chain.provider.as_deref(),
-            &mut cfg.chain.protocols,
+            &cfg.chain.protocols,
         )
         .expect("Failed to resolve blockchain environment");
         let contract_addresses = SmartContractConfig::from(&resolved_environment);
@@ -601,9 +601,6 @@ impl Hopr {
             me_onchain.public().to_hex(),
             contract_addresses
         );
-
-        // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
-        // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
 
         let is_public = cfg.chain.announce;
 

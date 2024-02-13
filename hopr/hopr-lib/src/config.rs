@@ -33,6 +33,7 @@ fn just_true() -> bool {
     true
 }
 
+// TODO: needs refactoring to use types from crate dependencies
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct Chain {
     #[validate(custom = "validate_announced")]
@@ -48,7 +49,13 @@ pub struct Chain {
     pub protocols: crate::chain::ProtocolsConfig,
     #[serde(default = "just_true")]
     #[default = true]
-    pub check_unrealized_balance: bool,
+    pub check_unrealized_balance: bool, // TODO: should be removed
+    #[serde(default = "1000")]
+    #[default = 1000]
+    pub max_block_range: u32,
+    #[serde(default = "3000")]
+    #[default = 3000]
+    pub tx_polling_interval: u32,
 }
 
 #[inline]

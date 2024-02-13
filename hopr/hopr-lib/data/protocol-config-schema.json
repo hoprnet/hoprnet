@@ -101,6 +101,12 @@
             },
             "hopr_token_name": {
               "type": "string"
+            },
+            "max_block_range": {
+              "type": "integer"
+            },
+            "tx_polling_interval": {
+              "type": "integer"
             }
           },
           "required": [
@@ -110,7 +116,9 @@
             "max_fee_per_gas",
             "max_priority_fee_per_gas",
             "hopr_token_name",
-            "native_token_name"
+            "native_token_name",
+            "max_block_range",
+            "tx_polling_interval"
           ],
           "additionalProperties": false
         },

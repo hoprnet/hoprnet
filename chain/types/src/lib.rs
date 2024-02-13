@@ -27,32 +27,43 @@ pub mod chain_events;
 pub mod utils;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;
+use serde_with::serde_as;
 
-/// Short-hand for creating new EIP1559 transaction object.
+/// Shorthand for creating new EIP1559 transaction object.
 pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(Eip1559TransactionRequest::new())
 }
 
 /// Holds addresses of all smart contracts.
+#[serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContractAddresses {
     /// Token contract
+    #[serde_as(as = "DisplayFromStr")]
     pub token: Address,
     /// Channels contract
+    #[serde_as(as = "DisplayFromStr")]
     pub channels: Address,
     /// Announcements contract
+    #[serde_as(as = "DisplayFromStr")]
     pub announcements: Address,
     /// Network registry contract
+    #[serde_as(as = "DisplayFromStr")]
     pub network_registry: Address,
     /// Network registry proxy contract
+    #[serde_as(as = "DisplayFromStr")]
     pub network_registry_proxy: Address,
     /// Safe registry contract
+    #[serde_as(as = "DisplayFromStr")]
     pub safe_registry: Address,
     /// Price oracle contract
+    #[serde_as(as = "DisplayFromStr")]
     pub price_oracle: Address,
     /// Stake factory contract
+    #[serde_as(as = "DisplayFromStr")]
     pub stake_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
+    #[serde_as(as = "DisplayFromStr")]
     pub module_implementation: Address,
 }
 

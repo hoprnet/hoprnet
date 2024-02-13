@@ -1148,7 +1148,7 @@ dependencies = [
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-stream",
@@ -1157,7 +1157,6 @@ dependencies = [
  "chain-types",
  "env_logger",
  "ethers",
- "ethers-providers",
  "futures",
  "futures-timer",
  "hopr-crypto-types",
@@ -1171,6 +1170,7 @@ dependencies = [
  "primitive-types",
  "serde",
  "serde_json",
+ "serde_with",
  "smart-default",
  "surf",
  "thiserror",
@@ -1192,6 +1192,7 @@ dependencies = [
  "log",
  "multiaddr",
  "serde",
+ "serde_with",
  "strum 0.25.0",
 ]
 

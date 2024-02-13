@@ -62,8 +62,6 @@ hopr:
             announcements: '0x09635f643e140090a9a8dcd712ed6285858cebef'
             node_stake_v2_factory: '0xb7f8bc63bbcad18155201308c8f3540b07f84f5e'
           confirmations: 2
-          tx_polling_interval: 1000
-          max_block_range: 100
         anvil-localhost2:
           chain: anvil
           environment_type: local
@@ -81,8 +79,6 @@ hopr:
             announcements: '0x09635f643e140090a9a8dcd712ed6285858cebef'
             node_stake_v2_factory: '0xb7f8bc63bbcad18155201308c8f3540b07f84f5e'
           confirmations: 2
-          tx_polling_interval: 1000
-          max_block_range: 100
       chains:
         anvil:
           description: Local Ethereum node, akin to Ganache, Hardhat chain
@@ -95,6 +91,8 @@ hopr:
           native_token_name: ETH
           hopr_token_name: wxHOPR
           block_time: 2000
+          tx_polling_interval: 1000
+          max_block_range: 100
           tags: []
     check_unrealized_balance: true
   safe_module:

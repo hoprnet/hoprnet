@@ -2,6 +2,7 @@
   "chains": {
     "xdai": {
       "block_time": 5000,
+      "tx_polling_interval": 3000,
       "chain_id": 100,
       "default_provider": "https://gnosis-provider.rpch.tech",
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -9,7 +10,8 @@
       "live": true,
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
-      "native_token_name": "xDAI"
+      "native_token_name": "xDAI",
+      "max_block_range": 1000
     }
   },
   "networks": {
@@ -29,9 +31,7 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29521261,
-      "max_block_range": 2000,
       "tags": ["development"],
-      "tx_polling_interval": 3000,
       "version_range": "*"
     },
     "dufour": {
@@ -50,9 +50,7 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 29706814,
-      "max_block_range": 2000,
       "tags": ["etherscan"],
-      "tx_polling_interval": 3000,
       "version_range": "2.*"
     },
     "monte_rosa": {
@@ -71,9 +69,7 @@
       "confirmations": 8,
       "environment_type": "production",
       "indexer_start_block_number": 24097267,
-      "max_block_range": 2000,
       "tags": ["etherscan"],
-      "tx_polling_interval": 3000,
       "version_range": "1.89||1.90||1.91||1.92||1.93"
     },
     "rotsee": {
@@ -92,9 +88,7 @@
       "confirmations": 8,
       "environment_type": "staging",
       "indexer_start_block_number": 29690361,
-      "max_block_range": 2000,
       "tags": ["etherscan"],
-      "tx_polling_interval": 3000,
       "version_range": "2.*"
     }
   }
