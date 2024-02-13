@@ -1,3 +1,25 @@
+//! ## Promiscuous Strategy
+//! This strategy opens or closes automatically channels based the following rules:
+//! - if node quality is below or equal to a threshold `network_quality_threshold` and we have a channel opened to it, the strategy will close it
+//!   - if node quality is above `network_quality_threshold` and no channel is opened yet, it will try to open channel to it (with initial stake `new_channel_stake`).
+//!     However, the channel is opened only if the following is both true:
+//!   - the total node balance does not drop below `minimum_node_balance`
+//!   - the number of channels opened by this strategy does not exceed `max_channels`
+//!
+//! Also, the candidates for opening (quality > `network_quality_threshold`), are sorted by best quality first.
+//! So that means if some nodes cannot have channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
+//! the better quality ones were taking precedence.
+//!
+//! The sorting algorithm is intentionally unstable, so that the nodes which have the same quality get random order.
+//! The constant `k` can be also set to a value > 1, which will make the strategy to open more channels for smaller networks,
+//! but it would keep the same asymptotic properties.
+//! Per default `k` = 1.
+//!
+//! The strategy starts acting only after at least `min_network_size_samples` network size samples were gathered, which means
+//! it does not start opening/closing channels earlier than `min_network_size_samples` number of minutes after the node has started.
+//!
+//! For details on default parameters see [PromiscuousStrategyConfig].
+//!
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -25,7 +47,7 @@ use validator::Validate;
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
-use crate::{decision::ChannelDecision, Strategy};
+use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -40,7 +62,54 @@ lazy_static::lazy_static! {
         SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
-/// Config of promiscuous strategy.
+/// A decision made by the Promiscuous strategy on each tick,
+/// represents which channels should be closed and which should be opened.
+/// Also indicates a number of maximum channels this strategy can open given the current network size.
+/// Note that the number changes as the network size changes.
+#[derive(Clone, Debug, PartialEq, Default)]
+struct ChannelDecision {
+    to_close: Vec<ChannelEntry>,
+    to_open: Vec<(Address, Balance)>,
+}
+
+impl ChannelDecision {
+    pub fn will_channel_be_closed(&self, counter_party: &Address) -> bool {
+        self.to_close.iter().any(|c| &c.destination == counter_party)
+    }
+
+    pub fn will_address_be_opened(&self, address: &Address) -> bool {
+        self.to_open.iter().any(|(addr, _)| addr == address)
+    }
+
+    pub fn add_to_close(&mut self, entry: ChannelEntry) {
+        self.to_close.push(entry);
+    }
+
+    pub fn add_to_open(&mut self, address: Address, balance: Balance) {
+        self.to_open.push((address, balance));
+    }
+
+    pub fn get_to_close(&self) -> &Vec<ChannelEntry> {
+        &self.to_close
+    }
+
+    pub fn get_to_open(&self) -> &Vec<(Address, Balance)> {
+        &self.to_open
+    }
+}
+
+impl Display for ChannelDecision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "channel decision: opening ({}), closing({})",
+            self.to_open.len(),
+            self.to_close.len()
+        )
+    }
+}
+
+/// Configuration of [PromiscuousStrategy].
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {

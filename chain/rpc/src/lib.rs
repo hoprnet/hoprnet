@@ -27,20 +27,11 @@ use crate::RetryAction::NoRetry;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 
-/// Extended `JsonRpcClient` abstraction
-/// This module contains custom implementation of `ethers::providers::JsonRpcClient`
-/// which allows usage of non-`reqwest` based HTTP clients.
 pub mod client;
 /// Errors specific to this crate.
 pub mod errors;
-
-/// Indexer specific trait implementation (`HoprIndexerRpcOperations`)
 pub mod indexer;
-
-/// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
-
-/// Helper types required by `client` module.
 mod helper;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.

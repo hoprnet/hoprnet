@@ -1,4 +1,6 @@
 //! Defines an enumeration of action that can be done by a HOPR node.
+//!
+//! The actions eventually lead to an on-chain transaction.
 //! See the `chain-actions` crate for details.
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

@@ -1,6 +1,6 @@
 //! Chain utilities used for testing.
+//!
 //! This used in unit and integration tests.
-
 use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
 use bindings::{
     hopr_channels::HoprChannels,

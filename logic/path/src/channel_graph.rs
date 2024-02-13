@@ -42,6 +42,7 @@ pub struct ChannelEdge {
 }
 
 /// Implements a HOPR payment channel graph (directed) cached in-memory.
+///
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
 /// The structure is updated only from the Indexer and therefore contains only

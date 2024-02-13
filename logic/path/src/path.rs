@@ -1,7 +1,3 @@
-use crate::channel_graph::ChannelGraph;
-use crate::errors::PathError;
-use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
-use crate::errors::Result;
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
@@ -15,6 +11,11 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+
+use crate::channel_graph::ChannelGraph;
+use crate::errors::PathError;
+use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
+use crate::errors::Result;
 
 /// Base implementation of an abstract path.
 /// Must contain always at least a single entry.
@@ -46,12 +47,13 @@ where
     }
 }
 
-/// Represents an on-chain path in the `ChannelGraph`.
+/// Represents an on-chain path in the [ChannelGraph].
+///
 /// This path is never allowed to be empty and is always constructed from
-/// `Addresses` that must be known to have open channels between them (at the time of construction).
+/// [Addresses](Address) that must be known to have open channels between them (at the time of construction).
 /// This path is not useful for transport, because it *does never contain the last hop*
 /// to the destination (which does not require and open channel).
-/// To make it useful for transport, it must be converted to a `TransportPath` via `to_path`.
+/// To make it useful for transport, it must be converted to a [TransportPath] via `into_path`.
 /// The `ChannelPath` does not allow simple loops (same adjacent hops)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPath {
@@ -60,6 +62,7 @@ pub struct ChannelPath {
 
 impl ChannelPath {
     /// Creates a new path by validating the list of addresses using the channel graph.
+    ///
     /// The given list of `hops` *must not* contain the sender node as the first entry,
     /// since this node is always assumed to be the sender.
     /// The list of `hops` also *must not* contain the destination, because an open
@@ -101,9 +104,11 @@ impl ChannelPath {
         Self { hops }
     }
 
-    /// Resolves this on-chain `ChannelPath` into the off-chain `TransportPath` and adds the final hop
+    // TODO: this method could be turned sync once the `PeerAddressResolver` is sync too.
+    /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
-    pub async fn to_path<R: PeerAddressResolver>(&self, resolver: &R, destination: Address) -> Result<TransportPath> {
+    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
+    pub async fn into_path<R: PeerAddressResolver>(self, resolver: &R, destination: Address) -> Result<TransportPath> {
         let mut hops = self
             .hops
             .iter()
@@ -143,10 +148,11 @@ impl Display for ChannelPath {
     }
 }
 
-/// Represents an off-chain path of `PeerId`s.
+/// Represents an off-chain path of [PeerIds](PeerId).
+///
 /// The path is never allowed to be empty and *always contains the destination*.
 /// In case of the direct path, this path contains only the destination.
-/// In case o multiple hops, it also must represent a valid `ChannelPath`, therefore
+/// In case o multiple hops, it also must represent a valid [ChannelPath], therefore
 /// open channels must exist (at the time of construction) except for the last hop.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPath {
@@ -154,13 +160,15 @@ pub struct TransportPath {
 }
 
 impl TransportPath {
-    /// Resolves vector of `PeerId`s into the corresponding `TransportPath` and optionally an associated `ChannelPath`.
+    /// Resolves vector of [PeerIds](PeerId) into the corresponding [TransportPath] and optionally an associated [ChannelPath].
+    ///
     /// - If `peers` contains only a single entry (destination), the resulting `TransportPath` contains just this entry.
-    /// Since in this case the `ChannelPath` would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
+    /// Since in this case the [ChannelPath] would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
     /// - If `peers` contains more than a single entry, it first resolves `PeerId`s into `Address`es and then validates and returns
     ///  also the multi-hop `ChannelPath`.
-    /// To do an inverse resolution, from `Address`es to `PeerId`s, construct the `ChannelPath` and use `ChannelPath::to_path()` to resolve the
+    /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
+    /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
     pub async fn resolve<R: PeerAddressResolver>(
         peers: Vec<PeerId>,
         resolver: &R,
@@ -192,7 +200,7 @@ impl TransportPath {
         }
     }
 
-    /// Constructs a direct `TransportPath` (= 0-hop `ChannelPath`)
+    /// Constructs a direct `TransportPath` (= 0-hop [ChannelPath])
     pub fn direct(destination: PeerId) -> Self {
         Self {
             hops: vec![destination],
@@ -208,7 +216,7 @@ impl TransportPath {
 
 impl Path<PeerId> for TransportPath {
     /// The `TransportPath` always returns one extra hop to the destination.
-    /// So it contains one more hop than a `ChannelPath` (the final hop does not require a channel).
+    /// So it contains one more hop than a [ChannelPath] (the final hop does not require a channel).
     fn hops(&self) -> &[PeerId] {
         &self.hops
     }
@@ -678,7 +686,8 @@ mod tests {
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let tp = cp
-            .to_path(&resolver, addrs[4])
+            .clone()
+            .into_path(&resolver, addrs[4])
             .await
             .expect("should convert to transport path");
         assert_eq!(

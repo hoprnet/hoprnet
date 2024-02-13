@@ -414,24 +414,19 @@ pub mod native {
     use crate::HttpPostRequestor;
 
     /// Common configuration for all native `HttpPostRequestor`s
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
     pub struct HttpPostRequestorConfig {
         /// Timeout for HTTP POST request
+        ///
         /// Defaults to 5 seconds.
+        #[default(Duration::from_secs(5))]
         pub http_request_timeout: Duration,
 
         /// Maximum number of HTTP redirects to follow
+        ///
         /// Defaults to 3
+        #[default(3)]
         pub max_redirects: u8,
-    }
-
-    impl Default for HttpPostRequestorConfig {
-        fn default() -> Self {
-            Self {
-                http_request_timeout: Duration::from_secs(5),
-                max_redirects: 3,
-            }
-        }
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.

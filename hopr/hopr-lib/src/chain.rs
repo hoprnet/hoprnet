@@ -223,6 +223,7 @@ impl ChainNetworkConfig {
     }
 }
 
+// TODO: parts to be replaced by chain_types::ContractAddresses
 #[derive(Debug, Serialize, Clone)]
 pub struct SmartContractConfig {
     pub hopr_announcements_address: Address,
@@ -248,7 +249,7 @@ impl From<&ChainNetworkConfig> for SmartContractConfig {
     }
 }
 
-/// The entire protocol configuration containing the information about
+/// The entire on-chain protocol configuration containing the information about
 /// usable networks and chains.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]

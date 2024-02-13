@@ -18,9 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// Types related to high-level actions that lead to Ethereum transactions.
 pub mod actions;
-/// Types related to the chain events processed by the Indexer
 pub mod chain_events;
 
 /// Various (mostly testing related) utility functions

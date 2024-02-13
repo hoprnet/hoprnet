@@ -413,7 +413,7 @@ impl HoprTransport {
                     selector.select_path(&cg, cg.my_address(), chain_key, 1, hops as usize)?
                 };
 
-                cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
+                cp.into_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
             } else {
                 return Err(crate::errors::HoprTransportError::Api(
                     "send msg: unknown destination peer id encountered".to_owned(),
