@@ -86,6 +86,11 @@ pub enum AcknowledgedTicketStatus {
     BeingAggregated,
 }
 
+/// Returns `Ok(())` if the embedded response fulfills the challenge
+/// stated in the embedded ticket.
+///
+/// Use `validate_ticket()` to check if the signature is valid and
+/// all properties are within the allowed intervals.
 pub fn validate_acknowledged_ticket(acked_ticket: &AcknowledgedTicket) -> CoreTypesResult<()> {
     if !acked_ticket
         .ticket
@@ -101,6 +106,41 @@ pub fn validate_acknowledged_ticket(acked_ticket: &AcknowledgedTicket) -> CoreTy
 }
 
 /// Contains acknowledgment information and the respective ticket
+///
+/// ```rust
+/// # use hex_literal::hex;
+/// # use hopr_crypto_types::prelude::*;
+/// # use hopr_internal_types::prelude::*;
+/// # use hopr_primitive_types::prelude::*;
+/// # use std::str::FromStr;
+///
+/// let ALICE = ChainKeypair::from_secret(&hex!("7b8f7608f34e12a3de93f06e05b71954cafe3a30c50846f31bbc113026bc993c")).unwrap();
+/// let BOB = ChainKeypair::from_secret(&hex!("cb5d5a6c14dafbc452c7c60799222b18dc531efce139309a3da14b6c6bf29cea")).unwrap();
+///
+/// let por_response: Response = hex!("e34f8d5b7334c8cf5eeb4fed6909cdf29fc0b71dd778da283c2d0898e222992e").into();
+///
+/// // prevents tickets issued for one smart contract issued being replayed
+/// // on differen smart contract or on a different EVM-compatible blockchain
+/// let DOMAIN_SEPARATOR: Hash = hex!("4d3b97901e4d70f23c4eae7afc768f4aaa0f363410519eee2c5eb35bf88a79df").into();
+///
+/// let ticket = Ticket::new(
+///     &BOB.public().to_address(),
+///     &Balance::from_str("1 HOPR").unwrap(),
+///     1u64.into(),
+///     1u64.into(),
+///     0.5f64, // 50% win probability
+///     1u64.into(),
+///     &por_response.to_challenge().to_ethereum_challenge(),
+///     &ALICE,
+///     &DOMAIN_SEPARATOR  
+/// );
+///
+/// assert!(validate_ticket(&ticket, &BOB.public().to_address(), &DOMAIN_SEPARATOR).is_ok());
+///
+/// let acked_ticket = AcknowledgedTicket::new(ticket, por_response);
+///
+/// assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+/// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
@@ -136,6 +176,8 @@ impl AcknowledgedTicket {
         }
     }
 
+    /// Determines if this ticket is a win. Mostly used to check if
+    /// the perceived acknowledgement leads to a payout.
     pub fn is_winning_ticket(&self, chain_key: &ChainKeypair, domain_separator: &Hash) -> CoreTypesResult<()> {
         let vrf_params = Ticket::get_vrf_values(&self.ticket.get_hash(domain_separator), chain_key, domain_separator)?;
         if Ticket::is_winning(&self.ticket, &vrf_params, &self.response, domain_separator)? {
@@ -154,8 +196,11 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Returs Ok(()) if the ticket is considered a win by the smart
-/// contract and is thus considered valid.
+/// Returs `Ok(())` if the embedded response and VRF values
+/// are sufficient to prove that the ticket is a win.
+///
+/// Use `validate_ticket()` to check if the signature is valid and
+/// all properties are within the allowed intervals.
 pub fn validate_provable_winning_ticket(
     maybe_winning_ticket: &ProvableWinningTicket,
     destination: &Address,
