@@ -1,3 +1,15 @@
+//! This module contains definiation of arguments that specify the environment
+//! and networks that a HOPR node runs in.
+//!
+//! [EnvironmentType] defines the environment type. EnvironmentType of a network is defined in
+//! `contracts-address.json` under the foundry contract root. Different environment type uses
+//! a different foundry profile.
+//!
+//! Network is a collection of several major/minor releases.
+//!
+//! [NetworkDetail] specifies the environment type of the network, the starting block number, and
+//! the deployed contract addresses in [NetworkContractAddresses]
+
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, path::Path};
 
