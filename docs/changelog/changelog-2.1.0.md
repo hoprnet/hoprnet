@@ -59,6 +59,9 @@ schema.
 All supported clients (JS, Python) were fixed and support the HTTP API v3 in
 `2.1.0`.
 
+The schema differences can be inspected here:
+https://gist.github.com/tolbrino/31ec835fdb2be5c88c774ea2fdf2f133
+
 ## Changes
 
 ### 🚀 New Features
