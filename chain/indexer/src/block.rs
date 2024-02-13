@@ -44,6 +44,7 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
     }
 }
 
+/// Configuration for the chain indexer functionality
 #[derive(Debug, Clone, Copy)]
 pub struct IndexerConfig {
     /// The block at which the indexer should start
@@ -71,6 +72,19 @@ impl Default for IndexerConfig {
     }
 }
 
+/// Indexer
+///
+/// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
+/// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
+/// streamed outside of the indexer by the unbounded channel.
+///
+/// The roles of the indexer:
+/// 1. prime the RPC endpoinnt
+/// 2. request an RPC stream of changes to process
+/// 3. process block and log stream
+/// 4. ensure finalization by postponing processing until the head is far enough
+/// 5. store relevant data into the DB
+/// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
 pub struct Indexer<T, U, V>
 where

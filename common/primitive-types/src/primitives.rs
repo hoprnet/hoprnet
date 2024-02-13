@@ -313,6 +313,7 @@ impl FromStr for Balance {
 }
 
 /// Represents and Ethereum challenge.
+/// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],

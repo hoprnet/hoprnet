@@ -1117,7 +1117,7 @@ dependencies = [
 
 [[package]]
 name = "chain-indexer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
@@ -1472,6 +1472,7 @@ dependencies = [
  "multiaddr",
  "serde",
  "serde_with",
+ "strum 0.25.0",
  "thiserror",
  "validator",
 ]
@@ -3350,6 +3351,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "strum 0.25.0",
  "thiserror",
  "utils-db",
  "validator",

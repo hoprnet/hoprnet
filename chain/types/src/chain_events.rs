@@ -1,3 +1,6 @@
+//! This module defines types that are related to events that are raised on-chain
+//! in response to actions (transactions, smart contract calls) done by a HOPR node on chain.
+//! See `chain-actions` and `chain-indexer` crates for details.
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -6,7 +9,8 @@ use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
 
 /// Contains TX hash along with the Chain Event data.
-/// This could be used to pair up some events with `Action`
+/// This could be used to pair up some events with [Action](crate::actions::Action).
+/// Each [Action](crate::actions::Action) is typically concluded by a significant chain event.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SignificantChainEvent {
     /// TX hash

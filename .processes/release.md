@@ -123,29 +123,29 @@ particular branch to deploy on every change.
 ### Release Cycle
 
 ```
-   hotfix/bug-2         hotfix/bug-1         release/providence           master
+   hotfix/bug-2         hotfix/bug-1         release/saint-louis           master
 
-         x                   x                       x  create new release     x
-         x                   x                       x◄─────────────────────   x 2.0.0
-         x                   x   start hotfix bug-1  x 2.0.0-rc1 / providence  x 2.0.1
-         x                   x ◄─────────────────────│                         x
-         x                   │                       │                         x
-         x                   │   hotfix merge  1     │  backport pr bug-1      x
-         x                   ▼ ─────────────────────►x ──────────────────►     x
-         x                   x                       │                         x
-         x  start fix bug-2  x                       │                         x
-         x◄──────────────────x───────────────────────│                         x
-         │                   x                       │                         x
-         │  hotfix merge 2   x                       │  backport pr bug-1      x
-         ▼───────────────────x──────────────────────►│ ───────────────────►    x
-         x                   x                       │                         x
-         x                   x                       │                         x
-         x                   x                       │                         x
-         x                   x                       x 2.0.0-rc2/providence    x
-         x                   x                       │                         x
-         x                   x                       │                         x
-         x                   x                       │                         x
-         x                   x                       │                         x
+         x                   x                       x  create new release      x
+         x                   x                       x◄─────────────────────    x 2.1.0
+         x                   x   start hotfix bug-1  x 2.1.0-rc1 / saint-louis  x 2.1.1
+         x                   x ◄─────────────────────│                          x
+         x                   │                       │                          x
+         x                   │   hotfix merge  1     │  backport pr bug-1       x
+         x                   ▼ ─────────────────────►x ──────────────────►      x
+         x                   x                       │                          x
+         x  start fix bug-2  x                       │                          x
+         x◄──────────────────x───────────────────────│                          x
+         │                   x                       │                          x
+         │  hotfix merge 2   x                       │  backport pr bug-1       x
+         ▼───────────────────x──────────────────────►│ ───────────────────►     x
+         x                   x                       │                          x
+         x                   x                       │                          x
+         x                   x                       │                          x
+         x                   x                       x 2.1.0-rc2/saint-louis    x
+         x                   x                       │                          x
+         x                   x                       │                          x
+         x                   x                       │                          x
+         x                   x                       │                          x
 
 ```
 
@@ -188,7 +188,7 @@ There should be a correspondence between the dappNode version an the upstream ve
 
 ### Promote release
 
-The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag, branch and artifacts based on the recently closed released. This process should be executed after the closure of release candidates only or the first minor version (X.X.0).
+The process of promoting the named release (providence, saint-louis etc) consists of creating or updating a given ${RELEASE_NAME} tag, branch and artifacts based on the recently closed released. This process should be executed after the closure of release candidates only or the first minor version (X.X.0).
 
 1. Execute the manual workflow named [Promote Release](https://github.com/hoprnet/hoprnet/actions/workflows/promote-release.yaml) specifying the name of the release and the tag you want to bind it
 2. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0

@@ -26,11 +26,13 @@ lazy_static::lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
+    ///
     /// Default is 1 HOPR
     #[serde_as(as = "DisplayFromStr")]
     pub min_stake_threshold: Balance,
 
     /// Funding amount.
+    ///
     /// Defaults to 10 HOPR.
     #[serde_as(as = "DisplayFromStr")]
     pub funding_amount: Balance,

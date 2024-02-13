@@ -1,3 +1,14 @@
+//! This module defines HTTP clients for the purpose of interaction with an RPC provider.
+//!
+//! The major type implemented in this module is the [JsonRpcProviderClient](client::JsonRpcProviderClient)
+//! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
+//!
+//! The [JsonRpcProviderClient](client::JsonRpcProviderClient) is abstract over a
+//! [HttpPostRequestor] trait, which makes it possible
+//! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
+//! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
+//! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
+//! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError};
 use log::{debug, trace, warn};

@@ -4,7 +4,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use hopr_crypto_types::types::OffchainPublicKey;
 
-use core_network::{network::Network, ping::PingExternalAPI, types::Result, PeerId};
+use core_network::{network::Network, ping::PingExternalAPI, ping::PingResult, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
 use log::{debug, error};
@@ -16,7 +16,8 @@ use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_META
 /// Ping requires functionality from external components in order to obtain
 /// the triggers for its functionality. This class implements the basic API by
 /// aggregating all necessary ping resources without leaking them into the
-/// `Ping` object and keeping both the adaptor and the ping object OCP and SRP compliant.
+/// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
+/// compliant.
 #[derive(Debug, Clone)]
 pub struct PingExternalInteractions<R: PeerAddressResolver> {
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
@@ -40,7 +41,7 @@ impl<R: PeerAddressResolver> PingExternalInteractions<R> {
 
 #[async_trait]
 impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExternalInteractions<R> {
-    async fn on_finished_ping(&self, peer: &PeerId, result: Result, version: String) {
+    async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
         // This logic deserves a larger refactor of the entire heartbeat mechanism, but
         // for now it is suffcient to fill out metadata only on successful pongs.
         let metadata = if result.is_ok() {

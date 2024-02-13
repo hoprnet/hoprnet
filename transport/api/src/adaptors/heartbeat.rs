@@ -26,7 +26,7 @@ impl HeartbeatExternalInteractions {
 
 #[async_trait]
 impl HeartbeatExternalApi for HeartbeatExternalInteractions {
-    /// Get all peers considered by the `Network` object to be pingable.
+    /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
     async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {

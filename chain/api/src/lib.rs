@@ -11,7 +11,7 @@ use chain_db::db::CoreEthereumDb;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chain_actions::CoreEthereumActions;
+use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_indexer::block::{Indexer, IndexerConfig};
 use chain_indexer::handlers::ContractEventHandlers;
@@ -104,7 +104,7 @@ pub struct HoprChain {
     indexer_cfg: IndexerConfig,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
@@ -118,7 +118,7 @@ impl HoprChain {
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-        chain_actions: CoreEthereumActions<CoreEthereumDb<CurrentDbShim>>,
+        chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
@@ -197,11 +197,11 @@ impl HoprChain {
         Ok(self.db.read().await.get_staking_safe_allowance().await?)
     }
 
-    pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_ref(&self) -> &ChainActions<CoreEthereumDb<CurrentDbShim>> {
         &self.chain_actions
     }
 
-    pub fn actions_mut_ref(&mut self) -> &mut CoreEthereumActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<CoreEthereumDb<CurrentDbShim>> {
         &mut self.chain_actions
     }
 

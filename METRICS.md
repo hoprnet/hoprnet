@@ -14,7 +14,7 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets: ['localhost:3001']
-    metrics_path: /api/v2/node/metrics
+    metrics_path: /api/v3/node/metrics
     basic_auth:
       username: ^MYtoken4testing^
       password: ''

@@ -1,6 +1,6 @@
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
-use chain_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
@@ -40,6 +40,7 @@ pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
     /// This condition is independent of `unrealized_balance_ratio`.
+    ///
     /// Default is 100.
     #[validate(range(min = 2))]
     pub aggregation_threshold: Option<u32>,
@@ -48,12 +49,14 @@ pub struct AggregatingStrategyConfig {
     /// that triggers the ticket aggregation when exceeded.
     /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
     /// This condition is independent of `aggregation_threshold`.
+    ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub unrealized_balance_ratio: Option<f32>,
 
     /// Maximum time to wait for the ticket aggregation to complete.
     /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
+    ///
     /// Default is 60 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub aggregation_timeout: Duration,
@@ -62,6 +65,7 @@ pub struct AggregatingStrategyConfig {
     /// to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
     /// or `unrealized_balance_ratio` thresholds are met on that channel.
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
+    ///
     /// Default is true.
     pub aggregate_on_channel_close: bool,
 }
