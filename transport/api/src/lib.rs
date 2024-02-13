@@ -114,7 +114,7 @@ where
 }
 
 type HoprPingComponents = (
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>>,
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
@@ -123,7 +123,7 @@ type HoprPingComponents = (
 pub fn build_manual_ping(
     cfg: core_protocol::config::ProtocolConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    addr_resolver: DbPeerAddressResolver,
+    addr_resolver: DefaultPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> HoprPingComponents {
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -136,7 +136,7 @@ pub fn build_manual_ping(
     };
 
     // manual ping explicitly called by the API
-    let ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>> = Ping::new(
+    let ping: Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>> = Ping::new(
         ping_cfg,
         ping_tx,
         pong_rx,
@@ -178,7 +178,7 @@ where
 }
 
 type HoprHearbeat = Heartbeat<
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+    Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>>,
     adaptors::heartbeat::HeartbeatExternalInteractions,
 >;
 
@@ -193,7 +193,7 @@ pub fn build_heartbeat(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-    addr_resolver: DbPeerAddressResolver,
+    addr_resolver: DefaultPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> HoprHeartbeatComponents {
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -266,13 +266,17 @@ use futures::pin_mut;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
+/// Currently used resolver to resolve between offchain and onchain public keys.
+pub type DefaultPeerAddressResolver = CachedPeerAddressResolver<DbPeerAddressResolver>;
+
 #[derive(Debug, Clone)]
 pub struct HoprTransport {
     me: PeerId,
     me_onchain: Address,
     cfg: config::TransportConfig,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
+    peer_map: DefaultPeerAddressResolver,
+    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>>>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
@@ -288,7 +292,8 @@ impl HoprTransport {
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-        ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+        peer_map: DefaultPeerAddressResolver,
+        ping: Ping<adaptors::ping::PingExternalInteractions<DefaultPeerAddressResolver>>,
         network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
@@ -301,6 +306,7 @@ impl HoprTransport {
             me_onchain: me_onchain.public().to_address(),
             cfg,
             db,
+            peer_map,
             ping: Arc::new(RwLock::new(ping)),
             network,
             indexer,
@@ -399,7 +405,7 @@ impl HoprTransport {
 
             let cg = self.channel_graph.read().await;
 
-            TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &cg)
+            TransportPath::resolve(full_path, &self.peer_map, &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
@@ -413,7 +419,7 @@ impl HoprTransport {
                     selector.select_path(&cg, cg.my_address(), chain_key, 1, hops as usize)?
                 };
 
-                cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
+                cp.to_path(&self.peer_map, chain_key).await?
             } else {
                 return Err(crate::errors::HoprTransportError::Api(
                     "send msg: unknown destination peer id encountered".to_owned(),

@@ -66,7 +66,7 @@ use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, execute_on_tick, p2p_loop,
+    build_ticket_aggregation, execute_on_tick, p2p_loop, DefaultPeerAddressResolver,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
@@ -325,7 +325,8 @@ where
             .store_peer_multiaddresses(&identity.public().to_peer_id(), my_multiaddresses.clone());
     });
 
-    let addr_resolver = DbPeerAddressResolver(db.clone());
+    let addr_resolver =
+        DefaultPeerAddressResolver::new(DbPeerAddressResolver(db.clone()), cfg.transport.peer_map_cache_size);
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
@@ -425,6 +426,7 @@ where
         me_onchain.clone(),
         cfg.transport,
         db.clone(),
+        addr_resolver,
         ping,
         network.clone(),
         indexer_updater,

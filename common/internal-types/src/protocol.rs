@@ -1,12 +1,16 @@
+use async_lock::Mutex;
 use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
+use log::{trace, warn};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::future::Future;
+use std::sync::Arc;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -25,13 +29,72 @@ pub type Tag = u16;
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
-/// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait] // TODO: the resolver should not be async once detached from the DB ?
+/// Trait for linking and resolving the corresponding [OffchainPublicKey] and on-chain [Address].
+#[async_trait]
 pub trait PeerAddressResolver {
     /// Tries to resolve off-chain public key given the on-chain address
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
     /// Tries to resolve on-chain public key given the off-chain public key
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
+}
+
+/// Implementation of [PeerAddressResolver] that wraps another resolver with added caching.
+#[derive(Debug, Clone)]
+pub struct CachedPeerAddressResolver<R: PeerAddressResolver + Clone + Send + Sync> {
+    inner: R,
+    address_to_key: Arc<Mutex<LruCache<Address, OffchainPublicKey>>>,
+    key_to_address: Arc<Mutex<LruCache<OffchainPublicKey, Address>>>,
+}
+
+impl<R: PeerAddressResolver + Clone + Send + Sync> CachedPeerAddressResolver<R> {
+    /// Instantiates a new peer address resolver with the given cache size.
+    pub fn new(inner: R, cache_size: usize) -> Self {
+        let s = cache_size.try_into().expect("cache size must not be zero");
+        Self {
+            inner,
+            address_to_key: Arc::new(Mutex::new(LruCache::new(s))),
+            key_to_address: Arc::new(Mutex::new(LruCache::new(s))),
+        }
+    }
+}
+
+async fn resolve_via_cache<K, V, R>(key: &K, cache: &Arc<Mutex<LruCache<K, V>>>, resolver: R) -> Option<V>
+where
+    K: std::hash::Hash + Eq + Clone + Display,
+    V: Clone, // Due to lock guard we need to own the data when returning them from the cache.
+    R: Future<Output = Option<V>>,
+{
+    if let Some(v) = cache.lock().await.get(key) {
+        return Some(v.clone());
+    }
+
+    trace!("cache miss when looking up {key}");
+    let resolved = resolver.await;
+    match resolved {
+        Some(v) => Some(cache.lock().await.get_or_insert(key.to_owned(), || v).clone()),
+        None => None, // Cache only the `Some` results
+    }
+}
+
+#[async_trait]
+impl<R: PeerAddressResolver + Clone + Send + Sync> PeerAddressResolver for CachedPeerAddressResolver<R> {
+    async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+        resolve_via_cache(
+            onchain_key,
+            &self.address_to_key,
+            self.inner.resolve_packet_key(onchain_key),
+        )
+        .await
+    }
+
+    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+        resolve_via_cache(
+            offchain_key,
+            &self.key_to_address,
+            self.inner.resolve_chain_key(offchain_key),
+        )
+        .await
+    }
 }
 
 /// Bloom filter for packet tags to detect packet replays.
@@ -165,9 +228,14 @@ impl BinarySerializable for ApplicationData {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::{CachedPeerAddressResolver, PeerAddressResolver};
     use crate::protocol::{ApplicationData, TagBloomFilter};
+    use async_trait::async_trait;
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair, OffchainPublicKey};
+    use hopr_primitive_types::prelude::Address;
     use hopr_primitive_types::traits::BinarySerializable;
+    use mockall::mock;
 
     #[test]
     fn test_application_data() {
@@ -226,5 +294,46 @@ mod tests {
             !filter2.check(&[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]),
             "bf 2 must not contain zero tag"
         );
+    }
+
+    mock! {
+        AddrResolver{}
+
+        #[async_trait]
+        impl PeerAddressResolver for AddrResolver {
+            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
+            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
+        }
+
+        impl Clone for AddrResolver {
+            fn clone(&self) -> Self;
+        }
+    }
+
+    #[async_std::test]
+    async fn test_caching_resolver() {
+        let pk_1 = OffchainKeypair::random().public().clone();
+        let pk_2 = Address::random();
+
+        let mut resolver = MockAddrResolver::new();
+        resolver
+            .expect_resolve_chain_key()
+            .once()
+            .withf(move |pk| pk_1.eq(pk))
+            .return_once(move |_| Some(pk_2));
+
+        resolver
+            .expect_resolve_packet_key()
+            .once()
+            .withf(move |pk| pk_2.eq(pk))
+            .return_once(move |_| Some(pk_1));
+
+        let caching = CachedPeerAddressResolver::new(resolver, 10);
+
+        assert_eq!(Some(pk_2), caching.resolve_chain_key(&pk_1).await);
+        assert_eq!(Some(pk_2), caching.resolve_chain_key(&pk_1).await);
+
+        assert_eq!(Some(pk_1), caching.resolve_packet_key(&pk_2).await);
+        assert_eq!(Some(pk_1), caching.resolve_packet_key(&pk_2).await);
     }
 }

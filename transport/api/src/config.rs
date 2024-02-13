@@ -117,16 +117,26 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
     /// not need any connection to nodes outside the subnet
+    ///
+    /// Default is false.
     #[serde(default)]
     pub announce_local_addresses: bool,
     /// When true, assume a testnet with multiple nodes running on the same machine
     /// or in the same private IPv4 network
+    ///
+    /// Default is false.
     #[serde(default)]
     pub prefer_local_addresses: bool,
+
+    /// Size of the LRU cache used for mapping between on-chain and offchain public keys.
+    ///
+    /// Default is 512.
+    #[default = 512]
+    pub peer_map_cache_size: usize,
 }
 
 #[cfg(test)]

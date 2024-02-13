@@ -221,6 +221,10 @@ hopr:
     # Set to true for testing only
     prefer_local_addresses: false
 
+    # Size of the LRU cached used for mapping between
+    # on-chain and off-chain public keys
+    peer_map_cache_size: 512
+
   # Configuration of various HOPR sub-protocols.
   protocol:
 

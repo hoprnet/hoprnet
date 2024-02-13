@@ -3308,6 +3308,8 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.5.0"
 dependencies = [
+ "async-lock 2.8.0",
+ "async-std",
  "async-trait",
  "bincode",
  "bindings",
@@ -3319,6 +3321,8 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "log",
+ "lru",
+ "mockall",
  "multiaddr",
  "serde",
  "serde_bytes",
@@ -4389,6 +4393,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 dependencies = [
  "value-bag",
+]
+
+[[package]]
+name = "lru"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db2c024b41519440580066ba82aab04092b333e09066a5eb86c7c4890df31f22"
+dependencies = [
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
