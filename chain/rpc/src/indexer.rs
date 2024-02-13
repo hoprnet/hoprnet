@@ -1,7 +1,7 @@
-//! Extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component.
+//! Extends the [RpcOperations] type with functionality needed by the Indexer component.
 //!
 //! The functionality required functionality is defined in the [HoprIndexerRpcOperations] trait,
-//! which is implemented for [RpcOperations](rpc::RpcOperations) hereof.
+//! which is implemented for [RpcOperations] hereof.
 //! The primary goal is to provide a stream of [BlockWithLogs] filtered by the given [LogFilter]
 //! as the new matching blocks are mined in the underlying blockchain. The stream also allows to collect
 //! historical blockchain data.

@@ -30,12 +30,12 @@ use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 
 /// The default HTTP request engine
 ///
-/// TODO: Should be an internal type, [hopr_lib::chain] must be moved to this package
+/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
 pub type DefaultHttpPostRequestor = chain_rpc::client::native::SurfRequestor;
 
 /// The default JSON RPC provider client
 ///
-/// TODO: Should be an internal type, [hopr_lib::chain] must be moved to this package
+/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
 pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry

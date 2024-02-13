@@ -3,11 +3,10 @@
 //! This module contains custom implementation of `ethers::providers::JsonRpcClient`
 //! which allows usage of non-`reqwest` based HTTP clients.
 //!
-//! The major type implemented in this module is the [JsonRpcProviderClient](client::JsonRpcProviderClient)
+//! The major type implemented in this module is the [JsonRpcProviderClient]
 //! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
 //!
-//! The [JsonRpcProviderClient](client::JsonRpcProviderClient) is abstract over a
-//! [HttpPostRequestor] trait, which makes it possible
+//! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).

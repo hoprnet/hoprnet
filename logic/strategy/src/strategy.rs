@@ -165,7 +165,7 @@ pub struct MultiStrategyConfig {
     /// Indicates if the strategy should check for `PendingToClose` channels which have
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
-    /// is over. This internally adds [ChannelCloseFinalizer] strategy to `strategies`.
+    /// is over.
     ///
     /// Default is false.
     #[default = false]

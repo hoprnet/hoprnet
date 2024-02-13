@@ -1,7 +1,7 @@
 /// Application version as presented externally using the heartbeat mechanism
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Application version coerced into the <major>.<minor>.<patch> form
+/// Application version coerced into the `major`.`minor`.`patch` form
 pub const APP_VERSION_COERCED: &str = const_format::formatcp!(
     "{}.{}.{}",
     env!("CARGO_PKG_VERSION_MAJOR"),
