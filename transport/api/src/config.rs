@@ -135,6 +135,7 @@ pub struct TransportConfig {
     /// Size of the LRU cache used for mapping between on-chain and offchain public keys.
     ///
     /// Default is 512.
+    #[validate(range(min = 128))]
     #[default = 512]
     pub peer_map_cache_size: usize,
 }
