@@ -1,6 +1,7 @@
 pub use core_protocol::errors::ProtocolError;
 use thiserror::Error;
 
+/// Errors produced by the crate.
 #[derive(Error, Debug)]
 pub enum HoprTransportError {
     #[error("API error: {0}")]
@@ -25,4 +26,5 @@ pub enum HoprTransportError {
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
 }
 
+/// Result produced by the crate, uses the [HoprTransportError] as the error type.
 pub type Result<T> = core::result::Result<T, HoprTransportError>;

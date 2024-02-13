@@ -1,15 +1,15 @@
-//! This module contains the [NodeActions](node::NodeActions) trait defining action which relate to HOPR node itself.
+//! This module contains the [NodeActions] trait defining action which relate to HOPR node itself.
 //!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue](action_queue::ActionQueue).
+//! operations via [ActionQueue](crate::action_queue::ActionQueue).
 //!
-//! There are 3 functions that can be used to redeem tickets in the [NodeActions](node::NodeActions) trait:
-//! - [withdraw](node::NodeActions::withdraw)
-//! - [announce](node::NodeActions::announce)
-//! - [register_safe_by_node](node::NodeActions::register_safe_by_node)
+//! There are 3 functions that can be used to redeem tickets in the [NodeActions] trait:
+//! - [withdraw](NodeActions::withdraw)
+//! - [announce](NodeActions::announce)
+//! - [register_safe_by_node](NodeActions::register_safe_by_node)
 //!
-//! All necessary pre-requisites are checked by the implementation before the respective [Action](chain_types::actions::Action) is submitted
-//! to the [ActionQueue](action_queue::ActionQueue).
+//! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
+//! to the [ActionQueue](crate::action_queue::ActionQueue).
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;

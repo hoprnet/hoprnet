@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+/// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum HoprLibError {
     #[error("HOPR lib Error: '{0}'")]

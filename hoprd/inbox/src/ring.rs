@@ -13,6 +13,7 @@ struct PayloadWrapper<M: std::marker::Send> {
 }
 
 /// Ring buffer based heap-allocated backend.
+///
 /// The capacity must be a power-of-two due to optimizations.
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>

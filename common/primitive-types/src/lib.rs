@@ -1,13 +1,18 @@
 //! This crate contains basic types used throughout the entire HOPR codebase.
 //! Types from this crate are not necessarily specific only to HOPR.
 
+/// Enumerates all errors in this crate.
 pub mod errors;
+/// Implements the most primitive types, such as [U256](crate::primitives::U256) or [Address](crate::primitives::Address).
 pub mod primitives;
+/// Contains various implementations of Simple Moving Average.
 pub mod sma;
+/// Defines commonly used traits across the entire code base.
 pub mod traits;
 
 // TODO: remove in 3.0
 // #[deprecated(note = "RLP encoding will be removed in 3.0")]
+/// Obsolete RLP encoding module to be removed in future versions.
 pub mod rlp {
     use crate::errors::GeneralError;
     use std::time::Duration;
