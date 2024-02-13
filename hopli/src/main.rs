@@ -13,7 +13,6 @@ pub mod create_safe_module;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
-pub mod initialize_node;
 pub mod key_pair;
 pub mod migrate_safe_module;
 pub mod move_node_to_safe_module;
