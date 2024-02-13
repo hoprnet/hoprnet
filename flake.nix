@@ -140,7 +140,14 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = with pkgs; [ hoprd iana-etc cacert bash ];
+            contents = with pkgs; [
+              hoprd
+              iana-etc
+              cacert
+              bash
+              findutils
+              coreutils
+            ];
             config = {
               Entrypoint = [
                 "/bin/hoprd"
@@ -156,7 +163,14 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = with pkgs; [ hopli iana-etc cacert bash ];
+            contents = with pkgs; [
+              hopli
+              iana-etc
+              cacert
+              bash
+              findutils
+              coreutils
+            ];
             config = {
               Entrypoint = [
                 "/bin/hopli"
@@ -164,6 +178,8 @@
               Env = [
                 "RUST_LOG=info"
                 "RUST_BACKTRACE=full"
+                "ETHERSCAN_API_KEY=placeholder"
+                "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
             };
           };
