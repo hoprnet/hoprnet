@@ -49,7 +49,7 @@ impl PrivateKeyArgs {
             pk
         } else {
             info!("reading private key from env PRIVATE_KEY");
-            env::var("PRIVATE_KEY").map_err(|err| HelperErrors::UnableToReadPrivateKey(err))?
+            env::var("PRIVATE_KEY").map_err(HelperErrors::UnableToReadPrivateKey)?
         };
 
         // FIXME: temporarily set as env variable
@@ -79,34 +79,13 @@ impl PasswordArgs {
     pub fn read(self) -> Result<String, HelperErrors> {
         let pwd = if let Some(pwd_path) = self.password_path {
             info!("reading password from password_path");
-            fs::read_to_string(pwd_path).map_err(|err| HelperErrors::UnableToReadFromPath(err))?
+            fs::read_to_string(pwd_path).map_err(HelperErrors::UnableToReadFromPath)?
         } else {
             info!("reading password from env IDENTITY_PASSWORD");
             env::var("IDENTITY_PASSWORD").map_err(|_| HelperErrors::UnableToReadPassword)?
         };
 
         Ok(pwd)
-
-        // match self.password_path {
-        //     Some(ref password_path) => {
-        //         // read password from file
-        //         if let Ok(pwd_from_file) = fs::read_to_string(password_path) {
-        //             Ok(pwd_from_file)
-        //         } else {
-        //             println!("Cannot read from password_path");
-        //             Err(HelperErrors::UnableToReadPassword)
-        //         }
-        //     }
-        //     None => {
-        //         // read password from environment variable
-        //         if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
-        //             Ok(pwd_from_env)
-        //         } else {
-        //             println!("Cannot read from env var");
-        //             Err(HelperErrors::UnableToReadPassword)
-        //         }
-        //     }
-        // }
     }
 }
 
@@ -216,22 +195,13 @@ impl IdentityFileArgs {
         // get Ethereum addresses from identity files
         if !files.is_empty() {
             // check if password is provided
-            let pwd = match self.password.read() {
-                Ok(read_pwd) => read_pwd,
-                Err(e) => return Err(e),
-            };
+            let pwd = self.password.read()?;
 
             // read all the identities from the directory
-            match read_identities(files, &pwd) {
-                Ok(node_identities) => Ok(node_identities
-                    .values()
-                    .map(|ni| ni.chain_key.public().0.to_address())
-                    .collect()),
-                Err(e) => {
-                    error!("error {:?}", e);
-                    return Err(e);
-                }
-            }
+            Ok(read_identities(files, &pwd)?
+                .values()
+                .map(|ni| ni.chain_key.public().0.to_address())
+                .collect())
         } else {
             Ok(Vec::<Address>::new())
         }
