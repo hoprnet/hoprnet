@@ -2,7 +2,6 @@
 use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
-use crate::initialize_node::InitializeNodeArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
@@ -43,8 +42,6 @@ enum Commands {
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
-    #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
-    InitializeNode(InitializeNodeArgs),
     #[clap(about = "Create a safe instance and a node management instance, configure default permissions")]
     CreateSafeModule(CreateSafeModuleArgs),
     #[clap(
@@ -68,9 +65,6 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::RegisterInNetworkRegistry(opt) => {
-            opt.run()?;
-        }
-        Commands::InitializeNode(opt) => {
             opt.run()?;
         }
         Commands::CreateSafeModule(opt) => {
