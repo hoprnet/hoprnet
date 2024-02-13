@@ -597,7 +597,7 @@ impl Hopr {
         } else {
             info!(
                 "Creating chain components using custom provider: {:?}",
-                cfg.chain.provider.unwrap()
+                cfg.chain.provider.clone().unwrap()
             );
         }
         let resolved_environment = crate::chain::ChainNetworkConfig::new(
