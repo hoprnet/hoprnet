@@ -314,19 +314,25 @@ mod tests {
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
         let ticket = Ticket::new(
-            &ALICE.public().to_address(),
+            &ALICE_ADDR,
             &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             idx.into(),
             U256::one(),
             1.0f64,
             channel_epoch,
-            &Challenge::from(cp_sum).to_ethereum_challenge(),
+            Challenge::from(cp_sum).into(),
             counterparty,
             &Hash::default(),
         );
 
+        assert!(validate_ticket(&ticket, &ALICE_ADDR, &Hash::default()).is_ok());
+
         let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
-        unacked_ticket.acknowledge(&hk2).unwrap()
+        let acked_ticket = unacked_ticket.acknowledge(&hk2).unwrap();
+
+        assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        acked_ticket
     }
 
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {

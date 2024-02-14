@@ -1386,7 +1386,7 @@ mod tests {
         let win_prob = 1.0f64; // 100 %
         let price_per_packet: U256 = PRICE_PER_PACKET.into(); // 0.01 HOPR
 
-        Ticket::new(
+        let ret = Ticket::new(
             counterparty,
             &Balance::new(
                 price_per_packet.div_f64(win_prob).unwrap() * U256::from(PATH_POS),
@@ -1396,10 +1396,14 @@ mod tests {
             index_offset.unwrap_or(U256::one()),
             1.0f64,
             channel_epoch.unwrap_or(U256::one()),
-            &challenge.unwrap_or_default(),
+            challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
-        )
+        );
+
+        assert!(validate_ticket(&ret, counterparty, &domain_separator.unwrap_or_default()).is_ok());
+
+        ret
     }
 
     #[test]

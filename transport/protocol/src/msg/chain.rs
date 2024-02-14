@@ -232,7 +232,7 @@ mod tests {
         let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
-            Ticket::new(
+            let ret = Ticket::new(
                 &next_peer_channel_key.to_address(),
                 &Balance::new(
                     price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
@@ -242,10 +242,14 @@ mod tests {
                 1u64.into(),
                 ticket_win_prob,
                 1u64.into(),
-                &EthereumChallenge::default(),
+                EthereumChallenge::default(),
                 private_key,
                 &Hash::default(),
-            )
+            );
+
+            assert!(validate_ticket(&ret, &next_peer_channel_key.to_address(), &Hash::default()).is_ok());
+
+            ret
         } else {
             Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
         }

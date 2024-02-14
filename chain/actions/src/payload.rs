@@ -75,8 +75,8 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
     fn redeem_ticket(&self, acked_ticket: ProvableWinningTicket, domain_separator: &Hash) -> Result<T>;
 
-    /// Creates a transaction payload         chain_key: &ChainKeypair,
-
+    /// Creates a transaction payload to register a Safe instance which is used
+    /// to manage the node's funds
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<T>;
 
     /// Creates a transaction payload to remove the Safe instance. Once succeeded,
@@ -701,7 +701,7 @@ pub mod tests {
             U256::one(),
             1.0_f64,
             U256::one(),
-            &response.to_challenge().to_ethereum_challenge(),
+            response.to_challenge().into(),
             &chain_key_alice,
             &domain_separator,
         );

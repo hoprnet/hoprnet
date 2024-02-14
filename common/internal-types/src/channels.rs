@@ -429,7 +429,7 @@ pub fn validate_ticket(ticket: &Ticket, destination: &Address, domain_separator:
 ///     1u64.into(),
 ///     0.5f64, // 50% win probability
 ///     1u64.into(),
-///     &por_response.to_challenge().to_ethereum_challenge(),
+///     por_response.to_challenge().to_ethereum_challenge(),
 /// );
 ///
 /// // unsigned tickets are not valid
@@ -600,7 +600,7 @@ impl Ticket {
         index_offset: U256,
         win_prob: f64,
         channel_epoch: U256,
-        challenge: &EthereumChallenge,
+        challenge: EthereumChallenge,
     ) -> Self {
         let channel_id = generate_channel_id(&source, destination);
 
@@ -627,7 +627,7 @@ impl Ticket {
         index_offset: U256,
         win_prob: f64,
         channel_epoch: U256,
-        challenge: &EthereumChallenge,
+        challenge: EthereumChallenge,
         signing_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> Ticket {
@@ -819,7 +819,7 @@ impl Ticket {
             U256::zero(),
             0.0,
             U256::zero(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             private_key,
             domain_separator,
         )
@@ -1130,7 +1130,7 @@ pub mod tests {
             U256::one(),
             0.5,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1151,7 +1151,7 @@ pub mod tests {
             U256::one(),
             0.5,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1173,7 +1173,7 @@ pub mod tests {
             U256::one(),
             0.5,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1192,7 +1192,7 @@ pub mod tests {
             U256::one(),
             0.5,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1206,7 +1206,7 @@ pub mod tests {
             U256::one(),
             0.5,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1220,7 +1220,7 @@ pub mod tests {
             U256::one(),
             0.5,
             ((1u32 << 24) + 1).into(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &ALICE,
             &Hash::default(),
         );
@@ -1254,7 +1254,7 @@ pub mod tests {
             U256::one(),
             1.0f64,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &*ALICE,
             &Hash::default(),
         );
@@ -1279,7 +1279,7 @@ pub mod tests {
             U256::one(),
             1.0f64,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &*ALICE,
             &Hash::default(),
         );
@@ -1310,7 +1310,7 @@ pub mod tests {
             U256::one(),
             1.0f64,
             U256::one(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             &*ALICE,
             &Hash::default(),
         );

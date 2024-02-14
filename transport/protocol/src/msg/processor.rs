@@ -441,7 +441,7 @@ where
                 U256::one(),     // unaggregated tickets always have index_offset == 1
                 TICKET_WIN_PROB, // 100% winning probability
                 channel.channel_epoch,
-                &EthereumChallenge::default(),
+                EthereumChallenge::default(),
             )
         };
 

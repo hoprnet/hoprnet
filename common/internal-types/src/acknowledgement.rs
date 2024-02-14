@@ -130,7 +130,7 @@ pub fn validate_acknowledged_ticket(acked_ticket: &AcknowledgedTicket) -> CoreTy
 ///     1u64.into(),
 ///     0.5f64, // 50% win probability
 ///     1u64.into(),
-///     &por_response.to_challenge().to_ethereum_challenge(),
+///     por_response.to_challenge().to_ethereum_challenge(),
 ///     &ALICE,
 ///     &DOMAIN_SEPARATOR  
 /// );
@@ -266,7 +266,7 @@ pub fn validate_provable_winning_ticket(
 ///     1u64.into(),
 ///     0.5f64, // 50% win probability
 ///     1u64.into(),
-///     &por_response.to_challenge().to_ethereum_challenge(),
+///     por_response.to_challenge().to_ethereum_challenge(),
 ///     &ALICE,
 ///     &DOMAIN_SEPARATOR  
 /// );
@@ -517,7 +517,7 @@ pub mod test {
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
         let path_pos = 5u64;
 
-        Ticket::new(
+        let ret = Ticket::new(
             counterparty,
             &Balance::new(
                 price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos),
@@ -527,10 +527,14 @@ pub mod test {
             U256::one(),
             0.5f64,
             4u64.into(),
-            &challenge.unwrap_or_default(),
+            challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
-        )
+        );
+
+        assert!(validate_ticket(&ret, counterparty, &domain_separator.unwrap_or_default()).is_ok());
+
+        ret
     }
 
     #[test]

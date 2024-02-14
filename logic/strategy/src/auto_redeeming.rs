@@ -115,13 +115,19 @@ mod tests {
             idx_offset.into(),
             1.0f64,
             4u64.into(),
-            &Challenge::from(cp_sum).to_ethereum_challenge(),
+            Challenge::from(cp_sum).to_ethereum_challenge(),
             issuer,
             &Hash::default(),
         );
 
+        assert!(validate_ticket(&ticket, &recipient.public().to_address(), &Hash::default()).is_ok());
+
         let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
-        unacked_ticket.acknowledge(&hk2).unwrap()
+        let acked_ticket = unacked_ticket.acknowledge(&hk2).unwrap();
+
+        assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        acked_ticket
     }
 
     mock! {

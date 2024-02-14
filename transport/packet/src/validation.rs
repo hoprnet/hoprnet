@@ -263,17 +263,21 @@ mod tests {
     }
 
     fn create_valid_ticket(issuer: &ChainKeypair, recipient: &ChainKeypair) -> Ticket {
-        Ticket::new(
+        let ret = Ticket::new(
             &recipient.public().to_address(),
             &Balance::new(1_u64, BalanceType::HOPR),
             1u64.into(),
             1u64.into(),
             1.0f64,
             1u64.into(),
-            &EthereumChallenge::default(),
+            EthereumChallenge::default(),
             issuer,
             &Hash::default(),
-        )
+        );
+
+        assert!(validate_ticket(&ret, &recipient.public().to_address(), &Hash::default()).is_ok());
+
+        ret
     }
 
     fn create_channel_entry(source: &ChainKeypair, destination: &ChainKeypair) -> ChannelEntry {

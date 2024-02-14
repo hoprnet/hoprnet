@@ -351,7 +351,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
             1.0, // Aggregated tickets have always 100% winning probability
             channel_epoch,
-            &first_acked_ticket.ticket.challenge,
+            first_acked_ticket.ticket.challenge,
             &self.chain_key,
             &domain_separator,
         ))
@@ -832,14 +832,18 @@ mod tests {
             1u64.into(),
             ticket_win_prob,
             1u64.into(),
-            &response.to_challenge().into(),
+            response.to_challenge().into(),
             signer,
             &domain_separator,
         );
 
         assert!(validate_ticket(&ticket, &destination.into(), &domain_separator).is_ok());
 
-        AcknowledgedTicket::new(ticket, response)
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        acked_ticket
     }
 
     async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
