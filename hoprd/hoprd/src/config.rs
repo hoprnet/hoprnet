@@ -53,6 +53,7 @@ fn validate_optional_private_key(s: &str) -> Result<(), ValidationError> {
 }
 
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Identity {
     #[validate(custom = "validate_file_path")]
     #[serde(default)]
@@ -86,6 +87,7 @@ impl std::fmt::Debug for Identity {
 /// which is always in the root of this crate.
 ///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
     #[validate]
