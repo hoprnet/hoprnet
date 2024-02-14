@@ -124,7 +124,7 @@ mod arrays {
 /// // group homomorphism
 /// // (a + b) * G = a * G + b * G
 /// assert_eq!(A_plus_B, a_plus_b);
-/// ````
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct CurvePoint {
     pub(crate) affine: AffinePoint,
@@ -838,8 +838,7 @@ impl PublicKey {
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
     pub fn random() -> Self {
-        let (_, pk) = Self::random_keypair();
-        pk
+        Self::random_keypair().1
     }
 
     /// Converts the public key to an Ethereum address
