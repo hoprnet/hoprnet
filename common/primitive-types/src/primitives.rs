@@ -50,7 +50,6 @@ impl Address {
     }
 
     /// Creates a random Ethereum address, only used for testing
-    #[cfg(test)]
     pub fn random() -> Self {
         Self(hopr_crypto_random::random_bytes())
     }

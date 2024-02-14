@@ -339,7 +339,6 @@ impl HalfKey {
     }
 
     /// Generates random half key, useful for tests.
-    #[cfg(test)]
     pub fn random() -> Self {
         Self::new(&random_group_element().0)
     }
