@@ -838,8 +838,7 @@ impl PublicKey {
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
     pub fn random() -> Self {
-        let (_, pk) = Self::random_keypair();
-        pk
+        Self::random_keypair().1
     }
 
     /// Converts the public key to an Ethereum address
