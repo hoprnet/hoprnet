@@ -22,7 +22,7 @@ pub struct Acknowledgement {
 impl Acknowledgement {
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
-            ack_signature: OffchainSignature::sign_message(&ack_key_share.as_slice(), node_keypair),
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_slice(), node_keypair),
             ack_key_share,
             validated: true,
         }
@@ -33,7 +33,7 @@ impl Acknowledgement {
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature
-            .verify_message(&self.ack_key_share.as_slice(), sender_node_key);
+            .verify_message(self.ack_key_share.as_slice(), sender_node_key);
 
         self.validated
     }
@@ -67,7 +67,7 @@ impl BinarySerializable for Acknowledgement {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ack_signature.to_bytes());
-        ret.extend_from_slice(&self.ack_key_share.as_slice());
+        ret.extend_from_slice(self.ack_key_share.as_slice());
         ret.into_boxed_slice()
     }
 }
@@ -371,9 +371,9 @@ impl BinarySerializable for ProvableWinningTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.response.as_slice());
+        ret.extend_from_slice(self.response.as_slice());
         ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(&self.issuer.as_slice());
+        ret.extend_from_slice(self.issuer.as_slice());
         ret.into_boxed_slice()
     }
 }
@@ -429,7 +429,7 @@ impl BinarySerializable for UnacknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.own_key.as_slice());
+        ret.extend_from_slice(self.own_key.as_slice());
         ret.into_boxed_slice()
     }
 }

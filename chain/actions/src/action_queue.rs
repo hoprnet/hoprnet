@@ -177,7 +177,7 @@ where
                     .await?
                     .ok_or(MissingDomainSeparator)?;
 
-                let ticket_channel_id = winning_ticket.ticket.channel_id.clone();
+                let ticket_channel_id = winning_ticket.ticket.channel_id;
                 let tx_hash = self.tx_exec.redeem_ticket(winning_ticket, &domain_separator).await?;
                 IndexerExpectation::new(
                     tx_hash,

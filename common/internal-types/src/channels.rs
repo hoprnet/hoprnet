@@ -215,8 +215,8 @@ impl BinarySerializable for ChannelEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.source.as_slice());
-        ret.extend_from_slice(&self.destination.as_slice());
+        ret.extend_from_slice(self.source.as_slice());
+        ret.extend_from_slice(self.destination.as_slice());
         ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(match self.status {
@@ -592,6 +592,7 @@ impl std::fmt::Debug for Ticket {
 impl Ticket {
     /// Creates an unsigned ticket. Note that this ticket is
     /// not a valid ticket.
+    #[allow(clippy::too_many_arguments)] // TODO: Refactor to use less inputs
     pub fn new_unsigned(
         source: &Address,
         destination: &Address,
@@ -602,7 +603,7 @@ impl Ticket {
         channel_epoch: U256,
         challenge: EthereumChallenge,
     ) -> Self {
-        let channel_id = generate_channel_id(&source, destination);
+        let channel_id = generate_channel_id(source, destination);
 
         Self {
             channel_id,
@@ -698,13 +699,13 @@ impl Ticket {
             Self::SIZE - Signature::SIZE
         });
 
-        ret.extend_from_slice(&self.channel_id.as_slice());
+        ret.extend_from_slice(self.channel_id.as_slice());
         ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
         ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
         ret.extend_from_slice(&self.encoded_win_prob);
-        ret.extend_from_slice(&self.challenge.as_slice());
+        ret.extend_from_slice(self.challenge.as_slice());
 
         if with_signature {
             ret.extend_from_slice(&self.signature.to_bytes());
@@ -859,7 +860,7 @@ impl Ticket {
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_issuer_address(ticket: &Ticket, domain_separator: &Hash) -> Result<Address> {
         Ok(
-            PublicKey::from_signature_hash(&ticket.get_hash(domain_separator).as_slice(), &ticket.signature)?
+            PublicKey::from_signature_hash(ticket.get_hash(domain_separator).as_slice(), &ticket.signature)?
                 .to_address(),
         )
     }
