@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, StreamExt, TryStreamExt};
-use log::error;
 use log::{debug, warn};
+use log::{error, trace};
 use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
@@ -99,26 +99,39 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         };
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        while let Ok(Some(log)) = retrieved_logs.try_next().await {
-                            let log = Log::from(log);
+                        trace!("begin processing batch #{from_block} - #{latest_block}");
+                        loop {
+                            match retrieved_logs.try_next().await {
+                                Ok(Some(log)) => {
+                                    let log = Log::from(log);
 
-                            // This in general should not happen, but handle such case to be safe
-                            if log.block_number > latest_block {
-                                warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
-                                break;
+                                    // This in general should not happen, but handle such case to be safe
+                                    if log.block_number > latest_block {
+                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        break;
+                                    }
+
+                                    // This assumes the logs are arriving ordered by blocks when fetching a range
+                                    if current_block_log.block_id != log.block_number {
+                                        debug!("completed {current_block_log}");
+                                        yield current_block_log;
+
+                                        current_block_log = BlockWithLogs::default();
+                                        current_block_log.block_id = log.block_number;
+                                    }
+
+                                    debug!("retrieved {log}");
+                                    current_block_log.logs.push(log);
+                                },
+                                Ok(None) => {
+                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                    break;
+                                },
+                                Err(e) => {
+                                    error!("fatal failure when processing blocks from RPC: {e}");
+                                    panic!("unrecoverable RPC error {e}");
+                                }
                             }
-
-                            // This assumes the logs are arriving ordered by blocks when fetching a range
-                            if current_block_log.block_id != log.block_number {
-                                debug!("completed {current_block_log}");
-                                yield current_block_log;
-
-                                current_block_log = BlockWithLogs::default();
-                                current_block_log.block_id = log.block_number;
-                            }
-
-                            debug!("retrieved {log}");
-                            current_block_log.logs.push(log);
                         }
 
                         // Yield everything we've collected until this point
@@ -126,6 +139,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         yield current_block_log;
                         from_block = latest_block + 1;
                     }
+
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
 
