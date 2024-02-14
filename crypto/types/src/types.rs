@@ -136,7 +136,7 @@ impl CurvePoint {
 
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
-        let serialized = self.affine.to_encoded_point(false);
+        let serialized = self.serialize_uncompressed();
         let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
         Address::new(&hash.as_slice()[12..])
     }
@@ -154,8 +154,12 @@ impl CurvePoint {
     }
 
     /// Serializes the curve point into a compressed form. This is a cheap operation.
-    pub fn serialize_compressed(&self) -> Vec<u8> {
-        self.affine.to_encoded_point(true).as_bytes().to_vec()
+    pub fn serialize_compressed(&self) -> EncodedPoint<Secp256k1> {
+        self.affine.to_encoded_point(true)
+    }
+
+    pub fn serialize_uncompressed(&self) -> EncodedPoint<Secp256k1> {
+        self.affine.to_encoded_point(false)
     }
 
     /// Sums all given curve points together, creating a new curve point.
@@ -232,7 +236,7 @@ impl BinarySerializable for CurvePoint {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.serialize_compressed().into_boxed_slice()
+        self.serialize_uncompressed().to_bytes()
     }
 }
 
@@ -298,7 +302,7 @@ impl BinarySerializable for Challenge {
 
     fn to_bytes(&self) -> Box<[u8]> {
         // Serializes only compressed points
-        self.curve_point.serialize_compressed().into()
+        self.curve_point.serialize_compressed().to_bytes()
     }
 }
 
@@ -342,7 +346,7 @@ impl HalfKey {
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
         CurvePoint::from_exponent(&self.hkey)
-            .map(|cp| HalfKeyChallenge::new(&cp.serialize_compressed()))
+            .map(|cp| HalfKeyChallenge::new(cp.serialize_compressed().as_bytes()))
             .expect("invalid public key")
     }
 }
