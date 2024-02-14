@@ -1,7 +1,7 @@
 /// Errors produced by this crate and other error-related types.
 use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
-use ethers_providers::{JsonRpcError, ProviderError};
+use ethers::providers::{JsonRpcError, ProviderError};
 use thiserror::Error;
 
 /// Enumerates different errors produced by this crate.
@@ -35,7 +35,7 @@ pub enum RpcError {
     KeypairError(#[from] ethers::signers::WalletError),
 
     #[error(transparent)]
-    ProviderError(#[from] ethers_providers::ProviderError),
+    ProviderError(#[from] ProviderError),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;

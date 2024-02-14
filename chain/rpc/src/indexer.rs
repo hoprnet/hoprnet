@@ -9,8 +9,8 @@
 //! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
+use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
-use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, StreamExt, TryStreamExt};
 use log::{debug, warn};
 use log::{error, trace};
@@ -51,7 +51,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             // On first iteration use the given block number as start
             let mut from_block = start_block_number;
 
-            loop {
+            const MAX_LOOP_FAILURES: usize = 5;
+            let mut count_failures = 0;
+
+            'outer: loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
                         if from_block > latest_block {
@@ -60,6 +63,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if from_block - 1 == latest_block {
                                 // If we came here early (we tolerate only off-by one), wait some more
+                                debug!("too early query, still at block {latest_block}");
                                 futures_timer::Delay::new(self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
@@ -128,8 +132,18 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     break;
                                 },
                                 Err(e) => {
-                                    error!("fatal failure when processing blocks from RPC: {e}");
-                                    panic!("unrecoverable RPC error {e}");
+                                    error!("failure when processing blocks from RPC: {e}");
+                                    count_failures += 1;
+
+                                    if count_failures < MAX_LOOP_FAILURES {
+                                        // Continue the outer loop, which throws away the current block
+                                        // that may be incomplete due to this error.
+                                        // We will start at this block again to re-query it.
+                                        from_block = current_block_log.block_id;
+                                        continue 'outer;
+                                    } else {
+                                        panic!("cannot advance due to unrecoverable RPC error: {e}");
+                                    }
                                 }
                             }
                         }
@@ -138,6 +152,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         debug!("completed {current_block_log}");
                         yield current_block_log;
                         from_block = latest_block + 1;
+                        count_failures = 0;
                     }
 
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
