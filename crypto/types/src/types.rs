@@ -692,7 +692,7 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 /// assert_eq!(from_compressed, from_uncompressed_plain);
 /// assert_eq!(from_uncompressed_plain, from_uncompressed);
 ///
-/// // also works a signed Ethereum transaction
+/// // also works from a signed Ethereum transaction
 /// const TX_HASH: [u8; 32] = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
 ///
 /// const R: [u8; 32] = hex!("c8048d137fbb10ddffa1e4ba5141c300fcd19e4fb7d0a4354ca62a7694e46f9b");
