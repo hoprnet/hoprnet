@@ -115,34 +115,34 @@ where
 {
     async fn redeem_ticket(
         &self,
-        winning_ticket: &ProvableWinningTicket,
+        winning_ticket: ProvableWinningTicket,
         domain_separator: &Hash,
     ) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.redeem_ticket(winning_ticket, domain_separator)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn fund_channel(&self, destination: &Address, balance: &Balance) -> chain_actions::errors::Result<Hash> {
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.fund_channel(destination, balance)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn initiate_outgoing_channel_closure(&self, dst: &Address) -> chain_actions::errors::Result<Hash> {
+    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.initiate_outgoing_channel_closure(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn finalize_outgoing_channel_closure(&self, dst: &Address) -> chain_actions::errors::Result<Hash> {
+    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.finalize_outgoing_channel_closure(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn close_incoming_channel(&self, src: &Address) -> chain_actions::errors::Result<Hash> {
+    async fn close_incoming_channel(&self, src: Address) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.close_incoming_channel(src)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn withdraw(&self, recipient: &Address, amount: &Balance) -> chain_actions::errors::Result<Hash> {
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.transfer(recipient, amount)?;
 
         // Withdraw transaction is out-of-band from Indexer, so its confirmation
@@ -150,12 +150,12 @@ where
         Ok(self.client.post_transaction_and_await_confirmation(payload).await?)
     }
 
-    async fn announce(&self, data: &AnnouncementData) -> chain_actions::errors::Result<Hash> {
+    async fn announce(&self, data: AnnouncementData) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.announce(data)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn register_safe(&self, safe_address: &Address) -> chain_actions::errors::Result<Hash> {
+    async fn register_safe(&self, safe_address: Address) -> chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.register_safe_by_node(safe_address)?;
         Ok(self.client.post_transaction(payload).await?)
     }

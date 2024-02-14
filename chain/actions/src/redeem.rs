@@ -21,7 +21,6 @@
 //!
 //! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -30,9 +29,9 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::{debug, error, info, warn};
 
-use crate::action_queue::{ActionSender, PendingAction};
+use crate::action_queue::PendingAction;
 use crate::errors::{
-    CoreEthereumActionsError::{ChannelDoesNotExist, MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
+    ChainActionsError::{ChannelDoesNotExist, MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::ChainActions;

@@ -48,43 +48,43 @@ enum Operation {
 pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     /// Create a ERC20 approve transaction payload. Pre-requisite to open payment channels.
     /// The `spender` address is typically the HOPR Channels contract address.
-    fn approve(&self, spender: &Address, amount: &Balance) -> Result<T>;
+    fn approve(&self, spender: Address, amount: Balance) -> Result<T>;
 
     /// Create a ERC20 transfer transaction payload
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<T>;
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<T>;
 
     /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: &AnnouncementData) -> Result<T>;
+    fn announce(&self, announcement: AnnouncementData) -> Result<T>;
 
     /// Creates the transaction payload to open a payment channel
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<T>;
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<T>;
 
     /// Creates the transaction payload to immediately close an incoming payment channel
-    fn close_incoming_channel(&self, source: &Address) -> Result<T>;
+    fn close_incoming_channel(&self, source: Address) -> Result<T>;
 
     /// Creates the transaction payload that initiates the closure of a payment channel.
     /// Once the notice period is due, the funds can be withdrawn using a
     /// finalizeChannelClosure transaction.
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<T>;
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Creates a transaction payload that withdraws funds from
     /// an outgoing payment channel. This will succeed once the closure
     /// notice period is due.
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<T>;
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: &ProvableWinningTicket, domain_separator: &Hash) -> Result<T>;
+    fn redeem_ticket(&self, acked_ticket: ProvableWinningTicket, domain_separator: &Hash) -> Result<T>;
 
     /// Creates a transaction payload         chain_key: &ChainKeypair,
 
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<T>;
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<T>;
 
     /// Creates a transaction payload to remove the Safe instance. Once succeeded,
     /// the funds are no longer managed by the node.
     fn deregister_node_by_safe(&self) -> Result<T>;
 }
 
-fn channels_payload(hopr_channels: &Address, call_data: Vec<u8>) -> Vec<u8> {
+fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
     ExecTransactionFromModuleCall {
         to: hopr_channels.into(),
         value: U256::zero(),
@@ -94,7 +94,7 @@ fn channels_payload(hopr_channels: &Address, call_data: Vec<u8>) -> Vec<u8> {
     .encode()
 }
 
-fn approve_tx(spender: &Address, amount: &Balance) -> TypedTransaction {
+fn approve_tx(spender: Address, amount: Balance) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
     tx.set_data(
         ApproveCall {
@@ -107,7 +107,7 @@ fn approve_tx(spender: &Address, amount: &Balance) -> TypedTransaction {
     tx
 }
 
-fn transfer_tx(destination: &Address, amount: &Balance) -> TypedTransaction {
+fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
     match amount.balance_type() {
         BalanceType::HOPR => {
@@ -127,7 +127,7 @@ fn transfer_tx(destination: &Address, amount: &Balance) -> TypedTransaction {
     tx
 }
 
-fn register_safe_tx(safe_addr: &Address) -> TypedTransaction {
+fn register_safe_tx(safe_addr: Address) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
     tx.set_data(
         RegisterSafeByNodeCall {
@@ -153,7 +153,7 @@ impl BasicPayloadGenerator {
 }
 
 impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
-    fn approve(&self, spender: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
                 "Invalid balance type. Expected a HOPR balance.".into(),
@@ -164,16 +164,16 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
         let mut tx = transfer_tx(destination, amount);
         tx.set_to(H160::from(match amount.balance_type() {
             BalanceType::Native => destination,
-            BalanceType::HOPR => &self.contract_addrs.channels,
+            BalanceType::HOPR => self.contract_addrs.channels,
         }));
         Ok(tx)
     }
 
-    fn announce(&self, announcement: &AnnouncementData) -> Result<TypedTransaction> {
+    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
         let mut tx = create_eip1559_transaction();
         tx.set_data(
             match &announcement.key_binding {
@@ -199,7 +199,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -224,7 +224,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: &Address) -> Result<TypedTransaction> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self".into()));
         }
@@ -236,7 +236,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<TypedTransaction> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -256,7 +256,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<TypedTransaction> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -277,21 +277,21 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
 
     fn redeem_ticket(
         &self,
-        winning_ticket: &ProvableWinningTicket,
+        winning_ticket: ProvableWinningTicket,
         domain_separator: &Hash,
     ) -> Result<TypedTransaction> {
-        let redeemable = convert_winning_ticket(winning_ticket)?;
+        let redeemable = convert_winning_ticket(&winning_ticket)?;
 
         let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(&winning_ticket.vrf_params, &self.me, &ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, self.me, ticket_hash, domain_separator);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
         Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<TypedTransaction> {
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
         let mut tx = register_safe_tx(safe_addr);
         tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
         Ok(tx)
@@ -325,7 +325,7 @@ impl SafePayloadGenerator {
 }
 
 impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
-    fn approve(&self, spender: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
                 "Invalid balance type. Expected a HOPR balance.".into(),
@@ -338,12 +338,12 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
         let mut tx = transfer_tx(destination, amount);
         tx.set_to(NameOrAddress::Address(
             match amount.balance_type() {
                 BalanceType::Native => destination,
-                BalanceType::HOPR => &self.contract_addrs.channels,
+                BalanceType::HOPR => self.contract_addrs.channels,
             }
             .into(),
         ));
@@ -352,7 +352,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: &AnnouncementData) -> Result<TypedTransaction> {
+    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
         let call_data = match &announcement.key_binding {
             Some(binding) => {
                 let serialized_signature = binding.signature.to_bytes();
@@ -390,7 +390,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<TypedTransaction> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -409,14 +409,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         .encode();
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(&self.contract_addrs.channels, call_data).into());
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
         tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: &Address) -> Result<TypedTransaction> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self".into()));
         }
@@ -428,14 +428,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         .encode();
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(&self.contract_addrs.channels, call_data).into());
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
         tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<TypedTransaction> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -449,14 +449,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         .encode();
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(&self.contract_addrs.channels, call_data).into());
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
         tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<TypedTransaction> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -470,7 +470,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         .encode();
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(&self.contract_addrs.channels, call_data).into());
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
         tx.set_gas(DEFAULT_TX_GAS);
 
@@ -479,14 +479,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
     fn redeem_ticket(
         &self,
-        winning_ticket: &ProvableWinningTicket,
+        winning_ticket: ProvableWinningTicket,
         domain_separator: &Hash,
     ) -> Result<TypedTransaction> {
-        let redeemable = convert_winning_ticket(winning_ticket)?;
+        let redeemable = convert_winning_ticket(&winning_ticket)?;
 
         let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(&winning_ticket.vrf_params, &self.me, &ticket_hash, domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, self.me, ticket_hash, domain_separator);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -496,14 +496,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         .encode();
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(&self.contract_addrs.channels, call_data).into());
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(NameOrAddress::Address(self.module.into()));
         tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<TypedTransaction> {
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
         let mut tx = register_safe_tx(safe_addr);
         tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
         tx.set_gas(DEFAULT_TX_GAS);
@@ -533,14 +533,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 /// Specific for smart contract payload generation
 pub fn convert_vrf_parameters(
     off_chain: &VrfParameters,
-    signer: &Address,
-    ticket_hash: &Hash,
+    signer: Address,
+    ticket_hash: Hash,
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.get_decompressed_v().unwrap().to_bytes();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        .get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_slice())
         .to_bytes();
 
     let h_v = off_chain.get_h_v_witness().to_bytes();
@@ -626,7 +626,7 @@ pub mod tests {
         )
         .unwrap();
 
-        let tx = generator.announce(&ad).expect("should generate tx");
+        let tx = generator.announce(ad).expect("should generate tx");
 
         assert!(client
             .send_transaction(tx, None)
@@ -639,7 +639,7 @@ pub mod tests {
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
 
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None).unwrap();
-        let reannounce_tx = generator.announce(&ad_reannounce).expect("should generate tx");
+        let reannounce_tx = generator.announce(ad_reannounce).expect("should generate tx");
 
         assert!(client
             .send_transaction(reannounce_tx, None)
@@ -722,7 +722,7 @@ pub mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator
-            .redeem_ticket(&winning_ticket, &domain_separator)
+            .redeem_ticket(winning_ticket, &domain_separator)
             .expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(

@@ -13,8 +13,7 @@
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
-use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use log::info;
@@ -99,6 +98,8 @@ mod tests {
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::actions::Action;
+    use chain_types::chain_events::*;
+    use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
@@ -121,14 +122,13 @@ mod tests {
     async fn test_announce() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let keypair = OffchainKeypair::random();
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE_ADDR,
         )));
 
         let ma = announce_multiaddr.clone();
@@ -139,7 +139,7 @@ mod tests {
             .once()
             .withf(move |ad| {
                 let kb = ad.key_binding.clone().unwrap();
-                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == self_addr
+                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE_ADDR
             })
             .returning(move |_| Ok(random_hash));
 
@@ -155,7 +155,7 @@ mod tests {
                     event_type: ChainEventType::Announcement {
                         peer: pk.into(),
                         multiaddresses: vec![ma.clone()],
-                        address: self_addr,
+                        address: *ALICE_ADDR,
                     },
                 })
                 .boxed())
@@ -167,7 +167,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &keypair)
             .await
@@ -220,7 +220,7 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &keypair).await;
         assert!(

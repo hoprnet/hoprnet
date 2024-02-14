@@ -48,31 +48,31 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TransactionExecutor {
     /// Executes ticket redemption transaction given a ticket.
-    async fn redeem_ticket(&self, ticket: &ProvableWinningTicket, domain_separator: &Hash) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: ProvableWinningTicket, domain_separator: &Hash) -> Result<Hash>;
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
-    async fn fund_channel(&self, destination: &Address, balance: &Balance) -> Result<Hash>;
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> Result<Hash>;
 
     /// Initiates closure of an outgoing channel.
-    async fn initiate_outgoing_channel_closure(&self, dst: &Address) -> Result<Hash>;
+    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
 
     /// Finalizes closure of an outgoing channel.
-    async fn finalize_outgoing_channel_closure(&self, dst: &Address) -> Result<Hash>;
+    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
 
     /// Closes incoming channel.
-    async fn close_incoming_channel(&self, src: &Address) -> Result<Hash>;
+    async fn close_incoming_channel(&self, src: Address) -> Result<Hash>;
 
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
     /// by the Indexer.
-    async fn withdraw(&self, recipient: &Address, amount: &Balance) -> Result<Hash>;
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash>;
 
     /// Announces the node on-chain given the `AnnouncementData`
-    async fn announce(&self, data: &AnnouncementData) -> Result<Hash>;
+    async fn announce(&self, data: AnnouncementData) -> Result<Hash>;
 
     /// Registers Safe with the node.
-    async fn register_safe(&self, safe_address: &Address) -> Result<Hash>;
+    async fn register_safe(&self, safe_address: Address) -> Result<Hash>;
 }
 
 /// Represents confirmation of the `Action` execution.
@@ -177,15 +177,16 @@ where
                     .await?
                     .ok_or(MissingDomainSeparator)?;
 
-                let tx_hash = self.tx_exec.redeem_ticket(&winning_ticket, &domain_separator).await?;
+                let ticket_channel_id = winning_ticket.ticket.channel_id.clone();
+                let tx_hash = self.tx_exec.redeem_ticket(winning_ticket, &domain_separator).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if winning_ticket.ticket.channel_id == channel.get_id()),
+                    move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ticket_channel_id == channel.get_id()),
                 )
             }
 
             Action::OpenChannel(address, stake) => {
-                let tx_hash = self.tx_exec.fund_channel(&address, &stake).await?;
+                let tx_hash = self.tx_exec.fund_channel(address, stake).await?;
                 IndexerExpectation::new(
                     tx_hash,
                     move |event| matches!(event, ChainEventType::ChannelOpened(channel) if channel.destination == address),
@@ -194,7 +195,7 @@ where
 
             Action::FundChannel(channel, amount) => {
                 if channel.status == ChannelStatus::Open {
-                    let tx_hash = self.tx_exec.fund_channel(&channel.destination, &amount).await?;
+                    let tx_hash = self.tx_exec.fund_channel(channel.destination, amount).await?;
                     IndexerExpectation::new(
                         tx_hash,
                         move |event| matches!(event, ChainEventType::ChannelBalanceIncreased(r_channel, diff) if r_channel.get_id() == channel.get_id() && amount.eq(diff)),
@@ -207,7 +208,7 @@ where
             Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
-                        let tx_hash = self.tx_exec.close_incoming_channel(&channel.source).await?;
+                        let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
                         IndexerExpectation::new(
                             tx_hash,
                             move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
@@ -223,7 +224,7 @@ where
                         debug!("initiating closure of {channel}");
                         let tx_hash = self
                             .tx_exec
-                            .initiate_outgoing_channel_closure(&channel.destination)
+                            .initiate_outgoing_channel_closure(channel.destination)
                             .await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -234,7 +235,7 @@ where
                         debug!("finalizing closure of {channel}");
                         let tx_hash = self
                             .tx_exec
-                            .finalize_outgoing_channel_closure(&channel.destination)
+                            .finalize_outgoing_channel_closure(channel.destination)
                             .await?;
                         IndexerExpectation::new(
                             tx_hash,
@@ -253,20 +254,22 @@ where
                 // so no indexer event stream expectation awaiting is needed.
                 // So simply return once the future completes
                 return Ok(ActionConfirmation {
-                    tx_hash: self.tx_exec.withdraw(&recipient, &amount).await?,
+                    tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
                     action: action.clone(),
                 });
             }
             Action::Announce(data) => {
-                let tx_hash = self.tx_exec.announce(&data).await?;
+                let announcement_multiaddress = data.multiaddress().clone();
+
+                let tx_hash = self.tx_exec.announce(data).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
+                    move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(&announcement_multiaddress)),
                 )
             }
             Action::RegisterSafe(safe_address) => {
-                let tx_hash = self.tx_exec.register_safe(&safe_address).await?;
+                let tx_hash = self.tx_exec.register_safe(safe_address).await?;
                 IndexerExpectation::new(
                     tx_hash,
                     move |event| matches!(event, ChainEventType::NodeSafeRegistered(address) if safe_address.eq(address)),
