@@ -17,6 +17,7 @@ pub fn validate_is_power_of_two(value: u32) -> Result<(), ValidationError> {
 /// Holds basic configuration parameters of the `MessageInbox`.
 #[serde_as]
 #[derive(Debug, Clone, Eq, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MessageInboxConfiguration {
     /// Maximum capacity per-each application tag.
     ///
