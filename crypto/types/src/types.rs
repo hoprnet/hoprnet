@@ -158,6 +158,7 @@ impl CurvePoint {
         self.affine.to_encoded_point(true)
     }
 
+    /// Serializes the curve point into a compressed form. This is many cases an expensive operation.
     pub fn serialize_uncompressed(&self) -> EncodedPoint<Secp256k1> {
         self.affine.to_encoded_point(false)
     }
