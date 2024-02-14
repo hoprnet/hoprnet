@@ -58,8 +58,10 @@ impl Address {
     pub fn is_zero(&self) -> bool {
         self.0.iter().all(|e| 0_u8.eq(e))
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
+impl AsRef<[u8]> for Address {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
