@@ -4,7 +4,7 @@
 //! which allows usage of non-`reqwest` based HTTP clients.
 //!
 //! The major type implemented in this module is the [JsonRpcProviderClient]
-//! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
+//! which implements the [JsonRpcClient] trait. That makes it possible to use it with `ethers`.
 //!
 //! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible

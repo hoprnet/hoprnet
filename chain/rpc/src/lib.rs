@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::{FutureExt, Stream};
+use futures::Stream;
 use primitive_types::H256;
 use serde::Serialize;
 
@@ -221,7 +221,7 @@ impl PendingTransaction<'_> {
 impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
     for PendingTransaction<'a>
 {
-    fn from(value: ethers_providers::PendingTransaction<'a, P>) -> Self {
+    fn from(value: ethers::providers::PendingTransaction<'a, P>) -> Self {
         let tx_hash = Hash::from(value.tx_hash());
         Self {
             tx_hash,
