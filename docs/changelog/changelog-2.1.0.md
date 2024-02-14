@@ -45,10 +45,6 @@ arguments, and further through their respective environment variables.
 The configuration file itself can be partial, missing values will be merged with
 the internal default configuration.
 
-Important changes:
-
-TODO: add specific changes
-
 ### HTTP API
 
 The swagger schema for the v3 API has become stricter in terms of input/output
