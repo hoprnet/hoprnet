@@ -49,7 +49,8 @@ impl Address {
         ret.into_boxed_slice()
     }
 
-    /// Creates a random Ethereum address, mostly used for testing
+    /// Creates a random Ethereum address, only used for testing
+    #[cfg(test)]
     pub fn random() -> Self {
         Self(hopr_crypto_random::random_bytes())
     }
