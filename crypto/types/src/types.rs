@@ -124,7 +124,7 @@ mod arrays {
 /// // group homomorphism
 /// // (a + b) * G = a * G + b * G
 /// assert_eq!(A_plus_B, a_plus_b);
-/// ````
+/// ```
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct CurvePoint {
     pub(crate) affine: AffinePoint,
