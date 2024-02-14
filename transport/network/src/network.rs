@@ -38,6 +38,7 @@ lazy_static::lazy_static! {
 /// Configuration for the [Network] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
     #[serde_as(as = "DurationSeconds<u64>")]

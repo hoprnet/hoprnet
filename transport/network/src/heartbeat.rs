@@ -37,6 +37,7 @@ use crate::ping::Pinging;
 /// Configuration for the Heartbeat mechanism
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
