@@ -13,14 +13,21 @@ pub const DEFAULT_PORT: u16 = 9091;
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 
-fn validate_file_path(s: &str) -> Result<(), ValidationError> {
-    if std::path::Path::new(s).is_file() {
-        Ok(())
-    } else {
-        Err(ValidationError::new(
-            "Invalid file path specified, the file does not exist or is not a file",
-        ))
-    }
+// Validate that the path is a valid UTF-8 path.
+//
+// Also used to perform the identitify file existence check on the
+// specified path, which is now circumvented, but could
+// return in the future workflows of setting up a node.
+fn validate_file_path(_s: &str) -> Result<(), ValidationError> {
+    Ok(())
+
+    // if std::path::Path::new(_s).is_file() {
+    //     Ok(())
+    // } else {
+    //     Err(ValidationError::new(
+    //         "Invalid file path specified, the file does not exist or is not a file",
+    //     ))
+    // }
 }
 
 fn validate_password(s: &str) -> Result<(), ValidationError> {
