@@ -45,4 +45,3 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
-

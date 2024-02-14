@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
+/// Configuration for the `ack` protocol.
 #[serde_as]
 #[derive(Debug, Copy, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AckProtocolConfig {

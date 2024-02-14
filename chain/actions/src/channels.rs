@@ -1,17 +1,17 @@
-//! This module contains the [ChannelActions](channels::ChannelActions) trait defining HOPR channels operations.
+//! This module contains the [ChannelActions] trait defining HOPR channels operations.
 //!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue](action_queue::ActionQueue).
-//! There are 4 basic high-level on-chain functions in the [ChannelActions](channels::ChannelActions) trait:
-//! - [open_channel](channels::ChannelActions::open_channel)
-//! - [fund_channel](channels::ChannelActions::fund_channel)
-//! - [close_channel](channels::ChannelActions::close_channel)
+//! operations via [ActionQueue](crate::action_queue::ActionQueue).
+//! There are 4 basic high-level on-chain functions in the [ChannelActions] trait:
+//! - [open_channel](ChannelActions::open_channel)
+//! - [fund_channel](ChannelActions::fund_channel)
+//! - [close_channel](ChannelActions::close_channel)
 //!
 //! All the functions do the necessary validations using the DB and then post the corresponding action
-//! into the [ActionQueue](action_queue::ActionQueue).
+//! into the [ActionQueue](crate::action_queue::ActionQueue).
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of the corresponding operation.
-//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;

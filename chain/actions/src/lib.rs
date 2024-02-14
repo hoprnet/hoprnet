@@ -1,4 +1,4 @@
-//! Contains high-level Core-Ethereum traits that translate to on-chain transactions
+//! Contains high-level traits that translate to on-chain transaction interactions
 //!
 //! ## Actions
 //! The main concept is an "action", which a node can perform and results into an on-chain
@@ -93,19 +93,13 @@ use std::sync::Arc;
 
 use crate::action_queue::ActionSender;
 
-/// Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
 pub mod action_queue;
-/// Adds functionality of tracking the action results via expectations.
 pub mod action_state;
-/// Actions related to HOPR channels.
 pub mod channels;
 /// Contains all errors used in this crate.
 pub mod errors;
-/// Actions related to a HOPR node itself.
 pub mod node;
-/// Ethereum transaction payload generators for the actions.
 pub mod payload;
-/// Ticket redemption related actions.
 pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.

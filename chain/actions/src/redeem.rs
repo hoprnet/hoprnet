@@ -1,25 +1,25 @@
-//! This module contains the [TicketRedeemActions](redeem::TicketRedeemActions) trait defining actions regarding
+//! This module contains the [TicketRedeemActions] trait defining actions regarding
 //! ticket redemption.
 //!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue](action_queue::ActionQueue).
+//! operations via [ActionQueue](crate::action_queue::ActionQueue).
 //!
-//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions](redeem::TicketRedeemActions) trait:
-//! - [redeem_all_tickets](redeem::TicketRedeemActions::redeem_all_tickets)
-//! - [redeem_tickets_in_channel](redeem::TicketRedeemActions::redeem_tickets_in_channel)
-//! - [redeem_tickets_with_counterparty](redeem::TicketRedeemActions::redeem_tickets_with_counterparty)
-//! - [redeem_ticket](redeem::TicketRedeemActions::redeem_ticket)
+//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions] trait:
+//! - [redeem_all_tickets](TicketRedeemActions::redeem_all_tickets)
+//! - [redeem_tickets_in_channel](TicketRedeemActions::redeem_tickets_in_channel)
+//! - [redeem_tickets_with_counterparty](TicketRedeemActions::redeem_tickets_with_counterparty)
+//! - [redeem_ticket](TicketRedeemActions::redeem_ticket)
 //!
 //! Each method first checks if the tickets are redeemable.
 //! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or
 //! [BeingAggregated](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingAggregated) in the DB),
 //! If they are redeemable, their state is changed to
 //! [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](action_queue::ActionQueue) so the redemption is soon executed on-chain.
+//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain.
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of each ticket redemption.
 //!
-//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;

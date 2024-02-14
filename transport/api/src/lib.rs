@@ -11,15 +11,18 @@
 //! 5. interface specifications to allow modular behavioral extensions
 
 pub mod adaptors;
+/// Configuration of the [HoprTransport].
 pub mod config;
+/// Constants used and exposed by the crate.
 pub mod constants;
+/// Errors used by the crate.
 pub mod errors;
 mod multiaddrs;
 mod p2p;
 mod processes;
 mod timer;
 
-/// Object representing different types of output from the transport layer
+/// Composite output from the transport layer.
 #[derive(Clone)]
 pub enum TransportOutput {
     Received(ApplicationData),
@@ -80,9 +83,9 @@ lazy_static::lazy_static! {
 
 use {async_std::task::sleep, hopr_platform::time::native::current_time};
 
-/// Build the [`core_transport::Network`] object responsible for tracking and holding the
-/// observable state of the network, peers inside the network and telemetry about network
-/// connections.
+/// Build the [Network] object responsible for tracking and holding the
+/// observable state of the physical transport network, peers inside the network
+/// and telemetry about network connections.
 pub fn build_network(
     peer_id: PeerId,
     cfg: NetworkConfig,
@@ -146,7 +149,7 @@ pub fn build_manual_ping(
     (ping, ping_rx, pong_tx)
 }
 
-/// Build the index updater mechanism
+/// Build the index updater mechanism for indexer generated behavior inclusion.
 pub fn build_index_updater<Db>(
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
@@ -155,7 +158,7 @@ where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
 {
     let (indexer_update_tx, indexer_update_rx) =
-        futures::channel::mpsc::channel::<IndexerProcessed>(processes::indexer::INDEXER_UPDATE_QUEUE_SIZE);
+        futures::channel::mpsc::channel::<IndexerProcessed>(constants::INDEXER_UPDATE_QUEUE_SIZE);
     let indexer_updater = processes::indexer::IndexerActions::new(db, network, indexer_update_tx);
 
     (indexer_updater, indexer_update_rx)
@@ -222,7 +225,8 @@ pub fn build_heartbeat(
     (heartbeat, hb_ping_rx, hb_pong_tx)
 }
 
-/// This is used by the indexer to emit events when a change on channel entry is detected.
+/// Event emitter used by the indexer to emit events when an on-chain change on a
+/// channel is detected.
 #[derive(Clone)]
 pub struct ChannelEventEmitter {
     pub tx: UnboundedSender<ChannelEntry>,
@@ -235,6 +239,7 @@ impl ChannelEventEmitter {
     }
 }
 
+/// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
     pub losing: u64,
@@ -266,6 +271,8 @@ use futures::pin_mut;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
+/// Interface into the physical transport mechanism allowing all HOPR related tasks on
+/// the transport mechanism, as well as off-chain ticket manipulation.
 #[derive(Debug, Clone)]
 pub struct HoprTransport {
     me: PeerId,
@@ -413,7 +420,7 @@ impl HoprTransport {
                     selector.select_path(&cg, cg.my_address(), chain_key, 1, hops as usize)?
                 };
 
-                cp.to_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
+                cp.into_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
             } else {
                 return Err(crate::errors::HoprTransportError::Api(
                     "send msg: unknown destination peer id encountered".to_owned(),

@@ -1,3 +1,8 @@
+//! ## Auto Redeeming Strategy
+//! This strategy listens for newly added acknowledged tickets and automatically issues a redeem transaction on that ticket.
+//! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far less on-chain transactions being issued).
+//!
+//! For details on default parameters see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;

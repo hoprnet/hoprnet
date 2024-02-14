@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+/// Configuration of the P2P protocols.
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Copy, Clone, PartialEq)]
 pub struct ProtocolConfig {
     /// `ack` protocol config
