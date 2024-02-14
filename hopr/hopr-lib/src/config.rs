@@ -50,10 +50,10 @@ pub struct Chain {
     #[serde(default = "just_true")]
     #[default = true]
     pub check_unrealized_balance: bool, // TODO: should be removed
-    #[serde(default = "1000")]
+    #[serde(default)]
     #[default = 1000]
     pub max_block_range: u32,
-    #[serde(default = "3000")]
+    #[serde(default)]
     #[default = 3000]
     pub tx_polling_interval: u32,
 }

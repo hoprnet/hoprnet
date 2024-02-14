@@ -16,6 +16,7 @@ use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -26,7 +27,6 @@ pub mod chain_events;
 pub mod utils;
 
 pub use ethers::core::types::transaction::eip2718::TypedTransaction;
-use serde_with::serde_as;
 
 /// Shorthand for creating new EIP1559 transaction object.
 pub fn create_eip1559_transaction() -> TypedTransaction {
