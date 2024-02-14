@@ -27,7 +27,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::TransportOutput;
 
-#[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum Inputs {
     Heartbeat(api::HeartbeatChallenge),
