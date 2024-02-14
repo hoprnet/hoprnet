@@ -98,7 +98,7 @@ impl VrfParameters {
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
-                &creator.as_slice(),
+                &creator.as_ref(),
                 &v.to_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
@@ -147,7 +147,7 @@ impl VrfParameters {
         msg: &[u8; T],
         dst: &[u8],
     ) -> k256::ProjectivePoint {
-        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_slice(), msg], &[dst]).unwrap()
+        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_ref(), msg], &[dst]).unwrap()
     }
 
     /// Returns decompressed `v`.
@@ -172,7 +172,7 @@ pub fn derive_vrf_parameters<const T: usize>(
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_slice(), msg], &[dst])?;
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -195,7 +195,7 @@ pub fn derive_vrf_parameters<const T: usize>(
 
     let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
-            chain_addr.as_slice(),
+            chain_addr.as_ref(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
             &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
             msg,
@@ -230,7 +230,7 @@ mod test {
 
         let test_msg: [u8; 32] = hex!("8248a966b9215e154c8f673cb154da030916be3fb31af3b1220419a1c98eeaed");
 
-        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, Hash::default().as_slice()).unwrap();
+        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, Hash::default().as_ref()).unwrap();
 
         assert_eq!(vrf_values, VrfParameters::from_bytes(&vrf_values.to_bytes()).unwrap());
     }
@@ -241,10 +241,10 @@ mod test {
 
         let test_msg: [u8; 32] = hex!("8248a966b9215e154c8f673cb154da030916be3fb31af3b1220419a1c98eeaed");
 
-        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, Hash::default().as_slice()).unwrap();
+        let vrf_values = derive_vrf_parameters(&test_msg, &keypair, Hash::default().as_ref()).unwrap();
 
         assert!(vrf_values
-            .verify(&keypair.public().to_address(), &test_msg, &Hash::default().as_slice())
+            .verify(&keypair.public().to_address(), &test_msg, &Hash::default().as_ref())
             .is_ok());
     }
 }

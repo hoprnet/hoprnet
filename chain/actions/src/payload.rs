@@ -539,21 +539,19 @@ pub fn convert_vrf_parameters(
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.get_decompressed_v().unwrap().to_bytes();
-    let s_b = off_chain
-        .get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_slice())
-        .to_bytes();
+    let s_b = off_chain.get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_ref());
 
-    let h_v = off_chain.get_h_v_witness().to_bytes();
+    let h_v = off_chain.get_h_v_witness();
 
     Vrfparameters {
         vx: U256::from_big_endian(&v[1..33]),
         vy: U256::from_big_endian(&v[33..65]),
         s: U256::from_big_endian(&off_chain.s.to_bytes()),
         h: U256::from_big_endian(&off_chain.h.to_bytes()),
-        s_bx: U256::from_big_endian(&s_b[1..33]),
-        s_by: U256::from_big_endian(&s_b[33..65]),
-        h_vx: U256::from_big_endian(&h_v[1..33]),
-        h_vy: U256::from_big_endian(&h_v[33..65]),
+        s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),
+        s_by: U256::from_big_endian(&s_b.as_bytes()[33..65]),
+        h_vx: U256::from_big_endian(&h_v.as_bytes()[1..33]),
+        h_vy: U256::from_big_endian(&h_v.as_bytes()[33..65]),
     }
 }
 
@@ -580,7 +578,7 @@ pub fn convert_winning_ticket(off_chain: &ProvableWinningTicket) -> Result<Redee
             r: H256::from_slice(&serialized_signature[0..32]).into(),
             vs: H256::from_slice(&serialized_signature[32..64]).into(),
         },
-        por_secret: U256::from_big_endian(off_chain.response.as_slice()),
+        por_secret: U256::from_big_endian(off_chain.response.as_ref()),
     })
 }
 

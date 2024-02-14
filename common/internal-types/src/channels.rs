@@ -215,8 +215,8 @@ impl BinarySerializable for ChannelEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.as_slice());
-        ret.extend_from_slice(self.destination.as_slice());
+        ret.extend_from_slice(self.source.as_ref());
+        ret.extend_from_slice(self.destination.as_ref());
         ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(match self.status {
@@ -261,7 +261,7 @@ impl BinarySerializable for ChannelEntry {
 /// assert_ne!(ALICE_BOB, BOB_ALICE);
 /// ```
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
-    Hash::create(&[&source.as_slice(), &destination.as_slice()])
+    Hash::create(&[source.as_ref(), destination.as_ref()])
 }
 
 /// Enumerates possible changes on a channel entry update
@@ -699,13 +699,13 @@ impl Ticket {
             Self::SIZE - Signature::SIZE
         });
 
-        ret.extend_from_slice(self.channel_id.as_slice());
+        ret.extend_from_slice(self.channel_id.as_ref());
         ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
         ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
         ret.extend_from_slice(&self.encoded_win_prob);
-        ret.extend_from_slice(self.challenge.as_slice());
+        ret.extend_from_slice(self.challenge.as_ref());
 
         if with_signature {
             ret.extend_from_slice(&self.signature.to_bytes());
@@ -718,13 +718,13 @@ impl Ticket {
     /// same value as the on-chain implementation.
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[&self.to_bytes_internal(false)]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_slice()]);
-        Hash::create(&[&hex!("1901"), domain_separator.as_slice(), hash_struct.as_slice()])
+        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+        Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
-        self.signature = Signature::sign_hash(self.get_hash(domain_separator).as_slice(), signing_key);
+        self.signature = Signature::sign_hash(self.get_hash(domain_separator).as_ref(), signing_key);
     }
 
     /// Computes the VRF values to check or prove that the ticket
@@ -749,7 +749,7 @@ impl Ticket {
         chain_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> Result<VrfParameters> {
-        derive_vrf_parameters(&ticket_hash.into(), chain_key, domain_separator.as_slice()).map_err(|e| e.into())
+        derive_vrf_parameters(&ticket_hash.into(), chain_key, domain_separator.as_ref()).map_err(|e| e.into())
     }
 
     /// Computes the value which is used to determine
@@ -771,12 +771,12 @@ impl Ticket {
 
         luck.copy_from_slice(
             &Hash::create(&[
-                ticket_hash.as_slice(),
+                ticket_hash.as_ref(),
                 &vrf_params.get_decompressed_v()?.to_bytes()[1..], // skip prefix
-                response.as_slice(),
+                response.as_ref(),
                 &signature.to_bytes(),
             ])
-            .as_slice()[0..7],
+            .as_ref()[0..7],
         );
 
         // clone bytes
@@ -859,10 +859,7 @@ impl Ticket {
     ///
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_issuer_address(ticket: &Ticket, domain_separator: &Hash) -> Result<Address> {
-        Ok(
-            PublicKey::from_signature_hash(ticket.get_hash(domain_separator).as_slice(), &ticket.signature)?
-                .to_address(),
-        )
+        Ok(PublicKey::from_signature_hash(ticket.get_hash(domain_separator).as_ref(), &ticket.signature)?.to_address())
     }
 
     /// Determines if the ticket has been aggregated, i.e. is the result
@@ -1138,7 +1135,7 @@ pub mod tests {
 
         assert!(super::validate_ticket(&initial_ticket, &BOB_ADDR, &Hash::default()).is_ok());
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_slice(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
         assert_eq!(initial_ticket, Ticket::from_bytes(&initial_ticket.to_bytes()).unwrap());
     }
@@ -1181,7 +1178,7 @@ pub mod tests {
 
         assert!(super::validate_ticket(&initial_ticket, &BOB_ADDR, &Hash::default()).is_ok());
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_slice(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
     }
 
     #[test]

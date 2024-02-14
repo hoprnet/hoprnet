@@ -296,7 +296,7 @@ impl Default for HalfKey {
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
-                .as_slice(),
+                .as_ref(),
         );
         ret
     }
@@ -322,8 +322,10 @@ impl HalfKey {
             .map(|cp| HalfKeyChallenge::new(&cp.serialize_compressed()))
             .expect("invalid public key")
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
+impl AsRef<[u8]> for HalfKey {
+    fn as_ref(&self) -> &[u8] {
         &self.hkey
     }
 }
@@ -389,6 +391,12 @@ impl HalfKeyChallenge {
 
     pub fn to_address(&self) -> Address {
         PublicKey::from_bytes(&self.hkc).expect("invalid half-key").to_address()
+    }
+}
+
+impl AsRef<[u8]> for HalfKeyChallenge {
+    fn as_ref(&self) -> &[u8] {
+        &self.hkc
     }
 }
 
@@ -468,8 +476,10 @@ impl Hash {
     pub fn hash(&self) -> Self {
         Self::create(&[&self.0])
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
+impl AsRef<[u8]> for Hash {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
@@ -928,8 +938,10 @@ impl Response {
                 .expect("response represents an invalid non-zero scalar"),
         }
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
+impl AsRef<[u8]> for Response {
+    fn as_ref(&self) -> &[u8] {
         &self.response
     }
 }
@@ -938,13 +950,11 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::as_slice(first))
-            .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
-            })
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::as_ref(first))
+            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.as_ref()).map(|s2| s1.as_ref() + s2.as_ref()))
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
-        Ok(Response::new(res.to_bytes().as_slice()))
+        Ok(Response::new(res.to_bytes().as_ref()))
     }
 }
 
@@ -1489,7 +1499,7 @@ pub mod tests {
     #[test]
     fn half_key_test() {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
-        let hk2 = HalfKey::from_bytes(&hk1.to_bytes()).unwrap();
+        let hk2 = HalfKey::from_bytes(hk1.as_ref()).unwrap();
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
     }
@@ -1497,7 +1507,7 @@ pub mod tests {
     #[test]
     fn half_key_challenge_test() {
         let hkc1 = HalfKeyChallenge::from_bytes(&PUBLIC_KEY).unwrap();
-        let hkc2 = HalfKeyChallenge::from_bytes(&hkc1.to_bytes()).unwrap();
+        let hkc2 = HalfKeyChallenge::from_bytes(hkc1.as_ref()).unwrap();
         assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
     }
 
