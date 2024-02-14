@@ -147,6 +147,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
