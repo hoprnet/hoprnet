@@ -9,8 +9,8 @@
 //! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
-use ethers::types::BlockNumber;
 use ethers::providers::{JsonRpcClient, Middleware};
+use ethers::types::BlockNumber;
 use futures::{Stream, StreamExt, TryStreamExt};
 use log::error;
 use log::{debug, warn};
