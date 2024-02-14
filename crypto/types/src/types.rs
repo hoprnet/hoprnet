@@ -100,17 +100,77 @@ mod arrays {
 }
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
+///
+/// ```rust
+/// # use hopr_crypto_types::prelude::*;
+/// # use hex_literal::hex;
+/// # use k256::{elliptic_curve::NonZeroScalar, Scalar, Secp256k1};
+///
+/// let a: [u8; 32] = hex!("876027a13900aad908842c3f79307cc8e96de5c3331090e91a24c315f2a8d43a");
+/// let b: [u8; 32] = hex!("561d3fe2990e6a768b90f7d510b69e967e0922a3b61e8141398113aede8e1d3e");
+///
+/// let A = CurvePoint::from_exponent(&a).unwrap();
+/// let B = CurvePoint::from_exponent(&b).unwrap();
+///
+/// // A_plus_B = a * G + b * G
+/// let A_plus_B = CurvePoint::combine(&[&A, &B]);
+///
+/// let scalar_a: Scalar = *NonZeroScalar::<Secp256k1>::try_from(&a[..]).unwrap();
+/// let scalar_b: Scalar = *NonZeroScalar::<Secp256k1>::try_from(&b[..]).unwrap();
+///
+/// // a_plus_b = (a + b) * G
+/// let a_plus_b = CurvePoint::from_exponent(&(scalar_a + scalar_b).to_bytes()).unwrap();
+///
+/// // group homomorphism
+/// // (a + b) * G = a * G + b * G
+/// assert_eq!(A_plus_B, a_plus_b);
+/// ````
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct CurvePoint {
     pub(crate) affine: AffinePoint,
 }
 
 impl CurvePoint {
+    /// Size of the point if serialized via `serialize_compressed`.
+    pub const SIZE_COMPRESSED: usize = 33;
+
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
-        let serialized = self.to_bytes();
-        let hash = Hash::create(&[&serialized[1..]]).to_bytes();
-        Address::new(&hash[12..])
+        let serialized = self.affine.to_encoded_point(false);
+        let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
+        Address::new(&hash.as_slice()[12..])
+    }
+
+    /// Creates a curve point from a non-zero scalar.
+    /// The given exponent must represent a non-zero scalar and must result into
+    /// a secp256k1 identity point.
+    pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
+        PublicKey::from_privkey(exponent).map(CurvePoint::from)
+    }
+
+    /// Converts the curve point to a representation suitable for calculations.
+    pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
+        self.affine.into()
+    }
+
+    /// Serializes the curve point into a compressed form. This is a cheap operation.
+    pub fn serialize_compressed(&self) -> Vec<u8> {
+        self.affine.to_encoded_point(true).as_bytes().to_vec()
+    }
+
+    /// Sums all given curve points together, creating a new curve point.
+    pub fn combine(summands: &[&CurvePoint]) -> CurvePoint {
+        // Convert all public keys to EC points in the projective coordinates, which are
+        // more efficient for doing the additions. Then finally make in an affine point
+        let affine: AffinePoint = summands
+            .iter()
+            .map(|p| ProjectivePoint::<Secp256k1>::from(p.affine))
+            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
+                acc.add(x)
+            })
+            .to_affine();
+
+        affine.into()
     }
 }
 
@@ -172,44 +232,7 @@ impl BinarySerializable for CurvePoint {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.affine.to_encoded_point(false).to_bytes()
-    }
-}
-
-impl CurvePoint {
-    /// Size of the point if serialized via `serialize_compressed`.
-    pub const SIZE_COMPRESSED: usize = 33;
-
-    /// Creates a curve point from a non-zero scalar.
-    /// The given exponent must represent a non-zero scalar and must result into
-    /// a secp256k1 identity point.
-    pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
-        PublicKey::from_privkey(exponent).map(CurvePoint::from)
-    }
-
-    /// Converts the curve point to a representation suitable for calculations.
-    pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
-        self.affine.into()
-    }
-
-    /// Serializes the curve point into a compressed form. This is a cheap operation.
-    pub fn serialize_compressed(&self) -> Box<[u8]> {
-        self.affine.to_encoded_point(true).to_bytes()
-    }
-
-    /// Sums all given curve points together, creating a new curve point.
-    pub fn combine(summands: &[&CurvePoint]) -> CurvePoint {
-        // Convert all public keys to EC points in the projective coordinates, which are
-        // more efficient for doing the additions. Then finally make in an affine point
-        let affine: AffinePoint = summands
-            .iter()
-            .map(|p| ProjectivePoint::<Secp256k1>::from(p.affine))
-            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
-                acc.add(x)
-            })
-            .to_affine();
-
-        affine.into()
+        self.serialize_compressed().into_boxed_slice()
     }
 }
 
@@ -225,7 +248,7 @@ impl Challenge {
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
     /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.curve_point.to_address().to_bytes())
+        EthereumChallenge::new(&self.curve_point.to_address().as_slice())
     }
 }
 
@@ -275,7 +298,7 @@ impl BinarySerializable for Challenge {
 
     fn to_bytes(&self) -> Box<[u8]> {
         // Serializes only compressed points
-        self.curve_point.serialize_compressed()
+        self.curve_point.serialize_compressed().into()
     }
 }
 
@@ -643,59 +666,53 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
+///
+/// ```rust
+/// # use hex_literal::hex;
+/// # use hopr_crypto_types::prelude::*;
+/// # use k256::ecdsa::VerifyingKey;
+///
+/// const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
+///
+/// // compressed public keys start with `0x02` or `0x03``, depening on sign of y-component
+/// const COMPRESSED: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
+///
+/// // full public without prefix
+/// const UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
+///
+/// // uncompressed public keys use `0x04` prefix
+/// const UNCOMPRESSED: [u8; 65] = hex!("041464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
+///
+/// let from_privkey = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
+/// let from_compressed = PublicKey::from_bytes(&COMPRESSED).unwrap();
+/// let from_uncompressed_plain = PublicKey::from_bytes(&UNCOMPRESSED_PLAIN).unwrap();
+/// let from_uncompressed = PublicKey::from_bytes(&UNCOMPRESSED).unwrap();
+///
+/// assert_eq!(from_privkey, from_uncompressed);
+/// assert_eq!(from_compressed, from_uncompressed_plain);
+/// assert_eq!(from_uncompressed_plain, from_uncompressed);
+///
+/// // also works a signed Ethereum transaction
+/// const TX_HASH: [u8; 32] = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
+///
+/// const R: [u8; 32] = hex!("c8048d137fbb10ddffa1e4ba5141c300fcd19e4fb7d0a4354ca62a7694e46f9b");
+/// const S: [u8; 32] = hex!("5bb43e23d8b430f17ba3649e38b5a94d02815f0bcfaaf171800c52d4794c3136");
+/// const V: u8 = 1u8;
+///
+/// let mut r_and_s = Vec::<u8>::with_capacity(64);
+/// r_and_s.extend_from_slice(&R);
+/// r_and_s.extend_from_slice(&S);
+///
+/// let sig = Signature::new(&r_and_s, V);
+///
+/// let from_transaction_signature = PublicKey::from_signature_hash(&TX_HASH, &sig).unwrap();
+///
+/// assert_eq!(from_uncompressed, from_transaction_signature);
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PublicKey {
     key: elliptic_curve::PublicKey<Secp256k1>,
     pub(crate) compressed: EncodedPoint<Secp256k1>,
-}
-
-impl PublicKey {
-    /// Generates a new random public key.
-    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
-    pub fn random() -> Self {
-        let (_, pk) = Self::random_keypair();
-        pk
-    }
-
-    /// Converts the public key to an Ethereum address
-    pub fn to_address(&self) -> Address {
-        let uncompressed = self.to_bytes(false);
-        let serialized = Hash::create(&[&uncompressed[1..]]).to_bytes();
-        Address::new(&serialized[12..])
-    }
-
-    /// Serializes the public key to a binary form.
-    pub fn to_bytes(&self, compressed: bool) -> Box<[u8]> {
-        if compressed {
-            self.compressed.to_bytes()
-        } else {
-            self.key.as_affine().to_encoded_point(false).to_bytes()
-        }
-    }
-
-    /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
-    pub fn to_hex(&self, compressed: bool) -> String {
-        let offset = if compressed { 0 } else { 1 };
-        format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
-    }
-}
-
-impl Display for PublicKey {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex(true))
-    }
-}
-
-impl TryFrom<CurvePoint> for PublicKey {
-    type Error = CryptoError;
-
-    fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
-        Ok(Self {
-            key,
-            compressed: key.to_encoded_point(true),
-        })
-    }
 }
 
 impl PublicKey {
@@ -817,6 +834,53 @@ impl PublicKey {
             compressed: new_pk.to_encoded_point(true),
         }
     }
+
+    /// Generates a new random public key.
+    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
+    pub fn random() -> Self {
+        let (_, pk) = Self::random_keypair();
+        pk
+    }
+
+    /// Converts the public key to an Ethereum address
+    pub fn to_address(&self) -> Address {
+        let uncompressed = self.to_bytes(false);
+        let serialized = Hash::create(&[&uncompressed[1..]]);
+        Address::new(&serialized.as_slice()[12..])
+    }
+
+    /// Serializes the public key to a binary form.
+    pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
+        if compressed {
+            self.compressed.as_bytes().to_vec()
+        } else {
+            self.key.as_affine().to_encoded_point(false).as_bytes().to_vec()
+        }
+    }
+
+    /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
+    pub fn to_hex(&self, compressed: bool) -> String {
+        let offset = if compressed { 0 } else { 1 };
+        format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Display for PublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex(true))
+    }
+}
+
+impl TryFrom<CurvePoint> for PublicKey {
+    type Error = CryptoError;
+
+    fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
+        Ok(Self {
+            key,
+            compressed: key.to_encoded_point(true),
+        })
+    }
 }
 
 impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
@@ -846,7 +910,7 @@ impl BinarySerializable for CompressedPublicKey {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.0.to_bytes(true)
+        self.0.to_bytes(true).into_boxed_slice()
     }
 }
 
