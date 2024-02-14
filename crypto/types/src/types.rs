@@ -248,7 +248,7 @@ impl Challenge {
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
     /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.curve_point.to_address().as_ref())
+        EthereumChallenge::new(self.curve_point.to_address().as_ref())
     }
 }
 
