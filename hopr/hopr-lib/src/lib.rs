@@ -261,7 +261,8 @@ where
                     }
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    match db.read().await.get_packet_key(&address).await {
+                    let packet_key = db.read().await.get_packet_key(&address).await;
+                    match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 let peer_id = pk.into();
