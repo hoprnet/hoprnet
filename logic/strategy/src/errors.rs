@@ -3,6 +3,7 @@ use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 
+/// Enumerates all errors in this crate.
 #[derive(Debug, Error)]
 pub enum StrategyError {
     #[error("criteria to trigger the strategy were not satisfied")]

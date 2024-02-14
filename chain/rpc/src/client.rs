@@ -1,10 +1,12 @@
-//! This module defines HTTP clients for the purpose of interaction with an RPC provider.
+//! Extended `JsonRpcClient` abstraction.
 //!
-//! The major type implemented in this module is the [JsonRpcProviderClient](client::JsonRpcProviderClient)
+//! This module contains custom implementation of `ethers::providers::JsonRpcClient`
+//! which allows usage of non-`reqwest` based HTTP clients.
+//!
+//! The major type implemented in this module is the [JsonRpcProviderClient]
 //! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
 //!
-//! The [JsonRpcProviderClient](client::JsonRpcProviderClient) is abstract over a
-//! [HttpPostRequestor] trait, which makes it possible
+//! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
@@ -415,24 +417,19 @@ pub mod native {
     use crate::HttpPostRequestor;
 
     /// Common configuration for all native `HttpPostRequestor`s
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
     pub struct HttpPostRequestorConfig {
         /// Timeout for HTTP POST request
+        ///
         /// Defaults to 5 seconds.
+        #[default(Duration::from_secs(5))]
         pub http_request_timeout: Duration,
 
         /// Maximum number of HTTP redirects to follow
+        ///
         /// Defaults to 3
+        #[default(3)]
         pub max_redirects: u8,
-    }
-
-    impl Default for HttpPostRequestorConfig {
-        fn default() -> Self {
-            Self {
-                http_request_timeout: Duration::from_secs(5),
-                max_redirects: 3,
-            }
-        }
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.

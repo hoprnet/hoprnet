@@ -1,3 +1,8 @@
+//! ## Auto Funding Strategy
+//! This strategy listens for channel state change events to check whether a channel has dropped below `min_stake_threshold` HOPR.
+//! If this happens, the strategy issues a **fund channel** transaction to re-stake the channel with `funding_amount` HOPR.
+//!
+//! For details on default parameters see [AutoFundingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use hopr_internal_types::prelude::*;

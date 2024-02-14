@@ -27,6 +27,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::TransportOutput;
 
+/// Composition of all inputs allowing to produce a single stream of
+/// input events passed into the swarm processing logic.
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum Inputs {

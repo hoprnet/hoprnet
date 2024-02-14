@@ -2,16 +2,16 @@
 //!
 //! It contains implementation of types necessary to perform tracking the
 //! on-chain state of [Actions](chain_types::actions::Action).
-//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation](action_state::IndexerExpectation)
-//! can be created and registered in an object implementing the [ActionState](action_state::ActionState) trait.
-//! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType](chain_types::chain_events::ChainEventType)
+//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation]
+//! can be created and registered in an object implementing the [ActionState] trait.
+//! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType]
 //! that must match on any chain event log in a block containing the given transaction hash.
 //!
 //! ### Example
-//! Once the [RegisterSafe(`0x0123..ef`)](chain_types::actions::Action) action that has been submitted via [ActionQueue](action_queue::ActionQueue)
+//! Once the [RegisterSafe(`0x0123..ef`)](chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
 //! in a transaction with hash `0xabcd...00`.
-//! The [IndexerExpectation](action_state::IndexerExpectation) is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
-//! a log that matches [NodeSafeRegistered(`0x0123..ef`)](chain_types::chain_events::ChainEventType) event type.
+//! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
+//! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use async_lock::RwLock;
 use async_trait::async_trait;

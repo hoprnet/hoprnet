@@ -1,10 +1,16 @@
+//! Types related to high-level actions that lead to Ethereum transactions.
+//!
 //! Defines an enumeration of action that can be done by a HOPR node.
+//!
+//! The actions eventually lead to an on-chain transaction.
+//!
 //! See the `chain-actions` crate for details.
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
 /// Enumerates all possible on-chain state change requests.
+///
 /// An `Action` is an operation done by the HOPR node that leads
 /// to an on-chain transaction or a contract call. An `Action` is considered complete
 /// until the corresponding [SignificantChainEvent](crate::chain_events::SignificantChainEvent)

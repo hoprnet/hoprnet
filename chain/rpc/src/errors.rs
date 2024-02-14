@@ -1,4 +1,4 @@
-//! Errors produced by this crate and other error-related types.
+/// Errors produced by this crate and other error-related types.
 use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
 use ethers::providers::{JsonRpcError, ProviderError};

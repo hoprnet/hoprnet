@@ -1,11 +1,8 @@
 //! # HOPR Metrics Collection
 //!
-//! The purpose of the `hopr_metrics` Rust crate is to create a thin Rust WASM-compatible wrapper
-//! over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
-//!
-//! The reason for making this wrapper is to make it suitable for `wasm-bindgen` bindings to JS/TS. The
-//! `prometheus` crate API is not suitable for `wasm-bindgen` as it is. However, this crate can be also used
-//! in pure Rust crates (either WASM or non-WASM compatible) and is not HOPR specific.
+//! The purpose of the `hopr_metrics` Rust crate is to create a thin wrapper
+//! over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/) or
+//! a similar metrics library, should it change in the future.
 //!
 //! This wrapper merely simplifies the 3 basic Metric Types:
 //!
@@ -15,12 +12,12 @@
 //!
 //! The above 3 types are wrapped using the following structs:
 //!
-//! - `SimpleCounter`
-//! - `MultiCounter`
-//! - `SimpleGauge`
-//! - `MultiGauge`
-//! - `SimpleHistogram`
-//! - `MultiHistogram`
+//! - [SimpleCounter](crate::metrics::SimpleCounter)
+//! - [MultiCounter](crate::metrics::MultiCounter)
+//! - [SimpleGauge](crate::metrics::SimpleGauge)
+//! - [MultiGauge](crate::metrics::MultiGauge)
+//! - [SimpleHistogram](crate::metrics::SimpleHistogram)
+//! - [MultiHistogram](crate::metrics::MultiHistogram)
 //!
 //! The "simple" types represent a singular named metrics, whereas the "multi" metrics represent a
 //! vector extension.
@@ -77,77 +74,6 @@
 //! println!("{:?}", gathered_metrics);
 //! ```
 //!
-//! ### Usage in JS/TS
-//!
-//! Because the crate is WASM compatible, it contains also TS/JS bindings via
-//! `wasm-bindgen`.
-//! Once a metric is created, it lives in a global registry. Values of all
-//! created metrics can be gathered in a serialized text for at any time.
-//!
-//! See the example below for details.
-//!
-//! #### Example use in JS/TS
-//!
-//! ```js
-//! const metric_counter = create_counter('test_counter', 'Some testing counter')
-//!
-//! // Counter can be only incremented by integers only
-//! metric_counter.increment_by(10)
-//!
-//! const metric_gauge = create_counter('test_gauge', 'Some testing gauge')
-//!
-//! // Gauges can be incremented and decrements and support floats
-//! metric_gauge.increment_by(5)
-//! metric_gauge.decrement_by(3.2)
-//!
-//! const metric_histogram = create_histogram('test_histogram', 'Some testing histogram')
-//!
-//! // Histograms can observe floating point values
-//! metric_histogram.observe(10.1)
-//!
-//! // ... and also can be used to measure time durations in seconds
-//! const timer = metric_histogram.start_measure()
-//! foo()
-//! metric_histogram.record_measure(timer)
-//!
-//! // Multi-metrics are labeled extensions
-//! const metric_countsPerVersion = create_multi_counter('test_multi_counter', 'Testing labeled counter', ['version'])
-//!
-//! // Tracks counters per different versions
-//! metric_countsPerVersion.increment_by('1.0.0', 2)
-//! metric_countsPerVersion.increment_by('1.0.1', 1)
-//!
-//! // All metrics live in a global state and can be serialized at any time
-//! let gathered_metrics = gather_all_metrics()
-//!
-//! // Metrics are in text format and can be exposed using an HTTP API endpoint
-//! console.log(gathered_metrics)
-//! ```
-//!
-//! ### Scraping metrics across separate WASM runtimes in HOPRd
-//!
-//! Each WASM module runs in its own separate runtime and has a private memory space. This has implications for the metric
-//! registries used by Prometheus in HOPRd. As a direct consequence of this fact, each WASM runtime has its own global metric
-//! registry which has to be scraped separately in order to have all the metrics exposed.
-//!
-//! Each Rust crate that will become a separate WASM runtime instantiated from the TS in HOPRd, must declare a public WASM-bound
-//! function for gathering metrics:
-//!
-//! ```js
-//! #[wasm_bindgen]
-//! pub fn my_crate_gather_metrics() -> JsResult<String> {
-//!     hopr_metrics::metrics::wasm::gather_all_metrics()
-//! }
-//! ```
-//!
-//! and when initializing the crate in TS, `registerMetricsCollector` function must be called
-//! passing the `my_crate_gather_metrics` as argument:
-//!
-//! ```typescript
-//! import registerMetricsCollector from '@hoprnet/hopr-utils'
-//! import { my_crate_initialize_crate, my_crate_gather_metrics } from '../lib/my_crate.js'
-//! my_crate_initialize_crate()
-//! registerMetricsCollector(my_crate_gather_metrics)
-//! ```
 
+/// Contains definitions of metric types.
 pub mod metrics;
