@@ -12,7 +12,7 @@ use ethers::{
 };
 use hopr_crypto_types::keypairs::Keypair;
 use std::env;
-use tracing::{log::log, log::Level};
+use tracing::{debug, info};
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -83,7 +83,7 @@ impl CreateSafeModuleArgs {
             .map(|ni| ni.chain_key.public().to_address().to_string())
             .collect();
 
-        log!(target: "create_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
+        info!(target: "create_safe_module", "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
@@ -94,7 +94,7 @@ impl CreateSafeModuleArgs {
         let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
-        log!(target: "create_safe_module", Level::Debug, "Calling foundry...");
+        debug!(target: "create_safe_module", "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_setup_safe_module(
             &network,

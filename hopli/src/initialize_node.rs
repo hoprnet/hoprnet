@@ -12,7 +12,7 @@ use ethers::{
 };
 use hopr_crypto_types::keypairs::Keypair;
 use std::env;
-use tracing::{log::log, log::Level};
+use tracing::{debug, info};
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -86,7 +86,7 @@ impl InitializeNodeArgs {
             .map(|ni| ni.chain_key.public().0.to_address().to_string())
             .collect();
 
-        log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
+        info!(target: "initialize_node", "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
@@ -97,7 +97,7 @@ impl InitializeNodeArgs {
         let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
-        log!(target: "initialize_node", Level::Debug, "Calling foundry...");
+        debug!(target: "initialize_node", "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_initialization(
             &network,

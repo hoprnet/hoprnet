@@ -8,7 +8,7 @@ use clap::Parser;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use std::{env, iter, str::FromStr};
-use tracing::{error, log::log, log::Level};
+use tracing::{debug, error, info};
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum SyncNetworkRegistryType {
@@ -79,7 +79,7 @@ impl SyncNetworkRegistryArgs {
             .map(|addr| Address::from_str(addr).unwrap().to_checksum())
             .collect();
 
-        log!(target: "sync_eligibility", Level::Info, "Safe addresses {:?}", all_safes_addresses);
+        info!(target: "sync_eligibility", "Safe addresses {:?}", all_safes_addresses);
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
@@ -91,9 +91,9 @@ impl SyncNetworkRegistryArgs {
                     let all_eligibilities: Vec<String> = iter::repeat(desired_eligibility.to_string())
                         .take(all_safes_addresses.len())
                         .collect();
-                    log!(target: "sync_eligibility", Level::Info, "Eligibilities {:?}", all_eligibilities);
+                    info!(target: "sync_eligibility", "Eligibilities {:?}", all_eligibilities);
 
-                    log!(target: "sync_eligibility::forced", Level::Debug, "Calling foundry...");
+                    debug!(target: "sync_eligibility::forced", "Calling foundry...");
                     // iterate and collect execution result. If error occurs, the entire operation failes.
                     child_process_call_foundry_set_eligibility(
                         &network,
@@ -106,7 +106,7 @@ impl SyncNetworkRegistryArgs {
                 }
             }
             SyncNetworkRegistryType::NormalSync => {
-                log!(target: "sync_eligibility::normal", Level::Debug, "Calling foundry...");
+                debug!(target: "sync_eligibility::normal", "Calling foundry...");
                 child_process_call_foundry_sync_eligibility(&network, &format!("[{}]", &&all_safes_addresses.join(",")))
             }
         }

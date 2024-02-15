@@ -1,6 +1,6 @@
 use clap::Parser;
 use std::env;
-use tracing::{log::log, log::Level};
+use tracing::info;
 
 use hopr_crypto_types::keypairs::Keypair;
 
@@ -91,7 +91,7 @@ impl RegisterInNetworkRegistryArgs {
             }
         }
 
-        log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_chain_addrs.join(","));
+        info!(target: "network_registry", "merged peer_ids {:?}", all_chain_addrs.join(","));
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;

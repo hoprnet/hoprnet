@@ -4,7 +4,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::{log::log, log::Level};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Parser, Default)]
 pub struct LocalIdentityFromDirectoryArgs {
@@ -48,7 +48,7 @@ impl LocalIdentityFromDirectoryArgs {
         } = self;
         let id_dir = identity_directory.unwrap();
 
-        log!(target: "identity_reader", Level::Debug, "Reading dir {}", &id_dir);
+        debug!(target: "identity_reader", "Reading dir {}", &id_dir);
 
         // early return if failed in reading identity directory
         let directory = fs::read_dir(Path::new(&id_dir))?;
@@ -66,7 +66,7 @@ impl LocalIdentityFromDirectoryArgs {
                 _ => true,
             })
             .collect();
-        log!(target: "identity_reader", Level::Info, "{} path read from dir", &files.len());
+        info!(target: "identity_reader", "{} path read from dir", &files.len());
         Ok(files)
     }
 }
@@ -78,19 +78,19 @@ impl LocalIdentityArgs {
             identity_from_directory,
             identity_from_path,
         } = self;
-        log!(target: "identity_reader", Level::Info, "Read from dir {}, path {}", &identity_from_directory.is_some(), &identity_from_path.is_some());
+        info!(target: "identity_reader", "Read from dir {}, path {}", &identity_from_directory.is_some(), &identity_from_path.is_some());
 
         let mut files: Vec<PathBuf> = Vec::new();
         if let Some(id_dir_args) = identity_from_directory {
             files = id_dir_args.get_files().unwrap();
         };
         if let Some(id_path) = identity_from_path {
-            log!(target: "identity_reader", Level::Info, "Reading path {}", &id_path.as_path().display().to_string());
+            info!(target: "identity_reader", "Reading path {}", &id_path.as_path().display().to_string());
             if id_path.exists() {
                 files.push(id_path);
-                log!(target: "identity_reader", Level::Info, "path read from path");
+                info!(target: "identity_reader", "path read from path");
             } else {
-                log!(target: "identity_reader", Level::Info, "Path {} does not exist.", &id_path.as_path().display().to_string());
+                info!(target: "identity_reader", "Path {} does not exist.", &id_path.as_path().display().to_string());
             }
         }
         files

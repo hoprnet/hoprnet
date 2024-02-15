@@ -11,7 +11,7 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use std::{env, str::FromStr};
-use tracing::{log::log, log::Level};
+use tracing::info;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
@@ -112,7 +112,7 @@ impl FaucetArgs {
             }
         }
 
-        log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
+        info!(target: "faucet", "All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;

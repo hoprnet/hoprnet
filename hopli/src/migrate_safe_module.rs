@@ -10,7 +10,7 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use std::{env, str::FromStr};
-use tracing::{log::log, log::Level};
+use tracing::{debug, info};
 
 /// CLI arguments for `hopli migrate-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -68,7 +68,7 @@ impl MigrateSafeModuleArgs {
             .map(|ni| ni.chain_key.public().to_address().to_string())
             .collect();
 
-        log!(target: "migrate_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
+        info!(target: "migrate_safe_module", "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // 3. parse safe and module address
         let parsed_safe_addr = if safe_address.starts_with("0x") {
@@ -87,7 +87,7 @@ impl MigrateSafeModuleArgs {
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
 
-        log!(target: "migrate_safe_module", Level::Debug, "Calling foundry...");
+        debug!(target: "migrate_safe_module", "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_migrate_safe_module(
             &network,
