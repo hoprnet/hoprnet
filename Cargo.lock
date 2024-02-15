@@ -7157,7 +7157,7 @@ dependencies = [
  "tide",
  "tracing",
  "tracing-futures",
- "uuid 1.7.0",
+ "uuid 1.6.1",
 ]
 
 [[package]]

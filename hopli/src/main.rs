@@ -67,7 +67,7 @@ fn main() -> Result<(), HelperErrors> {
         .with_level(true)
         .with_target(true)
         .with_thread_ids(true)
-        .with_thread_names(true);
+        .with_thread_names(false);
 
     let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
 
