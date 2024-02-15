@@ -1,6 +1,6 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::debug;
+use tracing::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

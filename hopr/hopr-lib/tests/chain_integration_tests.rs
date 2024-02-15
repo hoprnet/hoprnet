@@ -26,7 +26,7 @@ use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info};
+use tracing::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
 use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;

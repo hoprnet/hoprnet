@@ -11,7 +11,7 @@ use ethers::{
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use hopr_crypto_types::keypairs::Keypair;
-use log::{log, Level};
+use tracing::{log::log, log::Level};
 use std::env;
 
 /// CLI arguments for `hopli register-in-network-registry`

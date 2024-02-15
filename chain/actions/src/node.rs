@@ -17,7 +17,7 @@ use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::info;
+use tracing::info;
 use multiaddr::Multiaddr;
 
 use crate::action_queue::PendingAction;

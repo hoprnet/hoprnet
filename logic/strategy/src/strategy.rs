@@ -27,7 +27,7 @@ use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_internal_types::prelude::*;
-use log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Sub;

@@ -23,7 +23,7 @@ futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true, features = ["peerid", "ed25519", "serde"] }
-log = { workspace = true }
+tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 serde_json = { workspace = true }

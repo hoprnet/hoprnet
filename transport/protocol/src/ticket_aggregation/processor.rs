@@ -18,7 +18,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};

@@ -1,7 +1,7 @@
 use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
-use log::{trace, warn};
+use tracing::{trace, warn};
 use std::time::Duration;
 
 use async_std::task::sleep;

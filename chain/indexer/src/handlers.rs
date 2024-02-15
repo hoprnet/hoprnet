@@ -14,7 +14,7 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 use multiaddr::Multiaddr;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};

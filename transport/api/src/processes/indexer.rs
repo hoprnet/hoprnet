@@ -4,7 +4,7 @@ use core_network::{network::Network, PeerId};
 use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
-use log::{error, warn};
+use tracing::{error, warn};
 use std::{pin::Pin, sync::Arc};
 
 use async_std::task::spawn;

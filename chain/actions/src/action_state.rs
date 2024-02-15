@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
 use hopr_crypto_types::types::Hash;
-use log::{debug, error};
+use tracing::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};

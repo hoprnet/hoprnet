@@ -13,12 +13,12 @@
 //! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
+use tracing::{debug, trace, warn};
 use validator::Validate;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};

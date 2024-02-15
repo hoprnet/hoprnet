@@ -9,8 +9,8 @@ use clap::Parser;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
-use log::{log, Level};
 use std::{env, str::FromStr};
+use tracing::{log::log, log::Level};
 
 /// CLI arguments for `hopli migrate-safe-module`
 #[derive(Parser, Default, Debug)]

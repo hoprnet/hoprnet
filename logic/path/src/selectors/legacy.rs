@@ -5,7 +5,7 @@ use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
+use tracing::warn;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;

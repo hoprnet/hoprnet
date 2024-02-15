@@ -9,10 +9,11 @@ use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
+use tracing_subscriber::layer::SubscriberExt;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
@@ -26,40 +27,27 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-fn setup_logger(level: log::LevelFilter) {
-    if let Err(e) = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {} {}] {}",
-                humantime::format_rfc3339_seconds(SystemTime::now()),
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        .level(level)
-        .level_for("libp2p_mplex", log::LevelFilter::Info)
-        .level_for("multistream_select", log::LevelFilter::Info)
-        .level_for("sqlx::query", log::LevelFilter::Info)
-        .level_for("tracing::span", log::LevelFilter::Error)
-        .level_for("isahc::handler", log::LevelFilter::Error)
-        .level_for("isahc::client", log::LevelFilter::Error)
-        .level_for("surf::middleware::logger::native", log::LevelFilter::Error)
-        .chain(std::io::stdout())
-        .apply()
-    {
-        eprintln!("failed to setup logger: {e}")
-    }
-}
-
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    setup_logger(
-        std::env::var("RUST_LOG")
-            .map_err(|_| ())
-            .and_then(|level| log::LevelFilter::from_str(&level).map_err(|_| ()))
-            .unwrap_or(log::LevelFilter::Info),
-    );
+    let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
+        Ok(filter) => filter,
+        Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
+            .add_directive("libp2p_mplex=info".parse()?)
+            .add_directive("multistream_select=info".parse()?)
+            .add_directive("isahc::handler=error".parse()?)
+            .add_directive("isahc::client=error".parse()?)
+            .add_directive("surf::middleware::logger::native=error".parse()?),
+    };
+
+    let format = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(true);
+
+    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();

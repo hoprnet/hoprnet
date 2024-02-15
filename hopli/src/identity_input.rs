@@ -1,10 +1,10 @@
 use crate::utils::HelperErrors;
 use clap::{Parser, ValueHint};
-use log::{log, Level};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tracing::{log::log, log::Level};
 
 #[derive(Debug, Clone, Parser, Default)]
 pub struct LocalIdentityFromDirectoryArgs {
@@ -90,7 +90,7 @@ impl LocalIdentityArgs {
                 files.push(id_path);
                 log!(target: "identity_reader", Level::Info, "path read from path");
             } else {
-                log!(target: "identity_reader", Level::Error, "Path {} does not exist.", &id_path.as_path().display().to_string());
+                log!(target: "identity_reader", Level::Info, "Path {} does not exist.", &id_path.as_path().display().to_string());
             }
         }
         files

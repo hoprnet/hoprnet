@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
 use libp2p_identity::PeerId;
 
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 
 use hopr_platform::time::native::current_time;
 

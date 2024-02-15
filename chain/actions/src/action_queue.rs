@@ -13,7 +13,7 @@ use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::{poll_fn, Future};

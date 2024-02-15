@@ -14,7 +14,7 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use hopr_primitive_types::sma::{SingleSumSMA, SMA};
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiGauge, SimpleGauge};

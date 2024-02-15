@@ -11,7 +11,6 @@ use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
-use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use tide::http::headers::HeaderValue;
@@ -25,6 +24,7 @@ use tide::{
     Middleware, Next, Request, Response, StatusCode,
 };
 use tide_websockets::{Message, WebSocket};
+use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
@@ -217,7 +217,7 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
 }
 
 /// Custom request logging middleware
-struct LogRequestMiddleware(log::Level);
+struct LogRequestMiddleware(tracing::log::Level);
 
 #[async_trait]
 impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
@@ -248,7 +248,7 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
             }
         }
 
-        log::log!(
+        tracing::log::log!(
             self.0,
             r#"{} "{method} {path}" {status} {} {}ms"#,
             peer_addr.as_deref().unwrap_or("-"),
@@ -304,7 +304,7 @@ pub async fn run_hopr_api(
 
     let mut app = tide::with_state(state.clone());
 
-    app.with(LogRequestMiddleware(log::Level::Debug));
+    app.with(LogRequestMiddleware(tracing::log::Level::Debug));
     app.with(
         CorsMiddleware::new()
             .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())

@@ -4,7 +4,7 @@ use crate::password::PasswordArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
 use hoprd_keypair::key_pair::HoprKeys;
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use std::collections::HashMap;
 use std::str::FromStr;
 

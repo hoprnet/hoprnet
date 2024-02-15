@@ -13,7 +13,7 @@ use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
-use log::debug;
+use tracing::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;

@@ -19,7 +19,7 @@ use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use std::time::Duration;
 
 use crate::action_queue::PendingAction;

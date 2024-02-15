@@ -4,7 +4,7 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
+use tracing::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

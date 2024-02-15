@@ -30,7 +30,7 @@ validator = { workspace = true }
 bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
 chain-types = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 

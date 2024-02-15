@@ -27,7 +27,7 @@ thiserror = "1.0"
 bindings =  { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

@@ -11,7 +11,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 use std::pin::Pin;
 use std::sync::Arc;
 
