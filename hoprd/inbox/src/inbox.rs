@@ -20,10 +20,12 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     async fn push(&mut self, tag: Option<T>, payload: M);
 
     /// Count number of entries with the given `tag`.
+    ///
     /// If no `tag` is given, returns the total count of all tagged and untagged entries.
     async fn count(&self, tag: Option<T>) -> usize;
 
     /// Pops oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
+    ///
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
     async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
@@ -31,10 +33,12 @@ pub trait InboxBackend<T: Copy + Default + std::marker::Send, M: Clone + std::ma
     async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
     /// Peeks the oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
+    ///
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
     async fn peek(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
     /// Peeks all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
+    ///
     /// If the optional parameter `timestamp` is provided, only entries more recent than this are returned.
     /// NOTE: the timestamp comparison precision should be at most up to milliseconds.
     async fn peek_all(&mut self, tag: Option<T>, timestamp: Option<Duration>) -> Vec<(M, Duration)>;
@@ -80,6 +84,7 @@ where
     }
 
     /// Checks whether the tag is in the exclusion list.
+    ///
     /// NOTE: If the `tag` is `None`, it will never be considered as excluded.
     /// This has the following implication:
     /// Since [DEFAULT_APPLICATION_TAG](hopr_internal_types::protocol::DEFAULT_APPLICATION_TAG) is also considered as excluded per default,
@@ -93,7 +98,7 @@ where
     }
 
     /// Push message into the inbox. Returns `true` if the message has been enqueued, `false` if it
-    /// has been excluded based on the configured exluded tags.
+    /// has been excluded based on the configured excluded tags.
     pub async fn push(&self, payload: ApplicationData) -> bool {
         if self.is_excluded_tag(&payload.application_tag) {
             return false;
@@ -120,7 +125,9 @@ where
     }
 
     /// Pop the oldest message with the given tag, or the oldest message regardless the tag
-    /// if it is not given. Returns `None` if there's no message with such `tag` (if given) in the inbox
+    /// if it is not given.
+    ///
+    /// Returns `None` if there's no message with such `tag` (if given) in the inbox
     /// or if the whole inbox is empty (if no `tag` is given).
     pub async fn pop(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
@@ -134,7 +141,9 @@ where
     }
 
     /// Peek the oldest message with the given tag, or the oldest message regardless the tag
-    /// if it is not given. Returns `None` if there's no message with such `tag` (if given) in the inbox
+    /// if it is not given.
+    ///
+    /// Returns `None` if there's no message with such `tag` (if given) in the inbox
     /// or if the whole inbox is empty (if no `tag` is given).
     pub async fn peek(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {

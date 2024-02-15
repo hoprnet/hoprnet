@@ -34,6 +34,7 @@ fn just_true() -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
 pub struct Chain {
     #[validate(custom = "validate_announced")]
     #[serde(default = "just_true")]
@@ -63,6 +64,7 @@ fn default_safe_transaction_service_provider() -> String {
 
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
 pub struct SafeModule {
     #[validate(url)]
     #[serde(default = "default_safe_transaction_service_provider")]
@@ -88,6 +90,7 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
 }
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
 pub struct Db {
     /// Path to the directory containing the database
     #[serde(default)]

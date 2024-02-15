@@ -1148,7 +1148,7 @@ dependencies = [
 
 [[package]]
 name = "chain-rpc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-stream",
@@ -1157,7 +1157,6 @@ dependencies = [
  "chain-types",
  "env_logger",
  "ethers",
- "ethers-providers",
  "futures",
  "futures-timer",
  "hopr-crypto-types",

@@ -15,7 +15,7 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
             if token.len() >= MINIMAL_API_TOKEN_LENGTH {
                 Ok(())
             } else {
-                Err(ValidationError::new("The validation token is too short"))
+                Err(ValidationError::new("The API token is too short"))
             }
         }
     }
@@ -29,6 +29,7 @@ pub enum Auth {
 }
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Api {
     /// Selects whether the REST API is enabled
     #[serde(default)]

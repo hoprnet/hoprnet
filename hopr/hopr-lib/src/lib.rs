@@ -4,7 +4,7 @@
 //! The [`Hopr`] object is standalone, meaning that once it is constructed and run,
 //! it will perform its functionality autonomously. The API it offers serves as a
 //! high level integration point for other applications and utilities, but offers
-//! a complete and fulle featured HOPR node stripped from top level functionality
+//! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
 //! The intended way to use hopr_lib is for a specific tool to be built on top of it,
@@ -13,9 +13,13 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
+/// Types specific for blockchain deployments of HOPR.
 mod chain;
+/// Configuration related public types
 pub mod config;
+/// Various public constants.
 pub mod constants;
+/// Enumerates all errors thrown from this library.
 pub mod errors;
 mod helpers;
 
@@ -191,11 +195,13 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            let mut net = network.write().await;
-                            if ! net.has(&peer) {
-                                debug!("Network event: registering peer '{peer}'");
-                                net.add(&peer, PeerOrigin::NetworkRegistry);
-                                net.store_peer_multiaddresses(&peer, mas.clone());
+                            {
+                                let mut net = network.write().await;
+                                if ! net.has(&peer) {
+                                    debug!("Network event: registering peer '{peer}'");
+                                    net.add(&peer, PeerOrigin::NetworkRegistry);
+                                    net.store_peer_multiaddresses(&peer, mas.clone());
+                                }
                             }
 
                             transport_indexer_actions
@@ -255,7 +261,8 @@ where
                     }
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    match db.read().await.get_packet_key(&address).await {
+                    let packet_key = db.read().await.get_packet_key(&address).await;
+                    match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 let peer_id = pk.into();

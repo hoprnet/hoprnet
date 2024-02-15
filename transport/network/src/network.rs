@@ -35,9 +35,10 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Configuration for the [`Network`] object
+/// Configuration for the [Network] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
     #[serde_as(as = "DurationSeconds<u64>")]
@@ -127,11 +128,14 @@ pub enum Health {
     Green = 4,
 }
 
+/// Events emitted by the transport mechanism towards the network monitoring mechanism.
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
 }
 
+/// Trait defining the operations recognized by the [Network] object allowing it
+/// to physically interact with external systems, including the transport mechanism.
 #[cfg_attr(test, mockall::automock)]
 pub trait NetworkExternalActions {
     fn is_public(&self, peer: &PeerId) -> bool;
@@ -139,6 +143,7 @@ pub trait NetworkExternalActions {
     fn emit(&self, event: NetworkEvent);
 }
 
+/// Status of the peer as recorded by the [Network].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
     pub id: PeerId,

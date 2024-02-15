@@ -14,16 +14,18 @@ use proc_macro_regex::regex;
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
+/// Check whether the string looks like a valid domain.
 #[inline]
 pub fn looks_like_domain(s: &str) -> bool {
     is_dns_address_regex(s)
 }
 
+/// Check whether the string is an actual reachable domain.
 pub fn is_reachable_domain(host: &str) -> bool {
     host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
 }
 
-/// Enumerates possible host types.
+/// Enumeration of possible host types.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HostType {
     /// IPv4 based host
@@ -39,9 +41,12 @@ impl Default for HostType {
 }
 
 /// Configuration of the listening host.
+///
 /// This is used for the P2P and REST API listeners.
-// NOTE: this intentionally has no default, because it depends on the use case
+///
+/// Intentionally has no default, because it depends on the use case.
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HostConfig {
     /// Host on which to listen
     #[serde(default)] // must be defaulted to be mergeable from CLI args
@@ -117,7 +122,9 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
     }
 }
 
+/// Configuration of the physical transport mechanism.
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
     /// not need any connection to nodes outside the subnet

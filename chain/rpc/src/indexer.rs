@@ -1,7 +1,7 @@
-//! This module extends the [RpcOperations](rpc::RpcOperations) type with functionality needed by the Indexer component.
+//! Extends the [RpcOperations] type with functionality needed by the Indexer component.
 //!
 //! The functionality required functionality is defined in the [HoprIndexerRpcOperations] trait,
-//! which is implemented for [RpcOperations](rpc::RpcOperations) hereof.
+//! which is implemented for [RpcOperations] hereof.
 //! The primary goal is to provide a stream of [BlockWithLogs] filtered by the given [LogFilter]
 //! as the new matching blocks are mined in the underlying blockchain. The stream also allows to collect
 //! historical blockchain data.
@@ -9,11 +9,11 @@
 //! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
+use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
-use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, StreamExt, TryStreamExt};
-use log::error;
 use log::{debug, warn};
+use log::{error, trace};
 use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
@@ -51,7 +51,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             // On first iteration use the given block number as start
             let mut from_block = start_block_number;
 
-            loop {
+            const MAX_LOOP_FAILURES: usize = 5;
+            let mut count_failures = 0;
+
+            'outer: loop {
                 match self.block_number().await {
                     Ok(latest_block) => {
                         if from_block > latest_block {
@@ -60,6 +63,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if from_block - 1 == latest_block {
                                 // If we came here early (we tolerate only off-by one), wait some more
+                                debug!("too early query, still at block {latest_block}");
                                 futures_timer::Delay::new(self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
@@ -99,33 +103,58 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         };
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        while let Ok(Some(log)) = retrieved_logs.try_next().await {
-                            let log = Log::from(log);
+                        trace!("begin processing batch #{from_block} - #{latest_block}");
+                        loop {
+                            match retrieved_logs.try_next().await {
+                                Ok(Some(log)) => {
+                                    let log = Log::from(log);
 
-                            // This in general should not happen, but handle such case to be safe
-                            if log.block_number > latest_block {
-                                warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
-                                break;
+                                    // This in general should not happen, but handle such case to be safe
+                                    if log.block_number > latest_block {
+                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        break;
+                                    }
+
+                                    // This assumes the logs are arriving ordered by blocks when fetching a range
+                                    if current_block_log.block_id != log.block_number {
+                                        debug!("completed {current_block_log}");
+                                        yield current_block_log;
+
+                                        current_block_log = BlockWithLogs::default();
+                                        current_block_log.block_id = log.block_number;
+                                    }
+
+                                    debug!("retrieved {log}");
+                                    current_block_log.logs.push(log);
+                                },
+                                Ok(None) => {
+                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                    break;
+                                },
+                                Err(e) => {
+                                    error!("failure when processing blocks from RPC: {e}");
+                                    count_failures += 1;
+
+                                    if count_failures < MAX_LOOP_FAILURES {
+                                        // Continue the outer loop, which throws away the current block
+                                        // that may be incomplete due to this error.
+                                        // We will start at this block again to re-query it.
+                                        from_block = current_block_log.block_id;
+                                        continue 'outer;
+                                    } else {
+                                        panic!("cannot advance due to unrecoverable RPC error: {e}");
+                                    }
+                                }
                             }
-
-                            // This assumes the logs are arriving ordered by blocks when fetching a range
-                            if current_block_log.block_id != log.block_number {
-                                debug!("completed {current_block_log}");
-                                yield current_block_log;
-
-                                current_block_log = BlockWithLogs::default();
-                                current_block_log.block_id = log.block_number;
-                            }
-
-                            debug!("retrieved {log}");
-                            current_block_log.logs.push(log);
                         }
 
                         // Yield everything we've collected until this point
                         debug!("completed {current_block_log}");
                         yield current_block_log;
                         from_block = latest_block + 1;
+                        count_failures = 0;
                     }
+
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
 

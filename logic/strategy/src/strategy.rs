@@ -1,9 +1,22 @@
-use crate::aggregating::AggregatingStrategy;
-use crate::auto_funding::AutoFundingStrategy;
-use crate::auto_redeeming::AutoRedeemingStrategy;
-use crate::errors::Result;
-use crate::promiscuous::PromiscuousStrategy;
-use crate::Strategy;
+//! ## Multi Strategy
+//!
+//! This strategy can stack multiple above strategies (called sub-strategies in this context) into one.
+//! Once a strategy event is triggered, it is executed sequentially on the sub-strategies one by one.
+//! The strategy can be configured to not call the next sub-strategy event if the sub-strategy currently being executed failed,
+//! which is done by setting the `on_fail_continue` flag.
+//!
+//! Hence, the sub-strategy chain then can behave as a logical AND (`on_fail_continue` = `false`) execution chain
+//! or logical OR (`on_fail_continue` = `true`) execution chain.
+//!
+//! A Multi Strategy can also contain another Multi Strategy as a sub-strategy if `allow_recursive` flag is set.
+//! However, this recursion is always allowed up to 2 levels only.
+//! Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy chains.
+//!
+//! The MultiStrategy can also observe channels being `PendingToClose` and running out of closure grace period,
+//! and if this happens, it will issue automatically the final close transaction, which transitions the state to `Closed`.
+//! This can be controlled by the `finalize_channel_closure` parameter.
+//!
+//! For details on default parameters see [MultiStrategyConfig].
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
@@ -23,6 +36,13 @@ use std::time::Duration;
 use validator::Validate;
 
 use hopr_platform::time::native::current_time;
+
+use crate::aggregating::AggregatingStrategy;
+use crate::auto_funding::AutoFundingStrategy;
+use crate::auto_redeeming::AutoRedeemingStrategy;
+use crate::errors::Result;
+use crate::promiscuous::PromiscuousStrategy;
+use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -65,7 +85,8 @@ pub trait SingularStrategy: Display {
 }
 
 /// Internal strategy which runs per tick and finalizes `PendingToClose` channels
-/// which have elapsed the grace period
+/// which have elapsed the grace period.
+/// This is enabled in a [MultiStrategy] when [configured](MultiStrategyConfig) with the `finalize_channel_closure` set.
 struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
     db: Arc<RwLock<Db>>,
     chain_actions: ChainActions<Db>,
@@ -126,14 +147,19 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
+    ///
+    /// Default is true.
     #[default = true]
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
+    ///
+    /// Default is true.
     #[default = true]
     pub allow_recursive: bool,
 
@@ -141,6 +167,8 @@ pub struct MultiStrategyConfig {
     /// elapsed the closure grace period, to issue another channel closing transaction to close them.
     /// If not set, the user has to trigger the channel closure manually once again after the grace period
     /// is over.
+    ///
+    /// Default is false.
     #[default = false]
     pub finalize_channel_closure: bool,
 

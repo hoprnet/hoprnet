@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use std::ops::{AddAssign, Div, SubAssign};
 
 /// Simple Moving Average trait.
+///
 /// The second-most useful filter type, bested only by coffee filters.
 pub trait SMA<T> {
     /// Pushes a sample.
@@ -32,6 +33,7 @@ pub trait SMA<T> {
 }
 
 /// Basic implementation of Simple Moving Average (SMA).
+///
 /// The maximum window size is bound by 2^32 - 1.
 /// Useful mainly for floating-point types, as it does not accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(N)` for average computation, `N` being window size.
@@ -109,6 +111,7 @@ where
 }
 
 /// Basic implementation of Simple Moving Average (SMA).
+///
 /// The maximum window size is bound by 2^32 - 1.
 /// Useful mainly for integer types, as it does accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(1)` for average computation, `N` being window size.

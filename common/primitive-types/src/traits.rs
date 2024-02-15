@@ -13,6 +13,7 @@ pub trait ToHex: Sized {
 }
 
 /// A type that can be serialized and deserialized to a binary form.
+///
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
 pub trait BinarySerializable: Sized {
