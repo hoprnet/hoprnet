@@ -12,7 +12,7 @@
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
 //! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError};
+use ethers::providers::{JsonRpcClient, JsonRpcError};
 use log::{debug, trace, warn};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -512,7 +512,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 pub mod tests {
     use chain_types::utils::create_anvil;
     use chain_types::{ContractAddresses, ContractInstances};
-    use ethers_providers::JsonRpcClient;
+    use ethers::providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;

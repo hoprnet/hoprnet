@@ -245,8 +245,16 @@ impl HoprdConfig {
 
         //   TODO: custom provider is redundant with the introduction of protocol-config.json
         if let Some(x) = cli_args.provider {
-            cfg.hopr.chain.provider = Some(x)
-        };
+            cfg.hopr.chain.provider = Some(x);
+        }
+
+        if let Some(x) = cli_args.max_block_range {
+            // Override all max_block_range setting in all networks
+            for (_, n) in cfg.hopr.chain.protocols.networks.iter_mut() {
+                n.max_block_range = x;
+            }
+        }
+
         if cli_args.check_unrealized_balance == 0 {
             cfg.hopr.chain.check_unrealized_balance = true;
         }

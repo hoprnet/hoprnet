@@ -8,9 +8,9 @@ use chain_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
 use log::debug;
@@ -58,7 +58,7 @@ pub struct RpcOperationsConfig {
     ///
     /// Defaults to 2500 blocks
     #[validate(range(min = 1))]
-    #[default = 2500]
+    #[default = 1000]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
     ///
