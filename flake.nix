@@ -153,7 +153,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "RUST_LOG=info,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error,surf::middleware::logger::native"
+                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
               ];
             };
@@ -176,7 +176,7 @@
                 "/bin/hopli"
               ];
               Env = [
-                "RUST_LOG=info,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error,surf::middleware::logger::native"
+                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
                 "ETHERSCAN_API_KEY=placeholder"
                 "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
@@ -207,7 +207,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error,surf::middleware::logger::native"
+                "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
                 "RUST_BACKTRACE=full"
               ];
             };
