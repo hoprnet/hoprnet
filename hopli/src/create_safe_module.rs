@@ -1,24 +1,33 @@
+//! This module contains arguments and functions to quickly create necessary staking wallets
+//! and execute necessary on-chain transactions to setup a HOPR node.
+//!
+//! Detailed breakdown of the steps:
+//! - create a Safe proxy instance and HOPR node management module proxy instance
+//! - include nodes configure default permissions on the created module proxy
+//! - fund the node and Safe with some native tokens and HOPR tokens respectively
+//! - approve HOPR tokens to be transferred from the Safe proxy instaces by Channels contract
+//! - Use manager wallet to add nodes and staking safes to the Network Registry contract
 use crate::{
     identity::{IdentityFileArgs, PrivateKeyArgs},
     process::{child_process_call_foundry_express_setup_safe_module, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use ethers::{
-    types::U256,
-    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
-};
+use ethers::{types::U256, utils::parse_units};
 use log::{log, Level};
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
 pub struct CreateSafeModuleArgs {
+    /// Name of the network that the node is running on
     #[clap(help = "Network name. E.g. monte_rosa", long)]
     network: String,
 
+    /// Arguments to locate identity file(s) of HOPR node(s)
     #[clap(flatten)]
     local_identity: IdentityFileArgs,
 
+    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
     #[clap(
         help = "Specify path pointing to the contracts root",
         long,
@@ -27,6 +36,7 @@ pub struct CreateSafeModuleArgs {
     )]
     contracts_root: Option<String>,
 
+    /// The amount of HOPR tokens (in floating number) to be funded per wallet
     #[clap(
         help = "Hopr amount in ether, e.g. 10",
         long,
@@ -36,6 +46,7 @@ pub struct CreateSafeModuleArgs {
     )]
     hopr_amount: f64,
 
+    /// The amount of native tokens (in floating number) to be funded per wallet
     #[clap(
         help = "Native token amount in ether, e.g. 1",
         long,
@@ -45,11 +56,17 @@ pub struct CreateSafeModuleArgs {
     )]
     native_amount: f64,
 
+    /// Access to the private key, of which the wallet either contains sufficient assets
+    /// as the source of funds or it can mint necessary tokens
+    /// This wallet is also the manager of Network Registry contract
     #[clap(flatten)]
     pub private_key: PrivateKeyArgs,
 }
 
 impl CreateSafeModuleArgs {
+    /// Execute the command, which quickly create necessary staking wallets
+    /// and execute necessary on-chain transactions to setup a HOPR node.
+    ///
     /// 1. Create a safe instance and a node management module instance:
     /// 2. Set default permissions for the module
     /// 3. Include node as a member with restricted permission on sending assets

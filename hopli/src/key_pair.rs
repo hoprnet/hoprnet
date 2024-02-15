@@ -1,3 +1,5 @@
+//! This module contains utility functions to read and create an identity file
+
 use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
@@ -11,9 +13,8 @@ use std::{
 ///
 /// # Arguments
 ///
-/// * `identity_directory` - Directory to all the identity files
+/// * `files` - Paths to identity files
 /// * `password` - Password to unlock all the identity files
-/// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
 pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
     let mut results = HashMap::with_capacity(files.len());
 

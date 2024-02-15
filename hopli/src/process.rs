@@ -1,3 +1,5 @@
+//! This module contains functions to run `forge script`,
+//! which buids and broadcasts on-chain transactions used in hopli
 use std::{
     env,
     ffi::OsStr,
@@ -9,23 +11,11 @@ use std::{
 use crate::environment_config;
 use crate::utils::HelperErrors;
 
-pub fn build_path(network: &str, environment_type: &str) -> String {
-    let new_path = ["./", network, "/", environment_type].concat();
-    match Path::new(&new_path).to_str() {
-        None => panic!("new path is not a valid UTF-8 sequence"),
-        Some(s) => {
-            println!("new path is {}", s);
-            s.to_string()
-        }
-    }
-}
-
-/// Set environment variables
+/// Set environment variables used by `forge script`
 ///
 /// # Arguments
 ///
 /// * `contracts_root` - Directory to the foundry project
-/// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
 /// * `network` - Name of the network that nodes run in
 pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
@@ -200,16 +190,15 @@ pub fn child_process_call_foundry_express_setup_safe_module(
     child_process_call_foundry(network, &express_setup_safe_args)
 }
 
-/// Launch a child process to call foundry  command
+/// Launch a child process to call foundry command. Note that self-register is disabled
 ///
 /// # Arguments
 ///
 /// * `network` - Name of the network that nodes run in
-/// * `environment_type` - Type of the environment that nodes run in
-/// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
-pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String) -> Result<(), HelperErrors> {
+/// * `node_address` - Ethereum addresses of HOPR nodes to be registered under the caller
+pub fn child_process_call_foundry_self_register(network: &str, node_address: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let peer_id_string = ["[", peer_ids, "]"].concat();
+    let peer_id_string = ["[", node_address, "]"].concat();
     let self_register_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
@@ -220,6 +209,34 @@ pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String
     ];
 
     child_process_call_foundry(network, &self_register_args)
+}
+
+/// Launch a child process to call foundry command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `staking_address` - Ethereum addresses of staking safes
+/// * `node_address` - Ethereum addresses of HOPR nodes to be registered under the caller
+pub fn child_process_call_foundry_manager_register(
+    network: &str,
+    staking_address: &String,
+    node_address: &String,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let staking_address_string = ["[", staking_address, "]"].concat();
+    let node_address_string = ["[", node_address, "]"].concat();
+    let manager_register_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "registerNodes(address[],address[])",
+        &staking_address_string,
+        &node_address_string,
+    ];
+
+    child_process_call_foundry(network, &manager_register_args)
 }
 
 /// Launch a child process to call foundry command

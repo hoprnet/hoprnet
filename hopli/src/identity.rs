@@ -1,3 +1,13 @@
+//! This module contains the arguments and functions around private keys and keystores.
+//!
+//! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum wallet.
+//! This identity file uses password (received from [PasswordArgs]) for encryption.
+//!
+//! Actions related to identity files are specified in [IdentityActionType].
+//!
+//! Location of identity files can be provided with [IdentityFileArgs].
+//!
+//! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].
 use clap::{builder::RangedU64ValueParser, Parser, ValueHint};
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_primitive_types::primitives::Address;
@@ -13,9 +23,13 @@ use std::{
     str::FromStr,
 };
 
+/// An enum representing different actions around `hopli identiy`
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum IdentityActionType {
+    /// Create a new identity file
     Create,
+
+    /// Read an existing identity file
     Read,
 }
 
@@ -31,8 +45,10 @@ impl FromStr for IdentityActionType {
     }
 }
 
+/// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PrivateKeyArgs {
+    /// Either provide a private key as argument or as an environment variable `PRIVATE_KEY`
     #[clap(
         long,
         help = "Private key to unlock the account that broadcasts the transaction",
@@ -43,6 +59,7 @@ pub struct PrivateKeyArgs {
 }
 
 impl PrivateKeyArgs {
+    /// Read the private key and return an address string
     pub fn read(self) -> Result<String, HelperErrors> {
         let private_key = if let Some(pk) = self.private_key {
             info!("reading private key from cli");
@@ -62,11 +79,17 @@ impl PrivateKeyArgs {
     }
 }
 
+/// Arguments for password.
+///
+/// Password is used for encrypting an identity file
+/// Password can be passed as an environment variable `IDENTITY_PASSWORD`, or
+/// in a file of which the path is supplied in `--password_path`
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PasswordArgs {
+    /// The path to a file containing the password that encrypts the identity file
     #[clap(
         long,
-        help = "The path to a file containing the password",
+        help = "The path to a file containing the password that encrypts the identity file",
         long_help = "The path to read the password. If not specified, the IDENTITY_PASSWORD environment variable.",
         value_hint = ValueHint::FilePath,
         name = "password_path",
@@ -76,6 +99,7 @@ pub struct PasswordArgs {
 }
 
 impl PasswordArgs {
+    /// Read the password either from its path or from the environment variable IDENTITY_PASSWORD
     pub fn read(self) -> Result<String, HelperErrors> {
         let pwd = if let Some(pwd_path) = self.password_path {
             info!("reading password from password_path");
@@ -89,8 +113,8 @@ impl PasswordArgs {
     }
 }
 
-#[derive(Debug, Clone, Parser, Default)]
 /// CLI arguments to specify the directory of one or multiple identity files
+#[derive(Debug, Clone, Parser, Default)]
 pub struct IdentityFromDirectoryArgs {
     /// Directory to all the identity files
     #[arg(
@@ -148,9 +172,11 @@ impl IdentityFromDirectoryArgs {
 /// CLI arguments to specify the directory of one or multiple identity files
 #[derive(Debug, Clone, Parser, Default)]
 pub struct IdentityFileArgs {
+    /// Directory that contains one or multiple identity files
     #[clap(help = "Get identity file(s) from a directory", flatten)]
     pub identity_from_directory: Option<IdentityFromDirectoryArgs>,
 
+    /// Path to one identity file
     #[arg(
         long,
         help = "The path to an identity file",
@@ -159,12 +185,13 @@ pub struct IdentityFileArgs {
     )]
     pub identity_from_path: Option<PathBuf>,
 
+    /// Password to encrypt identity file(s)
     #[clap(flatten)]
     pub password: PasswordArgs,
 }
 
 impl IdentityFileArgs {
-    /// read files from given directory or file path
+    /// read identity files from given directory or file path
     pub fn get_files(self) -> Vec<PathBuf> {
         let IdentityFileArgs {
             identity_from_directory,
@@ -189,6 +216,7 @@ impl IdentityFileArgs {
         files
     }
 
+    /// read identity files and return their Ethereum addresses
     pub fn to_addresses(self) -> Result<Vec<Address>, HelperErrors> {
         let files = self.clone().get_files();
 
@@ -211,6 +239,7 @@ impl IdentityFileArgs {
 /// CLI arguments for `hopli identity`
 #[derive(Parser, Clone, Debug)]
 pub struct IdentityArgs {
+    /// Possible actions around identity files
     #[clap(
         value_enum,
         long,
@@ -220,9 +249,11 @@ pub struct IdentityArgs {
     )]
     pub action: IdentityActionType,
 
+    /// Arguments to locate one or multiple identity file(s)
     #[clap(flatten)]
     local_identity: IdentityFileArgs,
 
+    /// Number of identities to be generated
     #[clap(
         help = "Number of identities to be generated, e.g. 1",
         long,
@@ -368,7 +399,7 @@ mod tests {
 
     #[test]
     fn ok_when_no_env_is_supplied_but_password_path_is_supplied() {
-        let path = "./tmp_exist_1";
+        let path = "./tmp_pwd_1";
         create_file(path, None, 0);
 
         let pk_args = PrivateKeyArgs {
@@ -384,7 +415,7 @@ mod tests {
 
     #[test]
     fn take_cli_password_path_when_both_cli_arg_and_env_are_supplied() {
-        let path = "./tmp_exist_1";
+        let path = "./tmp_pwd_2";
         create_file(path, None, 0);
 
         let pk_args = PrivateKeyArgs {

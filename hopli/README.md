@@ -92,7 +92,8 @@ To register nodes
 export PRIVATE_KEY=<bank_private_key> \
 hopli register-in-network-registry \
     --network anvil-localhost \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -104,18 +105,8 @@ IDENTITY_PASSWORD=switzerland \
 hopli register-in-network-registry \
     --network anvil-localhost \
     --use-local-identities --identity-directory "/tmp" \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Express stake + register + fund
-
-```
-PRIVATE_KEY=<bank_private_key> \
-hopli initialize-node --network anvil-localhost \
-    --identity-directory "/tmp" \
-    --password-path "/tmp/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
+    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -226,7 +217,8 @@ Register some peer ids in the network registry contract
 ```
 PRIVATE_KEY=<bank_private_key> \
     cargo run -- register-in-network-registry --network anvil-localhost \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -237,22 +229,12 @@ PRIVATE_KEY=<bank_private_key> \
 IDENTITY_PASSWORD=local \
     cargo run -- register-in-network-registry --network anvil-localhost \
     --use-local-identities --identity-directory "/tmp" \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts"
 ```
 
 > If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.networks."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
-
-Express stake + registry + fund for node identity
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- initialize-node --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "/test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
 
 Express create a safe and a module instances, then set default permissions
 
