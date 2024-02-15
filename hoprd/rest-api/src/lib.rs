@@ -1899,7 +1899,7 @@ mod messages {
         let args: GetMessageBodyRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
-        let inbox = inbox.write().await;
+        let inbox = inbox.read().await;
         let messages = inbox
             .peek_all(args.tag, args.timestamp)
             .await

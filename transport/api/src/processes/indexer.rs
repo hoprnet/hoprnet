@@ -70,14 +70,14 @@ impl IndexerActions {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
                         PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
                         PeerEligibility::Ineligible => {
-                            (*network.write().await).remove(&peer);
+                            network.write().await.remove(&peer);
                             IndexerProcessed::Ban(peer)
                         }
                     },
                     IndexerToProcess::Announce(peer, multiaddress) => IndexerProcessed::Announce(peer, multiaddress),
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
-                        let peers = (*network.read().await).get_all_peers();
+                        let peers = network.read().await.get_all_peers();
 
                         for peer in peers.into_iter() {
                             let is_allowed = {
@@ -112,7 +112,7 @@ impl IndexerActions {
                             let event = if is_allowed {
                                 IndexerProcessed::Allow(peer)
                             } else {
-                                (*network.write().await).remove(&peer);
+                                network.write().await.remove(&peer);
                                 IndexerProcessed::Ban(peer)
                             };
 
