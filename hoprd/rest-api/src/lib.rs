@@ -23,6 +23,7 @@ use tide::{
     utils::async_trait,
     Middleware, Next, Request, Response, StatusCode,
 };
+use tide_tracing::TraceMiddleware;
 use tide_websockets::{Message, WebSocket};
 use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
@@ -216,20 +217,14 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     }
 }
 
-/// Custom request logging middleware
-struct LogRequestMiddleware(tracing::log::Level);
+/// Custom prometheus recording middleware
+#[cfg(all(feature = "prometheus", not(test)))]
+struct PrometheusMetricsMiddleware;
 
+#[cfg(all(feature = "prometheus", not(test)))]
 #[async_trait]
-impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
-    async fn handle(&self, mut req: Request<T>, next: Next<'_, T>) -> tide::Result {
-        struct LogMiddlewareHasBeenRun;
-
-        if req.ext::<LogMiddlewareHasBeenRun>().is_some() {
-            return Ok(next.run(req).await);
-        }
-        req.set_ext(LogMiddlewareHasBeenRun);
-
-        let peer_addr = req.peer_addr().map(String::from);
+impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddleware {
+    async fn handle(&self, req: Request<T>, next: Next<'_, T>) -> tide::Result {
         let path = req.url().path().to_owned();
         let method = req.method().to_string();
 
@@ -239,26 +234,13 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
 
         let status = response.status();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            // We're not interested on metrics for other endpoints
-            if path.starts_with("/api/v3/") {
-                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
-            }
+        // We're not interested on metrics for non-functional
+        if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
+            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
         }
 
-        tracing::log::log!(
-            self.0,
-            r#"{} "{method} {path}" {status} {} {}ms"#,
-            peer_addr.as_deref().unwrap_or("-"),
-            response
-                .len()
-                .map(|l| l.to_string())
-                .unwrap_or_else(|| String::from("-")),
-            response_duration.as_millis()
-        );
-        Ok(response)
+        return Ok(response);
     }
 }
 
@@ -304,12 +286,14 @@ pub async fn run_hopr_api(
 
     let mut app = tide::with_state(state.clone());
 
-    app.with(LogRequestMiddleware(tracing::log::Level::Debug));
+    app.with(TraceMiddleware::new());
     app.with(
         CorsMiddleware::new()
             .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())
             .allow_origin(Origin::from("*")),
     );
+    #[cfg(all(feature = "prometheus", not(test)))]
+    app.with(PrometheusMetricsMiddleware);
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });

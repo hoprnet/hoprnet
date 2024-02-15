@@ -3437,7 +3437,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-broadcast",
  "async-std",
@@ -3456,6 +3456,7 @@ dependencies = [
  "smart-default",
  "strum 0.25.0",
  "tide",
+ "tide-tracing",
  "tide-websockets",
  "tracing",
  "utoipa",
@@ -7144,6 +7145,19 @@ dependencies = [
  "route-recognizer",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tide-tracing"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57ed02097f7a6827023cbc5899e392753273fa7f415181134309b5c343ff77d2"
+dependencies = [
+ "async-trait",
+ "tide",
+ "tracing",
+ "tracing-futures",
+ "uuid 1.7.0",
 ]
 
 [[package]]
