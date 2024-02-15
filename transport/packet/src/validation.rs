@@ -6,7 +6,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info, trace};
+use tracing::{debug, info, trace};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 #[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored

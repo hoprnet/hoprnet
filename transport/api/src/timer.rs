@@ -1,8 +1,8 @@
 use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
-use log::{trace, warn};
 use std::time::Duration;
+use tracing::{trace, warn};
 
 use async_std::task::sleep;
 

@@ -22,7 +22,7 @@ void = "1"          # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
 core-protocol = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 
 [dev-dependencies]

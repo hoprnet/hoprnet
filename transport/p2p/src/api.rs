@@ -4,7 +4,7 @@ use libp2p::identity::PeerId;
 use std::pin::Pin;
 
 use core_network::messaging::ControlMessage;
-use log::error;
+use tracing::error;
 
 use crate::errors::{P2PError, Result};
 

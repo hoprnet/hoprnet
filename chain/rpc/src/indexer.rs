@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
 use futures::{Stream, StreamExt, TryStreamExt};
-use log::{debug, warn};
-use log::{error, trace};
 use std::pin::Pin;
+use tracing::{debug, warn};
+use tracing::{error, trace};
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
@@ -175,7 +175,7 @@ mod test {
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use log::debug;
+    use tracing::debug;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

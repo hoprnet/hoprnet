@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};

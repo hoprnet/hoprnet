@@ -75,7 +75,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 

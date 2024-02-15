@@ -1067,12 +1067,12 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "mockall",
  "multiaddr",
  "serde",
  "smart-default",
  "thiserror",
+ "tracing",
  "utils-db",
 ]
 
@@ -1093,10 +1093,10 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
- "log",
  "serde",
  "smart-default",
  "thiserror",
+ "tracing",
  "utils-db",
 ]
 
@@ -1112,8 +1112,8 @@ dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "mockall",
+ "tracing",
  "utils-db",
 ]
 
@@ -1128,7 +1128,6 @@ dependencies = [
  "chain-db",
  "chain-rpc",
  "chain-types",
- "env_logger",
  "ethers",
  "futures",
  "hex-literal",
@@ -1137,12 +1136,12 @@ dependencies = [
  "hopr-metrics",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "mockall",
  "multiaddr",
  "primitive-types",
  "smart-default",
  "thiserror",
+ "tracing",
  "utils-db",
 ]
 
@@ -1164,7 +1163,6 @@ dependencies = [
  "hopr-primitive-types",
  "http-types",
  "lazy_static",
- "log",
  "mockall",
  "mockito",
  "primitive-types",
@@ -1173,6 +1171,7 @@ dependencies = [
  "smart-default",
  "surf",
  "thiserror",
+ "tracing",
  "validator",
 ]
 
@@ -1188,10 +1187,10 @@ dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
  "libp2p-identity",
- "log",
  "multiaddr",
  "serde",
  "strum 0.25.0",
+ "tracing",
 ]
 
 [[package]]
@@ -1469,7 +1468,6 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
- "log",
  "mockall",
  "more-asserts",
  "multiaddr",
@@ -1478,6 +1476,7 @@ dependencies = [
  "smart-default",
  "strum 0.25.0",
  "thiserror",
+ "tracing",
  "validator",
 ]
 
@@ -1493,9 +1492,9 @@ dependencies = [
  "hopr-internal-types",
  "libp2p",
  "libp2p-mplex",
- "log",
  "serde",
  "thiserror",
+ "tracing",
  "void",
 ]
 
@@ -1515,10 +1514,10 @@ dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "mockall",
  "parameterized",
  "thiserror",
+ "tracing",
  "typenum",
  "utils-db",
 ]
@@ -1540,11 +1539,11 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
- "log",
  "petgraph",
  "regex",
  "serde",
  "thiserror",
+ "tracing",
  "utils-db",
 ]
 
@@ -1572,7 +1571,6 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "libp2p-identity",
- "log",
  "more-asserts",
  "parameterized",
  "rust-stream-ext-concurrent",
@@ -1581,6 +1579,7 @@ dependencies = [
  "serial_test",
  "smart-default",
  "thiserror",
+ "tracing",
  "utils-db",
  "validator",
 ]
@@ -1608,7 +1607,6 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "mockall",
  "rand 0.8.5",
  "semver 1.0.21",
@@ -1617,6 +1615,7 @@ dependencies = [
  "smart-default",
  "strum 0.25.0",
  "thiserror",
+ "tracing",
  "utils-db",
  "validator",
 ]
@@ -1644,12 +1643,12 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "libp2p",
- "log",
  "multiaddr",
  "proc-macro-regex",
  "serde",
  "smart-default",
  "thiserror",
+ "tracing",
  "utils-db",
  "validator",
 ]
@@ -3236,11 +3235,12 @@ dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
  "hoprd-keypair",
- "log",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3291,7 +3291,6 @@ dependencies = [
  "hopr-primitive-types",
  "k256",
  "libp2p-identity",
- "log",
  "primitive-types",
  "serde",
  "serde_bytes",
@@ -3299,6 +3298,7 @@ dependencies = [
  "sha3",
  "subtle",
  "thiserror",
+ "tracing",
  "typenum",
  "zeroize",
 ]
@@ -3317,7 +3317,6 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "multiaddr",
  "serde",
  "serde_bytes",
@@ -3325,6 +3324,7 @@ dependencies = [
  "smart-default",
  "strum 0.25.0",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -3344,7 +3344,6 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-transport",
- "env_logger",
  "ethers",
  "futures",
  "hopr-crypto-types",
@@ -3353,7 +3352,6 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "log",
  "semver 1.0.21",
  "serde",
  "serde_json",
@@ -3362,6 +3360,7 @@ dependencies = [
  "smart-default",
  "strum 0.25.0",
  "thiserror",
+ "tracing",
  "utils-db",
  "validator",
 ]
@@ -3424,7 +3423,6 @@ dependencies = [
  "hoprd-keypair",
  "humantime",
  "lazy_static",
- "log",
  "proc-macro-regex",
  "serde",
  "serde_json",
@@ -3432,12 +3430,14 @@ dependencies = [
  "strum 0.25.0",
  "tempfile",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
  "validator",
 ]
 
 [[package]]
 name = "hoprd-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-broadcast",
  "async-std",
@@ -3450,14 +3450,15 @@ dependencies = [
  "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
- "log",
  "serde",
  "serde_json",
  "serde_with",
  "smart-default",
  "strum 0.25.0",
  "tide",
+ "tide-tracing",
  "tide-websockets",
+ "tracing",
  "utoipa",
  "utoipa-swagger-ui",
  "validator",
@@ -3490,13 +3491,13 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-platform",
  "hopr-primitive-types",
- "log",
  "scrypt 0.11.0",
  "serde",
  "serde_json",
  "sha3",
  "tempfile",
  "thiserror",
+ "tracing",
  "typenum",
  "uuid 1.6.1",
 ]
@@ -4406,6 +4407,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffbee8634e0d45d258acb448e7eaab3fce7a0a467395d4d9f228e3c1f01fb2e4"
 
 [[package]]
+name = "matchers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
+dependencies = [
+ "regex-automata 0.1.10",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4680,6 +4690,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
+name = "nu-ansi-term"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
+dependencies = [
+ "overload",
+ "winapi",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4858,6 +4878,12 @@ dependencies = [
  "serde",
  "winapi",
 ]
+
+[[package]]
+name = "overload"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "parameterized"
@@ -5559,8 +5585,17 @@ checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata",
+ "regex-automata 0.4.3",
  "regex-syntax 0.8.2",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
+dependencies = [
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -6321,6 +6356,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded-slab"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "shell-words"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7073,6 +7117,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "thread_local"
+version = "1.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+]
+
+[[package]]
 name = "tide"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7091,6 +7145,19 @@ dependencies = [
  "route-recognizer",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tide-tracing"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57ed02097f7a6827023cbc5899e392753273fa7f415181134309b5c343ff77d2"
+dependencies = [
+ "async-trait",
+ "tide",
+ "tracing",
+ "tracing-futures",
+ "uuid 1.6.1",
 ]
 
 [[package]]
@@ -7352,6 +7419,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
+ "valuable",
 ]
 
 [[package]]
@@ -7362,6 +7430,35 @@ checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
  "pin-project",
  "tracing",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
+dependencies = [
+ "matchers",
+ "nu-ansi-term",
+ "once_cell",
+ "regex",
+ "sharded-slab",
+ "smallvec",
+ "thread_local",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]
@@ -7583,7 +7680,6 @@ dependencies = [
  "hex-literal",
  "hopr-platform",
  "hopr-primitive-types",
- "log",
  "mockall",
  "pin-project-lite 0.2.13",
  "rusty-leveldb",
@@ -7592,6 +7688,7 @@ dependencies = [
  "sqlx",
  "tempfile",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -7694,6 +7791,12 @@ dependencies = [
  "proc-macro2",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "value-bag"

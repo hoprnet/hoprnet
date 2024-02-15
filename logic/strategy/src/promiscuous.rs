@@ -23,8 +23,8 @@
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
 use std::collections::HashMap;
+use tracing::{debug, error, info, warn};
 
 use async_lock::RwLock;
 use async_trait::async_trait;

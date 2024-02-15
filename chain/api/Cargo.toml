@@ -30,7 +30,7 @@ chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

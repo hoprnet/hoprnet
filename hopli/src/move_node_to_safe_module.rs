@@ -9,8 +9,8 @@ use clap::Parser;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
-use log::{log, Level};
 use std::{env, str::FromStr};
+use tracing::{debug, info};
 
 /// CLI arguments for `hopli move-node-to-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -70,7 +70,7 @@ impl MoveNodeToSafeModuleArgs {
             .map(|ni| ni.chain_key.public().to_address().to_string())
             .collect();
 
-        log!(target: "move_node_to_safe_module", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
+        info!(target: "move_node_to_safe_module", "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // 3. parse safe and module address
         let parsed_safe_addr = if safe_address.starts_with("0x") {
@@ -89,7 +89,7 @@ impl MoveNodeToSafeModuleArgs {
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;
 
-        log!(target: "move_node_to_safe_module", Level::Debug, "Calling foundry...");
+        debug!(target: "move_node_to_safe_module", "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_move_node_to_safe_module(
             &network,

@@ -35,7 +35,6 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -45,6 +44,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;

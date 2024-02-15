@@ -28,13 +28,12 @@ chain-db = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true}
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-env_logger = { workspace = true }
 hex-literal = "0.4"
 mockall = "0.11"
 primitive-types = "0.12.2"
