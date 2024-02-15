@@ -195,11 +195,13 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            let mut net = network.write().await;
-                            if ! net.has(&peer) {
-                                debug!("Network event: registering peer '{peer}'");
-                                net.add(&peer, PeerOrigin::NetworkRegistry);
-                                net.store_peer_multiaddresses(&peer, mas.clone());
+                            {
+                                let mut net = network.write().await;
+                                if ! net.has(&peer) {
+                                    debug!("Network event: registering peer '{peer}'");
+                                    net.add(&peer, PeerOrigin::NetworkRegistry);
+                                    net.store_peer_multiaddresses(&peer, mas.clone());
+                                }
                             }
 
                             transport_indexer_actions
@@ -259,7 +261,8 @@ where
                     }
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    match db.read().await.get_packet_key(&address).await {
+                    let packet_key = db.read().await.get_packet_key(&address).await;
+                    match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 let peer_id = pk.into();

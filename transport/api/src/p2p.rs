@@ -550,11 +550,12 @@ pub async fn p2p_loop(
                     // concurrent_dial_errors,
                     // established_in,
                 } => {
+                    // TODO: async await in the event dispatch loop can block it, the await should be removed
                     debug!("Connection established with {:?}", peer_id);
                     if allowed_peers.contains(&peer_id) {
-                        let mut net = network.write().await;
-                        if ! net.has(&peer_id) {
-                            net.add(&peer_id, PeerOrigin::IncomingConnection)
+                        let has_peer = network.read().await.has(&peer_id);
+                        if !has_peer {
+                            network.write().await.add(&peer_id, PeerOrigin::IncomingConnection)
                         }
                     } else {
                         info!("DISCONNECTING (based on network registry) Peer ID '{:?}'", peer_id);

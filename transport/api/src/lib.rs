@@ -368,7 +368,8 @@ impl HoprTransport {
 
         pin_mut!(timeout, ping);
 
-        if !self.network.read().await.has(peer) {
+        let has_peer = self.network.read().await.has(peer);
+        if !has_peer {
             self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
