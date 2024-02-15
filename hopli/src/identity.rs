@@ -80,6 +80,7 @@ impl PrivateKeyArgs {
 }
 
 /// Arguments for password.
+///
 /// Password is used for encrypting an identity file
 /// Password can be passed as an environment variable `IDENTITY_PASSWORD`, or
 /// in a file of which the path is supplied in `--password_path`
