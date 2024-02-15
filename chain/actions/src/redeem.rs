@@ -28,9 +28,9 @@ use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 use utils_db::errors::DbError;
 
 use crate::action_queue::{ActionSender, PendingAction};

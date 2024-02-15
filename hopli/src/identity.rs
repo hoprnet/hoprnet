@@ -4,9 +4,9 @@ use crate::password::PasswordArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
 use hoprd_keypair::key_pair::HoprKeys;
-use tracing::{debug, error, info};
 use std::collections::HashMap;
 use std::str::FromStr;
+use tracing::{debug, error, info};
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum IdentityActionType {

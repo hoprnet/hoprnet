@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+use tracing::info;
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;

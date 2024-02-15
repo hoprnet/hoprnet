@@ -835,9 +835,9 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use tracing::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
+    use tracing::debug;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {

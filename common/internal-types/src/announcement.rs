@@ -1,8 +1,8 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::debug;
 use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
+use tracing::debug;
 
 /// Holds the signed binding of the chain key and the packet key.
 ///

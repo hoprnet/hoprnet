@@ -11,8 +11,8 @@ use ethers::{
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use hopr_crypto_types::keypairs::Keypair;
-use tracing::{log::log, log::Level};
 use std::env;
+use tracing::{log::log, log::Level};
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]

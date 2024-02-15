@@ -66,8 +66,8 @@ use futures::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use tracing::{debug, info, warn};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};

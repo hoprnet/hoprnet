@@ -15,8 +15,8 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::PeerAddressResolver;
 use hopr_primitive_types::primitives::Address;
-use tracing::error;
 use std::sync::Arc;
+use tracing::error;
 use utils_db::CurrentDbShim;
 
 // TODO: use internally a LRU cache

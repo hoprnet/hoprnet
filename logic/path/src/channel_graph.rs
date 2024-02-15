@@ -2,13 +2,13 @@ use crate::errors::Result;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use tracing::{debug, info};
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use tracing::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {

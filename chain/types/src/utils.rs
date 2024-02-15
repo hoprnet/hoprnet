@@ -15,9 +15,9 @@ use ethers::utils::keccak256;
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
-use tracing::debug;
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::debug;
 
 // define basic safe abi
 abigen!(

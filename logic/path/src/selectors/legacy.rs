@@ -5,11 +5,11 @@ use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::warn;
 use petgraph::visit::EdgeRef;
 use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
+use tracing::warn;
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]

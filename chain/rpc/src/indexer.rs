@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
 use futures::{Stream, StreamExt, TryStreamExt};
+use std::pin::Pin;
 use tracing::{debug, warn};
 use tracing::{error, trace};
-use std::pin::Pin;
 
 use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
