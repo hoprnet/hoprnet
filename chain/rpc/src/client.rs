@@ -66,6 +66,9 @@ lazy_static::lazy_static! {
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
 /// specified in `retryable_http_errors`.
 ///
+/// The total wait time will be `(initial_backoff/backoff_coefficient) * ((1 + backoff_coefficient)^max_retries - 1)`.
+/// or `max_backoff`, whatever is lower.
+///
 /// Transport and connection errors (such as connection timeouts) are retried without backoff
 /// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
 ///
@@ -77,9 +80,9 @@ pub struct SimpleJsonRpcRetryPolicy {
     ///
     /// If `None` is given, will keep retrying indefinitely.
     ///
-    /// Default is 10.
+    /// Default is 7.
     #[validate(range(min = 1))]
-    #[default(Some(10))]
+    #[default(Some(7))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
     ///
