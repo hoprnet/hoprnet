@@ -211,10 +211,16 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        self.network
+        let all_peers = self
+            .network
             .read()
             .await
             .all_peers()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        all_peers
             .into_iter()
             .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
                 Ok(offchain_key) => {
