@@ -9,6 +9,7 @@
 //! For details on the Indexer see the `chain-indexer` crate.
 use async_stream::stream;
 use async_trait::async_trait;
+use ethers::prelude::{LogQueryError, ProviderError};
 use ethers::providers::{JsonRpcClient, Middleware};
 use ethers::types::BlockNumber;
 use futures::{Stream, StreamExt, TryStreamExt};
@@ -30,6 +31,17 @@ lazy_static::lazy_static! {
             "hopr_chain_head_block_number",
             "Current block number of chain head",
     ).unwrap();
+}
+
+fn is_missing_block_error(err: LogQueryError<ProviderError>) -> bool {
+    match err {
+        LogQueryError::LoadLastBlockError(ProviderError::JsonRpcClientError(e))
+        | LogQueryError::LoadLogsError(ProviderError::JsonRpcClientError(e)) => e
+            .as_error_response()
+            .map(|rpc_err| rpc_err.code == -32001)
+            .unwrap_or(false),
+        _ => false,
+    }
 }
 
 #[async_trait]
@@ -132,6 +144,14 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     break;
                                 },
                                 Err(e) => {
+                                    // Workaround for some RPC providers complaining about
+                                    // ethers pagination algorithm that might be requesting blocks
+                                    // from the outside of the given range (in future).
+                                    if is_missing_block_error(e) {
+                                        warn!("pagination requested future blocks when processing range #{from_block} - #{latest_block}");
+                                        break;
+                                    }
+
                                     error!("failure when processing blocks from RPC: {e}");
                                     count_failures += 1;
 

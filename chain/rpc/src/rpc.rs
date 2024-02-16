@@ -46,19 +46,19 @@ pub struct RpcOperationsConfig {
     pub expected_block_time: Duration,
     /// Minimum size of the block range where batch fetch query should be used.
     ///
-    /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
+    /// For block ranges smaller than this size, the ordinary `eth_getLogs` will be called without pagination.
     ///
-    /// Defaults to 3.
+    /// Defaults to 100.
     #[validate(range(min = 1))]
-    #[default = 3]
+    #[default = 100]
     pub min_block_range_fetch_size: u64,
     /// The largest amount of blocks to fetch at once when fetching a range of blocks.
     ///
     /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
     ///
-    /// Defaults to 2500 blocks
+    /// Defaults to 2000 blocks
     #[validate(range(min = 1))]
-    #[default = 1000]
+    #[default = 2000]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
     ///
