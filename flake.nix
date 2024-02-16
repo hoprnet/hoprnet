@@ -153,6 +153,7 @@
                 "/bin/hoprd"
               ];
               Env = [
+                "NO_COLOR=true"     # suppress colored log output
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
               ];
@@ -178,6 +179,7 @@
               Env = [
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
+                "NO_COLOR=true"     # suppress colored log output
                 "ETHERSCAN_API_KEY=placeholder"
                 "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
@@ -207,6 +209,7 @@
                 "/bin/hoprd"
               ];
               Env = [
+                "NO_COLOR=true"     # suppress colored log output
                 "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
                 "RUST_BACKTRACE=full"
               ];
