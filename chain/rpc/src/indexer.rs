@@ -33,7 +33,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-fn is_missing_block_error(err: LogQueryError<ProviderError>) -> bool {
+fn is_missing_block_error(err: &LogQueryError<ProviderError>) -> bool {
     match err {
         LogQueryError::LoadLastBlockError(ProviderError::JsonRpcClientError(e))
         | LogQueryError::LoadLogsError(ProviderError::JsonRpcClientError(e)) => e
@@ -147,7 +147,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     // Workaround for some RPC providers complaining about
                                     // ethers pagination algorithm that might be requesting blocks
                                     // from the outside of the given range (in future).
-                                    if is_missing_block_error(e) {
+                                    if is_missing_block_error(&e) {
                                         warn!("pagination requested future blocks when processing range #{from_block} - #{latest_block}");
                                         break;
                                     }
