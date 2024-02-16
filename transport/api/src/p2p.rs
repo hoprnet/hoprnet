@@ -500,7 +500,7 @@ pub async fn p2p_loop(
                 })) => {
                     trace!("transport protocol - p2p - heartbeat - received a Ping request from '{peer}' (#{request_id})");
                     let challenge_response = api::HeartbeatResponder::generate_challenge_response(&request.0);
-                    if let Err(_) = swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())) {
+                    if swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())).is_err() {
                         error!("transport protocol - p2p - heartbeat - failed to reply to ping request");
                     };
                 },
