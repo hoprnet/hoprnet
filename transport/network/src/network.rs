@@ -187,7 +187,6 @@ impl PeerStatus {
             peer_version: None,
             quality_avg: SingleSumSMA::new(quality_window),
             multiaddresses: vec![],
-            version: None,
         }
     }
 
