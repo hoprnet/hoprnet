@@ -30,5 +30,6 @@ pub mod network;
 /// Implementation of the pinging mechanism used by the [heartbeat] and manual pings.
 pub mod ping;
 mod backend;
+mod traits;
 
 pub use libp2p_identity::PeerId;

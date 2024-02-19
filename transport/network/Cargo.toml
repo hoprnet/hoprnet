@@ -16,7 +16,8 @@ futures-lite = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
-sea-query = { version = "0", default-features = false, features = ["derive", "backend-sqlite", "with-chrono"]}
+sea-query = { version = "0", default-features = false, features = ["derive", "backend-sqlite", "with-chrono", "attr"]}
+sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite", "runtime-async-std-rustls"]}
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }

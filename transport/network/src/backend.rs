@@ -1,11 +1,14 @@
 use async_trait::async_trait;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use sea_query::{ColumnDef, SqliteQueryBuilder, Table};
+use sea_query::{ColumnDef, Query, SqliteQueryBuilder, Table};
+use sea_query::ConditionExpression::SimpleExpr;
+use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Serialize};
 
-use crate::network::{NetworkBackend, PeerOrigin, PeerStatus, Stats};
-use crate::ping::PingResult;
+use crate::network::{PeerOrigin, PeerStatus};
+use crate::traits::{NetworkBackend, Stats};
+use crate::errors::Result;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SqliteNetworkBackendConfig {
@@ -27,13 +30,13 @@ impl SqliteNetworkBackend {
             .table(NetworkPeersTable::Table)
             .if_not_exists()
             .col(ColumnDef::new(NetworkPeersTable::Id).integer().not_null().auto_increment().primary_key())
-            .col(ColumnDef::new(NetworkPeersTable::PeerId).string().unique_key())
-            .col(ColumnDef::new(NetworkPeersTable::MultiAddresses).string())
-            .col(ColumnDef::new(NetworkPeersTable::Origin).tiny_integer())
+            .col(ColumnDef::new(NetworkPeersTable::PeerId).string().not_null().unique_key())
+            .col(ColumnDef::new(NetworkPeersTable::MultiAddresses).string().not_null())
+            .col(ColumnDef::new(NetworkPeersTable::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeersTable::PeerVersion).string_len(20))
             .col(ColumnDef::new(NetworkPeersTable::LastSeenLatency).timestamp())
             .col(ColumnDef::new(NetworkPeersTable::LastSeenLatency).integer())
-            .col(ColumnDef::new(NetworkPeersTable::Ignored).boolean())
+            .col(ColumnDef::new(NetworkPeersTable::Ignored).boolean().not_null().default(false))
             .col(ColumnDef::new(NetworkPeersTable::Quality).float())
             .col(ColumnDef::new(NetworkPeersTable::QualitySMA).binary())
             .col(ColumnDef::new(NetworkPeersTable::Backoff).float())
@@ -70,27 +73,44 @@ pub enum NetworkPeersTable {
 
 #[async_trait]
 impl NetworkBackend for SqliteNetworkBackend {
-    async fn add(&self, origin: PeerOrigin, mas: Vec<Multiaddr>) {
+    async fn add(&self, peer: &PeerId, origin: PeerOrigin, mas: Vec<Multiaddr>) -> Result<()> {
+        let (sql, values) = Query::insert()
+            .into_table(NetworkPeersTable::Table)
+            .columns([
+                NetworkPeersTable::PeerId,
+                NetworkPeersTable::MultiAddresses,
+                NetworkPeersTable::Origin
+            ])
+            .values_panic([
+                peer.to_base58().into(),
+                mas.iter().map(|ma| ma.to_string()).collect::<Vec<_>>().join(",").into(),
+                (origin as u8).into()
+            ])
+            .build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values).execute(&self.db)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn remove(&self, peer: &PeerId) -> Result<()> {
         todo!()
     }
 
-    async fn remove(&self, peer: &PeerId) {
+    async fn update(&self, peer: &PeerId, new_status: &PeerStatus) -> Result<()> {
         todo!()
     }
 
-    async fn update(&self, peer: &PeerId, new_status: &PeerStatus) {
+    async fn get(&self, peer: &PeerId) -> Result<PeerStatus> {
         todo!()
     }
 
-    async fn get(&self, peer: &PeerId) -> PeerStatus {
+    async fn get_multiple<F: FnOnce() -> T + Send + Sync, T: Send + Sync>(&self, filter: F) -> Result<Vec<T>> {
         todo!()
     }
 
-    async fn get_multiple<F: FnOnce() -> T + Send + Sync, T: Send + Sync>(&self, filter: F) -> Vec<T> {
-        todo!()
-    }
-
-    async fn stats(&self) -> Stats {
+    async fn stats(&self) -> Result<Stats> {
         todo!()
     }
 }

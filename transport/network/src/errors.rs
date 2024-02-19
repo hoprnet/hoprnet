@@ -12,6 +12,9 @@ pub enum NetworkingError {
     #[error("error while decoding message data")]
     DecodingError,
 
+    #[error("backend error: {0}")]
+    BackendError(#[from] sqlx::Error),
+
     #[error("{0}")]
     Other(String),
 }

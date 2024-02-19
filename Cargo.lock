@@ -1472,6 +1472,7 @@ dependencies = [
  "more-asserts",
  "multiaddr",
  "sea-query",
+ "sea-query-binder",
  "serde",
  "serde_with",
  "smart-default",
@@ -1891,12 +1892,36 @@ dependencies = [
 
 [[package]]
 name = "darling"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b750cb3417fd1b327431a470f388520309479ab0bf5e323505daf0290cd3850"
+dependencies = [
+ "darling_core 0.14.4",
+ "darling_macro 0.14.4",
+]
+
+[[package]]
+name = "darling"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
 dependencies = [
- "darling_core",
- "darling_macro",
+ "darling_core 0.20.3",
+ "darling_macro 0.20.3",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "109c1ca6e6b7f82cc233a97004ea8ed7ca123a9af07a8230878fcfda9b158bf0"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1915,11 +1940,22 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
+dependencies = [
+ "darling_core 0.14.4",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "darling_macro"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
 dependencies = [
- "darling_core",
+ "darling_core 0.20.3",
  "quote",
  "syn 2.0.48",
 ]
@@ -5926,6 +5962,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
+dependencies = [
+ "base64 0.21.7",
+]
+
+[[package]]
 name = "rustls-webpki"
 version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6074,7 +6119,31 @@ checksum = "4166a1e072292d46dc91f31617c2a1cdaf55a8be4b5c9f4bf2ba248e3ac4999b"
 dependencies = [
  "chrono",
  "inherent",
+ "sea-query-attr",
  "sea-query-derive",
+]
+
+[[package]]
+name = "sea-query-attr"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "878cf3d57f0e5bfacd425cdaccc58b4c06d68a7b71c63fc28710a20c88676808"
+dependencies = [
+ "darling 0.14.4",
+ "heck",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "sea-query-binder"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36bbb68df92e820e4d5aeb17b4acd5cc8b5d18b2c36a4dd6f4626aabfa7ab1b9"
+dependencies = [
+ "chrono",
+ "sea-query",
+ "sqlx",
 ]
 
 [[package]]
@@ -6265,7 +6334,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93634eb5f75a2323b16de4748022ac4297f9e76b6dced2be287a099f41b5e788"
 dependencies = [
- "darling",
+ "darling 0.20.3",
  "proc-macro2",
  "quote",
  "syn 2.0.48",
@@ -6635,6 +6704,7 @@ dependencies = [
  "atoi",
  "byteorder",
  "bytes 1.5.0",
+ "chrono",
  "crc 3.0.1",
  "crossbeam-queue",
  "dotenvy",
@@ -6653,6 +6723,8 @@ dependencies = [
  "once_cell",
  "paste",
  "percent-encoding",
+ "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -6661,6 +6733,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "url",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -6695,6 +6768,8 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "sqlx-core",
+ "sqlx-mysql",
+ "sqlx-postgres",
  "sqlx-sqlite",
  "syn 1.0.109",
  "tempfile",
@@ -6712,6 +6787,7 @@ dependencies = [
  "bitflags 2.4.2",
  "byteorder",
  "bytes 1.5.0",
+ "chrono",
  "crc 3.0.1",
  "digest 0.10.7",
  "dotenvy",
@@ -6732,6 +6808,7 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "rsa",
+ "serde",
  "sha1 0.10.6",
  "sha2 0.10.8",
  "smallvec",
@@ -6752,6 +6829,7 @@ dependencies = [
  "base64 0.21.7",
  "bitflags 2.4.2",
  "byteorder",
+ "chrono",
  "crc 3.0.1",
  "dotenvy",
  "etcetera",
@@ -6788,6 +6866,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "210976b7d948c7ba9fced8ca835b11cbb2d677c59c79de41ac0d397e14547490"
 dependencies = [
  "atoi",
+ "chrono",
  "flume 0.11.0",
  "futures-channel",
  "futures-core",
