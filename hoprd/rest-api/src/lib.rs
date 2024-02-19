@@ -931,7 +931,7 @@ mod peers {
                         reported_version: hopr
                             .network_peer_info(&peer)
                             .await
-                            .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                            .and_then(|p| p.peer_version)
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
@@ -2375,11 +2375,7 @@ mod node {
                 quality: info.get_average_quality(),
                 backoff: info.backoff,
                 is_new: info.heartbeats_sent == 0u64,
-                reported_version: info
-                    .metadata()
-                    .get(&"protocol_version".to_owned())
-                    .cloned()
-                    .unwrap_or("UNKNOWN".to_string()),
+                reported_version: info.peer_version.unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
             .await;

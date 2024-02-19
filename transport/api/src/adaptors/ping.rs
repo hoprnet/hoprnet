@@ -42,17 +42,11 @@ impl<R: PeerAddressResolver> PingExternalInteractions<R> {
 #[async_trait]
 impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExternalInteractions<R> {
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
-        // This logic deserves a larger refactor of the entire heartbeat mechanism, but
-        // for now it is suffcient to fill out metadata only on successful pongs.
-        let metadata = if result.is_ok() {
-            let mut map = std::collections::HashMap::new();
-            map.insert(PEER_METADATA_PROTOCOL_VERSION.to_owned(), version);
-            Some(map)
-        } else {
-            None
-        };
-
-        let updated = self.network.write().await.update_with_metadata(peer, result, metadata);
+        let updated = self
+            .network
+            .write()
+            .await
+            .update_with_version(peer, result, result.is_ok().then_some(version));
 
         if let Some(status) = updated {
             debug!(

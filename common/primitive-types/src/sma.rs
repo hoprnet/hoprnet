@@ -110,6 +110,15 @@ where
     }
 }
 
+impl<'a, T, D> IntoIterator for &'a NoSumSMA<T, D> {
+    type Item = &'a T;
+    type IntoIter = <&'a ringbuffer::AllocRingBuffer<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.window).into_iter()
+    }
+}
+
 /// Basic implementation of Simple Moving Average (SMA).
 ///
 /// The maximum window size is bound by 2^32 - 1.
@@ -195,6 +204,15 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.average().unwrap_or_default())
+    }
+}
+
+impl<'a, T, D> IntoIterator for &'a SingleSumSMA<T, D> {
+    type Item = &'a T;
+    type IntoIter = <&'a ringbuffer::AllocRingBuffer<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.window).into_iter()
     }
 }
 

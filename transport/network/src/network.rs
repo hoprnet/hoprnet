@@ -144,6 +144,12 @@ pub trait NetworkExternalActions {
     fn emit(&self, event: NetworkEvent);
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PeerGoodness {
+    Bad = 0,
+    Good = 1,
+}
+
 /// Status of the peer as recorded by the [Network].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
@@ -152,12 +158,14 @@ pub struct PeerStatus {
     pub is_public: bool,
     pub last_seen: u64,         // timestamp
     pub last_seen_latency: u64, // duration in ms
-    quality: f64,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    quality_avg: SingleSumSMA<f64>,
-    metadata: HashMap<String, String>,
+    pub ignored: bool,
+    pub peer_goodness: PeerGoodness,
+    pub peer_version: Option<String>,
+    pub(crate) quality: f64,
+    pub(crate) quality_avg: SingleSumSMA<f64>,
 }
 
 impl PeerStatus {
@@ -170,9 +178,11 @@ impl PeerStatus {
             heartbeats_succeeded: 0,
             last_seen: 0,
             last_seen_latency: 0,
+            ignored: false,
+            peer_goodness: PeerGoodness::Bad,
             backoff,
             quality: 0.0,
-            metadata: HashMap::new(),
+            peer_version: None,
             quality_avg: SingleSumSMA::new(quality_window),
         }
     }
@@ -185,11 +195,6 @@ impl PeerStatus {
         } else {
             warn!("Quality failed to update with value outside the [0,1] range")
         }
-    }
-
-    /// Gets metadata associated with the peer
-    pub fn metadata(&self) -> &HashMap<String, String> {
-        &self.metadata
     }
 
     /// Gets the average quality of this peer
@@ -330,32 +335,21 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Update the PeerId record in the network
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::ping::PingResult) {
-        self.update_with_metadata(peer, ping_result, None);
+        self.update_with_version(peer, ping_result, None);
     }
 
     /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
-    pub fn update_with_metadata(
+    pub fn update_with_version(
         &mut self,
         peer: &PeerId,
         ping_result: crate::ping::PingResult,
-        metadata: Option<HashMap<String, String>>,
+        version: Option<String>,
     ) -> Option<PeerStatus> {
         if let Some(existing) = self.entries.get(peer) {
             let mut entry = existing.clone();
             entry.heartbeats_sent += 1;
             entry.is_public = self.network_actions_api.is_public(peer);
-
-            // Upsert metadata if any
-            if let Some(mm) = metadata {
-                mm.into_iter().for_each(|(k, v)| match entry.metadata.entry(k) {
-                    Entry::Occupied(val) => {
-                        *val.into_mut() = v.clone();
-                    }
-                    Entry::Vacant(vac) => {
-                        vac.insert(v);
-                    }
-                });
-            }
+            entry.peer_version = version;
 
             if let Ok(latency) = ping_result {
                 entry.last_seen = current_time().as_unix_timestamp().as_millis() as u64;
@@ -644,7 +638,7 @@ mod tests {
             let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
 
             peers.add(&peer, PeerOrigin::IncomingConnection);
-            peers.update_with_metadata(
+            peers.update_with_version(
                 &peer,
                 Ok(current_time().as_unix_timestamp().as_millis() as u64),
                 Some([proto_version.clone(), other_metadata_1.clone()].into()),
@@ -663,7 +657,7 @@ mod tests {
         {
             let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
 
-            peers.update_with_metadata(
+            peers.update_with_version(
                 &peer,
                 Ok(ts),
                 Some([proto_version.clone(), other_metadata_2.clone()].into()),

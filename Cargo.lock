@@ -1458,6 +1458,7 @@ version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
+ "bincode",
  "futures",
  "futures-lite 1.13.0",
  "hopr-crypto-random",

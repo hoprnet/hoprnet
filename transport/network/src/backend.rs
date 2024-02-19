@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use sea_query::ConditionExpression::SimpleExpr;
-use sea_query::{ColumnDef, Query, SqliteQueryBuilder, Table};
+use sea_query::{ColumnDef, Expr, Query, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
-use crate::errors::Result;
+use crate::errors::{NetworkingError, Result};
 use crate::network::{PeerOrigin, PeerStatus};
 use crate::traits::{NetworkBackend, Stats};
 
@@ -45,7 +45,7 @@ impl SqliteNetworkBackend {
             .col(ColumnDef::new(NetworkPeersTable::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeersTable::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeersTable::PeerVersion).string_len(20))
-            .col(ColumnDef::new(NetworkPeersTable::LastSeenLatency).timestamp())
+            .col(ColumnDef::new(NetworkPeersTable::LastSeen).big_integer())
             .col(ColumnDef::new(NetworkPeersTable::LastSeenLatency).integer())
             .col(
                 ColumnDef::new(NetworkPeersTable::Ignored)
@@ -55,6 +55,7 @@ impl SqliteNetworkBackend {
             )
             .col(ColumnDef::new(NetworkPeersTable::Quality).float())
             .col(ColumnDef::new(NetworkPeersTable::QualitySMA).binary())
+            .col(ColumnDef::new(NetworkPeersTable::QualityEval).tiny_integer().default(0))
             .col(ColumnDef::new(NetworkPeersTable::Backoff).float())
             .col(ColumnDef::new(NetworkPeersTable::HeartbeatsSent).integer())
             .col(ColumnDef::new(NetworkPeersTable::HeartbeatsSuccessful).integer())
@@ -69,7 +70,7 @@ impl SqliteNetworkBackend {
     }
 }
 
-#[derive(sea_query::Iden)]
+#[derive(Debug, Clone, Copy, sea_query::Iden)]
 pub enum NetworkPeersTable {
     Table,
     Id,
@@ -82,6 +83,7 @@ pub enum NetworkPeersTable {
     Ignored,
     Quality,
     QualitySMA,
+    QualityEval,
     Backoff,
     HeartbeatsSent,
     HeartbeatsSuccessful,
@@ -104,17 +106,46 @@ impl NetworkBackend for SqliteNetworkBackend {
             ])
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
         sqlx::query_with(&sql, values).execute(&self.db).await?;
 
         Ok(())
     }
 
     async fn remove(&self, peer: &PeerId) -> Result<()> {
-        todo!()
+        let (sql, values) = Query::delete()
+            .from_table(NetworkPeersTable::Table)
+            .and_where(Expr::col(NetworkPeersTable::PeerId).eq(peer.to_base58()))
+            .build_sqlx(SqliteQueryBuilder);
+
+        trace!("about to execute network sql {query}", query = sql);
+        sqlx::query_with(&sql, values).execute(&self.db).await?;
+
+        Ok(())
     }
 
     async fn update(&self, peer: &PeerId, new_status: &PeerStatus) -> Result<()> {
-        todo!()
+        let quality_sma = bincode::serialize(&Vec::from_iter((&new_status.quality_avg).into_iter()))
+            .map_err(|e| NetworkingError::Other("cannot serialize sma".into()))?
+            .into_boxed_slice();
+
+        let (sql, values) = Query::update()
+            .table(NetworkPeersTable::Table)
+            .values([
+                (NetworkPeersTable::PeerVersion, new_status.peer_version.clone().into()),
+                (NetworkPeersTable::LastSeen, new_status.last_seen.into()),
+                (NetworkPeersTable::LastSeenLatency, new_status.last_seen_latency.into()),
+                (NetworkPeersTable::Quality, new_status.quality.into()),
+                (NetworkPeersTable::QualitySMA, quality_sma.as_ref().into()),
+                (NetworkPeersTable::Ignored, new_status.ignored.into()),
+            ])
+            .and_where(Expr::col(NetworkPeersTable::PeerId).eq(peer.to_base58()))
+            .build_sqlx(SqliteQueryBuilder);
+
+        trace!("about to execute network sql {query}", query = sql);
+        sqlx::query_with(&sql, values).execute(&self.db).await?;
+
+        Ok(())
     }
 
     async fn get(&self, peer: &PeerId) -> Result<PeerStatus> {

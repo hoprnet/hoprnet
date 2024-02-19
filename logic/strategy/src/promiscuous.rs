@@ -225,18 +225,18 @@ where
             .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
                 Ok(offchain_key) => {
                     // Do peer version matching against minimum required version by this strategy
-                    let reported_version = status.metadata().get(PEER_METADATA_PROTOCOL_VERSION);
-                    match reported_version.and_then(|v| semver::Version::from_str(v).ok()) {
+                    match status
+                        .peer_version
+                        .clone()
+                        .and_then(|v| semver::Version::from_str(&v).ok())
+                    {
                         Some(v) => self
                             .cfg
                             .minimum_peer_version
                             .matches(&v)
                             .then_some((offchain_key, status.get_average_quality())),
                         None => {
-                            debug!(
-                                "peer {} has invalid or missing version info: {:?}",
-                                status.id, reported_version
-                            );
+                            debug!("peer {} has invalid or missing version info", status.id);
                             None
                         }
                     }
@@ -569,7 +569,7 @@ mod tests {
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
                 let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
-                net.update_with_metadata(
+                net.update_with_version(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
                     Some(metadata.into()),
@@ -654,7 +654,7 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         // Peer 10 has an old node version
-        network.write().await.update_with_metadata(
+        network.write().await.update_with_version(
             &PEERS[9].1,
             Ok(current_time().as_unix_timestamp().as_millis() as u64),
             Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
