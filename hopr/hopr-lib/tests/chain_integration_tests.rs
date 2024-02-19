@@ -26,9 +26,9 @@ use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, info};
 use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use utils_db::db::DB;
 use utils_db::sqlite::SqliteShim;
@@ -237,8 +237,6 @@ async fn start_node_chain_logic(
 
 #[async_std::test]
 async fn integration_test_indexer() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
