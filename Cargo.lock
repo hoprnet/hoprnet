@@ -1472,6 +1472,7 @@ dependencies = [
  "mockall",
  "more-asserts",
  "multiaddr",
+ "num_enum",
  "sea-query",
  "sea-query-binder",
  "serde",

@@ -44,31 +44,32 @@ lazy_static::lazy_static! {
 pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
     #[serde_as(as = "DurationSeconds<u64>")]
-    min_delay: Duration,
+    pub min_delay: Duration,
 
     /// Maximum delay
     #[serde_as(as = "DurationSeconds<u64>")]
-    max_delay: Duration,
+    pub max_delay: Duration,
 
     #[validate(range(min = 0.0, max = 1.0))]
-    quality_bad_threshold: f64,
+    pub quality_bad_threshold: f64,
 
     #[validate(range(min = 0.0, max = 1.0))]
     pub quality_offline_threshold: f64,
-    quality_step: f64,
+
+    pub quality_step: f64,
 
     /// Size of the window for quality moving average
     #[validate(range(min = 1_u32))]
     pub quality_avg_window_size: u32,
 
     #[serde_as(as = "DurationSeconds<u64>")]
-    ignore_timeframe: Duration,
+    pub ignore_timeframe: Duration,
 
-    backoff_exponent: f64,
+    pub backoff_exponent: f64,
 
-    backoff_min: f64,
+    pub backoff_min: f64,
 
-    backoff_max: f64,
+    pub backoff_max: f64,
 }
 
 impl Default for NetworkConfig {
@@ -92,7 +93,8 @@ impl Default for NetworkConfig {
 }
 
 /// Actual origin - first occurence of the peer in the network mechanism
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[repr(u8)]
 pub enum PeerOrigin {
     #[strum(to_string = "node initialization")]
     Initialization = 0,
@@ -145,7 +147,8 @@ pub trait NetworkExternalActions {
     fn emit(&self, event: NetworkEvent);
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[repr(u8)]
 pub enum PeerGoodness {
     Bad = 0,
     Good = 1,
@@ -264,7 +267,7 @@ impl<T: NetworkExternalActions> Network<T> {
             me: my_peer_id,
             cfg: cfg.clone(),
             db: async_std::task::block_on(SqliteNetworkBackend::new(SqliteNetworkBackendConfig {
-                peer_quality_threshold: cfg.quality_bad_threshold,
+                network_options: cfg.clone(),
             })),
             events_to_emit: VecDeque::new(),
             entries: HashMap::new(),

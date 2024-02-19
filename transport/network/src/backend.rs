@@ -1,18 +1,22 @@
 use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use hopr_primitive_types::prelude::SingleSumSMA;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use sea_query::{ColumnDef, Expr, Order, Query, SqliteQueryBuilder, Table};
+use sea_query::{ColumnDef, Expr, Func, Order, Query, SimpleExpr, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use tracing::trace;
 
 use crate::errors::{NetworkingError, Result};
-use crate::network::{PeerGoodness, PeerOrigin, PeerStatus};
+use crate::network::{NetworkConfig, PeerGoodness, PeerOrigin, PeerStatus};
 use crate::traits::{NetworkBackend, Stats};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SqliteNetworkBackendConfig {
-    pub peer_quality_threshold: f64,
+    pub network_options: NetworkConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -78,9 +82,9 @@ struct NetworkPeers {
     peer_id: String,
     multi_addresses: String,
     origin: u8,
-    version: String,
+    version: Option<String>,
     last_seen: i64,
-    last_seen_latency: f64,
+    last_seen_latency: i64,
     ignored: bool,
     public: bool,
     quality: f64,
@@ -88,19 +92,40 @@ struct NetworkPeers {
     goodness: u8,
     backoff: f64,
     heartbeats_sent: i64,
-    heartbeats_successful: i64
+    heartbeats_successful: i64,
 }
 
-impl From<NetworkPeers> for PeerStatus {
-    fn from(value: NetworkPeers) -> Self {
-        todo!()
-    }
+fn peer_status_from_row(row: NetworkPeers, quality_avg_window_size: u32) -> Result<PeerStatus> {
+    let multiaddresses = row
+        .multi_addresses
+        .split(",")
+        .map(Multiaddr::try_from)
+        .collect::<core::result::Result<Vec<_>, multiaddr::Error>>()
+        .map_err(|_| NetworkingError::DecodingError)?;
+
+    let samples: Vec<f64> = bincode::deserialize(&row.quality_sma).map_err(|_| NetworkingError::DecodingError)?;
+
+    Ok(PeerStatus {
+        id: PeerId::from_str(&row.peer_id).map_err(|_| NetworkingError::DecodingError)?,
+        origin: PeerOrigin::try_from(row.origin).map_err(|_| NetworkingError::DecodingError)?,
+        is_public: row.public,
+        last_seen: row.last_seen as u64,
+        last_seen_latency: row.last_seen_latency as u64,
+        heartbeats_sent: row.heartbeats_sent as u64,
+        heartbeats_succeeded: row.heartbeats_successful as u64,
+        backoff: row.backoff,
+        ignored: row.ignored,
+        peer_goodness: PeerGoodness::try_from(row.goodness).map_err(|_| NetworkingError::DecodingError)?,
+        peer_version: row.version,
+        multiaddresses,
+        quality: row.quality,
+        quality_avg: SingleSumSMA::new_with_samples(quality_avg_window_size, samples),
+    })
 }
 
 #[async_trait]
 impl NetworkBackend for SqliteNetworkBackend {
     async fn add(&self, peer: &PeerId, origin: PeerOrigin, mas: Vec<Multiaddr>) -> Result<()> {
-
         let (sql, values) = Query::insert()
             .into_table(NetworkPeersIden::Table)
             .columns([
@@ -138,14 +163,22 @@ impl NetworkBackend for SqliteNetworkBackend {
             .map_err(|e| NetworkingError::Other("cannot serialize sma".into()))?
             .into_boxed_slice();
 
-        let maddrs = new_status.multiaddresses.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(",");
+        let maddrs = new_status
+            .multiaddresses
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
 
         // Override the goodness based on the quality value
-        let goodness = if new_status.get_quality() <= self.cfg.peer_quality_threshold {
+        let goodness: u8 = if new_status.get_quality() <= self.cfg.network_options.quality_bad_threshold {
             PeerGoodness::Bad
         } else {
             PeerGoodness::Good
-        };
+        }
+        .into();
+
+        let origin: u8 = new_status.origin.into();
 
         let (sql, values) = Query::update()
             .table(NetworkPeersIden::Table)
@@ -158,11 +191,14 @@ impl NetworkBackend for SqliteNetworkBackend {
                 (NetworkPeersIden::Ignored, new_status.ignored.into()),
                 (NetworkPeersIden::Public, new_status.is_public.into()),
                 (NetworkPeersIden::MultiAddresses, maddrs.into()),
-                (NetworkPeersIden::Goodness, (new_status.peer_goodness as u8).into()),
+                (NetworkPeersIden::Goodness, goodness.into()),
                 (NetworkPeersIden::Backoff, new_status.backoff.into()),
                 (NetworkPeersIden::HeartbeatsSent, new_status.heartbeats_sent.into()),
-                (NetworkPeersIden::HeartbeatsSuccessful, new_status.heartbeats_succeeded.into()),
-                (NetworkPeersIden::Origin, (new_status.origin as u8).into())
+                (
+                    NetworkPeersIden::HeartbeatsSuccessful,
+                    new_status.heartbeats_succeeded.into(),
+                ),
+                (NetworkPeersIden::Origin, origin.into()),
             ])
             .and_where(Expr::col(NetworkPeersIden::PeerId).eq(peer.to_base58()))
             .build_sqlx(SqliteQueryBuilder);
@@ -180,15 +216,45 @@ impl NetworkBackend for SqliteNetworkBackend {
             .limit(1)
             .build_sqlx(SqliteQueryBuilder);
 
-        let peer: Option<NetworkPeers> = sqlx::query_as_with(&sql, values).fetch_optional(&self.db).await?;
-        Ok(peer.map(|p| p.into()))
+        if let Some(peer) = sqlx::query_as_with(&sql, values).fetch_optional(&self.db).await? {
+            Ok(Some(peer_status_from_row(
+                peer,
+                self.cfg.network_options.quality_avg_window_size,
+            )?))
+        } else {
+            Ok(None)
+        }
     }
 
-    async fn get_multiple<F: FnOnce() -> T + Send + Sync, T: Send + Sync>(&self, filter: F) -> Result<Vec<T>> {
+    async fn get_multiple<'a>(&'a self, filter: Option<SimpleExpr>) -> Result<BoxStream<'a, PeerStatus>> {
+        /*let qry = Query::select()
+            .from(NetworkPeersIden::Table);
+
+        if let Some(f) = filter {
+            qry = qry.and_where(f);
+        }
+
+        let (sql, values) = qry.build_sqlx(SqliteQueryBuilder);
+
+        sqlx::query_with(&sql, values).fetch_many(&self.db)
+            .map(|item| match item {
+                Ok(Ei)
+            })*/
         todo!()
     }
 
     async fn stats(&self) -> Result<Stats> {
+        /*let (sql, values) = Query::select()
+            .expr(Expr::col((NetworkPeersIden::Table, NetworkPeersIden::Id)).count())
+            .from(NetworkPeersIden::Table)
+            .and_where(Expr::col(NetworkPeersIden::Public).eq(true)
+                .and(Expr::col(NetworkPeersIden::Ignored).eq(false))
+                .and(Expr::col(Ne)))
+            .build_sqlx(SqliteQueryBuilder);
+
+        let count_public: u32 = sqlx::query_scalar_with(&sql, values).fetch_one(&self.db).await?;
+
+        Err(NetworkingError::DecodingError)*/
         todo!()
     }
 }
