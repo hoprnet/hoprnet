@@ -138,7 +138,7 @@ impl CurvePoint {
     pub fn to_address(&self) -> Address {
         let serialized = self.serialize_uncompressed();
         let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
-        Address::new(&hash.as_slice()[12..])
+        Address::new(&hash.as_ref()[12..])
     }
 
     /// Creates a curve point from a non-zero scalar.
@@ -870,7 +870,7 @@ impl PublicKey {
     pub fn to_address(&self) -> Address {
         let uncompressed = self.to_bytes(false);
         let serialized = Hash::create(&[&uncompressed[1..]]);
-        Address::new(&serialized.as_slice()[12..])
+        Address::new(&serialized.as_ref()[12..])
     }
 
     /// Serializes the public key to a binary form.
@@ -1588,7 +1588,7 @@ pub mod tests {
             "hash test vector failed to match"
         );
 
-        let hash2 = Hash::from_bytes(&hash1.to_bytes()).unwrap();
+        let hash2 = Hash::from_bytes(hash1.as_ref()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
 
         assert_eq!(

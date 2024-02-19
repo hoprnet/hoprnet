@@ -243,7 +243,7 @@ mod test {
 
     #[test]
     fn vrf_values_serialize_deserialize() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
         let deserialized = VrfParameters::from_bytes(&*ALICE_VRF_OUTPUT).unwrap();
 

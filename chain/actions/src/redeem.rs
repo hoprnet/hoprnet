@@ -27,10 +27,7 @@ use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::ops::DerefMut;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use utils_db::errors::DbError;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
@@ -341,7 +338,7 @@ mod tests {
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
         let mut ack_key = Vec::new();
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(&ack.ticket.channel_id.as_ref());
         ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
         ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
 

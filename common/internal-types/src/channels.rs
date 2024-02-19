@@ -772,7 +772,7 @@ impl Ticket {
         luck.copy_from_slice(
             &Hash::create(&[
                 ticket_hash.as_ref(),
-                &vrf_params.get_decompressed_v()?.to_bytes()[1..], // skip prefix
+                &vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
                 response.as_ref(),
                 &signature.to_bytes(),
             ])

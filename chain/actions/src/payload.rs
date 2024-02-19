@@ -540,7 +540,7 @@ pub fn convert_vrf_parameters(
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        .get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_ref())
         // Safe: hash value is always in the allowed length boundaries,
         //       only fails for longer values
         // Safe: always encoding to secp256k1 whose field elements are in

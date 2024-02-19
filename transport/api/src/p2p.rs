@@ -486,7 +486,7 @@ pub async fn p2p_loop(
                     peer, request_id, error})) => {
                     warn!("transport protocol - p2p - ticket aggregation - encountered inbound failure for '{peer}' (#{request_id}): {error}")
                 }
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::ResponseSent {..})) => {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p::request_response::Event::<Vec<ProvableWinningTicket>, std::result::Result<Ticket,String>>::ResponseSent {..})) => {
                     // debug!("Ticket aggregation protocol: Discarded messages not relevant for the protocol!");
                 },
                 // --------------
