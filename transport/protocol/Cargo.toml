@@ -18,7 +18,7 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
