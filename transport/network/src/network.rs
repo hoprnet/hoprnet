@@ -2,6 +2,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
 use std::collections::VecDeque;
 use std::time::Duration;
+use async_trait::async_trait;
 
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::traits::AsUnixTimestamp;
@@ -214,19 +215,20 @@ pub struct Stats {
     pub bad_quality: usize,
 }
 
+#[async_trait]
 pub trait NetworkBackend {
-    fn add(origin: PeerOrigin, mas: Vec<Multiaddr>);
+    async fn add(origin: PeerOrigin, mas: Vec<Multiaddr>);
 
-    fn remove(&self, peer: &PeerId);
+    async fn remove(&self, peer: &PeerId);
 
-    fn update(&self, peer: &PeerId, ping_result: crate::ping::PingResult);
+    async fn update(&self, peer: &PeerId, new_status: &PeerStatus);
 
-    fn get(&self, peer: &PeerId) -> PeerStatus;
+    async fn get(&self, peer: &PeerId) -> PeerStatus;
 
     // ? Can it be without the filter? Or what should the filter format be?
-    fn get_multiple<F: FnOnce() -> T, T>(&self, filter: F) -> Vec<T>;
+    async fn get_multiple<F: FnOnce() -> T + Send + Sync, T: Send + Sync>(&self, filter: F) -> Vec<T>;
 
-    fn stats(&self) -> Stats;
+    async fn stats(&self) -> Stats;
 }
 
 /// The network object storing information about the running observed state of the network,
