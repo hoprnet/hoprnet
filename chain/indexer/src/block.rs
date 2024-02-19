@@ -278,6 +278,7 @@ pub mod tests {
         contract::EthEvent,
     };
     use futures::{join, Stream};
+    use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
@@ -288,10 +289,22 @@ pub mod tests {
 
     use super::*;
 
+    lazy_static::lazy_static! {
+        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
+        static ref CHRIS: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
+
+        static ref RANDOM_ANNOUNCEMENT_CHAIN_EVENT: ChainEventType = ChainEventType::Announcement {
+            peer: (*OffchainKeypair::from_secret(&hex!("14d2d952715a51aadbd4cc6bfac9aa9927182040da7b336d37d5bb7247aa7566")).unwrap().public()).into(),
+            address: hex!("2f4b7662a192b8125bbf51cfbf1bf5cc00b2c8e5").into(),
+            multiaddresses: vec![Multiaddr::empty()],
+        };
+    }
+
     async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            Address::random(),
+            *ALICE,
         )))
     }
 
@@ -461,7 +474,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
-            logs: build_announcement_logs(Address::random(), 4, head_block - 1, U256::from(23u8)),
+            logs: build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8)),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
@@ -481,14 +494,6 @@ pub mod tests {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
-    }
-
-    fn random_announcement_chain_event() -> ChainEventType {
-        ChainEventType::Announcement {
-            peer: (*OffchainKeypair::random().public()).into(),
-            address: Address::random(),
-            multiaddresses: vec![Multiaddr::empty()],
-        }
     }
 
     #[async_std::test]
@@ -513,17 +518,17 @@ pub mod tests {
             // head - 1 sync block
             BlockWithLogs {
                 block_id: head_block - 1,
-                logs: build_announcement_logs(Address::random(), 1, head_block - 1, U256::from(23u8)),
+                logs: build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8)),
             },
             // head sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+                logs: build_announcement_logs(*BOB, 1, head_block, U256::from(23u8)),
             },
             // post-sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+                logs: build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8)),
             },
         ];
 
@@ -534,7 +539,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(blocks.len())
-            .returning(|_, _, _, _| Ok(Some(random_announcement_chain_event())));
+            .returning(|_, _, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());

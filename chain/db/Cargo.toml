@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 
 hopr-crypto-types = { workspace = true }

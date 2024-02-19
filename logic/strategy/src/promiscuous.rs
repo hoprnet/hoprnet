@@ -500,6 +500,7 @@ mod tests {
         PeerId,
     };
     use futures::{future::ok, FutureExt};
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_platform::time::native::current_time;
@@ -508,10 +509,52 @@ mod tests {
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref PEERS: Vec<(Address, PeerId)> = (0..10)
-            .into_iter()
-            .map(|_| (Address::random(), OffchainKeypair::random().public().into()))
-            .collect();
+        static ref PEERS: [(Address, PeerId); 10] = [
+            (
+                hex!("9a66b57d7c3c0b83cbd0d3455bf0bc8f58e1ec46"),
+                hex!("e03640d3184c8aa6f9d4ccd533281c51974a170c0c4d0fe1da9296a081ab1fd9")
+            ),
+            (
+                hex!("5f98dc63889681eb4306f0e3b5ee2e04b13af7c8"),
+                hex!("82a3cec1660697d8f3eb798f82ae281fc885c3e5370ef700c95c17397846c1e7")
+            ),
+            (
+                hex!("6e0bed94a8d2da952ad4468ff81157b6137a5566"),
+                hex!("2b93fcca9db2c5c12d1add5c07dd81d20c68eb713e99aa5c488210179c7505e3")
+            ),
+            (
+                hex!("8275b9ce8a3d2fe14029111f85b72ab05aa0f5d3"),
+                hex!("5cfd16dc160fd43396bfaff06e7c2e62cd087317671c159ce7cbc31c34fc32b6")
+            ),
+            (
+                hex!("3231673fd10c9ebeb9330745f1709c91db9cf40f"),
+                hex!("7f5b421cc58cf8449f5565756697261723fb96bba5f0aa2ba83c4973e0e994bf")
+            ),
+            (
+                hex!("585f4ca77b07ac7a3bf37de3069b641ba97bf76f"),
+                hex!("848af931ce57f54fbf96d7250eda8b0f36e3d1988ec8048c892e8d8ff0798f2f")
+            ),
+            (
+                hex!("ba413645edb6ddbd46d5911466264b119087dfea"),
+                hex!("d79258fc521dba8ded208066fe98fd8a857cf2e8f42f1b71c8f6e29b8f47e406")
+            ),
+            (
+                hex!("9ea8c0f3766022f84c41abd524c942971bd22d23"),
+                hex!("cd7a06caebcb90f95690c72472127cae8732b415440a1783c6ff9f9cb0bacf1e")
+            ),
+            (
+                hex!("9790b6cf8afe6a7d80102570fac18a322e26ef83"),
+                hex!("2dc3ff226be59333127ebfd3c79517eac8f81e0333abaa45189aae309880e55a")
+            ),
+            (
+                hex!("f6ab491cd4e2eccbe60a7f87aeaacfc408dabde8"),
+                hex!("5826ed44f52b3a26c472621812165bb2d3e60a9929e06db8b8df4e4d23068eba")
+            ),
+        ]
+        .map(|(addr, privkey)| (
+            addr.into(),
+            OffchainKeypair::from_secret(&privkey).unwrap().public().into()
+        ));
     }
 
     mock! {
