@@ -15,6 +15,7 @@ pub struct SqliteNetworkBackendConfig {
     pub peer_quality_threshold: f64,
 }
 
+#[derive(Debug, Clone)]
 pub struct SqliteNetworkBackend {
     db: sqlx::SqlitePool,
     cfg: SqliteNetworkBackendConfig,
@@ -117,7 +118,7 @@ impl NetworkBackend for SqliteNetworkBackend {
         todo!()
     }
 
-    async fn get(&self, peer: &PeerId) -> Result<PeerStatus> {
+    async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         todo!()
     }
 

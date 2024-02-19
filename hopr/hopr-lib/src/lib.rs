@@ -195,13 +195,9 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
+                            if let Err(e) = network.read().await.observe_peer(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
                             {
-                                let mut net = network.write().await;
-                                if ! net.has(&peer) {
-                                    debug!("Network event: registering peer '{peer}'");
-                                    net.add(&peer, PeerOrigin::NetworkRegistry);
-                                    net.store_peer_multiaddresses(&peer, mas.clone());
-                                }
+                                error!("failed to record '{peer}' from the NetworkRegistry: {e}");
                             }
 
                             transport_indexer_actions
@@ -276,9 +272,8 @@ where
 
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        let mut net = network.write().await;
-                                        if ! net.has(&peer_id) {
-                                            net.add(&peer_id, PeerOrigin::NetworkRegistry);
+                                        if let Err(e) = network.read().await.observe_peer(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
+                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
@@ -329,7 +324,13 @@ where
         network
             .write()
             .await
-            .store_peer_multiaddresses(&identity.public().to_peer_id(), my_multiaddresses.clone());
+            .observe_peer(
+                &identity.public().to_peer_id(),
+                PeerOrigin::Initialization,
+                my_multiaddresses.clone(),
+            )
+            .await
+            .expect("own multiaddresses should always be recordable in the local network registry")
     });
 
     let addr_resolver = DbPeerAddressResolver(db.clone());
