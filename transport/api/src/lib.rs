@@ -66,8 +66,8 @@ use futures::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use log::{debug, info, warn};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
@@ -368,7 +368,8 @@ impl HoprTransport {
 
         pin_mut!(timeout, ping);
 
-        if !self.network.read().await.has(peer) {
+        let has_peer = self.network.read().await.has(peer);
+        if !has_peer {
             self.network.write().await.add(peer, PeerOrigin::ManualPing)
         }
 
@@ -437,7 +438,7 @@ impl HoprTransport {
 
         match self.pkt_sender.clone().send_packet(app_data, path) {
             Ok(mut awaiter) => {
-                log::trace!("Awaiting the HalfKeyChallenge");
+                tracing::trace!("Awaiting the HalfKeyChallenge");
                 Ok(awaiter
                     .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
                     .await?)

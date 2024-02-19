@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -834,9 +834,9 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
+    use tracing::debug;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {

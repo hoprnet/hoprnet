@@ -6,9 +6,9 @@
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
-use log::info;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+use tracing::info;
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;

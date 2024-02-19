@@ -3,7 +3,7 @@ use core_network::{
     PeerId,
 };
 use futures::channel::mpsc::Sender;
-use log::error;
+use tracing::error;
 
 /// Implementation of the network interface allowing emitting and querying
 /// the swarm based p2p transport mechanism from the [crate::Network].

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, trace};
+use tracing::{debug, error, trace};
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
@@ -641,7 +641,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //log::debug!("DB: get_channel_to dest: {}", dest);
+        //tracing::debug!("DB: get_channel_to dest: {}", dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
@@ -659,7 +659,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         channel: &ChannelEntry,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        //log::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
+        //tracing::debug!("DB: update_channel_and_snapshot channel_id: {}", channel_id);
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
@@ -730,7 +730,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
-        //log::debug!("DB: update_latest_block_number to {}", number);
+        //tracing::debug!("DB: update_latest_block_number to {}", number);
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
         let _ = self.db.set(key, &number).await?;
         Ok(())
@@ -742,7 +742,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>> {
-        //log::debug!("DB: get_channel {}", channel);
+        //tracing::debug!("DB: get_channel {}", channel);
         let key = utils_db::db::Key::new_with_prefix(channel, CHANNEL_PREFIX)?;
         self.db.get_or_none::<ChannelEntry>(key).await
     }
@@ -940,7 +940,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
-        //log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
+        //tracing::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(src, dest), CHANNEL_PREFIX)?;
         self.db.get_or_none(key).await
     }
@@ -1002,7 +1002,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_hopr_balance(&self) -> Result<Balance> {
-        //log::debug!("DB: get_hopr_balance");
+        //tracing::debug!("DB: get_hopr_balance");
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         self.db
@@ -1024,7 +1024,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_ticket_price(&self) -> Result<Option<U256>> {
-        //log::debug!("DB: get_ticket_price");
+        //tracing::debug!("DB: get_ticket_price");
         let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
 
         self.db.get_or_none::<U256>(key).await

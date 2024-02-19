@@ -538,14 +538,20 @@ pub fn convert_vrf_parameters(
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.get_decompressed_v().unwrap().to_bytes();
-    let s_b = off_chain.get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_ref());
+    let v = off_chain.v.serialize_uncompressed();
+    let s_b = off_chain
+        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        // Safe: hash value is always in the allowed length boundaries,
+        //       only fails for longer values
+        // Safe: always encoding to secp256k1 whose field elements are in
+        //       allowed length boundaries
+        .expect("ticket hash exceeded hash2field boundaries or encoding to unsupported curve");
 
     let h_v = off_chain.get_h_v_witness();
 
     Vrfparameters {
-        vx: U256::from_big_endian(&v[1..33]),
-        vy: U256::from_big_endian(&v[33..65]),
+        vx: U256::from_big_endian(&v.as_bytes()[1..33]),
+        vy: U256::from_big_endian(&v.as_bytes()[33..65]),
         s: U256::from_big_endian(&off_chain.s.to_bytes()),
         h: U256::from_big_endian(&off_chain.h.to_bytes()),
         s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),

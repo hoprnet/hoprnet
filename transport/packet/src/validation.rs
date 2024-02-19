@@ -6,7 +6,7 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info, trace};
+use tracing::{debug, info, trace};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(

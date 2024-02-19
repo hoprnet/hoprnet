@@ -16,8 +16,8 @@ use chain_types::actions::Action;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::info;
 use multiaddr::Multiaddr;
+use tracing::info;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{

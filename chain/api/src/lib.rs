@@ -20,7 +20,7 @@ use chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 use utils_db::CurrentDbShim;
 
 use crate::errors::{HoprChainError, Result};

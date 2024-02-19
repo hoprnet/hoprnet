@@ -34,7 +34,7 @@ core-transport = { workspace = true }
 chain-db = { workspace = true }
 chain-actions = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }

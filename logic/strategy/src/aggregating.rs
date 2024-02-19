@@ -35,7 +35,6 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -45,6 +44,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -68,6 +68,7 @@ lazy_static::lazy_static! {
 pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
+    ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
     /// Default is 100.
@@ -77,6 +78,7 @@ pub struct AggregatingStrategyConfig {
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
     /// that triggers the ticket aggregation when exceeded.
+    ///
     /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
     /// This condition is independent of `aggregation_threshold`.
     ///
@@ -86,6 +88,7 @@ pub struct AggregatingStrategyConfig {
     pub unrealized_balance_ratio: Option<f32>,
 
     /// Maximum time to wait for the ticket aggregation to complete.
+    ///
     /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
     ///
     /// Default is 60 seconds.
@@ -94,8 +97,9 @@ pub struct AggregatingStrategyConfig {
     pub aggregation_timeout: Duration,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
-    /// to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
-    /// or `unrealized_balance_ratio` thresholds are met on that channel.
+    /// to the `PendingToClose` state.
+    ///
+    /// This happens regardless if `aggregation_threshold` or `unrealized_balance_ratio` thresholds are met on that channel.
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
