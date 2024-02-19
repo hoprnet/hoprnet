@@ -567,11 +567,10 @@ mod tests {
             net.add(peer, PeerOrigin::Initialization);
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
                 net.update_with_version(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                    Some(metadata.into()),
+                    Some("2.0.0".into()),
                 );
             }
             debug!(
@@ -656,7 +655,7 @@ mod tests {
         network.write().await.update_with_version(
             &PEERS[9].1,
             Ok(current_time().as_unix_timestamp().as_millis() as u64),
-            Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
+            Some("1.92.0".into()),
         );
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();

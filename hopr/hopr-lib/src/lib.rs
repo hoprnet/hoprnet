@@ -29,7 +29,6 @@ pub use {
     core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
-        constants::PEER_METADATA_PROTOCOL_VERSION,
         errors::{HoprTransportError, ProtocolError},
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
     },
