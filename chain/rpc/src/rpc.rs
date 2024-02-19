@@ -256,12 +256,17 @@ pub mod tests {
     use crate::{HoprRpcOperations, PendingTransaction};
     use async_std::task::sleep;
     use chain_types::{ContractAddresses, ContractInstances};
+    use hex_literal::hex;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
     use std::time::Duration;
 
     use crate::client::native::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+
+    lazy_static::lazy_static! {
+        static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
+    }
 
     pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
         let tx_hash = pending.tx_hash();
@@ -306,10 +311,7 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                1000000_u32.into(),
-            ))
+            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1000000_u32.into()))
             .await
             .expect("failed to send tx");
 
@@ -354,14 +356,11 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                send_amount.into(),
-            ))
-            .await
-            .expect("tx should be sent")
-            .await
-            .expect("tx should resolve")
+            rpc.send_transaction(chain_types::utils::create_native_transfer(*RANDY, send_amount.into()))
+                .await
+                .expect("tx should be sent")
+                .await
+                .expect("tx should resolve")
         }))
         .await;
 
@@ -411,10 +410,7 @@ pub mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(
-                Address::random(),
-                1_u32.into(),
-            ))
+            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
             .await
             .expect("failed to send tx");
 

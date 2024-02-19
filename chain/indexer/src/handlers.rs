@@ -652,7 +652,7 @@ pub mod tests {
     async fn create_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            Address::random(),
+            *SELF_CHAIN_ADDRESS,
         )))
     }
 
