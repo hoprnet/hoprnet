@@ -179,7 +179,7 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             peer_version: None,
-            quality_avg: SingleSumSMA::new(quality_window),
+            quality_avg: SingleSumSMA::new(quality_window as usize),
             multiaddresses: vec![],
         }
     }
