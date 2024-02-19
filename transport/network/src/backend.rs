@@ -233,11 +233,9 @@ impl NetworkBackend for SqliteNetworkBackend {
             .and_where(filter.unwrap_or(Expr::value(1)))
             .build_sqlx(SqliteQueryBuilder);
 
-        let executor = self.db.clone();
-        let cfg_clone = self.cfg.clone();
         Ok(Box::pin(stream! {
             loop {
-                let window_size = cfg_clone.network_options.quality_avg_window_size;
+                let window_size = self.cfg.network_options.quality_avg_window_size;
                 match sqlx::query_as_with::<_, NetworkPeers, _>(&sql, values.clone())
                     .fetch(&self.db)
                     .try_next()
