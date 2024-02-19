@@ -210,8 +210,6 @@ impl std::fmt::Display for PeerStatus {
     }
 }
 
-
-
 /// The network object storing information about the running observed state of the network,
 /// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]

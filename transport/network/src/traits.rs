@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 
-use crate::network::{PeerOrigin, PeerStatus};
 use crate::errors::Result;
+use crate::network::{PeerOrigin, PeerStatus};
 
 pub struct Stats {
     pub good_quality: usize,
