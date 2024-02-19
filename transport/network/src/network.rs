@@ -209,6 +209,26 @@ impl std::fmt::Display for PeerStatus {
     }
 }
 
+pub struct Stats {
+    pub good_quality: usize,
+    pub bad_quality: usize,
+}
+
+pub trait NetworkBackend {
+    fn add(origin: PeerOrigin, mas: Vec<Multiaddr>);
+
+    fn remove(&self, peer: &PeerId);
+
+    fn update(&self, peer: &PeerId, ping_result: crate::ping::PingResult);
+
+    fn get(&self, peer: &PeerId) -> PeerStatus;
+
+    // ? Can it be without the filter? Or what should the filter format be?
+    fn get_multiple<F: FnOnce() -> T, T>(&self, filter: F) -> Vec<T>;
+
+    fn stats(&self) -> Stats;
+}
+
 /// The network object storing information about the running observed state of the network,
 /// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]
@@ -289,13 +309,6 @@ impl<T: NetworkExternalActions> Network<T> {
     ///
     /// Each PeerId must have an origin specification.
     pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin) {
-        self.add_with_metadata(peer, origin, None)
-    }
-
-    /// Add a new PeerId into the network (with optional metadata entries)
-    ///
-    /// Each PeerId must have an origin specification.
-    pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let now = current_time().as_unix_timestamp().as_millis() as u64;
         debug!("Registering peer '{}' with origin {}", peer, origin);
 
@@ -319,9 +332,6 @@ impl<T: NetworkExternalActions> Network<T> {
             if !has_entry && !is_ignored {
                 let mut entry = PeerStatus::new(*peer, origin, self.cfg.backoff_min, self.cfg.quality_avg_window_size);
                 entry.is_public = self.network_actions_api.is_public(peer);
-                if let Some(m) = metadata {
-                    entry.metadata.extend(m);
-                }
                 self.refresh_network_status(&entry);
 
                 if let Some(x) = self.entries.insert(*peer, entry) {
@@ -512,14 +522,15 @@ impl<T: NetworkExternalActions> Network<T> {
         self.events_to_emit.drain(..).collect()
     }
 
-    /// Total count of the peers observed withing the network
-    pub fn length(&self) -> usize {
-        self.entries.len()
-    }
-
     /// Returns the quality of the network as a network health indicator.
     pub fn health(&self) -> Health {
         self.last_health
+    }
+
+    /// Total count of the peers observed withing the network
+    #[cfg(test)]
+    pub fn length(&self) -> usize {
+        self.entries.len()
     }
 
     #[cfg(test)]
@@ -604,28 +615,6 @@ mod tests {
     }
 
     #[test]
-    fn test_network_should_add_metadata() {
-        let expected = PeerId::random();
-
-        let mut peers = basic_network(&PeerId::random());
-
-        let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
-
-        peers.add_with_metadata(
-            &expected,
-            PeerOrigin::IncomingConnection,
-            Some([proto_version.clone()].into()),
-        );
-
-        assert_eq!(1, peers.length());
-        assert!(peers.has(&expected));
-
-        let status = peers.get_peer_status(&expected).unwrap();
-        assert!(status.metadata().contains_key(&proto_version.0));
-        assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
-    }
-
-    #[test]
     fn test_network_should_remove_a_peer_on_unregistration() {
         let peer = PeerId::random();
 
@@ -684,9 +673,10 @@ mod tests {
         {
             let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
 
-            peers.add_with_metadata(
+            peers.add(&peer, PeerOrigin::IncomingConnection);
+            peers.update_with_metadata(
                 &peer,
-                PeerOrigin::IncomingConnection,
+                Ok(current_time().as_unix_timestamp().as_millis() as u64),
                 Some([proto_version.clone(), other_metadata_1.clone()].into()),
             );
 
