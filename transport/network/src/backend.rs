@@ -40,12 +40,7 @@ impl SqliteNetworkBackend {
                     .auto_increment()
                     .primary_key(),
             )
-            .col(
-                ColumnDef::new(NetworkPeerIden::PeerId)
-                    .string()
-                    .not_null()
-                    .unique_key(),
-            )
+            .col(ColumnDef::new(NetworkPeerIden::PeerId).string().not_null().unique_key())
             .col(ColumnDef::new(NetworkPeerIden::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Version).string_len(20))
@@ -247,6 +242,7 @@ impl NetworkBackend for SqliteNetworkBackend {
         }))
     }
 
+    // TODO: does it make sense to use rather a separate table?
     async fn stats(&self) -> Result<Stats> {
         let (sql, values) = Query::select()
             .expr(Expr::col((NetworkPeerIden::Table, NetworkPeerIden::Id)).count())
@@ -307,4 +303,9 @@ impl NetworkBackend for SqliteNetworkBackend {
             bad_quality_non_public,
         })
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // TODO: missing tests
 }
