@@ -70,7 +70,7 @@ pub enum NetworkPeersTable {
 
 #[async_trait]
 impl NetworkBackend for SqliteNetworkBackend {
-    async fn add(origin: PeerOrigin, mas: Vec<Multiaddr>) {
+    async fn add(&self, origin: PeerOrigin, mas: Vec<Multiaddr>) {
         todo!()
     }
 

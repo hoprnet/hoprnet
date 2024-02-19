@@ -217,7 +217,7 @@ pub struct Stats {
 
 #[async_trait]
 pub trait NetworkBackend {
-    async fn add(origin: PeerOrigin, mas: Vec<Multiaddr>);
+    async fn add(&self, origin: PeerOrigin, mas: Vec<Multiaddr>);
 
     async fn remove(&self, peer: &PeerId);
 
