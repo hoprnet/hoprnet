@@ -141,7 +141,6 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::PublicKey;
     use hopr_crypto_types::vrf::derive_vrf_parameters;
-    use hopr_primitive_types::traits::BinarySerializable;
     use k256::Scalar;
 
     #[test]

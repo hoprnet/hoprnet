@@ -24,7 +24,7 @@ pub struct Acknowledgement {
 impl Acknowledgement {
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
-            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_keypair),
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
             ack_key_share,
             validated: true,
         }
@@ -35,7 +35,7 @@ impl Acknowledgement {
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature
-            .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
+            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
 
         self.validated
     }
@@ -69,7 +69,7 @@ impl BinarySerializable for Acknowledgement {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ack_signature.to_bytes());
-        ret.extend_from_slice(&self.ack_key_share.to_bytes());
+        ret.extend_from_slice(self.ack_key_share.as_ref());
         ret.into_boxed_slice()
     }
 }
@@ -183,7 +183,7 @@ impl AcknowledgedTicket {
                 &Hash::create(&[
                     self.ticket.get_hash(domain_separator).as_ref(),
                     &self.vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
-                    &self.response.to_bytes(),
+                    self.response.as_ref(),
                     &signature.to_bytes(),
                 ])
                 .as_ref()[0..7],
@@ -247,9 +247,9 @@ impl BinarySerializable for AcknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.response.to_bytes());
+        ret.extend_from_slice(self.response.as_ref());
         ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(&self.signer.as_ref());
+        ret.extend_from_slice(self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }
@@ -335,8 +335,8 @@ impl BinarySerializable for UnacknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.own_key.to_bytes());
-        ret.extend_from_slice(&self.signer.as_ref());
+        ret.extend_from_slice(self.own_key.as_ref());
+        ret.extend_from_slice(self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }

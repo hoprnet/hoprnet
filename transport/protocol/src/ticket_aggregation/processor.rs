@@ -351,7 +351,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
             1.0, // Aggregated tickets have always 100% winning probability
             channel_epoch,
-            first_acked_ticket.ticket.challenge.clone(),
+            first_acked_ticket.ticket.challenge,
             &self.chain_key,
             &domain_separator,
         )

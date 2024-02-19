@@ -577,7 +577,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
                 vs: H256::from_slice(&serialized_signature[32..64]).into(),
             },
-            por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
+            por_secret: U256::from_big_endian(off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))

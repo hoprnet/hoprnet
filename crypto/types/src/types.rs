@@ -352,6 +352,18 @@ impl HalfKey {
     }
 }
 
+impl AsRef<[u8; Self::SIZE]> for HalfKey {
+    fn as_ref(&self) -> &[u8; Self::SIZE] {
+        &self.hkey
+    }
+}
+
+impl From<[u8; Self::SIZE]> for HalfKey {
+    fn from(hkey: [u8; Self::SIZE]) -> Self {
+        Self { hkey }
+    }
+}
+
 impl BinarySerializable for HalfKey {
     const SIZE: usize = 32;
 
@@ -976,19 +988,29 @@ impl Response {
                 .expect("response represents an invalid non-zero scalar"),
         }
     }
-}
 
-impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(first).as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(first.as_ref().as_slice())
             .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
+                NonZeroScalar::<Secp256k1>::try_from(second.as_ref().as_slice()).map(|s2| s1.as_ref() + s2.as_ref())
             })
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
         Ok(Response::new(res.to_bytes().as_slice()))
+    }
+}
+
+impl AsRef<[u8; Self::SIZE]> for Response {
+    fn as_ref(&self) -> &[u8; Self::SIZE] {
+        &self.response
+    }
+}
+
+impl From<[u8; Self::SIZE]> for Response {
+    fn from(response: [u8; Self::SIZE]) -> Self {
+        Self { response }
     }
 }
 
@@ -1483,7 +1505,7 @@ pub mod tests {
     #[test]
     pub fn response_test() {
         let r1 = Response::new(&[0u8; Response::SIZE]);
-        let r2 = Response::from_bytes(&r1.to_bytes()).unwrap();
+        let r2 = Response::from_bytes(r1.as_ref()).unwrap();
         assert_eq!(r1, r2, "deserialized response does not match");
     }
 
@@ -1533,7 +1555,7 @@ pub mod tests {
     #[test]
     fn half_key_test() {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
-        let hk2 = HalfKey::from_bytes(&hk1.to_bytes()).unwrap();
+        let hk2 = HalfKey::from_bytes(hk1.as_ref()).unwrap();
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
     }
