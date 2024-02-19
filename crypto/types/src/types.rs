@@ -19,7 +19,6 @@ use k256::{
     AffinePoint, Secp256k1,
 };
 use libp2p_identity::PeerId;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
@@ -28,6 +27,7 @@ use std::{
     ops::Add,
     str::FromStr,
 };
+use tracing::warn;
 
 use crate::utils::random_group_element;
 use crate::{

@@ -24,7 +24,7 @@ thiserror = { workspace = true }
 chain-db = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 utils-db = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
