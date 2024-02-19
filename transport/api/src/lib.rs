@@ -67,7 +67,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
@@ -342,10 +342,14 @@ impl HoprTransport {
                     .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
                     .await;
 
-                let mut net = self.network.write().await;
-                if !net.has(&peer) {
-                    net.add(&peer, PeerOrigin::Initialization);
-                    net.store_peer_multiaddresses(&peer, multiaddresses);
+                if let Err(e) = self
+                    .network
+                    .read()
+                    .await
+                    .observe_peer(&peer, PeerOrigin::Initialization, multiaddresses)
+                    .await
+                {
+                    error!("Failed to store the peer observation: {e}");
                 }
             }
         }
@@ -368,9 +372,14 @@ impl HoprTransport {
 
         pin_mut!(timeout, ping);
 
-        let has_peer = self.network.read().await.has(peer);
-        if !has_peer {
-            self.network.write().await.add(peer, PeerOrigin::ManualPing)
+        if let Err(e) = self
+            .network
+            .read()
+            .await
+            .observe_peer(peer, PeerOrigin::ManualPing, vec![])
+            .await
+        {
+            error!("Failed to store the peer observation: {e}");
         }
 
         let start = current_time().as_unix_timestamp();
@@ -513,7 +522,13 @@ impl HoprTransport {
     }
 
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(&self.me)
+        // TODO: can fail with the Result?
+        self.network
+            .read()
+            .await
+            .get_peer_multiaddresses(&self.me)
+            .await
+            .unwrap_or(vec![])
     }
 
     pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
@@ -549,11 +564,21 @@ impl HoprTransport {
     }
 
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(peer)
+        self.network
+            .read()
+            .await
+            .get_peer_multiaddresses(peer)
+            .await
+            .unwrap_or(vec![])
     }
 
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(peer)
+        self.network
+            .read()
+            .await
+            .get_peer_multiaddresses(peer)
+            .await
+            .unwrap_or(vec![])
     }
 
     pub async fn network_health(&self) -> Health {

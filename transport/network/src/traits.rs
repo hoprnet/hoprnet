@@ -18,7 +18,7 @@ pub trait NetworkBackend {
 
     async fn update(&self, peer: &PeerId, new_status: &PeerStatus) -> Result<()>;
 
-    async fn get(&self, peer: &PeerId) -> Result<PeerStatus>;
+    async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
 
     // ? Can it be without the filter? Or what should the filter format be?
     async fn get_multiple<F: FnOnce() -> T + Send + Sync, T: Send + Sync>(&self, filter: F) -> Result<Vec<T>>;

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
 use std::collections::VecDeque;
@@ -13,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
+use crate::backend::{SqliteNetworkBackend, SqliteNetworkBackendConfig};
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
+use crate::traits::NetworkBackend;
 use hopr_primitive_types::sma::{SingleSumSMA, SMA};
 use tracing::{debug, info, warn};
 
@@ -164,6 +165,7 @@ pub struct PeerStatus {
     pub ignored: bool,
     pub peer_goodness: PeerGoodness,
     pub peer_version: Option<String>,
+    pub multiaddresses: Vec<Multiaddr>,
     pub(crate) quality: f64,
     pub(crate) quality_avg: SingleSumSMA<f64>,
 }
@@ -184,6 +186,8 @@ impl PeerStatus {
             quality: 0.0,
             peer_version: None,
             quality_avg: SingleSumSMA::new(quality_window),
+            multiaddresses: vec![],
+            version: None,
         }
     }
 
@@ -221,11 +225,11 @@ impl std::fmt::Display for PeerStatus {
 pub struct Network<T: NetworkExternalActions> {
     me: PeerId,
     cfg: NetworkConfig,
+    db: crate::backend::SqliteNetworkBackend,
     events_to_emit: VecDeque<NetworkEvent>,
     entries: HashMap<PeerId, PeerStatus>,
     ignored: HashMap<PeerId, u64>, // timestamp
     excluded: HashSet<PeerId>,
-    known_multiaddresses: HashMap<PeerId, Vec<Multiaddr>>,
     good_quality_public: HashSet<PeerId>,
     bad_quality_public: HashSet<PeerId>,
     good_quality_non_public: HashSet<PeerId>,
@@ -257,14 +261,16 @@ impl<T: NetworkExternalActions> Network<T> {
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
         }
 
-        Network {
+        Self {
             me: my_peer_id,
-            cfg,
+            cfg: cfg.clone(),
+            db: async_std::task::block_on(SqliteNetworkBackend::new(SqliteNetworkBackendConfig {
+                peer_quality_threshold: cfg.quality_bad_threshold,
+            })),
             events_to_emit: VecDeque::new(),
             entries: HashMap::new(),
             ignored: HashMap::new(),
             excluded,
-            known_multiaddresses: HashMap::new(),
             good_quality_public: HashSet::new(),
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
@@ -277,18 +283,24 @@ impl<T: NetworkExternalActions> Network<T> {
     }
 
     /// Set all registered multiaddresses for a specific peer
-    pub fn store_peer_multiaddresses(&mut self, peer: &PeerId, addrs: Vec<Multiaddr>) {
-        self.known_multiaddresses.insert(*peer, addrs);
+    pub async fn observe_peer(
+        &self,
+        peer: &PeerId,
+        origin: PeerOrigin,
+        addrs: Vec<Multiaddr>,
+    ) -> crate::errors::Result<()> {
+        // TODO: should handle the !has => store logic
+        self.db.add(&peer, origin, addrs).await
     }
 
     /// Get all registered multiaddresses for a specific peer
-    pub fn get_peer_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.known_multiaddresses.get(peer).cloned().unwrap_or_default()
+    pub async fn get_peer_multiaddresses(&self, peer: &PeerId) -> crate::errors::Result<Vec<Multiaddr>> {
+        Ok(self.db.get(peer).await?.map(|p| p.multiaddresses).unwrap_or(vec![]))
     }
 
     /// Check whether the PeerId is present in the network
-    pub fn has(&self, peer: &PeerId) -> bool {
-        self.entries.contains_key(peer)
+    pub async fn has(&self, peer: &PeerId) -> bool {
+        self.db.get(peer).await.is_ok_and(|p| p.is_some())
     }
 
     /// Add a new PeerId into the network
@@ -554,8 +566,8 @@ mod tests {
         assert_eq!(Health::Green as i32, 4);
     }
 
-    #[test]
-    fn test_network_should_not_contain_the_self_reference() {
+    #[async_std::test]
+    async fn test_network_should_not_contain_the_self_reference() {
         let me = PeerId::random();
 
         let mut peers = basic_network(&me);
@@ -563,11 +575,11 @@ mod tests {
         peers.add(&me, PeerOrigin::IncomingConnection);
 
         assert_eq!(0, peers.length());
-        assert!(!peers.has(&me))
+        assert!(!peers.has(&me).await)
     }
 
-    #[test]
-    fn test_network_should_contain_a_registered_peer() {
+    #[async_std::test]
+    async fn test_network_should_contain_a_registered_peer() {
         let expected = PeerId::random();
 
         let mut peers = basic_network(&PeerId::random());
@@ -575,11 +587,11 @@ mod tests {
         peers.add(&expected, PeerOrigin::IncomingConnection);
 
         assert_eq!(1, peers.length());
-        assert!(peers.has(&expected))
+        assert!(peers.has(&expected).await)
     }
 
-    #[test]
-    fn test_network_should_remove_a_peer_on_unregistration() {
+    #[async_std::test]
+    async fn test_network_should_remove_a_peer_on_unregistration() {
         let peer = PeerId::random();
 
         let mut peers = basic_network(&PeerId::random());
@@ -589,11 +601,11 @@ mod tests {
         peers.remove(&peer);
 
         assert_eq!(0, peers.length());
-        assert!(!peers.has(&peer))
+        assert!(!peers.has(&peer).await)
     }
 
-    #[test]
-    fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
+    #[async_std::test]
+    async fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
         let peer = PeerId::random();
 
         let mut peers = basic_network(&PeerId::random());
@@ -601,7 +613,7 @@ mod tests {
         peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
 
         assert_eq!(0, peers.length());
-        assert!(!peers.has(&peer))
+        assert!(!peers.has(&peer).await)
     }
 
     #[test]
@@ -672,8 +684,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
+    #[async_std::test]
+    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
         let peer = PeerId::random();
 
         let mut peers = basic_network(&PeerId::random());
@@ -685,12 +697,12 @@ mod tests {
         peers.update(&peer, Err(())); // should drop to ignored
         peers.update(&peer, Err(())); // should drop from network
 
-        assert!(!peers.has(&peer));
+        assert!(!peers.has(&peer).await);
 
         // peer should remain ignored and not be added
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert!(!peers.has(&peer))
+        assert!(!peers.has(&peer).await)
     }
 
     #[test]
@@ -799,8 +811,8 @@ mod tests {
         assert_eq!(peers.health(), Health::Orange);
     }
 
-    #[test]
-    fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
+    #[async_std::test]
+    async fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
         let peer = PeerId::random();
         let public = peer;
 
@@ -819,7 +831,7 @@ mod tests {
         peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         peers.update(&peer, Err(()));
 
-        assert!(!peers.has(&public));
+        assert!(!peers.has(&public).await);
     }
 
     #[test]
