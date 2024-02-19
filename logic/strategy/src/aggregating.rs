@@ -430,12 +430,7 @@ mod tests {
         let domain_separator = Hash::default();
 
         let response = Response::new(
-            &Hash::create(&[
-                &channel_id.to_bytes(),
-                &channel_epoch.to_be_bytes(),
-                &index.to_be_bytes(),
-            ])
-            .to_bytes(),
+            Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
         );
 
         let ticket = Ticket::new(
@@ -457,7 +452,7 @@ mod tests {
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
         let mut ack_key = Vec::new();
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(ack.ticket.channel_id.as_ref());
         ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
         ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
 

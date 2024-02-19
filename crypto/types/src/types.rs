@@ -138,7 +138,7 @@ impl CurvePoint {
     pub fn to_address(&self) -> Address {
         let serialized = self.serialize_uncompressed();
         let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
-        Address::new(&hash.as_slice()[12..])
+        Address::new(&hash.as_ref()[12..])
     }
 
     /// Creates a curve point from a non-zero scalar.
@@ -486,10 +486,6 @@ impl Hash {
     pub fn hash(&self) -> Self {
         Self::create(&[&self.0])
     }
-
-    pub fn as_slice(&self) -> &[u8] {
-        &self.0
-    }
 }
 
 impl BinarySerializable for Hash {
@@ -528,14 +524,14 @@ impl From<[u8; Self::SIZE]> for Hash {
     }
 }
 
-impl From<Hash> for [u8; Hash::SIZE] {
-    fn from(value: Hash) -> Self {
-        value.0
+impl AsRef<[u8; Self::SIZE]> for Hash {
+    fn as_ref(&self) -> &[u8; Self::SIZE] {
+        &self.0
     }
 }
 
-impl From<&Hash> for [u8; Hash::SIZE] {
-    fn from(value: &Hash) -> Self {
+impl From<Hash> for [u8; Hash::SIZE] {
+    fn from(value: Hash) -> Self {
         value.0
     }
 }
@@ -850,7 +846,7 @@ impl PublicKey {
     pub fn to_address(&self) -> Address {
         let uncompressed = self.to_bytes(false);
         let serialized = Hash::create(&[&uncompressed[1..]]);
-        Address::new(&serialized.as_slice()[12..])
+        Address::new(&serialized.as_ref()[12..])
     }
 
     /// Serializes the public key to a binary form.

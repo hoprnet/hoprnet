@@ -190,7 +190,7 @@ mod tests {
         let params = derive_vrf_parameters(&message, &keypair, dst).unwrap();
 
         let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
-            &[&pub_key.to_address().to_bytes(), &message],
+            &[pub_key.to_address().as_ref(), &message],
             &[dst],
         )
         .unwrap();

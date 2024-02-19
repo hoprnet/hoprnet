@@ -354,7 +354,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
                 let serialized_signature = binding.signature.to_bytes();
 
                 BindKeysAnnounceSafeCall {
-                    self_: H160::from_slice(&self.me.to_bytes()),
+                    self_: H160::from_slice(self.me.as_ref()),
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                     ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
@@ -532,7 +532,7 @@ pub fn convert_vrf_parameters(
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        .get_s_b_witness(signer, &(*ticket_hash).into(), domain_separator.as_ref())
         // Safe: hash value is always in the allowed length boundaries,
         //       only fails for longer values
         // Safe: always encoding to secp256k1 whose field elements are in

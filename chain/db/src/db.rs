@@ -20,7 +20,7 @@ const ACKNOWLEDGED_TICKETS_KEY_LENGTH: usize = Hash::SIZE + (u32::BITS / 8) as u
 fn to_acknowledged_ticket_key(channel_id: &Hash, epoch: u32, index: u64) -> Result<utils_db::db::Key> {
     let mut ack_key = Vec::with_capacity(ACKNOWLEDGED_TICKETS_KEY_LENGTH);
 
-    ack_key.extend_from_slice(&channel_id.to_bytes());
+    ack_key.extend_from_slice(channel_id.as_ref());
     ack_key.extend_from_slice(&epoch.to_be_bytes());
     ack_key.extend_from_slice(&index.to_be_bytes());
 
@@ -1563,8 +1563,8 @@ mod tests {
             let new_hk1_seed = Hash::create(&[&hk1_seed.clone()]);
             let new_hk2_seed = Hash::create(&[&hk1_seed.clone()]);
 
-            hk1_seed.copy_from_slice(&new_hk1_seed.to_bytes());
-            hk2_seed.copy_from_slice(&new_hk2_seed.to_bytes());
+            hk1_seed.copy_from_slice(new_hk1_seed.as_ref());
+            hk2_seed.copy_from_slice(new_hk2_seed.as_ref());
         }
 
         acked_tickets

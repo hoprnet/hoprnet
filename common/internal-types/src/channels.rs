@@ -205,8 +205,8 @@ impl BinarySerializable for ChannelEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.to_bytes().as_ref());
-        ret.extend_from_slice(self.destination.to_bytes().as_ref());
+        ret.extend_from_slice(self.source.as_ref());
+        ret.extend_from_slice(self.destination.as_ref());
         ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(match self.status {
@@ -231,7 +231,7 @@ impl BinarySerializable for ChannelEntry {
 }
 
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
-    Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
+    Hash::create(&[source.as_ref(), destination.as_ref()])
 }
 
 /// Enumerates possible changes on a channel entry update
@@ -651,7 +651,7 @@ impl Ticket {
             Self::SIZE - Signature::SIZE
         });
 
-        ret.extend_from_slice(&self.channel_id.to_bytes());
+        ret.extend_from_slice(self.channel_id.as_ref());
         ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
@@ -676,14 +676,14 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[&self.to_bytes_internal(false).unwrap()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], &ticket_hash.to_bytes()]);
-        Hash::create(&[&hex!("1901"), &domain_separator.to_bytes(), &hash_struct.to_bytes()])
+        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+        Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
         self.signature = Some(Signature::sign_hash(
-            &self.get_hash(domain_separator).to_bytes(),
+            self.get_hash(domain_separator).as_ref(),
             signing_key,
         ));
     }
@@ -738,7 +738,7 @@ impl Ticket {
             Ok(signer.clone())
         } else {
             let signer = PublicKey::from_signature_hash(
-                &self.get_hash(domain_separator).to_bytes(),
+                self.get_hash(domain_separator).as_ref(),
                 self.signature.as_ref().expect("ticket not signed"),
             )?;
             Ok(self.signer.get_or_init(|| signer).clone())
@@ -1025,7 +1025,7 @@ pub mod tests {
         )
         .unwrap();
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).to_bytes(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
         assert_eq!(initial_ticket, Ticket::from_bytes(&initial_ticket.to_bytes()).unwrap());
     }
@@ -1066,7 +1066,7 @@ pub mod tests {
         )
         .unwrap();
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).to_bytes(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
         assert!(initial_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())

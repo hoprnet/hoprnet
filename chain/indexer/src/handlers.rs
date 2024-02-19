@@ -688,7 +688,7 @@ pub mod tests {
             data: encode(&[
                 Token::FixedBytes(Vec::from(keybinding.signature.to_bytes())),
                 Token::FixedBytes(Vec::from(keybinding.packet_key.to_bytes())),
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
             ]),
         };
 
@@ -730,7 +730,7 @@ pub mod tests {
         let address_announcement_empty_log = RawLog {
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_empty.to_string()),
             ]),
         };
@@ -755,7 +755,7 @@ pub mod tests {
         let address_announcement_log = RawLog {
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr.to_string()),
             ]),
         };
@@ -789,7 +789,7 @@ pub mod tests {
         let address_announcement_dns_log = RawLog {
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
                 Token::String(test_multiaddr_dns.to_string()),
             ]),
         };
@@ -844,9 +844,7 @@ pub mod tests {
 
         let revoke_announcement_log = RawLog {
             topics: vec![RevokeAnnouncementFilter::signature()],
-            data: encode(&[Token::Address(EthereumAddress::from_slice(
-                &SELF_CHAIN_ADDRESS.to_bytes(),
-            ))]),
+            data: encode(&[Token::Address(EthereumAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref()))]),
         };
 
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
@@ -1311,7 +1309,7 @@ pub mod tests {
         let balance_increased_log = RawLog {
             topics: vec![
                 ChannelBalanceIncreasedFilter::signature(),
-                H256::from_slice(&channel_id.to_bytes()),
+                H256::from_slice(channel_id.as_ref()),
             ],
             data: Vec::from(solidity_balance.to_bytes()),
         };
@@ -1350,7 +1348,7 @@ pub mod tests {
         let log = RawLog {
             topics: vec![
                 DomainSeparatorUpdatedFilter::signature(),
-                H256::from_slice(&separator.to_bytes()),
+                H256::from_slice(separator.as_ref()),
             ],
             data: encode(&[]),
         };
@@ -1398,7 +1396,7 @@ pub mod tests {
         let balance_increased_log = RawLog {
             topics: vec![
                 ChannelBalanceDecreasedFilter::signature(),
-                H256::from_slice(&channel_id.to_bytes()),
+                H256::from_slice(channel_id.as_ref()),
             ],
             data: Vec::from(solidity_balance.to_bytes()),
         };
@@ -1453,10 +1451,7 @@ pub mod tests {
             .unwrap();
 
         let channel_closed_log = RawLog {
-            topics: vec![
-                ChannelClosedFilter::signature(),
-                H256::from_slice(&channel_id.to_bytes()),
-            ],
+            topics: vec![ChannelClosedFilter::signature(), H256::from_slice(channel_id.as_ref())],
             data: encode(&[]),
         };
 
@@ -1618,10 +1613,7 @@ pub mod tests {
         let ticket_index = U256::from((1u128 << 48) - 1);
 
         let ticket_redeemed_log = RawLog {
-            topics: vec![
-                TicketRedeemedFilter::signature(),
-                H256::from_slice(&channel_id.to_bytes()),
-            ],
+            topics: vec![TicketRedeemedFilter::signature(), H256::from_slice(channel_id.as_ref())],
             data: Vec::from(ticket_index.to_bytes()),
         };
 
@@ -1681,7 +1673,7 @@ pub mod tests {
         let closure_initiated_log = RawLog {
             topics: vec![
                 OutgoingChannelClosureInitiatedFilter::signature(),
-                H256::from_slice(&channel_id.to_bytes()),
+                H256::from_slice(channel_id.as_ref()),
             ],
             data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_bytes()),
         };

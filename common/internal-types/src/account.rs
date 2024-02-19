@@ -153,7 +153,7 @@ impl BinarySerializable for AccountEntry {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.public_key.to_bytes());
-        ret.extend_from_slice(&self.chain_addr.to_bytes());
+        ret.extend_from_slice(self.chain_addr.as_ref());
 
         match &self.entry_type {
             AccountType::NotAnnounced => {

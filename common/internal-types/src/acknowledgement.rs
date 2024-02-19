@@ -129,7 +129,7 @@ impl AcknowledgedTicket {
         let vrf_params = derive_vrf_parameters(
             &ticket.get_hash(domain_separator).into(),
             chain_keypair,
-            &domain_separator.to_bytes(),
+            domain_separator.as_ref(),
         )?;
 
         Ok(Self {
@@ -165,7 +165,7 @@ impl AcknowledgedTicket {
             .verify(
                 recipient,
                 &self.ticket.get_hash(domain_separator).into(),
-                &domain_separator.to_bytes(),
+                domain_separator.as_ref(),
             )
             .is_err()
         {
@@ -181,12 +181,12 @@ impl AcknowledgedTicket {
         if let Some(ref signature) = self.ticket.signature {
             luck.copy_from_slice(
                 &Hash::create(&[
-                    &self.ticket.get_hash(domain_separator).to_bytes(),
+                    self.ticket.get_hash(domain_separator).as_ref(),
                     &self.vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
                     &self.response.to_bytes(),
                     &signature.to_bytes(),
                 ])
-                .to_bytes()[0..7],
+                .as_ref()[0..7],
             );
         } else {
             return Err(InvalidInputData(
@@ -249,7 +249,7 @@ impl BinarySerializable for AcknowledgedTicket {
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.response.to_bytes());
         ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.extend_from_slice(&self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }
@@ -336,7 +336,7 @@ impl BinarySerializable for UnacknowledgedTicket {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.own_key.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.extend_from_slice(&self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }

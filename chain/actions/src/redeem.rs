@@ -306,7 +306,7 @@ mod tests {
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
         let mut ack_key = Vec::new();
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(ack.ticket.channel_id.as_ref());
         ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
         ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
 
