@@ -1,6 +1,7 @@
+use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use hopr_primitive_types::prelude::SingleSumSMA;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
@@ -8,7 +9,7 @@ use sea_query::{ColumnDef, Expr, Func, Order, Query, SimpleExpr, SqliteQueryBuil
 use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use tracing::trace;
+use tracing::{error, trace};
 
 use crate::errors::{NetworkingError, Result};
 use crate::network::{NetworkConfig, PeerGoodness, PeerOrigin, PeerStatus};
@@ -227,20 +228,38 @@ impl NetworkBackend for SqliteNetworkBackend {
     }
 
     async fn get_multiple<'a>(&'a self, filter: Option<SimpleExpr>) -> Result<BoxStream<'a, PeerStatus>> {
-        /*let qry = Query::select()
-            .from(NetworkPeersIden::Table);
+        let (sql, values) = Query::select()
+            .from(NetworkPeersIden::Table)
+            .and_where(filter.unwrap_or(Expr::value(1)))
+            .build_sqlx(SqliteQueryBuilder);
 
-        if let Some(f) = filter {
-            qry = qry.and_where(f);
-        }
-
-        let (sql, values) = qry.build_sqlx(SqliteQueryBuilder);
-
-        sqlx::query_with(&sql, values).fetch_many(&self.db)
-            .map(|item| match item {
-                Ok(Ei)
-            })*/
-        todo!()
+        let executor = self.db.clone();
+        let cfg_clone = self.cfg.clone();
+        Ok(Box::pin(stream! {
+            loop {
+                let window_size = cfg_clone.network_options.quality_avg_window_size;
+                match sqlx::query_as_with::<_, NetworkPeers, _>(&sql, values.clone())
+                    .fetch(&self.db)
+                    .try_next()
+                    .await {
+                        Ok(Some(peer_row)) => {
+                            trace!("got db network row: {peer_row:?}");
+                            match peer_status_from_row(peer_row, window_size) {
+                                Ok(peer_status) => yield peer_status,
+                                Err(e) => error!("cannot map peer from row: {e}"),
+                            }
+                        },
+                        Ok(None) => {
+                            trace!("fetched all network results");
+                            break;
+                        }
+                        Err(e) => {
+                            error!("failed to retrieve next row: {e}");
+                            break;
+                        }
+                }
+            }
+        }))
     }
 
     async fn stats(&self) -> Result<Stats> {
