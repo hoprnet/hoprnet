@@ -556,7 +556,7 @@ pub async fn p2p_loop(
                     // TODO: async await in the event dispatch loop can block it, the await should be removed
                     if allowed_peers.contains(&peer_id) {
                         // TODO: async spawn local and remove the RWLOCK
-                        if let Err(e) = network.read().await.observe_peer(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                        if let Err(e) = network.read().await.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
                             error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                         }
                     } else {

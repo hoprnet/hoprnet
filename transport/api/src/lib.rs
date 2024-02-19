@@ -346,7 +346,7 @@ impl HoprTransport {
                     .network
                     .read()
                     .await
-                    .observe_peer(&peer, PeerOrigin::Initialization, multiaddresses)
+                    .add(&peer, PeerOrigin::Initialization, multiaddresses)
                     .await
                 {
                     error!("Failed to store the peer observation: {e}");
@@ -376,7 +376,7 @@ impl HoprTransport {
             .network
             .read()
             .await
-            .observe_peer(peer, PeerOrigin::ManualPing, vec![])
+            .add(peer, PeerOrigin::ManualPing, vec![])
             .await
         {
             error!("Failed to store the peer observation: {e}");

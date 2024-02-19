@@ -43,6 +43,7 @@ async-lock = "2.7.0"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-stream = "0.3.5"
 async-trait = "0.1"
+atomic_enum = "0.2.0"
 base64 = "0.21.7"
 ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"

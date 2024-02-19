@@ -194,7 +194,7 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            if let Err(e) = network.read().await.observe_peer(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                            if let Err(e) = network.read().await.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
                             {
                                 error!("failed to record '{peer}' from the NetworkRegistry: {e}");
                             }
@@ -271,12 +271,14 @@ where
 
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        if let Err(e) = network.read().await.observe_peer(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
+                                        if let Err(e) = network.read().await.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
                                             error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
-                                        network.write().await.remove(&peer_id);
+                                        if let Err(e) = network.read().await.remove(&peer_id).await {
+                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
+                                        }
                                     },
                                 };
                             }
@@ -323,7 +325,7 @@ where
         network
             .write()
             .await
-            .observe_peer(
+            .add(
                 &identity.public().to_peer_id(),
                 PeerOrigin::Initialization,
                 my_multiaddresses.clone(),

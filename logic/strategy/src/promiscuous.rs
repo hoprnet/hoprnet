@@ -560,18 +560,20 @@ mod tests {
     async fn prepare_network(network: Arc<RwLock<Network<MockNetworkExternalActions>>>, qualities: Vec<f64>) {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
-        let mut net = network.write().await;
+        let net = network.read().await;
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
             net.add(peer, PeerOrigin::Initialization);
 
             while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                net.update_with_version(
+                net.update_from_ping(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
                     Some("2.0.0".into()),
-                );
+                )
+                .await
+                .expect("no errors should occur");
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
@@ -652,11 +654,16 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         // Peer 10 has an old node version
-        network.write().await.update_with_version(
-            &PEERS[9].1,
-            Ok(current_time().as_unix_timestamp().as_millis() as u64),
-            Some("1.92.0".into()),
-        );
+        network
+            .write()
+            .await
+            .update_from_ping(
+                &PEERS[9].1,
+                Ok(current_time().as_unix_timestamp().as_millis() as u64),
+                Some("1.92.0".into()),
+            )
+            .await
+            .expect("no errors should occur");
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels

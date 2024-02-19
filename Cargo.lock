@@ -1459,6 +1459,7 @@ dependencies = [
  "async-std",
  "async-stream",
  "async-trait",
+ "atomic_enum",
  "bincode",
  "futures",
  "futures-lite 1.13.0",

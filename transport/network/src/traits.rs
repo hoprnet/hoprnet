@@ -13,6 +13,16 @@ pub struct Stats {
     pub bad_quality_non_public: u32,
 }
 
+#[cfg(all(feature = "prometheus", not(test)))]
+impl Stats {
+    pub fn all_count(&self) -> usize {
+        self.good_quality_public as usize
+            + self.bad_quality_public as usize
+            + self.good_quality_non_public as usize
+            + self.bad_quality_non_public as usize
+    }
+}
+
 pub use sea_query::SimpleExpr;
 
 #[async_trait]

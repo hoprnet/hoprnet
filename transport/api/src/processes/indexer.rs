@@ -70,7 +70,9 @@ impl IndexerActions {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
                         PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
                         PeerEligibility::Ineligible => {
-                            network.write().await.remove(&peer);
+                            if let Err(e) = network.write().await.remove(&peer).await {
+                                error!("failed to remove '{peer}' from the local registry: {e}")
+                            }
                             IndexerProcessed::Ban(peer)
                         }
                     },
@@ -112,7 +114,9 @@ impl IndexerActions {
                             let event = if is_allowed {
                                 IndexerProcessed::Allow(peer)
                             } else {
-                                network.write().await.remove(&peer);
+                                if let Err(e) = network.write().await.remove(&peer).await {
+                                    error!("failed to remove '{peer}' from the local registry: {e}");
+                                }
                                 IndexerProcessed::Ban(peer)
                             };
 

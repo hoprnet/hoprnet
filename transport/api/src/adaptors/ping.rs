@@ -42,30 +42,34 @@ impl<R: PeerAddressResolver> PingExternalInteractions<R> {
 #[async_trait]
 impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExternalInteractions<R> {
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
-        let updated = self
+        match self
             .network
             .write()
             .await
-            .update_with_version(peer, result, result.is_ok().then_some(version));
-
-        if let Some(status) = updated {
-            debug!(
-                "peer {peer} has q = {}, avg_q = {}",
-                status.get_quality(),
-                status.get_average_quality()
-            );
-            if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
-                if let Some(chain_key) = maybe_chain_key {
-                    let mut g = self.channel_graph.write().await;
-                    let self_addr = g.my_address();
-                    g.update_channel_quality(self_addr, chain_key, status.get_quality())
+            .update_from_ping(peer, result, result.is_ok().then_some(version))
+            .await
+        {
+            Ok(Some(updated)) => {
+                debug!(
+                    "peer {peer} has q = {}, avg_q = {}",
+                    updated.get_quality(),
+                    updated.get_average_quality()
+                );
+                if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+                    let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
+                    if let Some(chain_key) = maybe_chain_key {
+                        let mut g = self.channel_graph.write().await;
+                        let self_addr = g.my_address();
+                        g.update_channel_quality(self_addr, chain_key, updated.get_quality())
+                    } else {
+                        error!("could not resolve chain key for '{peer}'");
+                    }
                 } else {
-                    error!("could not resolve chain key for peer {peer}");
+                    error!("encountered invalid peer id: '{peer}'");
                 }
-            } else {
-                error!("encountered invalid peer id: {peer}");
             }
+            Ok(None) => debug!("No update necessary"),
+            Err(e) => error!("Encountered error on on updating the collected ping data: {e}"),
         }
     }
 }
