@@ -1160,6 +1160,7 @@ dependencies = [
  "ethers-providers",
  "futures",
  "futures-timer",
+ "hex-literal",
  "hopr-crypto-types",
  "hopr-metrics",
  "hopr-primitive-types",
