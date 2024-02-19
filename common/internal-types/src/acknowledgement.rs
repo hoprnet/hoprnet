@@ -182,7 +182,7 @@ impl AcknowledgedTicket {
             luck.copy_from_slice(
                 &Hash::create(&[
                     &self.ticket.get_hash(domain_separator).to_bytes(),
-                    &self.vrf_params.get_decompressed_v()?.to_bytes()[1..], // skip prefix
+                    &self.vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
                     &self.response.to_bytes(),
                     &signature.to_bytes(),
                 ])
