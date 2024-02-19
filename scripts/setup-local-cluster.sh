@@ -161,7 +161,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=3 \
     HOPRD_HEARTBEAT_VARIANCE=1 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    RUST_LOG="debug" \
+    RUST_LOG="debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error" \
     RUST_BACKTRACE=1 \
     ${hoprd_command} \
       --announce \

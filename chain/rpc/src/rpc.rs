@@ -8,15 +8,15 @@ use chain_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::{BlockId, NameOrAddress};
-use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
-use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -46,19 +46,19 @@ pub struct RpcOperationsConfig {
     pub expected_block_time: Duration,
     /// Minimum size of the block range where batch fetch query should be used.
     ///
-    /// For block ranges smaller than this size, the ordinary `getLogs` will be called without pagination.
+    /// For block ranges smaller than this size, the ordinary `eth_getLogs` will be called without pagination.
     ///
-    /// Defaults to 3.
+    /// Defaults to 100.
     #[validate(range(min = 1))]
-    #[default = 3]
+    #[default = 100]
     pub min_block_range_fetch_size: u64,
     /// The largest amount of blocks to fetch at once when fetching a range of blocks.
     ///
     /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
     ///
-    /// Defaults to 2500 blocks
+    /// Defaults to 2000 blocks
     #[validate(range(min = 1))]
-    #[default = 2500]
+    #[default = 2000]
     pub max_block_range_fetch_size: u64,
     /// Interval for polling on TX submission
     ///

@@ -23,7 +23,7 @@ hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-path = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

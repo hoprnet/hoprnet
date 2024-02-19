@@ -22,7 +22,7 @@ serde = { version = "1.0", features = ["derive"] }
 sqlx = { version = "0.7.3", optional = true, default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
 thiserror = "1.0"
 
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-platform = { workspace = true }
 

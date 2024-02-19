@@ -4,7 +4,7 @@ use hopr_crypto_sphinx::{
 };
 use hopr_crypto_types::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use hopr_primitive_types::prelude::*;
-use log::error;
+use tracing::error;
 
 use crate::errors::{PacketError, Result};
 

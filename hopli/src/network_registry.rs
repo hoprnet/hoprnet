@@ -1,3 +1,9 @@
+use clap::Parser;
+use std::env;
+use tracing::info;
+
+use hopr_crypto_types::keypairs::Keypair;
+
 use crate::{
     identity_input::LocalIdentityArgs,
     key_pair::read_identities,
@@ -5,10 +11,6 @@ use crate::{
     process::{child_process_call_foundry_self_register, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
-use clap::Parser;
-use hopr_crypto_types::keypairs::Keypair;
-use log::{log, Level};
-use std::env;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -89,7 +91,7 @@ impl RegisterInNetworkRegistryArgs {
             }
         }
 
-        log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_chain_addrs.join(","));
+        info!(target: "network_registry", "merged peer_ids {:?}", all_chain_addrs.join(","));
 
         // set directory and environment variables
         set_process_path_env(&contracts_root, &network)?;

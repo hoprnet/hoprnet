@@ -23,8 +23,8 @@
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
 use std::collections::HashMap;
+use tracing::{debug, error, info, warn};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -211,10 +211,16 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        self.network
+        let all_peers = self
+            .network
             .read()
             .await
             .all_peers()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        all_peers
             .into_iter()
             .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
                 Ok(offchain_key) => {

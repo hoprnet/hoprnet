@@ -14,7 +14,7 @@ generic-array = { version = "0.14.7", features = ["zeroize"] }
 hex = { workspace = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 primitive-types = "0.12.2"
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
@@ -30,3 +30,4 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+lazy_static = { workspace = true }

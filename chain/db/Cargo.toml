@@ -18,7 +18,7 @@ lazy_static = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

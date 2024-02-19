@@ -35,7 +35,7 @@ hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
 utils-db = { workspace = true }

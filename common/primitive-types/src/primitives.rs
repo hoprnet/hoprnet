@@ -55,6 +55,12 @@ impl Address {
     }
 }
 
+impl AsRef<[u8]> for Address {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl BinarySerializable for Address {
     const SIZE: usize = 20;
 
