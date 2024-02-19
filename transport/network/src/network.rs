@@ -1,4 +1,4 @@
-use std::collections::hash_map::{Entry, HashMap};
+use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -147,13 +147,6 @@ pub trait NetworkExternalActions {
     fn emit(&self, event: NetworkEvent);
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
-#[repr(u8)]
-pub enum PeerGoodness {
-    Bad = 0,
-    Good = 1,
-}
-
 /// Status of the peer as recorded by the [Network].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
@@ -166,7 +159,6 @@ pub struct PeerStatus {
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
     pub ignored: bool,
-    pub peer_goodness: PeerGoodness,
     pub peer_version: Option<String>,
     pub multiaddresses: Vec<Multiaddr>,
     pub(crate) quality: f64,
@@ -184,7 +176,6 @@ impl PeerStatus {
             last_seen: 0,
             last_seen_latency: 0,
             ignored: false,
-            peer_goodness: PeerGoodness::Bad,
             backoff,
             quality: 0.0,
             peer_version: None,

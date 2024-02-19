@@ -7,8 +7,10 @@ use crate::errors::Result;
 use crate::network::{PeerOrigin, PeerStatus};
 
 pub struct Stats {
-    pub good_quality: usize,
-    pub bad_quality: usize,
+    pub good_quality_public: u32,
+    pub bad_quality_public: u32,
+    pub good_quality_non_public: u32,
+    pub bad_quality_non_public: u32,
 }
 
 pub use sea_query::SimpleExpr;

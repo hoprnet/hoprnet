@@ -829,7 +829,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
+    use hopr_lib::{HoprTransportError, Multiaddr};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;

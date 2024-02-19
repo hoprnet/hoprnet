@@ -31,7 +31,6 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;

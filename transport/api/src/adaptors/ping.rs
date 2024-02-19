@@ -9,7 +9,7 @@ use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
 use tracing::{debug, error};
 
-use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_METADATA_PROTOCOL_VERSION};
+use crate::adaptors::network::ExternalNetworkInteractions;
 
 /// Implementor of the ping external API.
 ///
