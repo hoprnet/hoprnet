@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
 use std::collections::VecDeque;
@@ -514,17 +515,6 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn length(&self) -> usize {
         self.entries.len()
     }
-
-    #[cfg(test)]
-    pub fn debug_output(&self) -> String {
-        let mut output = "".to_string();
-
-        for entry in self.entries.values() {
-            output.push_str(format!("{}\n", entry).as_str());
-        }
-
-        output
-    }
 }
 
 #[cfg(test)]
@@ -636,11 +626,11 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        let actual = peers.debug_output();
+        let actual = peers.get_peer_status(&peer).expect("peer record should be present");
 
-        assert!(actual.contains("heartbeats sent=1"));
-        assert!(actual.contains("heartbeats succeeded=1"));
-        assert!(actual.contains(format!("last seen on={}", ts).as_str()))
+        assert_eq!(actual.heartbeats_sent, 1);
+        assert_eq!(actual.heartbeats_succeeded, 1);
+        assert_eq!(actual.last_seen, ts);
     }
 
     #[test]
@@ -722,10 +712,10 @@ mod tests {
         peers.update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64));
         peers.update(&peer, Err(()));
 
-        let actual = peers.debug_output();
+        let actual = peers.get_peer_status(&peer).expect("the peer record should be preent");
 
-        assert!(actual.contains("heartbeats succeeded=2"));
-        assert!(actual.contains("backoff=300"));
+        assert_eq!(actual.heartbeats_succeeded, 2);
+        assert_eq!(actual.backoff, 300f64);
     }
 
     #[test]

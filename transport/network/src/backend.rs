@@ -12,12 +12,12 @@ use crate::errors::Result;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SqliteNetworkBackendConfig {
-    pub peer_quality_threshold: f64
+    pub peer_quality_threshold: f64,
 }
 
 pub struct SqliteNetworkBackend {
     db: sqlx::SqlitePool,
-    cfg: SqliteNetworkBackendConfig
+    cfg: SqliteNetworkBackendConfig,
 }
 
 impl SqliteNetworkBackend {
@@ -29,7 +29,13 @@ impl SqliteNetworkBackend {
         let sql = Table::create()
             .table(NetworkPeersTable::Table)
             .if_not_exists()
-            .col(ColumnDef::new(NetworkPeersTable::Id).integer().not_null().auto_increment().primary_key())
+            .col(
+                ColumnDef::new(NetworkPeersTable::Id)
+                    .integer()
+                    .not_null()
+                    .auto_increment()
+                    .primary_key(),
+            )
             .col(ColumnDef::new(NetworkPeersTable::PeerId).string().not_null().unique_key())
             .col(ColumnDef::new(NetworkPeersTable::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeersTable::Origin).tiny_integer().not_null())
@@ -49,7 +55,7 @@ impl SqliteNetworkBackend {
             .await
             .expect("must be able to provision in-memory database");
 
-        Self { db, cfg, }
+        Self { db, cfg }
     }
 }
 
