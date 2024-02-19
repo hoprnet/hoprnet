@@ -3290,6 +3290,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-primitive-types",
  "k256",
+ "lazy_static",
  "libp2p-identity",
  "primitive-types",
  "serde",

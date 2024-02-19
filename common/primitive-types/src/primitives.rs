@@ -49,7 +49,7 @@ impl Address {
         ret.into_boxed_slice()
     }
 
-    /// Creates a random Ethereum address, mostly used for testing
+    /// Creates a random Ethereum address, only used for testing
     pub fn random() -> Self {
         Self(hopr_crypto_random::random_bytes())
     }
@@ -57,6 +57,12 @@ impl Address {
     /// Checks if the address is all zeroes.
     pub fn is_zero(&self) -> bool {
         self.0.iter().all(|e| 0_u8.eq(e))
+    }
+}
+
+impl AsRef<[u8]> for Address {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 

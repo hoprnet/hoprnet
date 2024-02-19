@@ -30,3 +30,4 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"
+lazy_static = { workspace = true }
