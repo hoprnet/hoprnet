@@ -1,6 +1,6 @@
 use async_stream::stream;
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use hopr_primitive_types::prelude::SingleSumSMA;
@@ -8,6 +8,7 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use sea_query::{Asterisk, ColumnDef, Expr, Order, Query, SimpleExpr, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
+use sqlx::sqlite::SqliteConnectOptions;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 use tracing::{error, trace};
@@ -33,9 +34,11 @@ pub struct SqliteNetworkBackend {
 impl SqliteNetworkBackend {
     /// Construct new backend with in-memory database.
     pub async fn new(cfg: SqliteNetworkBackendConfig) -> Self {
-        let db = sqlx::SqlitePool::connect("sqlite::memory:")
-            .await
-            .expect("memory driver must be always constructible");
+        let db = sqlx::sqlite::SqlitePool::connect_with(
+            SqliteConnectOptions::from_str("sqlite::memory:").expect("must parse conn options"),
+        )
+        .await
+        .expect("memory driver must be always constructible");
 
         let default_sma = bincode::serialize(&SingleSumSMA::<f64, f64>::new(
             cfg.network_options.quality_avg_window_size as usize,
@@ -60,7 +63,7 @@ impl SqliteNetworkBackend {
             .col(
                 ColumnDef::new(NetworkPeerIden::LastSeen)
                     .timestamp()
-                    .default(NaiveDateTime::UNIX_EPOCH),
+                    .default(DateTime::<Utc>::UNIX_EPOCH),
             )
             .col(
                 ColumnDef::new(NetworkPeerIden::LastSeenLatency)

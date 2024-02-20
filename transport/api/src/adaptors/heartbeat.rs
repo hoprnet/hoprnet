@@ -30,7 +30,7 @@ impl HeartbeatExternalApi for HeartbeatExternalInteractions {
     /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
-    async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {
+    async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<PeerId> {
         let reader = self.network.read().await;
         (*reader).find_peers_to_ping(from_timestamp).await.unwrap_or_else(|e| {
             error!("Failed to generate peers for the heartbeat procedure: {e}");

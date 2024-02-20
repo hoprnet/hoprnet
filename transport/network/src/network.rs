@@ -14,10 +14,7 @@ use crate::backend::{SqliteNetworkBackend, SqliteNetworkBackendConfig};
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use crate::traits::{NetworkBackend, Stats};
 use hopr_platform::time::native::current_time;
-use hopr_primitive_types::{
-    prelude::AsUnixTimestamp,
-    sma::{SingleSumSMA, SMA},
-};
+use hopr_primitive_types::prelude::*;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiGauge, SimpleGauge};
@@ -460,11 +457,14 @@ impl<T: NetworkExternalActions> Network<T> {
         Ok(stream.filter_map(filter).collect().await)
     }
 
-    pub async fn find_peers_to_ping(&self, threshold: u64) -> crate::errors::Result<Vec<PeerId>> {
+    pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
             .get_multiple(
-                Some(sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen).lte(threshold)),
+                Some(
+                    sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen)
+                        .lte(chrono::DateTime::<chrono::Utc>::from(threshold)),
+                ),
                 true,
             )
             .await?;
@@ -477,12 +477,7 @@ impl<T: NetworkExternalActions> Network<T> {
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
-                panic!(
-                    "{} and {}",
-                    (v.last_seen.as_unix_timestamp() + delay).as_millis() as u64,
-                    threshold
-                );
-                if ((v.last_seen.as_unix_timestamp() + delay).as_millis() as u64) < threshold {
+                if (v.last_seen + delay) < threshold {
                     Some(v)
                 } else {
                     None
@@ -504,9 +499,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
     pub(crate) fn should_still_be_ignored(&self, peer: &PeerStatus) -> bool {
         peer.ignored
-            .map(|t| {
-                current_time().as_unix_timestamp().saturating_sub(t.as_unix_timestamp()) < self.cfg.ignore_timeframe
-            })
+            .map(|t| current_time().duration_since(t).unwrap_or_default() < self.cfg.ignore_timeframe)
             .unwrap_or(false)
     }
 }
@@ -519,6 +512,8 @@ mod tests {
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
+    use std::ops::Add;
+    use std::time::Duration;
 
     #[test]
     fn test_network_health_should_serialize_to_a_proper_string() {
@@ -739,23 +734,30 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
+        // Needs to do 3 pings, so we get over the ignore threshold limit
+        // when doing the 4th failed ping
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(123_u64), None)
             .await
             .expect("no error should occur");
         peers
-            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(200_u64), None)
             .await
             .expect("no error should occur");
+        peers
+            .update(&peer, Ok(200_u64), None)
+            .await
+            .expect("no error should occur");
+
         peers.update(&peer, Err(()), None).await.expect("no error should occur");
 
         let actual = peers
             .get(&peer)
             .await
             .unwrap()
-            .expect("the peer record should be preent");
+            .expect("the peer record should be present");
 
-        assert_eq!(actual.heartbeats_succeeded, 2);
+        assert_eq!(actual.heartbeats_succeeded, 3);
         assert_eq!(actual.backoff, 300f64);
     }
 
@@ -771,14 +773,17 @@ mod tests {
             .await
             .unwrap();
 
-        let ts = 77u64;
+        let latency = 77_u64;
 
         let mut expected = vec![first, second];
         expected.sort();
 
-        peers.update(&first, Ok(ts), None).await.expect("no error should occur");
         peers
-            .update(&second, Ok(ts), None)
+            .update(&first, Ok(latency), None)
+            .await
+            .expect("no error should occur");
+        peers
+            .update(&second, Ok(latency), None)
             .await
             .expect("no error should occur");
 
@@ -792,7 +797,7 @@ mod tests {
         // assert_eq!(format!("{:?}", peers.get(&first).await), "");
 
         let mut actual = peers
-            .find_peers_to_ping(current_time().as_unix_timestamp().as_millis() as u64 + 10u64)
+            .find_peers_to_ping(current_time().add(Duration::from_secs(2u64)))
             .await
             .unwrap();
         actual.sort();

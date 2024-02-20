@@ -318,7 +318,11 @@ where
 {
     let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
-    let (network, network_events_rx) = build_network(identity.public().to_peer_id(), my_multiaddresses.clone(), cfg.network_options);
+    let (network, network_events_rx) = build_network(
+        identity.public().to_peer_id(),
+        my_multiaddresses.clone(),
+        cfg.network_options,
+    );
 
     info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
     async_std::task::block_on(async {
