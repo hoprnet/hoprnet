@@ -125,7 +125,8 @@ impl BinarySerializable for AccountEntry {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
             let public_key = OffchainPublicKey::from_bytes(buf.drain(..OffchainPublicKey::SIZE).as_ref())?;
-            let chain_addr = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
+            let mut chain_addr = [0u8; Address::SIZE];
+            chain_addr.copy_from_slice(buf.drain(..Address::SIZE).as_ref());
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
                 let multiaddr = Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>())
@@ -142,7 +143,7 @@ impl BinarySerializable for AccountEntry {
             };
             Ok(Self {
                 public_key,
-                chain_addr,
+                chain_addr: chain_addr.into(),
                 entry_type,
             })
         } else {
@@ -189,17 +190,16 @@ mod test {
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
 
-    const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
-    const CHAIN_ADDR: [u8; 20] = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E");
+    lazy_static::lazy_static! {
+        static ref PUBLIC_KEY: OffchainPublicKey = OffchainPublicKey::from_privkey(&hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260")).unwrap();
+        static ref CHAIN_ADDR: Address = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E").into();
+    }
 
     #[test]
     fn test_account_entry_non_routable() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
-
         let ae1 = AccountEntry::new(
-            pub_key,
-            chain_addr,
+            *PUBLIC_KEY,
+            *CHAIN_ADDR,
             Announced {
                 multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -218,12 +218,9 @@ mod test {
 
     #[test]
     fn test_account_entry_routable() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
-
         let ae1 = AccountEntry::new(
-            pub_key,
-            chain_addr,
+            *PUBLIC_KEY,
+            *CHAIN_ADDR,
             Announced {
                 multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -242,10 +239,7 @@ mod test {
 
     #[test]
     fn test_account_entry_not_announced() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
-
-        let ae1 = AccountEntry::new(pub_key, chain_addr, NotAnnounced);
+        let ae1 = AccountEntry::new(*PUBLIC_KEY, *CHAIN_ADDR, NotAnnounced);
 
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());

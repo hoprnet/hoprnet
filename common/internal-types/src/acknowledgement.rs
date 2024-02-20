@@ -221,23 +221,27 @@ impl BinarySerializable for AcknowledgedTicket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
-            let response = Response::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
+            let mut response = [0u8; Response::SIZE];
+            response.copy_from_slice(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE]);
+
             let vrf_params = VrfParameters::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
             )?;
-            let signer = Address::from_bytes(
+
+            let mut signer = [0u8; Address::SIZE];
+            signer.copy_from_slice(
                 &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
                     ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
-            )?;
+            );
 
             Ok(Self {
                 // BinarySerializable is only used for over-the-wire encoding,
                 // so acked tickets are always untouched
                 status: AcknowledgedTicketStatus::Untouched,
                 ticket,
-                response,
+                response: response.into(),
                 vrf_params,
-                signer,
+                signer: signer.into(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -320,12 +324,12 @@ impl BinarySerializable for UnacknowledgedTicket {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
             let own_key = HalfKey::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
-            let signer =
-                Address::from_bytes(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
+            let mut signer = [0u8; Address::SIZE];
+            signer.copy_from_slice(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE]);
             Ok(Self {
                 ticket,
                 own_key,
-                signer,
+                signer: signer.into(),
             })
         } else {
             Err(GeneralError::ParseError)
@@ -548,10 +552,7 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket() {
-        let response = Response::from_bytes(&hex!(
-            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
-        ))
-        .unwrap();
+        let response: Response = hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").into();
 
         let ticket = mock_ticket(
             &ALICE,
@@ -585,10 +586,7 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket_serialize_deserialize() {
-        let response = Response::from_bytes(&hex!(
-            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
-        ))
-        .unwrap();
+        let response: Response = hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").into();
 
         let ticket = mock_ticket(
             &ALICE,

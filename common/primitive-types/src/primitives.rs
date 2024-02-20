@@ -316,27 +316,23 @@ impl FromStr for Balance {
 /// Represents and Ethereum challenge.
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct EthereumChallenge {
-    challenge: [u8; Self::SIZE],
-}
+pub struct EthereumChallenge([u8; Self::SIZE]);
 
 impl From<[u8; Self::SIZE]> for EthereumChallenge {
     fn from(challenge: [u8; Self::SIZE]) -> Self {
-        Self { challenge }
+        Self(challenge)
     }
 }
 
 impl AsRef<[u8; Self::SIZE]> for EthereumChallenge {
     fn as_ref(&self) -> &[u8; Self::SIZE] {
-        &self.challenge
+        &self.0
     }
 }
 
 impl Default for EthereumChallenge {
     fn default() -> Self {
-        Self {
-            challenge: [0u8; Self::SIZE],
-        }
+        Self([0u8; Self::SIZE])
     }
 }
 
@@ -345,7 +341,7 @@ impl EthereumChallenge {
         assert_eq!(data.len(), Self::SIZE);
 
         let mut ret = Self::default();
-        ret.challenge.copy_from_slice(data);
+        ret.0.copy_from_slice(data);
         ret
     }
 }
@@ -362,7 +358,7 @@ impl BinarySerializable for EthereumChallenge {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.challenge.into()
+        self.0.into()
     }
 }
 

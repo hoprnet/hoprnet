@@ -1712,14 +1712,8 @@ mod tests {
 
             total_balance = total_balance.add(&ticket.amount);
 
-            let ack = AcknowledgedTicket::new(
-                ticket,
-                Response::from_bytes(&challenge_seed.clone()).unwrap(),
-                (&*ALICE).into(),
-                &BOB,
-                &domain_separator,
-            )
-            .unwrap();
+            let ack = AcknowledgedTicket::new(ticket, challenge_seed.into(), (&*ALICE).into(), &BOB, &domain_separator)
+                .unwrap();
 
             acked_tickets.push(ack);
         }

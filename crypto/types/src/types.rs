@@ -947,16 +947,12 @@ impl CompressedPublicKey {
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Response {
-    response: [u8; Self::SIZE],
-}
+pub struct Response([u8; Self::SIZE]);
 
 impl Default for Response {
     fn default() -> Self {
-        let mut ret = Self {
-            response: [0u8; Self::SIZE],
-        };
-        ret.response.copy_from_slice(
+        let mut ret = Self([0u8; Self::SIZE]);
+        ret.0.copy_from_slice(
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
@@ -976,7 +972,7 @@ impl Response {
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
         let mut ret = Self::default();
-        ret.response.copy_from_slice(data);
+        ret.0.copy_from_slice(data);
         ret
     }
 
@@ -984,8 +980,7 @@ impl Response {
     /// represented by this response into a secp256k1 curve point (public key)
     pub fn to_challenge(&self) -> Challenge {
         Challenge {
-            curve_point: CurvePoint::from_exponent(&self.response)
-                .expect("response represents an invalid non-zero scalar"),
+            curve_point: CurvePoint::from_exponent(&self.0).expect("response represents an invalid non-zero scalar"),
         }
     }
 
@@ -1004,13 +999,13 @@ impl Response {
 
 impl AsRef<[u8; Self::SIZE]> for Response {
     fn as_ref(&self) -> &[u8; Self::SIZE] {
-        &self.response
+        &self.0
     }
 }
 
 impl From<[u8; Self::SIZE]> for Response {
     fn from(response: [u8; Self::SIZE]) -> Self {
-        Self { response }
+        Self(response)
     }
 }
 
@@ -1026,7 +1021,7 @@ impl BinarySerializable for Response {
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
-        self.response.into()
+        self.0.into()
     }
 }
 
@@ -1505,7 +1500,7 @@ pub mod tests {
     #[test]
     pub fn response_test() {
         let r1 = Response::new(&[0u8; Response::SIZE]);
-        let r2 = Response::from_bytes(r1.as_ref()).unwrap();
+        let r2 = Response::from_bytes(&r1.to_bytes()).unwrap();
         assert_eq!(r1, r2, "deserialized response does not match");
     }
 

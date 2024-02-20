@@ -771,7 +771,9 @@ impl BinarySerializable for Ticket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // TODO: not necessary to transmit over the wire
-            let channel_id = Hash::from_bytes(&data[0..32])?;
+            let mut channel_id = [0u8; 32];
+            channel_id.copy_from_slice(&data[0..32]);
+
             let mut amount = [0u8; 32];
             amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
 
@@ -797,7 +799,7 @@ impl BinarySerializable for Ticket {
             )?;
 
             Ok(Self {
-                channel_id,
+                channel_id: channel_id.into(),
                 amount: Balance::new(U256::from_bytes(&amount)?, BalanceType::HOPR),
                 index: u64::from_be_bytes(index),
                 index_offset: u32::from_be_bytes(index_offset),
