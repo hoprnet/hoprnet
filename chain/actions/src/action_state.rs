@@ -18,13 +18,13 @@ use async_trait::async_trait;
 use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
 use hopr_crypto_types::types::Hash;
-use log::{debug, error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use tracing::{debug, error};
 
 use crate::errors::{ChainActionsError, Result};
 
@@ -165,18 +165,24 @@ mod tests {
     use crate::errors::ChainActionsError;
     use async_std::prelude::FutureExt;
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
 
+    lazy_static::lazy_static! {
+        // some random address
+        static ref RANDY: Address = hex!("60f8492b6fbaf86ac2b064c90283d8978a491a01").into();
+    }
+
     #[async_std::test]
     async fn test_expectation_should_resolve() {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
             tx_hash: random_hash,
-            event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+            event_type: ChainEventType::NodeSafeRegistered(*RANDY),
         };
 
         let exp = Arc::new(IndexerActionTracker::default());
@@ -212,7 +218,7 @@ mod tests {
     async fn test_expectation_should_error_when_unregistered() {
         let sample_event = SignificantChainEvent {
             tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-            event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+            event_type: ChainEventType::NodeSafeRegistered(*RANDY),
         };
 
         let exp = Arc::new(IndexerActionTracker::default());
@@ -249,15 +255,15 @@ mod tests {
         let sample_events = vec![
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+                event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
                 tx_hash,
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Denied),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Denied),
             },
             SignificantChainEvent {
                 tx_hash,
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Allowed),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Allowed),
             },
         ];
 
@@ -296,15 +302,15 @@ mod tests {
         let sample_events = vec![
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NodeSafeRegistered(Address::random()),
+                event_type: ChainEventType::NodeSafeRegistered(*RANDY),
             },
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Denied),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Denied),
             },
             SignificantChainEvent {
                 tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                event_type: ChainEventType::NetworkRegistryUpdate(Address::random(), NetworkRegistryStatus::Allowed),
+                event_type: ChainEventType::NetworkRegistryUpdate(*RANDY, NetworkRegistryStatus::Allowed),
             },
         ];
 

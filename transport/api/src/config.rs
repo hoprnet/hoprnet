@@ -47,6 +47,7 @@ impl Default for HostType {
 ///
 /// Intentionally has no default, because it depends on the use case.
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HostConfig {
     /// Host on which to listen
     #[serde(default)] // must be defaulted to be mergeable from CLI args
@@ -125,6 +126,7 @@ pub fn validate_external_host(host: &HostConfig) -> Result<(), ValidationError> 
 /// Configuration of the physical transport mechanism.
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq, smart_default::SmartDefault)]
+#[serde(deny_unknown_fields)]
 pub struct TransportConfig {
     /// When true, assume that the node is running in an isolated network and does
     /// not need any connection to nodes outside the subnet

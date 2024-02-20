@@ -52,6 +52,7 @@ scrape_configs:
 - `hopr_strategy_promiscuous_max_auto_channels`: Count of maximum number of channels managed by the strategy
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
 - `hopr_strategy_aggregating_aggregation_count`: Count of initiated automatic aggregations
+- `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
 - `hopr_message_latency_sec`: Histogram of measured received message latencies in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
-use log::{debug, info};
+use tracing::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
@@ -37,6 +37,7 @@ use crate::ping::Pinging;
 /// Configuration for the Heartbeat mechanism
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]

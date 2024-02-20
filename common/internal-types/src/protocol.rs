@@ -4,10 +4,10 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
 use moka::future::{Cache, CacheBuilder};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use tracing::warn;
 use std::time::Duration;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};

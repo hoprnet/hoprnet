@@ -12,13 +12,13 @@
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
 //! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
+use ethers::providers::{JsonRpcClient, JsonRpcError};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
+use tracing::{debug, warn};
 use validator::Validate;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
@@ -66,6 +66,9 @@ lazy_static::lazy_static! {
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
 /// specified in `retryable_http_errors`.
 ///
+/// The total wait time will be `(initial_backoff/backoff_coefficient) * ((1 + backoff_coefficient)^max_retries - 1)`.
+/// or `max_backoff`, whatever is lower.
+///
 /// Transport and connection errors (such as connection timeouts) are retried without backoff
 /// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
 ///
@@ -77,9 +80,9 @@ pub struct SimpleJsonRpcRetryPolicy {
     ///
     /// If `None` is given, will keep retrying indefinitely.
     ///
-    /// Default is 10.
+    /// Default is 7.
     #[validate(range(min = 1))]
-    #[default(Some(10))]
+    #[default(Some(7))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
     ///
@@ -250,12 +253,14 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
+        debug!("sending rpc request {method}");
+
         // Perform the actual request
         let start = std::time::Instant::now();
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -512,7 +517,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 pub mod tests {
     use chain_types::utils::create_anvil;
     use chain_types::{ContractAddresses, ContractInstances};
-    use ethers_providers::JsonRpcClient;
+    use ethers::providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;

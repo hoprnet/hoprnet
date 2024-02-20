@@ -23,13 +23,13 @@ hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-path = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-trait = "0.1.73"
-hex-literal = "0.4.1"
+hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true, features = ["ed25519", "secp256k1", "x25519"] }
 mockall = "0.11.4"

@@ -1,11 +1,11 @@
 use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
-use log::warn;
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
+use tracing::warn;
 
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///

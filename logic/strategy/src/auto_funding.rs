@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+use tracing::info;
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -117,11 +117,19 @@ mod tests {
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
+
+    lazy_static::lazy_static! {
+        static ref ALICE: Address = hex!("18f8ae833c85c51fbeba29cef9fbfb53b3bad950").into();
+        static ref BOB: Address = hex!("44f23fa14130ca540b37251309700b6c281d972e").into();
+        static ref CHRIS: Address = hex!("b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234").into();
+        static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
+    }
 
     mock! {
         ChannelAct { }
@@ -153,8 +161,8 @@ mod tests {
         let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
 
         let c1 = ChannelEntry::new(
-            Address::random(),
-            Address::random(),
+            *ALICE,
+            *BOB,
             Balance::new(10_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
@@ -162,8 +170,8 @@ mod tests {
         );
 
         let c2 = ChannelEntry::new(
-            Address::random(),
-            Address::random(),
+            *BOB,
+            *CHRIS,
             Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::Open,
@@ -171,8 +179,8 @@ mod tests {
         );
 
         let c3 = ChannelEntry::new(
-            Address::random(),
-            Address::random(),
+            *CHRIS,
+            *DAVE,
             Balance::new(5_u32, BalanceType::HOPR),
             0_u32.into(),
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),

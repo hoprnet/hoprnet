@@ -27,12 +27,12 @@ use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_internal_types::prelude::*;
-use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Sub;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, error, info, warn};
 use validator::Validate;
 
 use hopr_platform::time::native::current_time;
@@ -147,6 +147,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`

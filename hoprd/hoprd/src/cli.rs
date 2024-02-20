@@ -200,6 +200,15 @@ pub struct CliArgs {
     pub check_unrealized_balance: u8,
 
     #[arg(
+        long = "maxBlockRange",
+        help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
+        env = "HOPRD_MAX_BLOCK_RANGE",
+        value_name = "MAX_BLOCK_RANGE",
+        value_parser = clap::value_parser ! (u64)
+    )]
+    pub max_block_range: Option<u64>,
+
+    #[arg(
         long,
         help = "A custom RPC provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",

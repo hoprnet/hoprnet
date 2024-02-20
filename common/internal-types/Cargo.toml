@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 async-trait = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 ethers = { workspace = true, default-features = false }
-hex-literal = "0.4.1"
+hex-literal = { workspace = true }
 moka = { version = "0.12.5", features = ["future", "atomic64", "quanta"] }
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
@@ -28,7 +28,7 @@ thiserror = "1.0"
 bindings =  { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

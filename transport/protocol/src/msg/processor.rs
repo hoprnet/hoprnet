@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -841,9 +841,9 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
+    use tracing::debug;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
@@ -1216,12 +1216,13 @@ mod tests {
         (received_packets, received_challenges, received_tickets)
     }
 
-    async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
-        let peers_addrs = peers
+    async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {
+        let peers_addrs = peers_offchain
             .iter()
-            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
+            .zip(peers_onchain)
+            .map(|(peer_id, addr)| (OffchainPublicKey::try_from(peer_id).unwrap(), addr))
             .collect::<Vec<_>>();
-        let mut cg = ChannelGraph::new(Address::random());
+        let mut cg = ChannelGraph::new(me);
         let mut last_addr = cg.my_address();
         for (_, addr) in peers_addrs.iter() {
             let c = ChannelEntry::new(
@@ -1249,7 +1250,7 @@ mod tests {
             }
         }
 
-        TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)
+        TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
             .await
             .unwrap()
             .0
@@ -1272,10 +1273,12 @@ mod tests {
 
         // Peer 1: start sending out packets
         let packet_path = resolve_mock_path(
-            PEERS[1..peer_count]
+            PEERS_CHAIN[0].public().to_address(),
+            PEERS[1..peer_count].iter().map(|p| p.public().into()).collect(),
+            PEERS_CHAIN[1..peer_count]
                 .iter()
-                .map(|p| p.public().into())
-                .collect::<Vec<PeerId>>(),
+                .map(|key| key.public().to_address())
+                .collect(),
         )
         .await;
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");

@@ -4,8 +4,8 @@ use core_network::{network::Network, PeerId};
 use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
-use log::{error, warn};
 use std::{pin::Pin, sync::Arc};
+use tracing::{error, warn};
 
 use async_std::task::spawn;
 
@@ -70,14 +70,14 @@ impl IndexerActions {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
                         PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
                         PeerEligibility::Ineligible => {
-                            (*network.write().await).remove(&peer);
+                            network.write().await.remove(&peer);
                             IndexerProcessed::Ban(peer)
                         }
                     },
                     IndexerToProcess::Announce(peer, multiaddress) => IndexerProcessed::Announce(peer, multiaddress),
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
-                        let peers = (*network.read().await).get_all_peers();
+                        let peers = network.read().await.get_all_peers();
 
                         for peer in peers.into_iter() {
                             let is_allowed = {
@@ -112,7 +112,7 @@ impl IndexerActions {
                             let event = if is_allowed {
                                 IndexerProcessed::Allow(peer)
                             } else {
-                                (*network.write().await).remove(&peer);
+                                network.write().await.remove(&peer);
                                 IndexerProcessed::Ban(peer)
                             };
 

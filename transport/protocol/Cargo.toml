@@ -18,7 +18,7 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
@@ -35,7 +35,7 @@ hopr-crypto-types = { workspace = true }
 chain-db = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
 utils-db = { workspace = true }

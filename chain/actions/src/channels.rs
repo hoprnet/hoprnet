@@ -19,8 +19,8 @@ use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info};
 use std::time::Duration;
+use tracing::{debug, error, info};
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{
@@ -374,12 +374,9 @@ mod tests {
     async fn test_open_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -394,11 +391,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -408,7 +405,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -419,13 +416,11 @@ mod tests {
     async fn test_should_not_open_if_not_enough_allowance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -440,11 +435,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -455,13 +450,11 @@ mod tests {
     async fn test_should_not_open_if_not_enough_token_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
 
         let tx_queue = ActionQueue::new(
@@ -483,11 +476,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
@@ -498,14 +491,12 @@ mod tests {
     async fn test_fund_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         db.write()
             .await
@@ -519,7 +510,7 @@ mod tests {
             .await
             .unwrap();
 
-        let channel = ChannelEntry::new(self_addr, bob, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -551,7 +542,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -575,13 +566,11 @@ mod tests {
     async fn test_should_not_fund_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -602,7 +591,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -617,13 +606,11 @@ mod tests {
     async fn test_fund_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -638,11 +625,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake).await.err().unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -662,13 +649,11 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_allowance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -683,7 +668,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -698,13 +683,11 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-        let channel_id = generate_channel_id(&self_addr, &bob);
+        let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -725,7 +708,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
