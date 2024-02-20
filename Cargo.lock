@@ -6120,7 +6120,6 @@ version = "0.30.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4166a1e072292d46dc91f31617c2a1cdaf55a8be4b5c9f4bf2ba248e3ac4999b"
 dependencies = [
- "chrono",
  "inherent",
  "sea-query-attr",
  "sea-query-derive",
@@ -6144,7 +6143,6 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36bbb68df92e820e4d5aeb17b4acd5cc8b5d18b2c36a4dd6f4626aabfa7ab1b9"
 dependencies = [
- "chrono",
  "sea-query",
  "sqlx",
 ]
@@ -6707,7 +6705,6 @@ dependencies = [
  "atoi",
  "byteorder",
  "bytes 1.5.0",
- "chrono",
  "crc 3.0.1",
  "crossbeam-queue",
  "dotenvy",
@@ -6771,8 +6768,6 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "sqlx-core",
- "sqlx-mysql",
- "sqlx-postgres",
  "sqlx-sqlite",
  "syn 1.0.109",
  "tempfile",
@@ -6790,7 +6785,6 @@ dependencies = [
  "bitflags 2.4.2",
  "byteorder",
  "bytes 1.5.0",
- "chrono",
  "crc 3.0.1",
  "digest 0.10.7",
  "dotenvy",
@@ -6811,7 +6805,6 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "rsa",
- "serde",
  "sha1 0.10.6",
  "sha2 0.10.8",
  "smallvec",
@@ -6832,7 +6825,6 @@ dependencies = [
  "base64 0.21.7",
  "bitflags 2.4.2",
  "byteorder",
- "chrono",
  "crc 3.0.1",
  "dotenvy",
  "etcetera",
@@ -6869,7 +6861,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "210976b7d948c7ba9fced8ca835b11cbb2d677c59c79de41ac0d397e14547490"
 dependencies = [
  "atoi",
- "chrono",
  "flume 0.11.0",
  "futures-channel",
  "futures-core",
