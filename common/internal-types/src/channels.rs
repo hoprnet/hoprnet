@@ -173,8 +173,10 @@ impl BinarySerializable for ChannelEntry {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
-            let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
-            let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
+            let mut source = [0u8; Address::SIZE];
+            source.copy_from_slice(b.drain(0..Address::SIZE).as_ref());
+            let mut destination = [0u8; Address::SIZE];
+            destination.copy_from_slice(b.drain(0..Address::SIZE).as_ref());
             let balance = Balance::new(U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?, BalanceType::HOPR);
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let status_byte = b.drain(0..1).as_ref()[0];
@@ -191,8 +193,8 @@ impl BinarySerializable for ChannelEntry {
             };
 
             Ok(Self::new(
-                source,
-                destination,
+                source.into(),
+                destination.into(),
                 balance,
                 ticket_index,
                 status,
@@ -771,8 +773,8 @@ impl BinarySerializable for Ticket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // TODO: not necessary to transmit over the wire
-            let mut channel_id = [0u8; 32];
-            channel_id.copy_from_slice(&data[0..32]);
+            let mut channel_id = [0u8; Hash::SIZE];
+            channel_id.copy_from_slice(&data[0..Hash::SIZE]);
 
             let mut amount = [0u8; 32];
             amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
@@ -789,9 +791,8 @@ impl BinarySerializable for Ticket {
             let mut encoded_win_prob = [0u8; 7];
             encoded_win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
 
-            let challenge = EthereumChallenge::from_bytes(
-                &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
-            )?;
+            let mut challenge = [0u8; EthereumChallenge::SIZE];
+            challenge.copy_from_slice(&data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE]);
 
             let signature = Signature::from_bytes(
                 &data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
@@ -805,7 +806,7 @@ impl BinarySerializable for Ticket {
                 index_offset: u32::from_be_bytes(index_offset),
                 encoded_win_prob,
                 channel_epoch: u32::from_be_bytes(channel_epoch),
-                challenge,
+                challenge: challenge.into(),
                 signature: Some(signature),
                 signer: OnceLock::new(),
             })
@@ -889,8 +890,8 @@ pub mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
 
-        static ref ADDRESS_1: Address = Address::from_bytes(&hex!("3829b806aea42200c623c4d6b9311670577480ed")).unwrap();
-        static ref ADDRESS_2: Address = Address::from_bytes(&hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1")).unwrap();
+        static ref ADDRESS_1: Address = hex!("3829b806aea42200c623c4d6b9311670577480ed").into();
+        static ref ADDRESS_2: Address = hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1").into();
     }
 
     #[test]
