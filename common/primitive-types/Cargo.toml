@@ -24,7 +24,7 @@ thiserror = "1.0"
 hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 
 [features]
 default = []

@@ -34,7 +34,7 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-hex-literal = "0.4"
+hex-literal = { workspace = true }
 mockall = "0.11"
 primitive-types = "0.12.2"
 
