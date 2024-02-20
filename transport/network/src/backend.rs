@@ -67,7 +67,8 @@ impl SqliteNetworkBackend {
             )
             .col(
                 ColumnDef::new(NetworkPeerIden::LastSeenLatency)
-                    .big_integer()
+                    .integer()
+                    .unsigned()
                     .default(0),
             )
             .col(ColumnDef::new(NetworkPeerIden::Ignored).timestamp())
@@ -83,10 +84,16 @@ impl SqliteNetworkBackend {
                     .float()
                     .default(cfg.network_options.backoff_min),
             )
-            .col(ColumnDef::new(NetworkPeerIden::HeartbeatsSent).integer().default(0))
+            .col(
+                ColumnDef::new(NetworkPeerIden::HeartbeatsSent)
+                    .integer()
+                    .unsigned()
+                    .default(0),
+            )
             .col(
                 ColumnDef::new(NetworkPeerIden::HeartbeatsSuccessful)
                     .integer()
+                    .unsigned()
                     .default(0),
             )
             .build(SqliteQueryBuilder);
@@ -109,14 +116,14 @@ struct NetworkPeer {
     origin: u8,
     version: Option<String>,
     last_seen: DateTime<Utc>,
-    last_seen_latency: i64,
+    last_seen_latency: u32,
     ignored: Option<DateTime<Utc>>,
     public: bool,
     quality: f64,
     quality_sma: Box<[u8]>,
     backoff: f64,
-    heartbeats_sent: i64,
-    heartbeats_successful: i64,
+    heartbeats_sent: u32,
+    heartbeats_successful: u32,
 }
 
 impl TryFrom<NetworkPeer> for PeerStatus {
@@ -212,7 +219,7 @@ impl NetworkBackend for SqliteNetworkBackend {
                 ),
                 (
                     NetworkPeerIden::LastSeenLatency,
-                    (new_status.last_seen_latency.as_millis() as i64).into(),
+                    (new_status.last_seen_latency.as_millis() as u32).into(),
                 ),
                 (NetworkPeerIden::Quality, new_status.quality.into()),
                 (NetworkPeerIden::QualitySma, quality_sma.as_ref().into()),
