@@ -318,23 +318,15 @@ where
 {
     let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
+    info!(
+        "Creating local network registry and registering own external multiaddresses: {:?}",
+        my_multiaddresses
+    );
     let (network, network_events_rx) = build_network(
         identity.public().to_peer_id(),
         my_multiaddresses.clone(),
         cfg.network_options,
     );
-
-    info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
-    async_std::task::block_on(async {
-        network
-            .add(
-                &identity.public().to_peer_id(),
-                PeerOrigin::Initialization,
-                my_multiaddresses.clone(),
-            )
-            .await
-            .expect("own multiaddresses should always be recordable in the local network registry")
-    });
 
     let addr_resolver = DbPeerAddressResolver(db.clone());
 
