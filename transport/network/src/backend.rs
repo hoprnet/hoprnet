@@ -5,7 +5,7 @@ use futures::TryStreamExt;
 use hopr_primitive_types::prelude::SingleSumSMA;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use sea_query::{Asterisk, ColumnDef, Expr, Query, SimpleExpr, SqliteQueryBuilder, Table};
+use sea_query::{Asterisk, ColumnDef, Expr, Order, Query, SimpleExpr, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
 use std::str::FromStr;
 use tracing::{error, trace};
@@ -235,11 +235,19 @@ impl NetworkBackend for SqliteNetworkBackend {
         }
     }
 
-    async fn get_multiple<'a>(&'a self, filter: Option<SimpleExpr>) -> Result<BoxStream<'a, PeerStatus>> {
+    async fn get_multiple<'a>(
+        &'a self,
+        filter: Option<SimpleExpr>,
+        sort_last_seen_asc: bool,
+    ) -> Result<BoxStream<'a, PeerStatus>> {
         let (sql, values) = Query::select()
             .column(Asterisk)
             .from(NetworkPeerIden::Table)
             .and_where(filter.unwrap_or(Expr::value(1)))
+            .order_by(
+                NetworkPeerIden::LastSeen,
+                if sort_last_seen_asc { Order::Asc } else { Order::Desc },
+            )
             .build_sqlx(SqliteQueryBuilder);
 
         trace!("about to execute network sql {query}", query = sql);
@@ -532,7 +540,7 @@ mod tests {
         }
 
         let peers_from_db: Vec<PeerId> = db
-            .get_multiple(None)
+            .get_multiple(None, false)
             .await
             .expect("should get stream")
             .map(|s| s.id)
@@ -558,7 +566,7 @@ mod tests {
                     id: peer.clone(),
                     origin: PeerOrigin::IncomingConnection,
                     is_public: true,
-                    last_seen: 1,
+                    last_seen: i as u64,
                     last_seen_latency: 2,
                     heartbeats_sent: 3,
                     heartbeats_succeeded: 4,
@@ -574,7 +582,7 @@ mod tests {
         }
 
         let peers_from_db: Vec<PeerId> = db
-            .get_multiple(Some(Expr::col(NetworkPeerIden::Quality).gt(0.5_f64)))
+            .get_multiple(Some(Expr::col(NetworkPeerIden::Quality).gt(0.5_f64)), false)
             .await
             .expect("should get stream")
             .map(|s| s.id)
@@ -583,7 +591,7 @@ mod tests {
 
         assert_eq!(peer_count / 2, peers_from_db.len(), "lengths must match");
         assert_eq!(
-            peers.into_iter().skip(5).collect::<Vec<_>>(),
+            peers.into_iter().skip(5).rev().collect::<Vec<_>>(),
             peers_from_db,
             "peer ids must match"
         );

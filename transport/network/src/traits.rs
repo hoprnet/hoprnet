@@ -55,7 +55,13 @@ pub trait NetworkBackend {
     async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
 
     /// Returns a stream of all stored peers, optionally matching the given [SimpleExpr] filter.
-    async fn get_multiple<'a>(&'a self, filter: Option<SimpleExpr>) -> Result<BoxStream<'a, PeerStatus>>;
+    /// The `sort_last_seen_asc` indicates whether the results should be sorted in ascending
+    /// or descending order of the `last_seen` field.
+    async fn get_multiple<'a>(
+        &'a self,
+        filter: Option<SimpleExpr>,
+        sort_last_seen_asc: bool,
+    ) -> Result<BoxStream<'a, PeerStatus>>;
 
     /// Returns the [statistics](Stats) on the stored peers.
     async fn stats(&self) -> Result<Stats>;
