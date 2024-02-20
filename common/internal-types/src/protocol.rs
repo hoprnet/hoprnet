@@ -7,8 +7,8 @@ use hopr_primitive_types::prelude::*;
 use moka::future::{Cache, CacheBuilder};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use tracing::warn;
 use std::time::Duration;
+use tracing::warn;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -213,6 +213,7 @@ mod tests {
     use hopr_primitive_types::traits::BinarySerializable;
     use mockall::mock;
     use std::time::Duration;
+    use hex_literal::hex;
 
     #[test]
     fn test_application_data() {
@@ -290,7 +291,7 @@ mod tests {
     #[async_std::test]
     async fn test_caching_resolver() {
         let pk_1 = OffchainKeypair::random().public().clone();
-        let pk_2 = Address::random();
+        let pk_2: Address = hex!("60f8492b6fbaf86ac2b064c90283d8978a491a01").into();
 
         let mut resolver = MockAddrResolver::new();
         resolver
