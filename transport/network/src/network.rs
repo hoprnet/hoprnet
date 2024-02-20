@@ -22,6 +22,7 @@ use {
     crate::traits::Stats,
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
 };
+use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
