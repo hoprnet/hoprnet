@@ -1,8 +1,8 @@
-use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
+use futures::StreamExt;
 use hopr_platform::time::native::current_time;
 use libp2p_identity::PeerId;
 
@@ -13,16 +13,12 @@ use validator::Validate;
 
 use crate::backend::{SqliteNetworkBackend, SqliteNetworkBackendConfig};
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
-use crate::traits::NetworkBackend;
+use crate::traits::{NetworkBackend, Stats};
 use hopr_primitive_types::sma::{SingleSumSMA, SMA};
 use tracing::{debug, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    crate::traits::Stats,
-    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
-};
-use hopr_primitive_types::prelude::AsUnixTimestamp;
+use hopr_metrics::metrics::{MultiGauge, SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -145,8 +141,6 @@ pub enum NetworkEvent {
 /// to physically interact with external systems, including the transport mechanism.
 #[cfg_attr(test, mockall::automock)]
 pub trait NetworkExternalActions {
-    fn is_public(&self, peer: &PeerId) -> bool;
-
     fn emit(&self, event: NetworkEvent);
 }
 
@@ -173,7 +167,7 @@ impl PeerStatus {
         PeerStatus {
             id,
             origin,
-            is_public: false,
+            is_public: true,
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: SystemTime::UNIX_EPOCH,
@@ -216,7 +210,6 @@ impl std::fmt::Display for PeerStatus {
 }
 
 /// Calculate the health factor for network from the available stats
-#[cfg(all(feature = "prometheus", not(test)))]
 fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
     let mut health = Health::Red;
 
@@ -240,17 +233,22 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
 #[derive(Debug)]
 pub struct Network<T: NetworkExternalActions> {
     me: PeerId,
+    me_addresses: Vec<Multiaddr>,
+    am_i_public: bool,
     cfg: NetworkConfig,
     db: crate::backend::SqliteNetworkBackend,
-    entries: HashMap<PeerId, PeerStatus>,
-    last_health: Health,
     network_actions_api: T,
     #[cfg(all(feature = "prometheus", not(test)))]
     started_at: std::time::Duration,
 }
 
 impl<T: NetworkExternalActions> Network<T> {
-    pub fn new(my_peer_id: PeerId, cfg: NetworkConfig, network_actions_api: T) -> Self {
+    pub fn new(
+        my_peer_id: PeerId,
+        my_multiaddresses: Vec<Multiaddr>,
+        cfg: NetworkConfig,
+        network_actions_api: T,
+    ) -> Self {
         if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
             panic!(
                 "Strict requirement failed, bad quality threshold {} must be lower than quality offline threshold {}",
@@ -270,12 +268,12 @@ impl<T: NetworkExternalActions> Network<T> {
 
         Self {
             me: my_peer_id,
+            me_addresses: my_multiaddresses,
+            am_i_public: true,
             cfg: cfg.clone(),
             db: async_std::task::block_on(SqliteNetworkBackend::new(SqliteNetworkBackendConfig {
                 network_options: cfg.clone(),
             })),
-            entries: HashMap::new(),
-            last_health: Health::Unknown,
             network_actions_api,
             #[cfg(all(feature = "prometheus", not(test)))]
             started_at: current_time().as_unix_timestamp(),
@@ -284,12 +282,12 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Check whether the PeerId is present in the network
     pub async fn has(&self, peer: &PeerId) -> bool {
-        self.db.get(peer).await.is_ok_and(|p| p.is_some())
+        peer == &self.me || self.db.get(peer).await.is_ok_and(|p| p.is_some())
     }
 
     /// Add a new peer into the network
     ///
-    /// Each PeerId must have an origin specification.
+    /// Each peer must have an origin specification.
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> crate::errors::Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
@@ -297,19 +295,6 @@ impl<T: NetworkExternalActions> Network<T> {
 
         debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
         // let now = current_time().as_unix_timestamp().as_millis() as u64;
-
-        // if !is_excluded {
-
-        //     if !has_entry && !is_ignored {
-        //         let mut entry = PeerStatus::new(*peer, origin, self.cfg.backoff_min, self.cfg.quality_avg_window_size);
-        //         entry.is_public = self.network_actions_api.is_public(peer);
-        //         self.refresh_network_status().await;
-
-        //         if let Some(x) = self.entries.insert(*peer, entry) {
-        //             warn!("Evicting an existing record for {}, this should not happen!", &x);
-        //         }
-        //     }
-        // }
 
         if let Some(mut peer_status) = self.db.get(&peer).await? {
             let is_ignored = false;
@@ -336,16 +321,37 @@ impl<T: NetworkExternalActions> Network<T> {
                 self.db.update(&peer_status).await?;
             }
         } else {
+            // TODO: this operation is suboptimal, but can be refactored once the entire Network object changes
+            // the mechanism and logic of monitoring the peers
             self.db.add(&peer, origin, addrs).await?;
+            if let Some(mut record) = self.db.get(peer).await? {
+                record.backoff = self.cfg.backoff_min;
+                record.quality_avg = SingleSumSMA::new(self.cfg.quality_avg_window_size as usize);
+                self.db.update(&record).await?;
+            }
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        let _ = self.refresh_metrics();
+        {
+            let stats = self.db.stats().await?;
+            self.refresh_metrics(&stats)
+        }
 
         Ok(())
     }
 
-    /// Remove PeerId from the network
+    pub async fn get(&self, peer: &PeerId) -> crate::errors::Result<Option<PeerStatus>> {
+        if peer == &self.me {
+            Ok(Some(PeerStatus {
+                multiaddresses: self.me_addresses.clone(),
+                ..PeerStatus::new(peer.clone(), PeerOrigin::Initialization, 0.0f64, 0u32)
+            }))
+        } else {
+            self.db.get(&peer).await
+        }
+    }
+
+    /// Remove peer from the network
     pub async fn remove(&self, peer: &PeerId) -> crate::errors::Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
@@ -354,18 +360,16 @@ impl<T: NetworkExternalActions> Network<T> {
         self.db.remove(peer).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        let _ = self.refresh_metrics();
+        {
+            let stats = self.db.stats().await?;
+            self.refresh_metrics(&stats)
+        }
 
         Ok(())
     }
 
-    /// Get all registered multiaddresses for a specific peer
-    pub async fn get_peer_multiaddresses(&self, peer: &PeerId) -> crate::errors::Result<Vec<Multiaddr>> {
-        Ok(self.db.get(peer).await?.map(|p| p.multiaddresses).unwrap_or(vec![]))
-    }
-
-    /// Update the PeerId record in the network
-    pub async fn update_from_ping(
+    /// Update the peer record with the observation
+    pub async fn update(
         &self,
         peer: &PeerId,
         ping_result: crate::ping::PingResult,
@@ -377,7 +381,6 @@ impl<T: NetworkExternalActions> Network<T> {
 
         if let Some(mut entry) = self.db.get(peer).await? {
             entry.heartbeats_sent += 1;
-            entry.is_public = self.network_actions_api.is_public(peer);
             entry.peer_version = version;
 
             if let Ok(latency) = ping_result {
@@ -404,7 +407,10 @@ impl<T: NetworkExternalActions> Network<T> {
             self.db.update(&entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            let _ = self.refresh_metrics().await;
+            {
+                let stats = self.db.stats().await?;
+                self.refresh_metrics(&stats)
+            }
 
             Ok(Some(entry))
         } else {
@@ -413,11 +419,19 @@ impl<T: NetworkExternalActions> Network<T> {
         }
     }
 
+    /// Returns the quality of the network as a network health indicator.
+    pub async fn health(&self) -> Health {
+        self.db
+            .stats()
+            .await
+            .map(|stats| health_from_stats(&stats, self.am_i_public))
+            .unwrap_or(Health::Unknown)
+    }
+
     /// Update the internally perceived network status that is processed to the network health
     #[cfg(all(feature = "prometheus", not(test)))]
-    async fn refresh_metrics(&self) -> crate::errors::Result<()> {
-        let stats = self.db.stats().await?;
-        let health = health_from_stats(&stats, self.network_actions_api.is_public(&self.me));
+    fn refresh_metrics(&self, stats: &Stats) {
+        let health = health_from_stats(&stats, self.am_i_public);
 
         if METRIC_NETWORK_HEALTH_TIME_TO_GREEN.get() < 0.5f64 {
             if let Some(ts) = current_time().checked_sub(self.started_at) {
@@ -430,54 +444,53 @@ impl<T: NetworkExternalActions> Network<T> {
         METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], stats.good_quality_non_public as f64);
         METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], stats.bad_quality_non_public as f64);
         METRIC_NETWORK_HEALTH.set((health as i32).into());
-
-        Ok(())
     }
 
-    pub fn get_peer_status(&self, peer: &PeerId) -> Option<PeerStatus> {
-        self.entries.get(peer).cloned()
-    }
-
-    pub fn get_all_peers(&self) -> Vec<PeerId> {
-        self.entries
-            .values()
-            .map(|peer_status| peer_status.id)
-            .collect::<Vec<_>>()
-    }
-
-    /// Perform arbitrary predicate filtering operation on the network entries
-    fn filter<F>(&self, f: F) -> Vec<PeerId>
+    // ======
+    pub async fn peer_filter<Fut, U, F>(&self, filter: F) -> crate::errors::Result<Vec<U>>
     where
-        F: FnMut(&&PeerStatus) -> bool,
+        F: FnMut(PeerStatus) -> Fut,
+        Fut: std::future::Future<Output = Option<U>>,
     {
-        self.entries.values().filter(f).map(|x| x.id).collect::<Vec<_>>()
+        let stream = self.db.get_multiple(None).await?;
+        futures::pin_mut!(stream);
+        Ok(stream.filter_map(filter).collect().await)
     }
 
-    pub fn all_peers(&self) -> Vec<&PeerStatus> {
-        self.entries.values().collect()
-    }
+    pub async fn find_peers_to_ping(&self, threshold: u64) -> crate::errors::Result<Vec<PeerId>> {
+        let stream = self
+            .db
+            .get_multiple(Some(
+                sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen).lte(threshold),
+            ))
+            .await?;
+        futures::pin_mut!(stream);
+        let mut data: Vec<PeerStatus> = stream
+            .filter_map(|v| async move {
+                if v.id == self.me.clone() {
+                    return None;
+                }
+                let backoff = v.backoff.powf(self.cfg.backoff_exponent);
+                let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
-    pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
-        let mut data: Vec<PeerId> = self.filter(|v| {
-            let backoff = v.backoff.powf(self.cfg.backoff_exponent);
-            let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
+                if (v.last_seen + (delay.as_millis() as u64)) < threshold {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect()
+            .await;
 
-            v.last_seen.add(delay) < SystemTime::UNIX_EPOCH.add(Duration::from_millis(threshold))
-        });
         data.sort_by(|a, b| {
-            if self.entries.get(a).unwrap().last_seen < self.entries.get(b).unwrap().last_seen {
+            if a.last_seen < b.last_seen {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Greater
             }
         });
 
-        data
-    }
-
-    /// Returns the quality of the network as a network health indicator.
-    pub fn health(&self) -> Health {
-        self.last_health
+        Ok(data.into_iter().map(|peer| peer.id).collect())
     }
 }
 
@@ -504,17 +517,13 @@ mod tests {
     struct DummyNetworkAction {}
 
     impl NetworkExternalActions for DummyNetworkAction {
-        fn is_public(&self, _: &PeerId) -> bool {
-            false
-        }
-
         fn emit(&self, _: NetworkEvent) {}
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(*my_id, cfg, DummyNetworkAction {})
+        Network::new(*my_id, vec![], cfg, DummyNetworkAction {})
     }
 
     #[test]
@@ -527,15 +536,22 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_should_not_contain_the_self_reference() {
+    async fn test_network_should_not_be_able_to_add_self_reference() {
         let me = PeerId::random();
 
         let peers = basic_network(&me);
 
-        peers.add(&me, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
+        assert!(peers.add(&me, PeerOrigin::IncomingConnection, vec![]).await.is_err());
 
-        assert_eq!(0, peers.get_all_peers().len());
-        assert!(!peers.has(&me).await)
+        assert_eq!(
+            0,
+            peers
+                .peer_filter(|peer| async move { Some(peer.id) })
+                .await
+                .unwrap_or(vec![])
+                .len()
+        );
+        assert!(peers.has(&me).await)
     }
 
     #[async_std::test]
@@ -549,7 +565,14 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, peers.get_all_peers().len());
+        assert_eq!(
+            1,
+            peers
+                .peer_filter(|peer| async move { Some(peer.id) })
+                .await
+                .unwrap_or(vec![])
+                .len()
+        );
         assert!(peers.has(&expected).await)
     }
 
@@ -563,7 +586,14 @@ mod tests {
 
         peers.remove(&peer).await.expect("should not fail on DB remove");
 
-        assert_eq!(0, peers.get_all_peers().len());
+        assert_eq!(
+            0,
+            peers
+                .peer_filter(|peer| async move { Some(peer.id) })
+                .await
+                .unwrap_or(vec![])
+                .len()
+        );
         assert!(!peers.has(&peer).await)
     }
 
@@ -574,11 +604,18 @@ mod tests {
         let peers = basic_network(&PeerId::random());
 
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
 
-        assert_eq!(0, peers.get_all_peers().len());
+        assert_eq!(
+            0,
+            peers
+                .peer_filter(|peer| async move { Some(peer.id) })
+                .await
+                .unwrap_or(vec![])
+                .len()
+        );
         assert!(!peers.has(&peer).await)
     }
 
@@ -590,20 +627,18 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
-        let ts = current_time();
+        let latency = 123u64;
 
         peers
-            .update_from_ping(&peer, Ok(ts.as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(latency), None)
             .await
             .expect("no error should occur");
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
-        let actual = peers.get_peer_status(&peer).expect("peer record should be present");
+        let actual = peers.get(&peer).await.expect("peer record should be present").unwrap();
 
         assert_eq!(actual.heartbeats_sent, 1);
         assert_eq!(actual.heartbeats_succeeded, 1);
-        assert_eq!(actual.last_seen, ts);
+        assert_eq!(actual.last_seen_latency, latency);
     }
 
     #[async_std::test]
@@ -620,7 +655,7 @@ mod tests {
                 .await
                 .expect("should not fail on DB add");
             peers
-                .update_from_ping(
+                .update(
                     &peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
                     expected_version.clone(),
@@ -628,7 +663,7 @@ mod tests {
                 .await
                 .expect("no error should occur");
 
-            let status = peers.get_peer_status(&peer).unwrap();
+            let status = peers.get(&peer).await.unwrap().unwrap();
 
             assert_eq!(status.peer_version, expected_version);
         }
@@ -639,11 +674,15 @@ mod tests {
             let expected_version = Some("2.0.0".to_string());
 
             peers
-                .update_from_ping(&peer, Ok(ts), expected_version.clone())
+                .update(&peer, Ok(ts), expected_version.clone())
                 .await
                 .expect("no error should occur");
 
-            let status = peers.get_peer_status(&peer).expect("the peer status should be preent");
+            let status = peers
+                .get(&peer)
+                .await
+                .expect("the peer status should be preent")
+                .unwrap();
 
             assert_eq!(status.peer_version, expected_version);
         }
@@ -658,21 +697,15 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
-        peers
-            .update_from_ping(&peer, Err(()), None)
-            .await
-            .expect("no error should occur"); // should drop to ignored
-        peers
-            .update_from_ping(&peer, Err(()), None)
-            .await
-            .expect("no error should occur"); // should drop from network
+        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop to ignored
+        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
 
         assert!(!peers.has(&peer).await);
 
@@ -690,19 +723,20 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
-        peers
-            .update_from_ping(&peer, Err(()), None)
-            .await
-            .expect("no error should occur");
+        peers.update(&peer, Err(()), None).await.expect("no error should occur");
 
-        let actual = peers.get_peer_status(&peer).expect("the peer record should be preent");
+        let actual = peers
+            .get(&peer)
+            .await
+            .unwrap()
+            .expect("the peer record should be preent");
 
         assert_eq!(actual.heartbeats_succeeded, 2);
         assert_eq!(actual.backoff, 300f64);
@@ -725,26 +759,23 @@ mod tests {
         let mut expected = vec![first, second];
         expected.sort();
 
+        peers.update(&first, Ok(ts), None).await.expect("no error should occur");
         peers
-            .update_from_ping(&first, Ok(ts), None)
-            .await
-            .expect("no error should occur");
-        peers
-            .update_from_ping(&second, Ok(ts), None)
+            .update(&second, Ok(ts), None)
             .await
             .expect("no error should occur");
 
-        let mut actual = peers.find_peers_to_ping(ts + 3000);
+        let mut actual = peers.find_peers_to_ping(ts + 3000).await.unwrap();
         actual.sort();
 
         assert_eq!(actual, expected);
     }
 
-    #[test]
-    fn test_network_should_have_no_knowledge_about_health_without_any_registered_peers() {
+    #[async_std::test]
+    async fn test_network_should_have_red_health_without_any_registered_peers() {
         let peers = basic_network(&PeerId::random());
 
-        assert_eq!(peers.health(), Health::Unknown);
+        assert_eq!(peers.health().await, Health::Red);
     }
 
     #[async_std::test]
@@ -755,7 +786,8 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
-        assert_eq!(peers.health(), Health::Red);
+        // all peers are public
+        assert_eq!(peers.health().await, Health::Orange);
     }
 
     #[async_std::test]
@@ -768,45 +800,26 @@ mod tests {
         let _ = peers.health();
         peers.remove(&peer).await.expect("should not fail on DB remove");
 
-        assert_eq!(peers.health(), Health::Red);
-    }
-
-    #[async_std::test]
-    async fn test_network_should_notify_the_callback_for_every_health_change() {
-        let peer = PeerId::random();
-
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.6;
-
-        let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(1).returning(|_| false);
-        let peers = Network::new(PeerId::random(), cfg, mock);
-
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
-
-        assert_eq!(peers.health(), Health::Red);
+        assert_eq!(peers.health().await, Health::Red);
     }
 
     #[async_std::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() {
         let peer = PeerId::random();
-        let public = peer;
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(2).returning(move |x| x == &public);
-        let peers = Network::new(PeerId::random(), cfg, mock);
+        let peers = Network::new(PeerId::random(), vec![], cfg, MockNetworkExternalActions::new());
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
 
-        assert_eq!(peers.health(), Health::Orange);
+        assert_eq!(peers.health().await, Health::Orange);
     }
 
     #[async_std::test]
@@ -818,22 +831,18 @@ mod tests {
         cfg.quality_offline_threshold = 0.6;
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(3).returning(move |x| x == &public);
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer)))
             .return_const(());
-        let peers = Network::new(PeerId::random(), cfg, mock);
+        let peers = Network::new(PeerId::random(), vec![], cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         peers
-            .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+            .update(&peer, Ok(13u64), None)
             .await
             .expect("no error should occur");
-        peers
-            .update_from_ping(&peer, Err(()), None)
-            .await
-            .expect("no error should occur");
+        peers.update(&peer, Err(()), None).await.expect("no error should occur");
 
         assert!(!peers.has(&public).await);
     }
@@ -842,25 +851,22 @@ mod tests {
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
         let me = PeerId::random();
         let peer = PeerId::random();
-        let public = [peer, me];
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(5).returning(move |x| public.contains(x));
-        let peers = Network::new(me, cfg, mock);
+        let peers = Network::new(me, vec![], cfg, MockNetworkExternalActions::new());
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         for _ in 0..3 {
             peers
-                .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
                 .await
                 .expect("no error should occur");
         }
 
-        assert_eq!(peers.health(), Health::Green);
+        assert_eq!(peers.health().await, Health::Green);
     }
 
     #[async_std::test]
@@ -868,29 +874,26 @@ mod tests {
     ) {
         let peer = PeerId::random();
         let peer2 = PeerId::random();
-        let public = [peer];
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public().times(8).returning(move |x| public.contains(x));
-        let peers = Network::new(PeerId::random(), cfg, mock);
+        let peers = Network::new(PeerId::random(), vec![], cfg, MockNetworkExternalActions::new());
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         peers.add(&peer2, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
         for _ in 0..3 {
             peers
-                .update_from_ping(&peer2, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer2, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
                 .await
                 .expect("no error should occur");
             peers
-                .update_from_ping(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
+                .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
                 .await
                 .expect("no error should occur");
         }
 
-        assert_eq!(peers.health(), Health::Green);
+        assert_eq!(peers.health().await, Health::Green);
     }
 }

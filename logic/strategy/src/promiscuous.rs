@@ -187,7 +187,7 @@ where
             db,
             network,
             chain_actions,
-            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples)),
+            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
         }
     }
@@ -210,36 +210,27 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        let all_peers = self
-            .network
+        self.network
             .read()
             .await
-            .all_peers()
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>();
-
-        all_peers
-            .into_iter()
-            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
-                Ok(offchain_key) => {
-                    // Do peer version matching against minimum required version by this strategy
-                    match status
-                        .peer_version
-                        .clone()
-                        .and_then(|v| semver::Version::from_str(&v).ok())
-                    {
-                        Some(v) => self
-                            .cfg
-                            .minimum_peer_version
-                            .matches(&v)
-                            .then_some((offchain_key, status.get_average_quality())),
-                        None => {
-                            debug!("peer {} has invalid or missing version info", status.id);
-                            None
-                        }
+            .peer_filter(|status| async move {
+                match status
+                    .peer_version
+                    .clone()
+                    .and_then(|v| semver::Version::from_str(&v).ok())
+                {
+                    Some(v) => self.cfg.minimum_peer_version.matches(&v).then_some(status),
+                    None => {
+                        debug!("peer {} has invalid or missing version info", status.id);
+                        None
                     }
                 }
+            })
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
+            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
+                Ok(offchain_key) => Some((offchain_key, status.get_average_quality())),
                 Err(_) => {
                     error!("encountered invalid peer id: {}", status.id);
                     None
@@ -564,10 +555,10 @@ mod tests {
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
-            net.add(peer, PeerOrigin::Initialization);
+            net.add(peer, PeerOrigin::Initialization, vec![]).await.unwrap();
 
-            while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                net.update_from_ping(
+            while net.get(peer).await.unwrap().unwrap().get_average_quality() < quality {
+                net.update(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
                     Some("2.0.0".into()),
@@ -578,7 +569,7 @@ mod tests {
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
                 PEERS[i + 1].0,
-                net.get_peer_status(peer).unwrap().get_average_quality()
+                net.get(peer).await.unwrap().unwrap().get_average_quality()
             );
         }
     }
@@ -657,7 +648,7 @@ mod tests {
         network
             .write()
             .await
-            .update_from_ping(
+            .update(
                 &PEERS[9].1,
                 Ok(current_time().as_unix_timestamp().as_millis() as u64),
                 Some("1.92.0".into()),

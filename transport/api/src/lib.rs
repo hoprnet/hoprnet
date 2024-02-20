@@ -396,7 +396,8 @@ impl HoprTransport {
             .network
             .read()
             .await
-            .get_peer_status(peer)
+            .get(peer)
+            .await?
             .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
     }
 
@@ -526,8 +527,10 @@ impl HoprTransport {
         self.network
             .read()
             .await
-            .get_peer_multiaddresses(&self.me)
+            .get(&self.me)
             .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
             .unwrap_or(vec![])
     }
 
@@ -567,8 +570,10 @@ impl HoprTransport {
         self.network
             .read()
             .await
-            .get_peer_multiaddresses(peer)
+            .get(peer)
             .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
             .unwrap_or(vec![])
     }
 
@@ -576,21 +581,28 @@ impl HoprTransport {
         self.network
             .read()
             .await
-            .get_peer_multiaddresses(peer)
+            .get(peer)
             .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
             .unwrap_or(vec![])
     }
 
     pub async fn network_health(&self) -> Health {
-        self.network.read().await.health()
+        self.network.read().await.health().await
     }
 
-    pub async fn network_connected_peers(&self) -> Vec<PeerId> {
-        self.network.read().await.get_all_peers()
+    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
+        Ok(self
+            .network
+            .read()
+            .await
+            .peer_filter(|peer| async move { Some(peer.id) })
+            .await?)
     }
 
-    pub async fn network_peer_info(&self, peer: &PeerId) -> Option<PeerStatus> {
-        self.network.read().await.get_peer_status(peer)
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
+        Ok(self.network.read().await.get(peer).await?)
     }
 
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {

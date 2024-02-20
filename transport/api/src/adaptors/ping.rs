@@ -46,7 +46,7 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
             .network
             .write()
             .await
-            .update_from_ping(peer, result, result.is_ok().then_some(version))
+            .update(peer, result, result.is_ok().then_some(version))
             .await
         {
             Ok(Some(updated)) => {

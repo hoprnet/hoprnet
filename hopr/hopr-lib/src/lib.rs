@@ -989,38 +989,40 @@ impl Hopr {
     }
 
     /// List all peers connected to this
-    pub async fn network_connected_peers(&self) -> Vec<PeerId> {
-        self.transport_api.network_connected_peers().await
+    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
+        Ok(self.transport_api.network_connected_peers().await?)
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> Option<core_transport::PeerStatus> {
-        self.transport_api.network_peer_info(peer).await
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<core_transport::PeerStatus>> {
+        Ok(self.transport_api.network_peer_info(peer).await?)
     }
 
     /// Get peers connected peers with quality higher than some value
     pub async fn all_network_peers(
         &self,
         minimum_quality: f64,
-    ) -> Vec<(Option<Address>, PeerId, core_transport::PeerStatus)> {
-        futures::stream::iter(self.transport_api.network_connected_peers().await)
-            .filter_map(|peer| async move {
-                if let Some(info) = self.transport_api.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= minimum_quality {
-                        Some((peer, info))
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, core_transport::PeerStatus)>> {
+        Ok(
+            futures::stream::iter(self.transport_api.network_connected_peers().await?)
+                .filter_map(|peer| async move {
+                    if let Ok(Some(info)) = self.transport_api.network_peer_info(&peer).await {
+                        if info.get_average_quality() >= minimum_quality {
+                            Some((peer, info))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
-                }
-            })
-            .filter_map(|(peer_id, info)| async move {
-                let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
-                Some((address, peer_id, info))
-            })
-            .collect::<Vec<_>>()
-            .await
+                })
+                .filter_map(|(peer_id, info)| async move {
+                    let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
+                    Some((address, peer_id, info))
+                })
+                .collect::<Vec<_>>()
+                .await,
+        )
     }
 
     // Ticket ========

@@ -930,7 +930,7 @@ mod peers {
                         latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                         reported_version: hopr
                             .network_peer_info(&peer)
-                            .await
+                            .await?
                             .and_then(|p| p.peer_version)
                             .unwrap_or("unknown".into())
                     }))
@@ -2334,12 +2334,12 @@ mod node {
         let hopr = req.state().hopr.clone();
 
         let quality = query_params.quality.unwrap_or(0f64);
-        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await)
+        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await?)
             .filter_map(|peer| {
                 let hopr = hopr.clone();
 
                 async move {
-                    if let Some(info) = hopr.network_peer_info(&peer).await {
+                    if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
                         if info.get_average_quality() >= quality {
                             Some((peer, info))
                         } else {

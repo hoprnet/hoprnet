@@ -4,6 +4,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 
 use core_network::{heartbeat::HeartbeatExternalApi, network::Network, PeerId};
+use tracing::error;
 
 use crate::adaptors::network::ExternalNetworkInteractions;
 
@@ -31,6 +32,9 @@ impl HeartbeatExternalApi for HeartbeatExternalInteractions {
     /// After a duration of non-pinging based specified by the configurable threshold.
     async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {
         let reader = self.network.read().await;
-        (*reader).find_peers_to_ping(from_timestamp)
+        (*reader).find_peers_to_ping(from_timestamp).await.unwrap_or_else(|e| {
+            error!("Failed to generate peers for the heartbeat procedure: {e}");
+            vec![]
+        })
     }
 }
