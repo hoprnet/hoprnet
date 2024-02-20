@@ -56,7 +56,7 @@ impl SqliteNetworkBackend {
                     .auto_increment()
                     .primary_key(),
             )
-            .col(ColumnDef::new(NetworkPeerIden::PeerId).string().not_null().unique_key())
+            .col(ColumnDef::new(NetworkPeerIden::PeerId).string_len(100).not_null().unique_key())
             .col(ColumnDef::new(NetworkPeerIden::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Version).string_len(20))
