@@ -298,7 +298,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
         debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
 
-        if let Some(mut peer_status) = self.db.get(&peer).await? {
+        if let Some(mut peer_status) = self.db.get(peer).await? {
             if !self.should_still_be_ignored(&peer_status) {
                 peer_status.multiaddresses.append(&mut addrs);
                 peer_status.multiaddresses = peer_status
@@ -312,7 +312,7 @@ impl<T: NetworkExternalActions> Network<T> {
         } else {
             // TODO: this operation is suboptimal, but can be refactored once the entire Network object changes
             // the mechanism and logic of monitoring the peers
-            self.db.add(&peer, origin, addrs).await?;
+            self.db.add(peer, origin, addrs).await?;
             if let Some(mut record) = self.db.get(peer).await? {
                 record.backoff = self.cfg.backoff_min;
                 record.quality_avg = SingleSumSMA::new(self.cfg.quality_avg_window_size as usize);
@@ -333,18 +333,14 @@ impl<T: NetworkExternalActions> Network<T> {
         if peer == &self.me {
             Ok(Some(PeerStatus {
                 multiaddresses: self.me_addresses.clone(),
-                ..PeerStatus::new(peer.clone(), PeerOrigin::Initialization, 0.0f64, 0u32)
+                ..PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 0u32)
             }))
         } else {
-            Ok(if let Some(peer_status) = self.db.get(&peer).await? {
-                if self.should_still_be_ignored(&peer_status) {
-                    None
-                } else {
-                    Some(peer_status)
-                }
-            } else {
-                None
-            })
+            Ok(self
+                .db
+                .get(peer)
+                .await?
+                .filter(|peer_status| !self.should_still_be_ignored(peer_status)))
         }
     }
 
@@ -431,7 +427,7 @@ impl<T: NetworkExternalActions> Network<T> {
     /// Update the internally perceived network status that is processed to the network health
     #[cfg(all(feature = "prometheus", not(test)))]
     fn refresh_metrics(&self, stats: &Stats) {
-        let health = health_from_stats(&stats, self.am_i_public);
+        let health = health_from_stats(stats, self.am_i_public);
 
         if METRIC_NETWORK_HEALTH_TIME_TO_GREEN.get() < 0.5f64 {
             if let Some(ts) = current_time().checked_sub(self.started_at) {
@@ -471,7 +467,7 @@ impl<T: NetworkExternalActions> Network<T> {
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
             .filter_map(|v| async move {
-                if v.id == self.me.clone() {
+                if v.id == self.me {
                     return None;
                 }
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
