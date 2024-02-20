@@ -58,6 +58,15 @@ pub trait HoprCoreEthereumDbActions {
         index_end: u64,
     ) -> Result<Vec<AcknowledgedTicket>>;
 
+    /// Gets a single acknowledged ticket, specified by its uniquely identifying
+    /// properties, which are `channel_id`, `epoch` and `index`.
+    async fn get_acknowledged_ticket(
+        &self,
+        channel_id: &Hash,
+        epoch: u32,
+        index: u64,
+    ) -> Result<Option<AcknowledgedTicket>>;
+
     async fn get_acknowledged_tickets_range(
         &self,
         channel_id: &Hash,
@@ -72,7 +81,11 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all unacknowledged tickets within the filter criteria.
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
-    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn update_acknowledged_ticket_status(
+        &mut self,
+        ticket: &Ticket,
+        new_status: AcknowledgedTicketStatus,
+    ) -> Result<()>;
 
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 

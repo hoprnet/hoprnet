@@ -728,7 +728,7 @@ mod tests {
         dbs[1]
             .write()
             .await
-            .update_acknowledged_ticket(&acked_tickets[0])
+            .replace_acked_tickets_by_aggregated_ticket(acked_tickets[0].clone())
             .await
             .unwrap();
 

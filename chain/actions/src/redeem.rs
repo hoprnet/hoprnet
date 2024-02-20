@@ -21,7 +21,6 @@
 //!
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -29,16 +28,11 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::DerefMut;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use utils_db::errors::DbError;
 
-use crate::action_queue::{ActionSender, PendingAction};
+use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::ChannelDoesNotExist;
-use crate::errors::{
-    ChainActionsError::{NotAWinningTicket, WrongTicketState},
-    Result,
-};
+use crate::errors::{ChainActionsError::WrongTicketState, Result};
 use crate::ChainActions;
 
 lazy_static::lazy_static! {
@@ -71,44 +65,32 @@ pub trait TicketRedeemActions {
     async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> Result<PendingAction>;
 }
 
-async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
+/// Checks the status of the ticket in the database and updates its status
+/// in the database as being redeemed. Fails if the status of the ticket in
+/// the database is not `Untouched`.
+///
+/// Assumes that received tickets are winning tickets
+async fn set_being_redeemed<Db>(db: &mut Db, ticket: &Ticket, tx_hash: Hash) -> Result<()>
 where
     Db: HoprCoreEthereumDbActions,
 {
-    match ack_ticket.status {
-        AcknowledgedTicketStatus::Untouched => {
-            let dst = db
-                .get_channels_domain_separator()
-                .await
-                .and_then(|separator| separator.ok_or(DbError::NotFound))?;
-
-            // Check if we're going to redeem a winning ticket
-            if !ack_ticket.is_winning_ticket(&dst) {
-                return Err(NotAWinningTicket);
-            }
+    if let Some(stored) = db
+        .get_acknowledged_ticket(&ticket.channel_id, ticket.channel_epoch, ticket.index)
+        .await?
+    {
+        if stored.status != AcknowledgedTicketStatus::Untouched {
+            return Err(WrongTicketState(format!(
+                "expected a ticket with state {} but found a ticket in the database with state {}",
+                AcknowledgedTicketStatus::Untouched,
+                stored.status
+            )));
         }
-        AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed => {}
     }
 
-    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
-    debug!(
-        "setting a winning {} as being redeemed with TX hash {tx_hash}",
-        ack_ticket.ticket
-    );
-    Ok(db.update_acknowledged_ticket(ack_ticket).await?)
-}
-
-async fn unchecked_ticket_redeem<Db>(
-    db: Arc<RwLock<Db>>,
-    mut ack_ticket: AcknowledgedTicket,
-    on_chain_tx_sender: ActionSender,
-) -> Result<PendingAction>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
+    debug!("setting a winning {} as being redeemed with TX hash {tx_hash}", ticket);
+    Ok(db
+        .update_acknowledged_ticket_status(ticket, AcknowledgedTicketStatus::BeingRedeemed)
+        .await?)
 }
 
 #[async_trait]
@@ -200,8 +182,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
                         && (!only_aggregated || t.ticket.is_aggregated())
                 });
 
-            for mut avail_to_redeem in redeemable {
-                if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
+            for avail_to_redeem in redeemable {
+                if let Err(e) = set_being_redeemed(&mut *db, &avail_to_redeem.ticket, *EMPTY_TX_HASH).await {
                     error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
                 } else {
                     to_redeem.push(avail_to_redeem);
@@ -216,9 +198,13 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
         let mut receivers: Vec<PendingAction> = vec![];
 
-        for acked_ticket in to_redeem {
+        // All tickets got marked as `BeingRedeemed` in the database, now mark
+        // submit them to the transaction processor to claim their incentive
+        // on-chain in the smart contract.
+        for mut acked_ticket in to_redeem {
             let ticket_index = acked_ticket.ticket.index;
-            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, self.tx_sender.clone()).await {
+            acked_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
+            match self.tx_sender.send(Action::RedeemTicket(acked_ticket)).await {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
@@ -242,7 +228,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
             if ack_ticket.status == AcknowledgedTicketStatus::Untouched
                 && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
             {
-                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
+                set_being_redeemed(self.db.write().await.deref_mut(), &ack_ticket.ticket, *EMPTY_TX_HASH).await?;
+                self.tx_sender.send(Action::RedeemTicket(ack_ticket)).await
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
             }
@@ -255,6 +242,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
@@ -263,6 +251,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
@@ -592,7 +581,7 @@ mod tests {
         let ticket_count = 3;
         let rdb = CurrentDbShim::new_in_memory().await;
 
-        let (channel_from_bob, mut tickets) =
+        let (channel_from_bob, tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
         // ticket redemption requires a domain separator
@@ -604,12 +593,18 @@ mod tests {
         )));
 
         // Make the first ticket unredeemable
-        tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
-        db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
+        db.write()
+            .await
+            .update_acknowledged_ticket_status(&tickets[0].ticket, AcknowledgedTicketStatus::BeingAggregated)
+            .await
+            .unwrap();
 
         // Make the second ticket unredeemable
-        tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
-        db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();
+        db.write()
+            .await
+            .update_acknowledged_ticket_status(&tickets[1].ticket, AcknowledgedTicketStatus::BeingRedeemed)
+            .await
+            .unwrap();
 
         // Expect only the redeemable tickets get redeemed
         let tickets_clone = tickets.clone();

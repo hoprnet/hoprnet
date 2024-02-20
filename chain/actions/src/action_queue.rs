@@ -377,11 +377,15 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack) = act {
+                        if let Action::RedeemTicket(ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
-                                error!("cannot mark {ack} as untouched: {e}");
+                            if let Err(e) = db_clone
+                                .write()
+                                .await
+                                .update_acknowledged_ticket_status(&ack.ticket, AcknowledgedTicketStatus::Untouched)
+                                .await
+                            {
+                                error!("cannot mark {} as untouched: {}", ack.clone(), e);
                             }
                         }
 

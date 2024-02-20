@@ -154,6 +154,12 @@ mod tests {
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> chain_db::errors::Result<()>;
+            async fn get_acknowledged_ticket(
+                &self,
+                channel_id: &Hash,
+                epoch: u32,
+                index: u64,
+            ) -> chain_db::errors::Result<Option<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<usize>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(
@@ -163,8 +169,7 @@ mod tests {
                 index_start: u64,
                 index_end: u64,
             ) -> chain_db::errors::Result<Vec<AcknowledgedTicket>>;
-            async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> chain_db::errors::Result<()>;
-            async fn prepare_aggregatable_tickets(
+            async fn update_acknowledged_ticket_status(&mut self, ticket: &Ticket, new_status: AcknowledgedTicketStatus) -> chain_db::errors::Result<()>;            async fn prepare_aggregatable_tickets(
                 &mut self,
                 channel_id: &Hash,
                 epoch: u32,

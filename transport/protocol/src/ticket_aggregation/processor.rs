@@ -100,10 +100,13 @@ impl AggregationList {
         let reverted = tickets
             .iter()
             .map(|t| async {
-                let mut ticket = t.clone();
-                ticket.status = AcknowledgedTicketStatus::Untouched;
-                if let Err(e) = db.write().await.update_acknowledged_ticket(&ticket).await {
-                    error!("failed to revert {ticket} : {e}");
+                if let Err(e) = db
+                    .write()
+                    .await
+                    .update_acknowledged_ticket_status(&t.ticket, AcknowledgedTicketStatus::Untouched)
+                    .await
+                {
+                    error!("failed to revert {} : {}", t.clone(), e);
                     false
                 } else {
                     true
