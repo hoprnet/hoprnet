@@ -112,10 +112,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
             info!("Starting a heartbeat round for peers since timestamp {from_timestamp:?}");
-            let peers = self
-                .external_api
-                .get_peers(from_timestamp)
-                .await;
+            let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
             let this_round_planned_duration = std::time::Duration::from_millis({
@@ -201,7 +198,7 @@ mod tests {
             ..simple_heartbeat_config()
         };
 
-        let ping_delay = 2 * config.interval;
+        let ping_delay = 2 * config.interval + config.interval / 2;
         let expected_loop_count = 2;
 
         let mut mock = MockHeartbeatExternalApi::new();

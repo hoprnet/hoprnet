@@ -194,7 +194,7 @@ impl MultiStrategy {
     pub fn new<Db, Net>(
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<Net>>>,
+        network: Arc<Network<Net>>,
         chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self

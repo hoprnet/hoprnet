@@ -1,4 +1,3 @@
-use async_lock::RwLock;
 use futures::{
     channel::mpsc::{Receiver, UnboundedSender},
     select, StreamExt,
@@ -164,7 +163,7 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 pub async fn p2p_loop(
     version: String,
     me: libp2p::identity::Keypair,
-    network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<crate::adaptors::network::ExternalNetworkInteractions>>,
     network_update_input: Receiver<NetworkEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
@@ -556,7 +555,7 @@ pub async fn p2p_loop(
                     // TODO: async await in the event dispatch loop can block it, the await should be removed
                     if allowed_peers.contains(&peer_id) {
                         // TODO: async spawn local and remove the RWLOCK
-                        if let Err(e) = network.read().await.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                        if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
                             error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                         }
                     } else {

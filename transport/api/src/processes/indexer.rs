@@ -52,7 +52,7 @@ pub struct IndexerActions {
 impl IndexerActions {
     pub fn new<Db>(
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+        network: Arc<Network<ExternalNetworkInteractions>>,
         emitter: Sender<IndexerProcessed>,
     ) -> Self
     where
@@ -70,7 +70,7 @@ impl IndexerActions {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
                         PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
                         PeerEligibility::Ineligible => {
-                            if let Err(e) = network.write().await.remove(&peer).await {
+                            if let Err(e) = network.remove(&peer).await {
                                 error!("failed to remove '{peer}' from the local registry: {e}")
                             }
                             IndexerProcessed::Ban(peer)
@@ -80,8 +80,6 @@ impl IndexerActions {
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
                         let peers = network
-                            .read()
-                            .await
                             .peer_filter(|peer| async move { Some(peer.id) })
                             .await
                             .unwrap_or(vec![]);
@@ -119,7 +117,7 @@ impl IndexerActions {
                             let event = if is_allowed {
                                 IndexerProcessed::Allow(peer)
                             } else {
-                                if let Err(e) = network.write().await.remove(&peer).await {
+                                if let Err(e) = network.remove(&peer).await {
                                     error!("failed to remove '{peer}' from the local registry: {e}");
                                 }
                                 IndexerProcessed::Ban(peer)

@@ -20,14 +20,14 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 /// compliant.
 #[derive(Debug, Clone)]
 pub struct PingExternalInteractions<R: PeerAddressResolver> {
-    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+    network: Arc<Network<ExternalNetworkInteractions>>,
     resolver: R,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 }
 
 impl<R: PeerAddressResolver> PingExternalInteractions<R> {
     pub fn new(
-        network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+        network: Arc<Network<ExternalNetworkInteractions>>,
         resolver: R,
         channel_graph: Arc<RwLock<ChannelGraph>>,
     ) -> Self {
@@ -44,8 +44,6 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
         match self
             .network
-            .write()
-            .await
             .update(peer, result, result.is_ok().then_some(version))
             .await
         {

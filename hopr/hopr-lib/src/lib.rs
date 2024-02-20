@@ -171,7 +171,7 @@ pub fn to_chain_events_refresh_process<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+    network: Arc<Network<ExternalNetworkInteractions>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -194,7 +194,7 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            if let Err(e) = network.read().await.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                            if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
                             {
                                 error!("failed to record '{peer}' from the NetworkRegistry: {e}");
                             }
@@ -271,12 +271,12 @@ where
 
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        if let Err(e) = network.read().await.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
+                                        if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
                                             error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
-                                        if let Err(e) = network.read().await.remove(&peer_id).await {
+                                        if let Err(e) = network.remove(&peer_id).await {
                                             error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
                                         }
                                     },
@@ -327,8 +327,6 @@ where
     info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
     async_std::task::block_on(async {
         network
-            .write()
-            .await
             .add(
                 &identity.public().to_peer_id(),
                 PeerOrigin::Initialization,

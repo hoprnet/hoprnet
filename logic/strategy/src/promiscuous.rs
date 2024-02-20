@@ -165,7 +165,7 @@ where
     A: ChannelActions,
 {
     db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<Net>>>,
+    network: Arc<Network<Net>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
@@ -180,7 +180,7 @@ where
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<Net>>>,
+        network: Arc<Network<Net>>,
         chain_actions: A,
     ) -> Self {
         Self {
@@ -211,8 +211,6 @@ where
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
         self.network
-            .read()
-            .await
             .peer_filter(|status| async move {
                 match status
                     .peer_version
@@ -564,9 +562,6 @@ mod tests {
 
     struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
-        fn is_public(&self, _: &PeerId) -> bool {
-            false
-        }
         fn emit(&self, _: NetworkEvent) {}
     }
 
@@ -591,10 +586,10 @@ mod tests {
         channel
     }
 
-    async fn prepare_network(network: Arc<RwLock<Network<MockNetworkExternalActions>>>, qualities: Vec<f64>) {
+    async fn prepare_network(network: Arc<Network<MockNetworkExternalActions>>, qualities: Vec<f64>) {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
-        let net = network.read().await;
+        let net = network;
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
@@ -670,11 +665,12 @@ mod tests {
             PEERS[0].0,
         )));
 
-        let network = Arc::new(RwLock::new(Network::new(
+        let network = Arc::new(Network::new(
             PEERS[0].1,
+            vec![],
             NetworkConfig::default(),
             MockNetworkExternalActions {},
-        )));
+        ));
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
@@ -689,8 +685,6 @@ mod tests {
 
         // Peer 10 has an old node version
         network
-            .write()
-            .await
             .update(
                 &PEERS[9].1,
                 Ok(current_time().as_unix_timestamp().as_millis() as u64),
