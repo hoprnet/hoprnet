@@ -18,6 +18,9 @@ pub enum NetworkingError {
     #[error("backend error: {0}")]
     BackendError(#[from] sqlx::Error),
 
+    #[error("peer does not exist")]
+    NonExistingPeer,
+
     #[error("{0}")]
     Other(String),
 }

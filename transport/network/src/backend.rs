@@ -14,11 +14,14 @@ use crate::errors::{NetworkingError, Result};
 use crate::network::{NetworkConfig, PeerOrigin, PeerStatus};
 use crate::traits::{NetworkBackend, Stats};
 
+/// Configuration object for the Sqlite backend.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct SqliteNetworkBackendConfig {
+    /// Configuration object of the parent [crate::network::Network].
     pub network_options: NetworkConfig,
 }
 
+/// Implementation of the [NetworkBackend] trait that uses in-memory Sqlite database.
 #[derive(Debug, Clone)]
 pub struct SqliteNetworkBackend {
     db: sqlx::SqlitePool,
@@ -26,6 +29,7 @@ pub struct SqliteNetworkBackend {
 }
 
 impl SqliteNetworkBackend {
+    /// Construct new backend with in-memory database.
     pub async fn new(cfg: SqliteNetworkBackendConfig) -> Self {
         let db = sqlx::SqlitePool::connect("sqlite::memory:")
             .await
@@ -162,10 +166,7 @@ impl NetworkBackend for SqliteNetworkBackend {
         if res.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(NetworkingError::Other(format!(
-                "could not remove peer {}, maybe it does not exist?",
-                peer
-            )))
+            Err(NetworkingError::NonExistingPeer)
         }
     }
 
@@ -211,10 +212,7 @@ impl NetworkBackend for SqliteNetworkBackend {
         if res.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(NetworkingError::Other(format!(
-                "cannot update non-existing peer entry: {}",
-                new_status.id
-            )))
+            Err(NetworkingError::NonExistingPeer)
         }
     }
 
