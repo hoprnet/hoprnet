@@ -1,5 +1,6 @@
 use async_stream::stream;
 use async_trait::async_trait;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use hopr_primitive_types::prelude::SingleSumSMA;
@@ -8,6 +9,7 @@ use multiaddr::Multiaddr;
 use sea_query::{Asterisk, ColumnDef, Expr, Order, Query, SimpleExpr, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
 use std::str::FromStr;
+use std::time::{Duration, SystemTime};
 use tracing::{error, trace};
 
 use crate::errors::{NetworkingError, Result};
@@ -35,6 +37,12 @@ impl SqliteNetworkBackend {
             .await
             .expect("memory driver must be always constructible");
 
+        let default_sma = bincode::serialize(&SingleSumSMA::<f64, f64>::new(
+            cfg.network_options.quality_avg_window_size as usize,
+        ))
+        .expect("must serialize default sma")
+        .into_boxed_slice();
+
         let sql = Table::create()
             .table(NetworkPeerIden::Table)
             .if_not_exists()
@@ -49,18 +57,29 @@ impl SqliteNetworkBackend {
             .col(ColumnDef::new(NetworkPeerIden::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Version).string_len(20))
-            .col(ColumnDef::new(NetworkPeerIden::LastSeen).big_integer().default(0))
-            .col(ColumnDef::new(NetworkPeerIden::LastSeenLatency).integer().default(0))
             .col(
-                ColumnDef::new(NetworkPeerIden::Ignored)
-                    .boolean()
-                    .not_null()
-                    .default(false),
+                ColumnDef::new(NetworkPeerIden::LastSeen)
+                    .timestamp()
+                    .default(NaiveDateTime::UNIX_EPOCH),
             )
+            .col(
+                ColumnDef::new(NetworkPeerIden::LastSeenLatency)
+                    .big_integer()
+                    .default(0),
+            )
+            .col(ColumnDef::new(NetworkPeerIden::Ignored).timestamp())
             .col(ColumnDef::new(NetworkPeerIden::Public).boolean().default(true))
             .col(ColumnDef::new(NetworkPeerIden::Quality).float().default(0.0))
-            .col(ColumnDef::new(NetworkPeerIden::QualitySma).binary())
-            .col(ColumnDef::new(NetworkPeerIden::Backoff).float().default(0.0))
+            .col(
+                ColumnDef::new(NetworkPeerIden::QualitySma)
+                    .binary()
+                    .default(default_sma.as_ref()),
+            )
+            .col(
+                ColumnDef::new(NetworkPeerIden::Backoff)
+                    .float()
+                    .default(cfg.network_options.backoff_min),
+            )
             .col(ColumnDef::new(NetworkPeerIden::HeartbeatsSent).integer().default(0))
             .col(
                 ColumnDef::new(NetworkPeerIden::HeartbeatsSuccessful)
@@ -86,9 +105,9 @@ struct NetworkPeer {
     multi_addresses: String,
     origin: u8,
     version: Option<String>,
-    last_seen: i64,
+    last_seen: DateTime<Utc>,
     last_seen_latency: i64,
-    ignored: bool,
+    ignored: Option<DateTime<Utc>>,
     public: bool,
     quality: f64,
     quality_sma: Box<[u8]>,
@@ -108,22 +127,18 @@ impl TryFrom<NetworkPeer> for PeerStatus {
             .collect::<core::result::Result<Vec<_>, multiaddr::Error>>()
             .map_err(|_| NetworkingError::DecodingError)?;
 
-        let quality_avg = if !value.quality_sma.is_empty() {
-            bincode::deserialize(&value.quality_sma).map_err(|_| NetworkingError::DecodingError)?
-        } else {
-            SingleSumSMA::new(25) // just give some default, will be overriden on `update`
-        };
+        let quality_avg = bincode::deserialize(&value.quality_sma).map_err(|_| NetworkingError::DecodingError)?;
 
         Ok(PeerStatus {
             id: PeerId::from_str(&value.peer_id).map_err(|_| NetworkingError::DecodingError)?,
             origin: PeerOrigin::try_from(value.origin).map_err(|_| NetworkingError::DecodingError)?,
             is_public: value.public,
-            last_seen: value.last_seen as u64,
-            last_seen_latency: value.last_seen_latency as u64,
+            last_seen: value.last_seen.into(),
+            last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent as u64,
             heartbeats_succeeded: value.heartbeats_successful as u64,
             backoff: value.backoff,
-            ignored: value.ignored,
+            ignored: value.ignored.map(SystemTime::from),
             peer_version: value.version,
             multiaddresses,
             quality: value.quality,
@@ -188,11 +203,20 @@ impl NetworkBackend for SqliteNetworkBackend {
             .table(NetworkPeerIden::Table)
             .values([
                 (NetworkPeerIden::Version, new_status.peer_version.clone().into()),
-                (NetworkPeerIden::LastSeen, new_status.last_seen.into()),
-                (NetworkPeerIden::LastSeenLatency, new_status.last_seen_latency.into()),
+                (
+                    NetworkPeerIden::LastSeen,
+                    DateTime::<Utc>::from(new_status.last_seen).into(),
+                ),
+                (
+                    NetworkPeerIden::LastSeenLatency,
+                    (new_status.last_seen_latency.as_millis() as i64).into(),
+                ),
                 (NetworkPeerIden::Quality, new_status.quality.into()),
                 (NetworkPeerIden::QualitySma, quality_sma.as_ref().into()),
-                (NetworkPeerIden::Ignored, new_status.ignored.into()),
+                (
+                    NetworkPeerIden::Ignored,
+                    new_status.ignored.map(DateTime::<Utc>::from).into(),
+                ),
                 (NetworkPeerIden::Public, new_status.is_public.into()),
                 (NetworkPeerIden::MultiAddresses, maddrs.into()),
                 (NetworkPeerIden::Backoff, new_status.backoff.into()),
@@ -285,7 +309,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             .and_where(
                 Expr::col(NetworkPeerIden::Public)
                     .eq(true)
-                    .and(Expr::col(NetworkPeerIden::Ignored).eq(false))
+                    .and(Expr::col(NetworkPeerIden::Ignored).is_null())
                     .and(Expr::col(NetworkPeerIden::Quality).gt(self.cfg.network_options.quality_bad_threshold)),
             )
             .build_sqlx(SqliteQueryBuilder);
@@ -299,7 +323,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             .and_where(
                 Expr::col(NetworkPeerIden::Public)
                     .eq(true)
-                    .and(Expr::col(NetworkPeerIden::Ignored).eq(false))
+                    .and(Expr::col(NetworkPeerIden::Ignored).is_null())
                     .and(Expr::col(NetworkPeerIden::Quality).lte(self.cfg.network_options.quality_bad_threshold)),
             )
             .build_sqlx(SqliteQueryBuilder);
@@ -313,7 +337,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             .and_where(
                 Expr::col(NetworkPeerIden::Public)
                     .eq(false)
-                    .and(Expr::col(NetworkPeerIden::Ignored).eq(false))
+                    .and(Expr::col(NetworkPeerIden::Ignored).is_null())
                     .and(Expr::col(NetworkPeerIden::Quality).gt(self.cfg.network_options.quality_bad_threshold)),
             )
             .build_sqlx(SqliteQueryBuilder);
@@ -327,7 +351,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             .and_where(
                 Expr::col(NetworkPeerIden::Public)
                     .eq(false)
-                    .and(Expr::col(NetworkPeerIden::Ignored).eq(false))
+                    .and(Expr::col(NetworkPeerIden::Ignored).is_null())
                     .and(Expr::col(NetworkPeerIden::Quality).lte(self.cfg.network_options.quality_bad_threshold)),
             )
             .build_sqlx(SqliteQueryBuilder);
@@ -354,10 +378,13 @@ mod tests {
     use libp2p_identity::PeerId;
     use multiaddr::Multiaddr;
     use sea_query::Expr;
+    use std::ops::Add;
+    use std::time::{Duration, SystemTime};
 
     #[async_std::test]
     async fn test_add_get() {
-        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let cfg = SqliteNetworkBackendConfig::default();
+        let db = SqliteNetworkBackend::new(cfg.clone()).await;
         let peer_id = PeerId::random();
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
         let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
@@ -380,12 +407,12 @@ mod tests {
             id: peer_id,
             origin: PeerOrigin::IncomingConnection,
             is_public: true,
-            last_seen: 0,
-            last_seen_latency: 0,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::default(),
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
-            backoff: 0.0,
-            ignored: false,
+            backoff: cfg.network_options.backoff_min,
+            ignored: None,
             peer_version: None,
             multiaddresses: vec![ma_1, ma_2],
             quality: 0.0,
@@ -471,12 +498,12 @@ mod tests {
             id: peer_id,
             origin: PeerOrigin::IncomingConnection,
             is_public: true,
-            last_seen: 1,
-            last_seen_latency: 2,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::from_secs(2),
             heartbeats_sent: 3,
             heartbeats_succeeded: 4,
-            backoff: 1.0,
-            ignored: false,
+            backoff: 2.0,
+            ignored: None,
             peer_version: Some("1.2.3".into()),
             multiaddresses: vec![ma_1],
             quality: 0.6,
@@ -511,12 +538,12 @@ mod tests {
             id: peer_id,
             origin: PeerOrigin::IncomingConnection,
             is_public: true,
-            last_seen: 1,
-            last_seen_latency: 2,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::from_secs(2),
             heartbeats_sent: 3,
             heartbeats_succeeded: 4,
-            backoff: 1.0,
-            ignored: false,
+            backoff: 2.0,
+            ignored: None,
             peer_version: Some("1.2.3".into()),
             multiaddresses: vec![],
             quality: 0.6,
@@ -566,12 +593,12 @@ mod tests {
                     id: peer.clone(),
                     origin: PeerOrigin::IncomingConnection,
                     is_public: true,
-                    last_seen: i as u64,
-                    last_seen_latency: 2,
+                    last_seen: SystemTime::UNIX_EPOCH.add(Duration::from_secs(i as u64)),
+                    last_seen_latency: Duration::from_secs(2),
                     heartbeats_sent: 3,
                     heartbeats_succeeded: 4,
                     backoff: 1.0,
-                    ignored: false,
+                    ignored: None,
                     peer_version: Some("1.2.3".into()),
                     multiaddresses: vec![],
                     quality: 0.6,
@@ -642,12 +669,12 @@ mod tests {
             id: peer_id_1,
             origin: PeerOrigin::IncomingConnection,
             is_public: true,
-            last_seen: 1,
-            last_seen_latency: 2,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::from_secs(2),
             heartbeats_sent: 3,
             heartbeats_succeeded: 4,
-            backoff: 1.0,
-            ignored: false,
+            backoff: 2.0,
+            ignored: None,
             peer_version: Some("1.2.3".into()),
             multiaddresses: vec![],
             quality: 0.8,
@@ -671,12 +698,12 @@ mod tests {
             id: peer_id_2,
             origin: PeerOrigin::IncomingConnection,
             is_public: false,
-            last_seen: 1,
-            last_seen_latency: 2,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::from_secs(2),
             heartbeats_sent: 3,
             heartbeats_succeeded: 4,
-            backoff: 1.0,
-            ignored: false,
+            backoff: 2.0,
+            ignored: None,
             peer_version: Some("1.2.3".into()),
             multiaddresses: vec![],
             quality: 0.0,

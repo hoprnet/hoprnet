@@ -1,9 +1,9 @@
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
-use std::time::Duration;
+use std::ops::Add;
+use std::time::{Duration, SystemTime};
 
 use hopr_platform::time::native::current_time;
-use hopr_primitive_types::traits::AsUnixTimestamp;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
@@ -155,12 +155,12 @@ pub struct PeerStatus {
     pub id: PeerId,
     pub origin: PeerOrigin,
     pub is_public: bool,
-    pub last_seen: u64,         // timestamp
-    pub last_seen_latency: u64, // duration in ms
+    pub last_seen: std::time::SystemTime,
+    pub last_seen_latency: Duration,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    pub ignored: bool,
+    pub ignored: Option<std::time::SystemTime>,
     pub peer_version: Option<String>,
     pub multiaddresses: Vec<Multiaddr>,
     pub(crate) quality: f64,
@@ -175,9 +175,9 @@ impl PeerStatus {
             is_public: false,
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
-            last_seen: 0,
-            last_seen_latency: 0,
-            ignored: false,
+            last_seen: SystemTime::UNIX_EPOCH,
+            last_seen_latency: Duration::default(),
+            ignored: None,
             backoff,
             quality: 0.0,
             peer_version: None,
@@ -209,7 +209,7 @@ impl PeerStatus {
 
 impl std::fmt::Display for PeerStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Entry: [id={}, origin={}, last seen on={}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
+        write!(f, "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
             self.id, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
     }
 }
@@ -380,8 +380,8 @@ impl<T: NetworkExternalActions> Network<T> {
             entry.peer_version = version;
 
             if let Ok(latency) = ping_result {
-                entry.last_seen = current_time().as_unix_timestamp().as_millis() as u64;
-                entry.last_seen_latency = latency;
+                entry.last_seen = current_time();
+                entry.last_seen_latency = Duration::from_millis(latency);
                 entry.heartbeats_succeeded += 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
@@ -461,7 +461,7 @@ impl<T: NetworkExternalActions> Network<T> {
             let backoff = v.backoff.powf(self.cfg.backoff_exponent);
             let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
-            (v.last_seen + (delay.as_millis() as u64)) < threshold
+            v.last_seen.add(delay) < SystemTime::UNIX_EPOCH.add(Duration::from_millis(threshold))
         });
         data.sort_by(|a, b| {
             if self.entries.get(a).unwrap().last_seen < self.entries.get(b).unwrap().last_seen {
@@ -589,10 +589,10 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
-        let ts = current_time().as_unix_timestamp().as_millis() as u64;
+        let ts = current_time();
 
         peers
-            .update_from_ping(&peer, Ok(ts), None)
+            .update_from_ping(&peer, Ok(ts.as_unix_timestamp().as_millis() as u64), None)
             .await
             .expect("no error should occur");
 
