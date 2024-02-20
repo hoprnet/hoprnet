@@ -88,6 +88,7 @@ use {async_std::task::sleep, hopr_platform::time::native::current_time};
 /// and telemetry about network connections.
 pub fn build_network(
     peer_id: PeerId,
+    addresses: Vec<Multiaddr>,
     cfg: NetworkConfig,
 ) -> (
     Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
@@ -98,6 +99,7 @@ pub fn build_network(
 
     let network = Arc::new(RwLock::new(Network::new(
         peer_id,
+        addresses,
         cfg,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
     )));
@@ -398,7 +400,7 @@ impl HoprTransport {
             .await
             .get(peer)
             .await?
-            .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
+            .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
     pub async fn send_message(

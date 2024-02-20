@@ -2223,7 +2223,7 @@ mod tickets {
 mod node {
     use super::*;
     use futures::StreamExt;
-    use hopr_lib::{Health, Multiaddr};
+    use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
     use {std::str::FromStr, tide::Body};
 
@@ -2370,8 +2370,8 @@ mod node {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
                 },
-                last_seen: info.last_seen as u128,
-                last_seen_latency: info.last_seen_latency as u128,
+                last_seen: info.last_seen.as_unix_timestamp().as_millis(),
+                last_seen_latency: info.last_seen_latency.as_millis(),
                 quality: info.get_average_quality(),
                 backoff: info.backoff,
                 is_new: info.heartbeats_sent == 0u64,

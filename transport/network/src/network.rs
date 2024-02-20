@@ -1,21 +1,23 @@
 use std::collections::hash_set::HashSet;
-use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 use futures::StreamExt;
-use hopr_platform::time::native::current_time;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use tracing::{debug, warn};
 use validator::Validate;
 
 use crate::backend::{SqliteNetworkBackend, SqliteNetworkBackendConfig};
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use crate::traits::{NetworkBackend, Stats};
-use hopr_primitive_types::sma::{SingleSumSMA, SMA};
-use tracing::{debug, warn};
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::{
+    prelude::AsUnixTimestamp,
+    sma::{SingleSumSMA, SMA},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiGauge, SimpleGauge};
@@ -282,7 +284,11 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Check whether the PeerId is present in the network
     pub async fn has(&self, peer: &PeerId) -> bool {
-        peer == &self.me || self.db.get(peer).await.is_ok_and(|p| p.is_some())
+        peer == &self.me
+            || self.db.get(peer).await.is_ok_and(|p| {
+                p.map(|peer_status| !self.should_still_be_ignored(&peer_status))
+                    .unwrap_or(false)
+            })
     }
 
     /// Add a new peer into the network
@@ -294,23 +300,9 @@ impl<T: NetworkExternalActions> Network<T> {
         }
 
         debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
-        // let now = current_time().as_unix_timestamp().as_millis() as u64;
 
         if let Some(mut peer_status) = self.db.get(&peer).await? {
-            let is_ignored = false;
-            // TODO: check if should still be ignored
-            //     let is_ignored = if !has_entry && self.ignored.contains_key(peer) {
-            //         let timestamp = self.ignored.get(peer).unwrap();
-            //         if Duration::from_millis(now - timestamp) > self.cfg.ignore_timeframe {
-            //             self.ignored.remove(peer);
-            //             false
-            //         } else {
-            //             true
-            //         }
-            //     } else {
-            //         false
-            //     };
-            if !is_ignored && addrs.len() > 0 {
+            if !self.should_still_be_ignored(&peer_status) {
                 peer_status.multiaddresses.append(&mut addrs);
                 peer_status.multiaddresses = peer_status
                     .multiaddresses
@@ -347,7 +339,15 @@ impl<T: NetworkExternalActions> Network<T> {
                 ..PeerStatus::new(peer.clone(), PeerOrigin::Initialization, 0.0f64, 0u32)
             }))
         } else {
-            self.db.get(&peer).await
+            Ok(if let Some(peer_status) = self.db.get(&peer).await? {
+                if self.should_still_be_ignored(&peer_status) {
+                    None
+                } else {
+                    Some(peer_status)
+                }
+            } else {
+                None
+            })
         }
     }
 
@@ -380,6 +380,10 @@ impl<T: NetworkExternalActions> Network<T> {
         }
 
         if let Some(mut entry) = self.db.get(peer).await? {
+            if !self.should_still_be_ignored(&entry) {
+                entry.ignored = None;
+            }
+
             entry.heartbeats_sent += 1;
             entry.peer_version = version;
 
@@ -395,12 +399,11 @@ impl<T: NetworkExternalActions> Network<T> {
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api.emit(NetworkEvent::CloseConnection(entry.id));
+                    // TODO: the current logic does not really assume any removals, will need to change with an autojob
                     self.db.remove(&entry.id).await?;
                     return Ok(Some(entry));
                 } else if entry.quality < self.cfg.quality_bad_threshold {
-                    // TODO: solve the ignored case in the DB
-                    // self.ignored
-                    //     .insert(entry.id, current_time().as_unix_timestamp().as_millis() as u64);
+                    entry.ignored = Some(current_time());
                 }
             }
 
@@ -452,7 +455,7 @@ impl<T: NetworkExternalActions> Network<T> {
         F: FnMut(PeerStatus) -> Fut,
         Fut: std::future::Future<Output = Option<U>>,
     {
-        let stream = self.db.get_multiple(None).await?;
+        let stream = self.db.get_multiple(None, false).await?;
         futures::pin_mut!(stream);
         Ok(stream.filter_map(filter).collect().await)
     }
@@ -460,9 +463,10 @@ impl<T: NetworkExternalActions> Network<T> {
     pub async fn find_peers_to_ping(&self, threshold: u64) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
-            .get_multiple(Some(
-                sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen).lte(threshold),
-            ))
+            .get_multiple(
+                Some(sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen).lte(threshold)),
+                true,
+            )
             .await?;
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
@@ -473,7 +477,12 @@ impl<T: NetworkExternalActions> Network<T> {
                 let backoff = v.backoff.powf(self.cfg.backoff_exponent);
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
-                if (v.last_seen + (delay.as_millis() as u64)) < threshold {
+                panic!(
+                    "{} and {}",
+                    (v.last_seen.as_unix_timestamp() + delay).as_millis() as u64,
+                    threshold
+                );
+                if ((v.last_seen.as_unix_timestamp() + delay).as_millis() as u64) < threshold {
                     Some(v)
                 } else {
                     None
@@ -491,6 +500,14 @@ impl<T: NetworkExternalActions> Network<T> {
         });
 
         Ok(data.into_iter().map(|peer| peer.id).collect())
+    }
+
+    pub(crate) fn should_still_be_ignored(&self, peer: &PeerStatus) -> bool {
+        peer.ignored
+            .map(|t| {
+                current_time().as_unix_timestamp().saturating_sub(t.as_unix_timestamp()) < self.cfg.ignore_timeframe
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -638,7 +655,7 @@ mod tests {
 
         assert_eq!(actual.heartbeats_sent, 1);
         assert_eq!(actual.heartbeats_succeeded, 1);
-        assert_eq!(actual.last_seen_latency, latency);
+        assert_eq!(actual.last_seen_latency, std::time::Duration::from_millis(latency));
     }
 
     #[async_std::test]
@@ -705,7 +722,7 @@ mod tests {
             .await
             .expect("no error should occur");
         peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop to ignored
-        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
+                                                                                  // peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
 
         assert!(!peers.has(&peer).await);
 
@@ -743,7 +760,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_should_be_listed_for_the_ping_if_last_recorded_later_than_reference() {
+    async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference() {
         let first = PeerId::random();
         let second = PeerId::random();
         let peers = basic_network(&PeerId::random());
@@ -754,7 +771,7 @@ mod tests {
             .await
             .unwrap();
 
-        let ts = current_time().as_unix_timestamp().as_millis() as u64;
+        let ts = 77u64;
 
         let mut expected = vec![first, second];
         expected.sort();
@@ -765,7 +782,19 @@ mod tests {
             .await
             .expect("no error should occur");
 
-        let mut actual = peers.find_peers_to_ping(ts + 3000).await.unwrap();
+        // assert_eq!(
+        //     format!(
+        //         "{:?}",
+        //         peers.should_still_be_ignored(&peers.get(&first).await.unwrap().unwrap())
+        //     ),
+        //     ""
+        // );
+        // assert_eq!(format!("{:?}", peers.get(&first).await), "");
+
+        let mut actual = peers
+            .find_peers_to_ping(current_time().as_unix_timestamp().as_millis() as u64 + 10u64)
+            .await
+            .unwrap();
         actual.sort();
 
         assert_eq!(actual, expected);
