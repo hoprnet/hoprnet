@@ -6,6 +6,7 @@ use multiaddr::Multiaddr;
 use crate::errors::Result;
 use crate::network::{PeerOrigin, PeerStatus};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Stats {
     pub good_quality_public: u32,
     pub bad_quality_public: u32,
@@ -31,7 +32,7 @@ pub trait NetworkBackend {
 
     async fn remove(&self, peer: &PeerId) -> Result<()>;
 
-    async fn update(&self, peer: &PeerId, new_status: &PeerStatus) -> Result<()>;
+    async fn update(&self, new_status: &PeerStatus) -> Result<()>;
 
     async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
 

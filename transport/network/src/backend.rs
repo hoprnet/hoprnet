@@ -2,9 +2,10 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
+use hopr_primitive_types::prelude::SingleSumSMA;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use sea_query::{ColumnDef, Expr, Query, SimpleExpr, SqliteQueryBuilder, Table};
+use sea_query::{Asterisk, ColumnDef, Expr, Query, SimpleExpr, SqliteQueryBuilder, Table};
 use sea_query_binder::SqlxBinder;
 use std::str::FromStr;
 use tracing::{error, trace};
@@ -13,7 +14,7 @@ use crate::errors::{NetworkingError, Result};
 use crate::network::{NetworkConfig, PeerOrigin, PeerStatus};
 use crate::traits::{NetworkBackend, Stats};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct SqliteNetworkBackendConfig {
     pub network_options: NetworkConfig,
 }
@@ -44,8 +45,8 @@ impl SqliteNetworkBackend {
             .col(ColumnDef::new(NetworkPeerIden::MultiAddresses).string().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Origin).tiny_integer().not_null())
             .col(ColumnDef::new(NetworkPeerIden::Version).string_len(20))
-            .col(ColumnDef::new(NetworkPeerIden::LastSeen).big_integer())
-            .col(ColumnDef::new(NetworkPeerIden::LastSeenLatency).integer())
+            .col(ColumnDef::new(NetworkPeerIden::LastSeen).big_integer().default(0))
+            .col(ColumnDef::new(NetworkPeerIden::LastSeenLatency).integer().default(0))
             .col(
                 ColumnDef::new(NetworkPeerIden::Ignored)
                     .boolean()
@@ -53,11 +54,15 @@ impl SqliteNetworkBackend {
                     .default(false),
             )
             .col(ColumnDef::new(NetworkPeerIden::Public).boolean().default(true))
-            .col(ColumnDef::new(NetworkPeerIden::Quality).float())
+            .col(ColumnDef::new(NetworkPeerIden::Quality).float().default(0.0))
             .col(ColumnDef::new(NetworkPeerIden::QualitySma).binary())
-            .col(ColumnDef::new(NetworkPeerIden::Backoff).float())
-            .col(ColumnDef::new(NetworkPeerIden::HeartbeatsSent).integer())
-            .col(ColumnDef::new(NetworkPeerIden::HeartbeatsSuccessful).integer())
+            .col(ColumnDef::new(NetworkPeerIden::Backoff).float().default(0.0))
+            .col(ColumnDef::new(NetworkPeerIden::HeartbeatsSent).integer().default(0))
+            .col(
+                ColumnDef::new(NetworkPeerIden::HeartbeatsSuccessful)
+                    .integer()
+                    .default(0),
+            )
             .build(SqliteQueryBuilder);
 
         sqlx::query(&sql)
@@ -94,10 +99,16 @@ impl TryFrom<NetworkPeer> for PeerStatus {
     fn try_from(value: NetworkPeer) -> std::result::Result<Self, Self::Error> {
         let multiaddresses = value
             .multi_addresses
-            .split(",")
+            .split(',')
             .map(Multiaddr::try_from)
             .collect::<core::result::Result<Vec<_>, multiaddr::Error>>()
             .map_err(|_| NetworkingError::DecodingError)?;
+
+        let quality_avg = if !value.quality_sma.is_empty() {
+            bincode::deserialize(&value.quality_sma).map_err(|_| NetworkingError::DecodingError)?
+        } else {
+            SingleSumSMA::new(25) // just give some default, will be overriden on `update`
+        };
 
         Ok(PeerStatus {
             id: PeerId::from_str(&value.peer_id).map_err(|_| NetworkingError::DecodingError)?,
@@ -112,7 +123,7 @@ impl TryFrom<NetworkPeer> for PeerStatus {
             peer_version: value.version,
             multiaddresses,
             quality: value.quality,
-            quality_avg: bincode::deserialize(&value.quality_sma).map_err(|_| NetworkingError::DecodingError)?,
+            quality_avg,
         })
     }
 }
@@ -147,12 +158,18 @@ impl NetworkBackend for SqliteNetworkBackend {
             .build_sqlx(SqliteQueryBuilder);
 
         trace!("about to execute network sql {query}", query = sql);
-        sqlx::query_with(&sql, values).execute(&self.db).await?;
-
-        Ok(())
+        let res = sqlx::query_with(&sql, values).execute(&self.db).await?;
+        if res.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(NetworkingError::Other(format!(
+                "could not remove peer {}, maybe it does not exist?",
+                peer
+            )))
+        }
     }
 
-    async fn update(&self, peer: &PeerId, new_status: &PeerStatus) -> Result<()> {
+    async fn update(&self, new_status: &PeerStatus) -> Result<()> {
         let quality_sma = bincode::serialize(&new_status.quality_avg)
             .map_err(|e| NetworkingError::Other(format!("cannot serialize sma: {e}")))?
             .into_boxed_slice();
@@ -185,21 +202,31 @@ impl NetworkBackend for SqliteNetworkBackend {
                 ),
                 (NetworkPeerIden::Origin, origin.into()),
             ])
-            .and_where(Expr::col(NetworkPeerIden::PeerId).eq(peer.to_base58()))
+            .and_where(Expr::col(NetworkPeerIden::PeerId).eq(new_status.id.to_base58()))
             .build_sqlx(SqliteQueryBuilder);
 
         trace!("about to execute network sql {query}", query = sql);
-        sqlx::query_with(&sql, values).execute(&self.db).await?;
+        let res = sqlx::query_with(&sql, values).execute(&self.db).await?;
 
-        Ok(())
+        if res.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(NetworkingError::Other(format!(
+                "cannot update non-existing peer entry: {}",
+                new_status.id
+            )))
+        }
     }
 
     async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         let (sql, values) = Query::select()
+            .column(Asterisk)
             .from(NetworkPeerIden::Table)
             .and_where(Expr::col(NetworkPeerIden::PeerId).eq(peer.to_base58()))
             .limit(1)
             .build_sqlx(SqliteQueryBuilder);
+
+        trace!("about to execute network sql {query}", query = sql);
 
         let peers: Option<NetworkPeer> = sqlx::query_as_with(&sql, values).fetch_optional(&self.db).await?;
 
@@ -212,12 +239,15 @@ impl NetworkBackend for SqliteNetworkBackend {
 
     async fn get_multiple<'a>(&'a self, filter: Option<SimpleExpr>) -> Result<BoxStream<'a, PeerStatus>> {
         let (sql, values) = Query::select()
+            .column(Asterisk)
             .from(NetworkPeerIden::Table)
             .and_where(filter.unwrap_or(Expr::value(1)))
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
+
         Ok(Box::pin(stream! {
-            let mut sub_stream = sqlx::query_as_with::<_, NetworkPeer, _>(&sql, values.clone())
+            let mut sub_stream = sqlx::query_as_with::<_, NetworkPeer, _>(&sql, values)
                 .fetch(&self.db);
 
             loop {
@@ -242,7 +272,6 @@ impl NetworkBackend for SqliteNetworkBackend {
         }))
     }
 
-    // TODO: does it make sense to use rather a separate table?
     async fn stats(&self) -> Result<Stats> {
         let (sql, values) = Query::select()
             .expr(Expr::col((NetworkPeerIden::Table, NetworkPeerIden::Id)).count())
@@ -255,6 +284,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             )
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
         let good_quality_public: u32 = sqlx::query_scalar_with(&sql, values).fetch_one(&self.db).await?;
 
         let (sql, values) = Query::select()
@@ -268,6 +298,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             )
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
         let bad_quality_public: u32 = sqlx::query_scalar_with(&sql, values).fetch_one(&self.db).await?;
 
         let (sql, values) = Query::select()
@@ -281,6 +312,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             )
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
         let good_quality_non_public: u32 = sqlx::query_scalar_with(&sql, values).fetch_one(&self.db).await?;
 
         let (sql, values) = Query::select()
@@ -294,6 +326,7 @@ impl NetworkBackend for SqliteNetworkBackend {
             )
             .build_sqlx(SqliteQueryBuilder);
 
+        trace!("about to execute network sql {query}", query = sql);
         let bad_quality_non_public: u32 = sqlx::query_scalar_with(&sql, values).fetch_one(&self.db).await?;
 
         Ok(Stats {
@@ -307,5 +340,368 @@ impl NetworkBackend for SqliteNetworkBackend {
 
 #[cfg(test)]
 mod tests {
-    // TODO: missing tests
+    use crate::backend::{NetworkPeerIden, SqliteNetworkBackend, SqliteNetworkBackendConfig};
+    use crate::network::{PeerOrigin, PeerStatus};
+    use crate::traits::{NetworkBackend, Stats};
+    use futures_lite::StreamExt;
+    use hopr_primitive_types::sma::SingleSumSMA;
+    use libp2p_identity::PeerId;
+    use multiaddr::Multiaddr;
+    use sea_query::Expr;
+
+    #[async_std::test]
+    async fn test_add_get() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+
+        db.add(
+            &peer_id,
+            PeerOrigin::IncomingConnection,
+            vec![ma_1.clone(), ma_2.clone()],
+        )
+        .await
+        .expect("should add peer");
+
+        let peer_from_db = db
+            .get(&peer_id)
+            .await
+            .expect("should be able to get a peer")
+            .expect("peer must exist in the db");
+
+        let expected_peer = PeerStatus {
+            id: peer_id,
+            origin: PeerOrigin::IncomingConnection,
+            is_public: true,
+            last_seen: 0,
+            last_seen_latency: 0,
+            heartbeats_sent: 0,
+            heartbeats_succeeded: 0,
+            backoff: 0.0,
+            ignored: false,
+            peer_version: None,
+            multiaddresses: vec![ma_1, ma_2],
+            quality: 0.0,
+            quality_avg: SingleSumSMA::new(25),
+        };
+
+        assert_eq!(expected_peer, peer_from_db, "peer states must match");
+    }
+
+    #[async_std::test]
+    async fn test_should_remove_peer() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+
+        db.add(&peer_id, PeerOrigin::IncomingConnection, vec![ma_1.clone()])
+            .await
+            .expect("should add peer");
+        assert!(
+            db.get(&peer_id).await.expect("should get peer").is_some(),
+            "must have peer entry"
+        );
+
+        db.remove(&peer_id).await.expect("must remove peer");
+        assert!(
+            db.get(&peer_id).await.expect("should get peer").is_none(),
+            "peer entry must be gone"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_should_not_remove_non_existing_peer() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+
+        db.remove(&peer_id)
+            .await
+            .expect_err("must not delete non-existent peer");
+    }
+
+    #[async_std::test]
+    async fn test_should_not_add_duplicate_peers() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+
+        db.add(&peer_id, PeerOrigin::IncomingConnection, vec![ma_1.clone()])
+            .await
+            .expect("should add peer");
+        db.add(&peer_id, PeerOrigin::IncomingConnection, vec![])
+            .await
+            .expect_err("should fail adding second time");
+    }
+
+    #[async_std::test]
+    async fn test_should_return_none_on_non_existing_peer() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+
+        assert!(
+            db.get(&peer_id).await.expect("should succeed").is_none(),
+            "should return none"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_update() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+
+        db.add(
+            &peer_id,
+            PeerOrigin::IncomingConnection,
+            vec![ma_1.clone(), ma_2.clone()],
+        )
+        .await
+        .expect("should add peer");
+
+        let peer_status = PeerStatus {
+            id: peer_id,
+            origin: PeerOrigin::IncomingConnection,
+            is_public: true,
+            last_seen: 1,
+            last_seen_latency: 2,
+            heartbeats_sent: 3,
+            heartbeats_succeeded: 4,
+            backoff: 1.0,
+            ignored: false,
+            peer_version: Some("1.2.3".into()),
+            multiaddresses: vec![ma_1],
+            quality: 0.6,
+            quality_avg: SingleSumSMA::new_with_samples(3, vec![0.1_f64, 0.4_64, 0.6_f64]),
+        };
+
+        let peer_status_from_db = db
+            .get(&peer_id)
+            .await
+            .expect("get should succeed")
+            .expect("entry should exist");
+
+        assert_ne!(peer_status, peer_status_from_db, "entries must not be equal");
+
+        db.update(&peer_status).await.expect("update should succeed");
+
+        let peer_status_from_db = db
+            .get(&peer_id)
+            .await
+            .expect("get should succeed")
+            .expect("entry should exist");
+
+        assert_eq!(peer_status, peer_status_from_db, "entries must be equal");
+    }
+
+    #[async_std::test]
+    async fn test_should_fail_to_update_non_existing_peer() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id = PeerId::random();
+
+        let peer_status = PeerStatus {
+            id: peer_id,
+            origin: PeerOrigin::IncomingConnection,
+            is_public: true,
+            last_seen: 1,
+            last_seen_latency: 2,
+            heartbeats_sent: 3,
+            heartbeats_succeeded: 4,
+            backoff: 1.0,
+            ignored: false,
+            peer_version: Some("1.2.3".into()),
+            multiaddresses: vec![],
+            quality: 0.6,
+            quality_avg: SingleSumSMA::new_with_samples(3, vec![0.1_f64, 0.4_64, 0.6_f64]),
+        };
+
+        db.update(&peer_status)
+            .await
+            .expect_err("should fail updating non-existing peer");
+    }
+
+    #[async_std::test]
+    async fn test_get_multiple_should_return_all_peers() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peers = (0..10).map(|_| PeerId::random()).collect::<Vec<_>>();
+
+        for peer in &peers {
+            db.add(peer, PeerOrigin::Initialization, vec![])
+                .await
+                .expect("should not fail adding peers");
+        }
+
+        let peers_from_db: Vec<PeerId> = db
+            .get_multiple(None)
+            .await
+            .expect("should get stream")
+            .map(|s| s.id)
+            .collect()
+            .await;
+
+        assert_eq!(peers.len(), peers_from_db.len(), "lengths must match");
+        assert_eq!(peers, peers_from_db, "peer ids must match");
+    }
+
+    #[async_std::test]
+    async fn test_get_multiple_should_return_filtered_peers() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_count = 10;
+        let peers = (0..peer_count).map(|_| PeerId::random()).collect::<Vec<_>>();
+
+        for (i, peer) in peers.iter().enumerate() {
+            db.add(peer, PeerOrigin::Initialization, vec![])
+                .await
+                .expect("should not fail adding peers");
+            if i >= peer_count / 2 {
+                let peer_status = PeerStatus {
+                    id: peer.clone(),
+                    origin: PeerOrigin::IncomingConnection,
+                    is_public: true,
+                    last_seen: 1,
+                    last_seen_latency: 2,
+                    heartbeats_sent: 3,
+                    heartbeats_succeeded: 4,
+                    backoff: 1.0,
+                    ignored: false,
+                    peer_version: Some("1.2.3".into()),
+                    multiaddresses: vec![],
+                    quality: 0.6,
+                    quality_avg: SingleSumSMA::new_with_samples(3, vec![0.1_f64, 0.4_64, 0.6_f64]),
+                };
+                db.update(&peer_status).await.expect("must update peer status");
+            }
+        }
+
+        let peers_from_db: Vec<PeerId> = db
+            .get_multiple(Some(Expr::col(NetworkPeerIden::Quality).gt(0.5_f64)))
+            .await
+            .expect("should get stream")
+            .map(|s| s.id)
+            .collect()
+            .await;
+
+        assert_eq!(peer_count / 2, peers_from_db.len(), "lengths must match");
+        assert_eq!(
+            peers.into_iter().skip(5).collect::<Vec<_>>(),
+            peers_from_db,
+            "peer ids must match"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_should_update_stats_when_updating_peers() {
+        let db = SqliteNetworkBackend::new(SqliteNetworkBackendConfig::default()).await;
+        let peer_id_1 = PeerId::random();
+        let peer_id_2 = PeerId::random();
+
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id_1}").parse().unwrap();
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id_2}").parse().unwrap();
+
+        db.add(&peer_id_1, PeerOrigin::IncomingConnection, vec![ma_1])
+            .await
+            .expect("should add peer");
+
+        let stats = db.stats().await.expect("must get stats");
+        assert_eq!(
+            Stats {
+                good_quality_public: 0,
+                bad_quality_public: 1,
+                good_quality_non_public: 0,
+                bad_quality_non_public: 0,
+            },
+            stats,
+            "stats must be equal"
+        );
+
+        db.add(&peer_id_2, PeerOrigin::IncomingConnection, vec![ma_2])
+            .await
+            .expect("should add peer");
+
+        let stats = db.stats().await.expect("must get stats");
+        assert_eq!(
+            Stats {
+                good_quality_public: 0,
+                bad_quality_public: 2,
+                good_quality_non_public: 0,
+                bad_quality_non_public: 0,
+            },
+            stats,
+            "stats must be equal"
+        );
+
+        let peer_status = PeerStatus {
+            id: peer_id_1,
+            origin: PeerOrigin::IncomingConnection,
+            is_public: true,
+            last_seen: 1,
+            last_seen_latency: 2,
+            heartbeats_sent: 3,
+            heartbeats_succeeded: 4,
+            backoff: 1.0,
+            ignored: false,
+            peer_version: Some("1.2.3".into()),
+            multiaddresses: vec![],
+            quality: 0.8,
+            quality_avg: SingleSumSMA::new_with_samples(3, vec![0.1_f64, 0.4_64, 0.6_f64]),
+        };
+        db.update(&peer_status).await.expect("must be able to update peer");
+
+        let stats = db.stats().await.expect("must get stats");
+        assert_eq!(
+            Stats {
+                good_quality_public: 1,
+                bad_quality_public: 1,
+                good_quality_non_public: 0,
+                bad_quality_non_public: 0,
+            },
+            stats,
+            "stats must be equal"
+        );
+
+        let peer_status = PeerStatus {
+            id: peer_id_2,
+            origin: PeerOrigin::IncomingConnection,
+            is_public: false,
+            last_seen: 1,
+            last_seen_latency: 2,
+            heartbeats_sent: 3,
+            heartbeats_succeeded: 4,
+            backoff: 1.0,
+            ignored: false,
+            peer_version: Some("1.2.3".into()),
+            multiaddresses: vec![],
+            quality: 0.0,
+            quality_avg: SingleSumSMA::new_with_samples(3, vec![0.1_f64, 0.4_64, 0.6_f64]),
+        };
+        db.update(&peer_status).await.expect("must be able to update peer");
+
+        let stats = db.stats().await.expect("must get stats");
+        assert_eq!(
+            Stats {
+                good_quality_public: 1,
+                bad_quality_public: 0,
+                good_quality_non_public: 0,
+                bad_quality_non_public: 1,
+            },
+            stats,
+            "stats must be equal"
+        );
+
+        db.remove(&peer_id_1).await.expect("should remove peer");
+
+        let stats = db.stats().await.expect("must get stats");
+        assert_eq!(
+            Stats {
+                good_quality_public: 0,
+                bad_quality_public: 0,
+                good_quality_non_public: 0,
+                bad_quality_non_public: 1,
+            },
+            stats,
+            "stats must be equal"
+        );
+    }
 }

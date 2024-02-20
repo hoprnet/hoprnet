@@ -332,7 +332,7 @@ impl<T: NetworkExternalActions> Network<T> {
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
-                self.db.update(&peer, &peer_status).await?;
+                self.db.update(&peer_status).await?;
             }
         } else {
             self.db.add(&peer, origin, addrs).await?;
@@ -400,7 +400,7 @@ impl<T: NetworkExternalActions> Network<T> {
                 }
             }
 
-            self.db.update(peer, &entry).await?;
+            self.db.update(&entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             let _ = self.refresh_metrics().await;
