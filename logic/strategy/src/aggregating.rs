@@ -182,7 +182,12 @@ where
 
         let list = AggregationList::TicketList(tickets_to_agg);
 
-        match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
+        match self
+            .ticket_aggregator
+            .lock()
+            .await
+            .aggregate_tickets(&channel.destination, list.clone())
+        {
             Ok(mut awaiter) => {
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
@@ -430,12 +435,7 @@ mod tests {
         let domain_separator = Hash::default();
 
         let response = Response::new(
-            &Hash::create(&[
-                &channel_id.to_bytes(),
-                &channel_epoch.to_be_bytes(),
-                &index.to_be_bytes(),
-            ])
-            .to_bytes(),
+            Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
         );
 
         let ticket = Ticket::new(
@@ -448,16 +448,15 @@ mod tests {
             response.to_challenge().into(),
             signer,
             &domain_separator,
-        )
-        .unwrap();
+        );
 
-        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+        AcknowledgedTicket::new(ticket, response)
     }
 
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
         let mut ack_key = Vec::new();
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(&ack.ticket.channel_id.as_ref());
         ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
         ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
 
@@ -728,7 +727,7 @@ mod tests {
         dbs[1]
             .write()
             .await
-            .update_acknowledged_ticket(&acked_tickets[0])
+            .replace_acked_tickets_by_aggregated_ticket(acked_tickets[0].clone())
             .await
             .unwrap();
 

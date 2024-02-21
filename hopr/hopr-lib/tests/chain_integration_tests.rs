@@ -60,16 +60,21 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         Challenge::from(cp_sum).to_ethereum_challenge(),
         counterparty,
         &domain_separator,
-    )
-    .unwrap();
+    );
 
-    let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-    let ack_ticket = unacked_ticket
-        .acknowledge(&hk2, &myself.chain_key, &domain_separator)
-        .unwrap();
+    if let Err(e) = validate_ticket(&ticket, &myself.chain_key.public().to_address(), &domain_separator) {
+        panic!("{:?}", e);
+    }
+
+    let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
+
+    assert!(validate_unacknowledged_ticket(&unacked_ticket, &Hash::default()).is_ok());
+    let ack_ticket = unacked_ticket.acknowledge(&hk2).unwrap();
+
+    assert!(validate_acknowledged_ticket(&ack_ticket).is_ok());
 
     let mut ack_key = Vec::new();
-    ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
+    ack_key.extend_from_slice(ack_ticket.ticket.channel_id.as_ref());
     ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
     ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
     let key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap();
@@ -204,7 +209,7 @@ async fn start_node_chain_logic(
     // Actions
     let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = ChainActions::new(chain_key.public().to_address(), db.clone(), action_queue.new_sender());
+    let actions = ChainActions::new(chain_key.clone(), db.clone(), action_queue.new_sender());
 
     let mut node_tasks = Vec::new();
 

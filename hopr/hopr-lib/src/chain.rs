@@ -19,7 +19,7 @@ use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
-use core_transport::{ChainKeypair, Keypair};
+use core_transport::ChainKeypair;
 use hopr_primitive_types::primitives::Address;
 use utils_db::CurrentDbShim;
 
@@ -305,7 +305,7 @@ type ActiveTxExecutor = EthereumTransactionExecutor<
 >;
 
 pub fn build_chain_components<Db>(
-    me_onchain: &ChainKeypair,
+    me_onchain: ChainKeypair,
     chain_config: ChainNetworkConfig,
     contract_addrs: ContractAddresses,
     module_address: Address,
@@ -352,12 +352,12 @@ where
     );
 
     // Build RPC operations
-    let rpc_operations = RpcOperations::new(rpc_client, me_onchain, rpc_cfg).expect("failed to initialize RPC");
+    let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
 
     // Build the Ethereum Transaction Executor that uses RpcOperations as backend
     let ethereum_tx_executor = EthereumTransactionExecutor::new(
         RpcEthereumClient::new(rpc_operations.clone(), rpc_client_cfg),
-        SafePayloadGenerator::new(me_onchain, contract_addrs, module_address),
+        SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
     );
 
     // Build the Action Queue
@@ -369,7 +369,7 @@ where
     );
 
     // Instantiate Chain Actions
-    let chain_actions = ChainActions::new(me_onchain.public().to_address(), db, action_queue.new_sender());
+    let chain_actions = ChainActions::new(me_onchain.clone(), db, action_queue.new_sender());
 
     (action_queue, chain_actions, rpc_operations)
 }

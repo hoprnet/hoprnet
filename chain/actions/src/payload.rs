@@ -73,7 +73,7 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<T>;
+    fn redeem_ticket(&self, acked_ticket: ProvableWinningTicket, domain_separator: &Hash) -> Result<T>;
 
     /// Creates a transaction payload to register a Safe instance which is used
     /// to manage the node's funds
@@ -275,12 +275,16 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
-        let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
+    fn redeem_ticket(
+        &self,
+        winning_ticket: ProvableWinningTicket,
+        domain_separator: &Hash,
+    ) -> Result<TypedTransaction> {
+        let redeemable = convert_winning_ticket(&winning_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
+        let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, self.me, ticket_hash, domain_separator);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -473,12 +477,16 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
-        let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
+    fn redeem_ticket(
+        &self,
+        winning_ticket: ProvableWinningTicket,
+        domain_separator: &Hash,
+    ) -> Result<TypedTransaction> {
+        let redeemable = convert_winning_ticket(&winning_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
+        let ticket_hash = winning_ticket.ticket.get_hash(domain_separator);
 
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(&winning_ticket.vrf_params, self.me, ticket_hash, domain_separator);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -522,17 +530,17 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 /// Converts off-chain representation of VRF parameters into a representation
 /// that the smart contract understands
 ///
-/// Not implemented using From trait because logic fits better here
+/// Specific for smart contract payload generation
 pub fn convert_vrf_parameters(
     off_chain: &VrfParameters,
-    signer: &Address,
-    ticket_hash: &Hash,
+    signer: Address,
+    ticket_hash: Hash,
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        .get_s_b_witness(&signer, &ticket_hash.into(), domain_separator.as_ref())
         // Safe: hash value is always in the allowed length boundaries,
         //       only fails for longer values
         // Safe: always encoding to secp256k1 whose field elements are in
@@ -553,35 +561,31 @@ pub fn convert_vrf_parameters(
     }
 }
 
-/// Convert off-chain representation of acknowledged ticket to representation
-/// that the smart contract understands
+/// Convert off-chain representation of a winning ticket to a representation
+/// that is understood by the smart contract
 ///
-/// Not implemented using From trait because logic fits better here
-pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<RedeemableTicket> {
-    if let Some(ref signature) = off_chain.ticket.signature {
-        let serialized_signature = signature.to_bytes();
+/// Specific for smart contract payload generation
+pub fn convert_winning_ticket(off_chain: &ProvableWinningTicket) -> Result<RedeemableTicket> {
+    let serialized_signature = off_chain.ticket.signature.to_bytes();
 
-        let mut encoded_win_prob = [0u8; 8];
-        encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
+    let mut encoded_win_prob = [0u8; 8];
+    encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
 
-        Ok(RedeemableTicket {
-            data: TicketData {
-                channel_id: off_chain.ticket.channel_id.into(),
-                amount: off_chain.ticket.amount.amount().as_u128(),
-                ticket_index: off_chain.ticket.index,
-                index_offset: off_chain.ticket.index_offset,
-                epoch: off_chain.ticket.channel_epoch,
-                win_prob: u64::from_be_bytes(encoded_win_prob),
-            },
-            signature: CompactSignature {
-                r: H256::from_slice(&serialized_signature[0..32]).into(),
-                vs: H256::from_slice(&serialized_signature[32..64]).into(),
-            },
-            por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
-        })
-    } else {
-        Err(InvalidArguments("Acknowledged ticket must be signed".into()))
-    }
+    Ok(RedeemableTicket {
+        data: TicketData {
+            channel_id: off_chain.ticket.channel_id.into(),
+            amount: off_chain.ticket.amount.amount().as_u128(),
+            ticket_index: off_chain.ticket.index,
+            index_offset: off_chain.ticket.index_offset,
+            epoch: off_chain.ticket.channel_epoch,
+            win_prob: u64::from_be_bytes(encoded_win_prob),
+        },
+        signature: CompactSignature {
+            r: H256::from_slice(&serialized_signature[0..32]).into(),
+            vs: H256::from_slice(&serialized_signature[32..64]).into(),
+        },
+        por_secret: U256::from_big_endian(off_chain.response.as_ref()),
+    })
 }
 
 #[cfg(test)]
@@ -701,26 +705,28 @@ pub mod tests {
             U256::one(),
             1.0_f64,
             U256::one(),
-            response.to_challenge().to_ethereum_challenge(),
+            response.to_challenge().into(),
             &chain_key_alice,
             &domain_separator,
-        )
-        .unwrap();
+        );
+
+        assert!(validate_ticket(&ticket, &(&chain_key_bob).into(), &domain_separator).is_ok());
 
         // Bob acknowledges the ticket using the HalfKey from the Response
-        let acked_ticket = AcknowledgedTicket::new(
-            ticket,
-            response,
-            (&chain_key_alice).into(),
-            &chain_key_bob,
-            &domain_separator,
-        )
-        .unwrap();
+        let acked_ticket = AcknowledgedTicket::new(ticket, response);
+
+        assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        // Expand acknowledged ticket
+        let winning_ticket =
+            ProvableWinningTicket::from_acked_ticket(acked_ticket, &chain_key_bob, &domain_separator).unwrap();
+
+        assert!(validate_provable_winning_ticket(&winning_ticket, &(&chain_key_bob).into(), &domain_separator).is_ok());
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator
-            .redeem_ticket(acked_ticket, domain_separator)
+            .redeem_ticket(winning_ticket, &domain_separator)
             .expect("should create tx");
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
         println!(

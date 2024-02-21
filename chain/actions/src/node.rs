@@ -13,8 +13,7 @@
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
-use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
@@ -56,8 +55,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainA
 
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
-        let announcement_data =
-            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.me, offchain_key)))?;
+        let announcement_data = AnnouncementData::new(
+            multiaddrs[0].clone(),
+            Some(KeyBinding::new(self.self_address(), offchain_key)),
+        )?;
 
         if !self
             .db
@@ -97,15 +98,12 @@ mod tests {
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::actions::Action;
-    use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
+    use chain_types::chain_events::*;
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::OffchainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::account::AccountType;
-    use hopr_internal_types::prelude::AccountEntry;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
@@ -114,8 +112,10 @@ mod tests {
     use utils_db::CurrentDbShim;
 
     lazy_static::lazy_static! {
-        static ref ALICE: Address = hex!("e1fe50e5046d5c05cc89872e244f045bbcdad742").into();
-        static ref BOB: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("cdb0e2219b75ef23a0167e8f3196f0a292c92699e562a4533df658b8fac196d0")).unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("92019229229fff4c36c52fb1257f3ca710c73502ec7f6111eda4c1b5b8e84810")).unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
         static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).unwrap();
     }
 
@@ -128,7 +128,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let ma = announce_multiaddr.clone();
@@ -139,7 +139,7 @@ mod tests {
             .once()
             .withf(move |ad| {
                 let kb = ad.key_binding.clone().unwrap();
-                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE
+                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE_ADDR
             })
             .returning(move |_| Ok(random_hash));
 
@@ -155,7 +155,7 @@ mod tests {
                     event_type: ChainEventType::Announcement {
                         peer: pk.into(),
                         multiaddresses: vec![ma.clone()],
-                        address: *ALICE,
+                        address: *ALICE_ADDR,
                     },
                 })
                 .boxed())
@@ -167,7 +167,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
@@ -191,7 +191,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         db.write()
@@ -199,7 +199,7 @@ mod tests {
             .update_account_and_snapshot(
                 &AccountEntry::new(
                     *ALICE_OFFCHAIN.public(),
-                    *ALICE,
+                    *ALICE_ADDR,
                     AccountType::Announced {
                         multiaddr: announce_multiaddr.clone(),
                         updated_block: 0,
@@ -218,7 +218,7 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
@@ -236,14 +236,14 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_withdraw()
             .times(1)
-            .withf(move |dst, balance| *BOB == *dst && stake.eq(balance))
+            .withf(move |dst, balance| BOB_ADDR.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -255,10 +255,10 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .withdraw(*BOB, stake)
+            .withdraw(*BOB_ADDR, stake)
             .await
             .unwrap()
             .await
@@ -281,7 +281,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -289,12 +289,12 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .withdraw(*BOB, Balance::zero(BalanceType::HOPR))
+                    .withdraw(*BOB_ADDR, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
                     .unwrap(),

@@ -249,7 +249,7 @@ mod tests {
         let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
-            Ticket::new(
+            let ret = Ticket::new(
                 &next_peer_channel_key.to_address(),
                 &Balance::new(
                     price_per_packet.div_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
@@ -262,10 +262,13 @@ mod tests {
                 EthereumChallenge::default(),
                 private_key,
                 &Hash::default(),
-            )
-            .unwrap()
+            );
+
+            assert!(validate_ticket(&ret, &next_peer_channel_key.to_address(), &Hash::default()).is_ok());
+
+            ret
         } else {
-            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
+            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
         }
     }
     async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {

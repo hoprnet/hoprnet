@@ -87,6 +87,7 @@
 //! See the [payload] module for details.
 use async_lock::RwLock;
 use chain_db::traits::HoprCoreEthereumDbActions;
+use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_primitive_types::primitives::Address;
 use std::sync::Arc;
 
@@ -104,19 +105,19 @@ pub mod redeem;
 /// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
 pub struct ChainActions<Db: HoprCoreEthereumDbActions + Clone> {
-    me: Address,
+    me: ChainKeypair,
     db: Arc<RwLock<Db>>,
     tx_sender: ActionSender,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone> ChainActions<Db> {
     ///! Creates new instance.
-    pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
+    pub fn new(me: ChainKeypair, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }
     }
 
     ///! On-chain address of this node
     pub fn self_address(&self) -> Address {
-        self.me
+        (&self.me).into()
     }
 }

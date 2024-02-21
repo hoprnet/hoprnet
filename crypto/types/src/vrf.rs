@@ -170,7 +170,7 @@ impl VrfParameters {
         msg: &[u8; T],
         dst: &[u8],
     ) -> crate::errors::Result<k256::ProjectivePoint> {
-        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&creator.as_ref(), msg], &[dst])
+        Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_ref(), msg], &[dst])
             .or(Err(CalculationError))
     }
 }
@@ -184,7 +184,7 @@ pub fn derive_vrf_parameters<const T: usize>(
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg], &[dst])?;
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -207,7 +207,7 @@ pub fn derive_vrf_parameters<const T: usize>(
 
     let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
-            &chain_addr.as_ref(),
+            chain_addr.as_ref(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
             &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
             msg,
@@ -243,14 +243,14 @@ mod test {
 
     #[test]
     fn vrf_values_serialize_deserialize() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
         let deserialized = VrfParameters::from_bytes(&*ALICE_VRF_OUTPUT).unwrap();
 
         // check for regressions
         assert_eq!(vrf_values.v, deserialized.v);
         assert!(deserialized
-            .verify(&*ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&*ALICE_ADDR, &*TEST_MSG, &Hash::default().as_ref())
             .is_ok());
 
         assert_eq!(vrf_values, VrfParameters::from_bytes(&vrf_values.to_bytes()).unwrap());
@@ -267,10 +267,10 @@ mod test {
 
     #[test]
     fn vrf_values_crypto() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().as_ref()).unwrap();
 
         assert!(vrf_values
-            .verify(&ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&ALICE_ADDR, &*TEST_MSG, &Hash::default().as_ref())
             .is_ok());
     }
 }

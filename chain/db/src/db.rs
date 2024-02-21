@@ -20,7 +20,7 @@ const ACKNOWLEDGED_TICKETS_KEY_LENGTH: usize = Hash::SIZE + (u32::BITS / 8) as u
 fn to_acknowledged_ticket_key(channel_id: &Hash, epoch: u32, index: u64) -> Result<utils_db::db::Key> {
     let mut ack_key = Vec::with_capacity(ACKNOWLEDGED_TICKETS_KEY_LENGTH);
 
-    ack_key.extend_from_slice(&channel_id.to_bytes());
+    ack_key.extend_from_slice(channel_id.as_ref());
     ack_key.extend_from_slice(&epoch.to_be_bytes());
     ack_key.extend_from_slice(&index.to_be_bytes());
 
@@ -28,8 +28,8 @@ fn to_acknowledged_ticket_key(channel_id: &Hash, epoch: u32, index: u64) -> Resu
 }
 
 #[inline]
-fn get_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> Result<utils_db::db::Key> {
-    to_acknowledged_ticket_key(&ack.ticket.channel_id, ack.ticket.channel_epoch, ack.ticket.index)
+fn get_acknowledged_ticket_key(ack: &Ticket) -> Result<utils_db::db::Key> {
+    to_acknowledged_ticket_key(&ack.channel_id, ack.channel_epoch, ack.index)
 }
 
 #[derive(Debug, Clone)]
@@ -165,12 +165,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
     }
 
     async fn get_tickets(&self, maybe_signer: Option<Address>) -> Result<Vec<Ticket>> {
+        let maybe_channel_id = maybe_signer.map(|ref signer| generate_channel_id(signer, &self.me));
         let mut acked_tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                Box::new(move |v: &AcknowledgedTicket| maybe_signer.map(|s| v.signer.eq(&s)).unwrap_or(true)),
+                Box::new(move |acked: &AcknowledgedTicket| {
+                    maybe_channel_id.map(|s| acked.ticket.channel_id == s).unwrap_or(true)
+                }),
             )
             .await?
             .into_iter()
@@ -185,10 +188,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
                 HalfKeyChallenge::SIZE as u32,
                 Box::new(move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => match maybe_signer {
-                        None => true,
-                        Some(signer) => unack.signer.eq(&signer),
-                    },
+                    PendingAcknowledgement::WaitingAsRelayer(unacked) => {
+                        maybe_channel_id.map(|s| unacked.ticket.channel_id == s).unwrap_or(true)
+                    }
                 }),
             )
             .await?
@@ -251,7 +253,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             )
             .await?
             .into_iter()
-            .map(|ack| (ack.ticket.amount, get_acknowledged_ticket_key(&ack)));
+            .map(|ack| (ack.ticket.amount, get_acknowledged_ticket_key(&ack.ticket)));
 
         // Get all unack tickets in the given channel with channel epoch less than the one on the channel
         let unack_tickets = self
@@ -354,7 +356,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         acked_ticket: AcknowledgedTicket,
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        let ack_key = get_acknowledged_ticket_key(&acked_ticket)?;
+        let ack_key = get_acknowledged_ticket_key(&acked_ticket.ticket)?;
 
         // FIXME: Currently a node does not have a way of reconciling unacknowledged
         // tickets with the sender. Therefore, the use of unack tickets could make a
@@ -530,6 +532,17 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         Ok(tickets)
     }
 
+    async fn get_acknowledged_ticket(
+        &self,
+        channel_id: &Hash,
+        epoch: u32,
+        index: u64,
+    ) -> Result<Option<AcknowledgedTicket>> {
+        self.db
+            .get_or_none(to_acknowledged_ticket_key(channel_id, epoch, index)?)
+            .await
+    }
+
     async fn replace_acked_tickets_by_aggregated_ticket(
         &mut self,
         aggregated_ticket: AcknowledgedTicket,
@@ -549,10 +562,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             if AcknowledgedTicketStatus::BeingRedeemed == acked_ticket.status {
                 return Ok(());
             }
-            batch.del(get_acknowledged_ticket_key(acked_ticket)?);
+            batch.del(get_acknowledged_ticket_key(&acked_ticket.ticket)?);
         }
 
-        batch.put(get_acknowledged_ticket_key(&aggregated_ticket)?, aggregated_ticket);
+        batch.put(
+            get_acknowledged_ticket_key(&aggregated_ticket.ticket)?,
+            aggregated_ticket,
+        );
 
         self.db.batch(batch, true).await?;
         Ok(())
@@ -580,10 +596,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
             .collect::<Vec<UnacknowledgedTicket>>())
     }
 
-    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn update_acknowledged_ticket_status(
+        &mut self,
+        ticket: &Ticket,
+        new_status: AcknowledgedTicketStatus,
+    ) -> Result<()> {
         let key = get_acknowledged_ticket_key(ticket)?;
-        if self.db.contains(key.clone()).await {
-            self.db.set(key, ticket).await.map(|_| ())
+        if let Some(mut stored) = self.db.get_or_none::<AcknowledgedTicket>(key.clone()).await? {
+            stored.status = new_status;
+            self.db.set(key, &stored).await.map(|_| ())
         } else {
             Err(DbError::NotFound)
         }
@@ -691,7 +712,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
         let mut batch_ops = utils_db::db::Batch::default();
         for acked_ticket in acknowledged_tickets.iter() {
-            batch_ops.del(get_acknowledged_ticket_key(acked_ticket)?);
+            batch_ops.del(get_acknowledged_ticket_key(&acked_ticket.ticket)?);
             neglected_ticket_value = neglected_ticket_value.add(&acked_ticket.ticket.amount);
         }
 
@@ -829,7 +850,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
 
         let mut ops = utils_db::db::Batch::default();
 
-        let key = get_acknowledged_ticket_key(acked_ticket)?;
+        let key = get_acknowledged_ticket_key(&acked_ticket.ticket)?;
         ops.del(key);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
@@ -862,7 +883,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = get_acknowledged_ticket_key(acked_ticket)?;
+        let key = get_acknowledged_ticket_key(&acked_ticket.ticket)?;
         ops.del(key);
 
         if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
@@ -1370,7 +1391,7 @@ mod tests {
         let win_prob = 1.0f64; // 100 %
         let price_per_packet: U256 = PRICE_PER_PACKET.into(); // 0.01 HOPR
 
-        Ticket::new(
+        let ret = Ticket::new(
             counterparty,
             &Balance::new(
                 price_per_packet.div_f64(win_prob).unwrap() * U256::from(PATH_POS),
@@ -1383,8 +1404,11 @@ mod tests {
             challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
-        )
-        .unwrap()
+        );
+
+        assert!(validate_ticket(&ret, counterparty, &domain_separator.unwrap_or_default()).is_ok());
+
+        ret
     }
 
     #[test]
@@ -1519,11 +1543,7 @@ mod tests {
                 Some(Challenge::from(cp_sum).to_ethereum_challenge()),
             );
 
-            let unacked_ticket = UnacknowledgedTicket::new(
-                ticket,
-                HalfKey::from_bytes(&hk1_seed).unwrap(),
-                ALICE.public().to_address(),
-            );
+            let unacked_ticket = UnacknowledgedTicket::new(ticket, HalfKey::from_bytes(&hk1_seed).unwrap());
 
             db.store_pending_acknowledgment(
                 HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge(),
@@ -1543,16 +1563,11 @@ mod tests {
             };
 
             let acked_ticket = unacked_ticket
-                .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap(), &BOB, &Hash::default())
+                .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap())
                 .unwrap();
 
-            assert!(acked_ticket
-                .verify(
-                    &ALICE.public().to_address(),
-                    &BOB.public().to_address(),
-                    &Hash::default()
-                )
-                .is_ok());
+            assert!(validate_ticket(&acked_ticket.ticket, &BOB.public().to_address(), &Hash::default()).is_ok());
+            assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
 
             acked_tickets.push(acked_ticket.clone());
 
@@ -1563,8 +1578,8 @@ mod tests {
             let new_hk1_seed = Hash::create(&[&hk1_seed.clone()]);
             let new_hk2_seed = Hash::create(&[&hk1_seed.clone()]);
 
-            hk1_seed.copy_from_slice(&new_hk1_seed.to_bytes());
-            hk2_seed.copy_from_slice(&new_hk2_seed.to_bytes());
+            hk1_seed.copy_from_slice(new_hk1_seed.as_ref());
+            hk2_seed.copy_from_slice(new_hk2_seed.as_ref());
         }
 
         acked_tickets
@@ -1621,7 +1636,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), BOB.public().to_address());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1666,14 +1681,7 @@ mod tests {
             Some(acked_tickets[0].ticket.challenge.clone()),
         );
 
-        let aggregated_acked_ticket = AcknowledgedTicket::new(
-            aggregated_ticket,
-            acked_tickets[0].response.to_owned(),
-            acked_tickets[0].signer.to_owned(),
-            &BOB,
-            &Hash::default(),
-        )
-        .unwrap();
+        let aggregated_acked_ticket = AcknowledgedTicket::new(aggregated_ticket, acked_tickets[0].response.to_owned());
 
         db.replace_acked_tickets_by_aggregated_ticket(aggregated_acked_ticket)
             .await
@@ -1712,14 +1720,7 @@ mod tests {
 
             total_balance = total_balance.add(&ticket.amount);
 
-            let ack = AcknowledgedTicket::new(
-                ticket,
-                Response::from_bytes(&challenge_seed.clone()).unwrap(),
-                (&*ALICE).into(),
-                &BOB,
-                &domain_separator,
-            )
-            .unwrap();
+            let ack = AcknowledgedTicket::new(ticket, Response::from_bytes(&challenge_seed.clone()).unwrap());
 
             acked_tickets.push(ack);
         }
@@ -1749,7 +1750,7 @@ mod tests {
         // Store ack tickets
         for ack in ack_tickets.iter() {
             inner_db
-                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .set(get_acknowledged_ticket_key(&ack.ticket).unwrap(), ack)
                 .await
                 .unwrap();
         }
@@ -1780,7 +1781,7 @@ mod tests {
         // Store ack tickets
         for ack in ack_tickets.iter() {
             inner_db
-                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .set(get_acknowledged_ticket_key(&ack.ticket).unwrap(), ack)
                 .await
                 .unwrap();
         }
@@ -1812,7 +1813,7 @@ mod tests {
         // Store ack tickets
         for ack in ack_tickets.iter() {
             inner_db
-                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .set(get_acknowledged_ticket_key(&ack.ticket).unwrap(), ack)
                 .await
                 .unwrap();
         }
@@ -1843,7 +1844,7 @@ mod tests {
         // Store ack tickets
         for ack in ack_tickets.iter() {
             inner_db
-                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .set(get_acknowledged_ticket_key(&ack.ticket).unwrap(), ack)
                 .await
                 .unwrap();
         }
@@ -2139,7 +2140,7 @@ mod tests {
         // Store ack tickets
         for ack in tickets.iter() {
             inner_db
-                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .set(get_acknowledged_ticket_key(&ack.ticket).unwrap(), ack)
                 .await
                 .unwrap();
         }

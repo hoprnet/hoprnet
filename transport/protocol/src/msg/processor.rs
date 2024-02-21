@@ -140,7 +140,7 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
+            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
@@ -294,7 +294,6 @@ where
                     &*self.db.read().await,
                     &ticket,
                     &channel,
-                    &previous_hop_addr,
                     Balance::new(price_per_packet, BalanceType::HOPR),
                     TICKET_WIN_PROB,
                     self.cfg.check_unrealized_balance,
@@ -324,7 +323,6 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             ticket.clone(),
                             own_key.clone(),
-                            previous_hop_addr,
                         )),
                     )
                     .await?;
@@ -339,7 +337,7 @@ where
 
                 // Create next ticket for the packet
                 let mut ticket = if ticket_path_pos == 1 {
-                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)?
+                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
                 } else {
                     self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
@@ -435,16 +433,17 @@ where
                 return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")));
             }
 
-            Ticket::new_partial(
+            Ticket::new_unsigned(
                 &self.cfg.chain_keypair.public().to_address(),
                 &destination,
                 &amount,
                 current_ticket_index,
-                U256::one(),     // unaggregated always have index_offset == 1
+                U256::one(),     // unaggregated tickets always have index_offset == 1
                 TICKET_WIN_PROB, // 100% winning probability
                 channel.channel_epoch,
+                EthereumChallenge::default(),
             )
-        }?;
+        };
 
         debug!("Creating ticket in channel {channel_id}.",);
 

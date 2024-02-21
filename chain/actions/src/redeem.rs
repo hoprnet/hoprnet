@@ -21,22 +21,17 @@
 //!
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::ops::DerefMut;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use utils_db::errors::DbError;
 
-use crate::action_queue::{ActionSender, PendingAction};
-use crate::errors::ChainActionsError::ChannelDoesNotExist;
+use crate::action_queue::PendingAction;
 use crate::errors::{
-    ChainActionsError::{NotAWinningTicket, WrongTicketState},
+    ChainActionsError::{ChannelDoesNotExist, MissingDomainSeparator, NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::ChainActions;
@@ -71,44 +66,27 @@ pub trait TicketRedeemActions {
     async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> Result<PendingAction>;
 }
 
-async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
+async fn set_being_redeemed<Db>(db: &mut Db, ticket: &Ticket, tx_hash: Hash) -> Result<()>
 where
     Db: HoprCoreEthereumDbActions,
 {
-    match ack_ticket.status {
-        AcknowledgedTicketStatus::Untouched => {
-            let dst = db
-                .get_channels_domain_separator()
-                .await
-                .and_then(|separator| separator.ok_or(DbError::NotFound))?;
-
-            // Check if we're going to redeem a winning ticket
-            if !ack_ticket.is_winning_ticket(&dst) {
-                return Err(NotAWinningTicket);
-            }
+    if let Some(stored) = db
+        .get_acknowledged_ticket(&ticket.channel_id, ticket.channel_epoch, ticket.index)
+        .await?
+    {
+        if stored.status != AcknowledgedTicketStatus::Untouched {
+            return Err(WrongTicketState(format!(
+                "expected a ticket with state {} but found a ticket in the database with state {}",
+                AcknowledgedTicketStatus::Untouched,
+                stored.status
+            )));
         }
-        AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed => {}
     }
 
-    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
-    debug!(
-        "setting a winning {} as being redeemed with TX hash {tx_hash}",
-        ack_ticket.ticket
-    );
-    Ok(db.update_acknowledged_ticket(ack_ticket).await?)
-}
-
-async fn unchecked_ticket_redeem<Db>(
-    db: Arc<RwLock<Db>>,
-    mut ack_ticket: AcknowledgedTicket,
-    on_chain_tx_sender: ActionSender,
-) -> Result<PendingAction>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
+    debug!("setting a winning {} as being redeemed with TX hash {tx_hash}", ticket);
+    Ok(db
+        .update_acknowledged_ticket_status(ticket, AcknowledgedTicketStatus::BeingRedeemed)
+        .await?)
 }
 
 #[async_trait]
@@ -190,6 +168,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
         {
             // Lock the database and retrieve again all the redeemable tickets
             let mut db = self.db.write().await;
+            let domain_separator = db
+                .get_channels_domain_separator()
+                .await?
+                .ok_or(MissingDomainSeparator)?;
+
             let redeemable = db
                 .get_acknowledged_tickets(Some(*channel))
                 .await?
@@ -200,11 +183,35 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
                         && (!only_aggregated || t.ticket.is_aggregated())
                 });
 
-            for mut avail_to_redeem in redeemable {
-                if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
-                    error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
+            for avail_to_redeem in redeemable {
+                if let AcknowledgedTicketStatus::BeingAggregated = avail_to_redeem.status {
+                    return Err(WrongTicketState(avail_to_redeem.to_string()));
+                }
+
+                // Expand acknowledged tickets for on-chain redemption
+                let maybe_winning_ticket =
+                    ProvableWinningTicket::from_acked_ticket(avail_to_redeem, &self.me, &domain_separator).map_err(
+                        |e| {
+                            error!("failed to expand acknowledged ticket to get it redeemed on-chain");
+                            e
+                        },
+                    )?;
+
+                if let Err(e) =
+                    validate_provable_winning_ticket(&maybe_winning_ticket, &self.self_address(), &domain_separator)
+                {
+                    error!(
+                        "stored ticket {} from the database is not a win due to {}",
+                        maybe_winning_ticket.clone(),
+                        e
+                    );
+                    continue;
+                }
+
+                if let Err(e) = set_being_redeemed(&mut *db, &maybe_winning_ticket.ticket, *EMPTY_TX_HASH).await {
+                    error!("failed to update state of {}: {e}", maybe_winning_ticket.ticket.clone())
                 } else {
-                    to_redeem.push(avail_to_redeem);
+                    to_redeem.push(maybe_winning_ticket);
                 }
             }
         }
@@ -216,9 +223,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
         let mut receivers: Vec<PendingAction> = vec![];
 
-        for acked_ticket in to_redeem {
-            let ticket_index = acked_ticket.ticket.index;
-            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, self.tx_sender.clone()).await {
+        for winning_ticket in to_redeem {
+            let ticket_index = winning_ticket.ticket.index;
+            match self.tx_sender.send(Action::RedeemTicket(winning_ticket)).await {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
@@ -237,24 +244,40 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
-        if let Some(channel) = ch {
-            if ack_ticket.status == AcknowledgedTicketStatus::Untouched
-                && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
-            {
-                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
-            } else {
-                Err(WrongTicketState(ack_ticket.to_string()))
-            }
-        } else {
-            Err(ChannelDoesNotExist)
+        let mut db = self.db.write().await;
+
+        let domain_separator = db
+            .get_channels_domain_separator()
+            .await?
+            .ok_or(MissingDomainSeparator)?;
+
+        let ch = db
+            .get_channel(&ack_ticket.ticket.channel_id)
+            .await?
+            .ok_or(ChannelDoesNotExist)?;
+
+        if ack_ticket.status != AcknowledgedTicketStatus::Untouched
+            || ch.channel_epoch != U256::from(ack_ticket.ticket.channel_epoch)
+        {
+            return Err(WrongTicketState(ack_ticket.to_string()));
         }
+
+        // Expand acknowledged tickets for on-chain redemption
+        let maybe_winning_ticket = ProvableWinningTicket::from_acked_ticket(ack_ticket, &self.me, &domain_separator)?;
+
+        validate_provable_winning_ticket(&maybe_winning_ticket, &self.self_address(), &domain_separator)
+            .or(Err(NotAWinningTicket))?;
+
+        set_being_redeemed(&mut *db, &maybe_winning_ticket.ticket, *EMPTY_TX_HASH).await?;
+
+        self.tx_sender.send(Action::RedeemTicket(maybe_winning_ticket)).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_lock::RwLock;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
@@ -263,6 +286,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
@@ -272,8 +296,11 @@ mod tests {
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).unwrap();
+        static ref CHARLIE_ADDR: Address = CHARLIE.public().to_address();
     }
 
     fn generate_random_ack_ticket(idx: u32, counterparty: &ChainKeypair, channel_epoch: U256) -> AcknowledgedTicket {
@@ -287,26 +314,31 @@ mod tests {
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
         let ticket = Ticket::new(
-            &ALICE.public().to_address(),
+            &ALICE_ADDR,
             &Balance::new(price_per_packet.div_f64(1.0f64).unwrap() * 5u32, BalanceType::HOPR),
             idx.into(),
             U256::one(),
             1.0f64,
             channel_epoch,
-            Challenge::from(cp_sum).to_ethereum_challenge(),
+            Challenge::from(cp_sum).into(),
             counterparty,
             &Hash::default(),
-        )
-        .unwrap();
+        );
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        assert!(validate_ticket(&ticket, &ALICE_ADDR, &Hash::default()).is_ok());
+
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1);
+        let acked_ticket = unacked_ticket.acknowledge(&hk2).unwrap();
+
+        assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
+
+        acked_ticket
     }
 
     fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
         let mut ack_key = Vec::new();
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(&ack.ticket.channel_id.as_ref());
         ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
         ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
 
@@ -315,7 +347,7 @@ mod tests {
 
     async fn set_domain_separator(rdb: CurrentDbShim) {
         let inner_db = DB::new(rdb);
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, *ALICE_ADDR);
 
         db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
             .await
@@ -340,10 +372,10 @@ mod tests {
             input_tickets.push(ack_ticket);
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, *ALICE_ADDR);
         let channel = ChannelEntry::new(
             counterparty.public().to_address(),
-            ALICE.public().to_address(),
+            *ALICE_ADDR,
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
@@ -376,10 +408,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -438,7 +467,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -501,10 +530,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -538,7 +564,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -592,24 +618,27 @@ mod tests {
         let ticket_count = 3;
         let rdb = CurrentDbShim::new_in_memory().await;
 
-        let (channel_from_bob, mut tickets) =
+        let (channel_from_bob, tickets) =
             create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Make the first ticket unredeemable
-        tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
-        db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
+        db.write()
+            .await
+            .update_acknowledged_ticket_status(&tickets[0].ticket, AcknowledgedTicketStatus::BeingAggregated)
+            .await
+            .unwrap();
 
         // Make the second ticket unredeemable
-        tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
-        db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();
+        db.write()
+            .await
+            .update_acknowledged_ticket_status(&tickets[1].ticket, AcknowledgedTicketStatus::BeingRedeemed)
+            .await
+            .unwrap();
 
         // Expect only the redeemable tickets get redeemed
         let tickets_clone = tickets.clone();
@@ -641,7 +670,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -695,10 +724,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Expect only the redeemable tickets get redeemed
         let mut tickets = tickets_from_previous_epoch.clone();
@@ -737,7 +763,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -778,10 +804,7 @@ mod tests {
         // ticket redemption requires a domain separator
         set_domain_separator(rdb.clone()).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), *ALICE_ADDR)));
 
         // Expect only the redeemable tickets get redeemed
         let mut tickets = tickets_from_next_epoch.clone();
@@ -820,7 +843,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

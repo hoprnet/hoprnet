@@ -138,7 +138,7 @@ impl CurvePoint {
     pub fn to_address(&self) -> Address {
         let serialized = self.serialize_uncompressed();
         let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
-        Address::new(&hash.as_slice()[12..])
+        Address::new(&hash.as_ref()[12..])
     }
 
     /// Creates a curve point from a non-zero scalar.
@@ -324,7 +324,7 @@ impl Default for HalfKey {
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
-                .as_slice(),
+                .as_ref(),
         );
         ret
     }
@@ -349,6 +349,18 @@ impl HalfKey {
         CurvePoint::from_exponent(&self.hkey)
             .map(|cp| HalfKeyChallenge::new(cp.serialize_compressed().as_bytes()))
             .expect("invalid public key")
+    }
+}
+
+impl AsRef<[u8]> for HalfKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.hkey
+    }
+}
+
+impl From<[u8; Self::SIZE]> for HalfKey {
+    fn from(hkey: [u8; Self::SIZE]) -> Self {
+        Self { hkey }
     }
 }
 
@@ -407,6 +419,12 @@ impl HalfKeyChallenge {
 
     pub fn to_address(&self) -> Address {
         PublicKey::from_bytes(&self.hkc).expect("invalid half-key").to_address()
+    }
+}
+
+impl AsRef<[u8]> for HalfKeyChallenge {
+    fn as_ref(&self) -> &[u8] {
+        &self.hkc
     }
 }
 
@@ -486,8 +504,10 @@ impl Hash {
     pub fn hash(&self) -> Self {
         Self::create(&[&self.0])
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
+impl AsRef<[u8]> for Hash {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
@@ -850,7 +870,7 @@ impl PublicKey {
     pub fn to_address(&self) -> Address {
         let uncompressed = self.to_bytes(false);
         let serialized = Hash::create(&[&uncompressed[1..]]);
-        Address::new(&serialized.as_slice()[12..])
+        Address::new(&serialized.as_ref()[12..])
     }
 
     /// Serializes the public key to a binary form.
@@ -943,6 +963,12 @@ pub struct Response {
     response: [u8; Self::SIZE],
 }
 
+impl From<[u8; Self::SIZE]> for Response {
+    fn from(response: [u8; Self::SIZE]) -> Self {
+        Self { response }
+    }
+}
+
 impl Default for Response {
     fn default() -> Self {
         let mut ret = Self {
@@ -982,17 +1008,21 @@ impl Response {
     }
 }
 
+impl AsRef<[u8]> for Response {
+    fn as_ref(&self) -> &[u8] {
+        &self.response
+    }
+}
+
 impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(first).as_ref())
-            .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
-            })
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::as_ref(first))
+            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.as_ref()).map(|s2| s1.as_ref() + s2.as_ref()))
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
-        Ok(Response::new(res.to_bytes().as_slice()))
+        Ok(Response::new(res.to_bytes().as_ref()))
     }
 }
 
@@ -1537,7 +1567,7 @@ pub mod tests {
     #[test]
     fn half_key_test() {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
-        let hk2 = HalfKey::from_bytes(&hk1.to_bytes()).unwrap();
+        let hk2 = HalfKey::from_bytes(hk1.as_ref()).unwrap();
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
     }
@@ -1545,7 +1575,7 @@ pub mod tests {
     #[test]
     fn half_key_challenge_test() {
         let hkc1 = HalfKeyChallenge::from_bytes(&PUBLIC_KEY).unwrap();
-        let hkc2 = HalfKeyChallenge::from_bytes(&hkc1.to_bytes()).unwrap();
+        let hkc2 = HalfKeyChallenge::from_bytes(hkc1.as_ref()).unwrap();
         assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
     }
 
@@ -1558,7 +1588,7 @@ pub mod tests {
             "hash test vector failed to match"
         );
 
-        let hash2 = Hash::from_bytes(&hash1.to_bytes()).unwrap();
+        let hash2 = Hash::from_bytes(hash1.as_ref()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
 
         assert_eq!(

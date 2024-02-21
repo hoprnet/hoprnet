@@ -97,6 +97,12 @@ impl From<Address> for primitive_types::H160 {
     }
 }
 
+impl From<&Address> for primitive_types::H160 {
+    fn from(value: &Address) -> Self {
+        primitive_types::H160::from_slice(value.0.as_slice())
+    }
+}
+
 impl FromStr for Address {
     type Err = GeneralError;
 
@@ -315,9 +321,15 @@ impl FromStr for Balance {
 
 /// Represents and Ethereum challenge.
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],
+}
+
+impl From<[u8; Self::SIZE]> for EthereumChallenge {
+    fn from(challenge: [u8; Self::SIZE]) -> Self {
+        Self { challenge }
+    }
 }
 
 impl Default for EthereumChallenge {
@@ -335,6 +347,12 @@ impl EthereumChallenge {
         let mut ret = Self::default();
         ret.challenge.copy_from_slice(data);
         ret
+    }
+}
+
+impl AsRef<[u8]> for EthereumChallenge {
+    fn as_ref(&self) -> &[u8] {
+        &self.challenge
     }
 }
 

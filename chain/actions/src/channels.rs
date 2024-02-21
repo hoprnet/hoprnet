@@ -56,7 +56,7 @@ pub trait ChannelActions {
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for ChainActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
-        if self.me == destination {
+        if self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
@@ -82,7 +82,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
             return Err(PeerAccessDenied);
         }
 
-        let maybe_channel = self.db.read().await.get_channel_x(&self.me, &destination).await?;
+        let maybe_channel = self
+            .db
+            .read()
+            .await
+            .get_channel_x(&self.self_address(), &destination)
+            .await?;
         if let Some(channel) = maybe_channel {
             debug!("already found existing {channel}");
             if channel.status != ChannelStatus::Closed {
@@ -133,8 +138,20 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
         let maybe_channel = match direction {
-            ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
-            ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
+            ChannelDirection::Incoming => {
+                self.db
+                    .read()
+                    .await
+                    .get_channel_x(&counterparty, &self.self_address())
+                    .await?
+            }
+            ChannelDirection::Outgoing => {
+                self.db
+                    .read()
+                    .await
+                    .get_channel_x(&self.self_address(), &counterparty)
+                    .await?
+            }
         };
 
         match maybe_channel {
@@ -188,6 +205,7 @@ mod tests {
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -201,8 +219,16 @@ mod tests {
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref ALICE: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
-        static ref BOB: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(
+            hex!("d3d7c87803928c73ed543d62b30eb93dfba59df1b4991aae50883705c43964c6").as_slice()
+        )
+        .unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(
+            &hex!("0d0a254cd67734512426591293259864d14d27d230571b9031b030987b61b14a").as_slice()
+        )
+        .unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
     }
 
     #[async_std::test]
@@ -214,7 +240,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         db.write()
             .await
@@ -238,10 +264,17 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| BOB_ADDR.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let new_channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let new_channel = ChannelEntry::new(
+            *ALICE_ADDR,
+            *BOB_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
 
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
@@ -262,10 +295,10 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .open_channel(*BOB, stake)
+            .open_channel(*BOB_ADDR, stake)
             .await
             .unwrap()
             .await
@@ -289,7 +322,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let tx_queue = ActionQueue::new(
@@ -299,7 +332,14 @@ mod tests {
             Default::default(),
         );
 
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelEntry::new(
+            *ALICE_ADDR,
+            *BOB_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
 
         db.write()
             .await
@@ -325,11 +365,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
@@ -344,7 +384,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -359,11 +399,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*ALICE, stake).await.err().unwrap(),
+                actions.open_channel(*ALICE_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
@@ -376,7 +416,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -391,11 +431,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -405,7 +445,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -420,7 +460,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -435,11 +475,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -454,7 +494,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let tx_queue = ActionQueue::new(
@@ -476,11 +516,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::BalanceTooLow
             ),
             "should fail when not enough token balance"
@@ -496,7 +536,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         db.write()
             .await
@@ -510,7 +550,14 @@ mod tests {
             .await
             .unwrap();
 
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelEntry::new(
+            *ALICE_ADDR,
+            *BOB_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -542,7 +589,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .fund_channel(channel.get_id(), stake)
@@ -566,11 +613,11 @@ mod tests {
     async fn test_should_not_fund_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -591,7 +638,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -606,11 +653,11 @@ mod tests {
     async fn test_fund_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -625,11 +672,11 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(*BOB, stake).await.err().unwrap(),
+                actions.open_channel(*BOB_ADDR, stake).await.err().unwrap(),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
@@ -649,11 +696,11 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_allowance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -668,7 +715,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -683,11 +730,11 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE_ADDR, &BOB_ADDR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -708,7 +755,7 @@ mod tests {
             .await
             .unwrap();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
         assert!(
             matches!(
@@ -728,10 +775,17 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
-        let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let mut channel = ChannelEntry::new(
+            *ALICE_ADDR,
+            *BOB_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
 
         db.write()
             .await
@@ -745,14 +799,14 @@ mod tests {
             .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -787,10 +841,10 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -816,7 +870,7 @@ mod tests {
             .unwrap();
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -840,10 +894,17 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
-        let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelEntry::new(
+            *BOB_ADDR,
+            *ALICE_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
 
         db.write()
             .await
@@ -857,7 +918,7 @@ mod tests {
             .expect_close_incoming_channel()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dst| BOB_ADDR.eq(dst))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -877,10 +938,10 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Incoming, false)
+            .close_channel(*BOB_ADDR, ChannelDirection::Incoming, false)
             .await
             .unwrap()
             .await
@@ -903,12 +964,12 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
+            *ALICE_ADDR,
+            *BOB_ADDR,
             stake,
             U256::zero(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
@@ -928,12 +989,12 @@ mod tests {
             Default::default(),
         );
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),
@@ -949,7 +1010,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -957,12 +1018,12 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),
@@ -980,7 +1041,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -988,9 +1049,16 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_queue.new_sender());
 
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
+        let channel = ChannelEntry::new(
+            *ALICE_ADDR,
+            *BOB_ADDR,
+            stake,
+            U256::zero(),
+            ChannelStatus::Closed,
+            U256::zero(),
+        );
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -1000,7 +1068,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(*BOB_ADDR, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .unwrap(),
