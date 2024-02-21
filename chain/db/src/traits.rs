@@ -81,6 +81,8 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all unacknowledged tickets within the filter criteria.
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
+    /// Updates the status of a ticket stored in the database.
+    /// Used to mark tickets as being reedemed or being aggregated.
     async fn update_acknowledged_ticket_status(
         &mut self,
         ticket: &Ticket,

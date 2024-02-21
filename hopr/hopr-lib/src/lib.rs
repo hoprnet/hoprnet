@@ -1206,10 +1206,10 @@ impl Hopr {
         Ok(())
     }
 
-    pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<usize> {
+    pub async fn redeem_tickets_in_channel(&self, channel_id: &Hash, only_aggregated: bool) -> errors::Result<usize> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel = self.chain_api.db().read().await.get_channel(channel).await?;
+        let channel = self.chain_api.db().read().await.get_channel(channel_id).await?;
         let mut redeem_count = 0;
 
         if let Some(channel) = channel {

@@ -69,7 +69,7 @@ pub trait TicketRedeemActions {
 /// in the database as being redeemed. Fails if the status of the ticket in
 /// the database is not `Untouched`.
 ///
-/// Assumes that received tickets are winning tickets
+/// Assumes that received tickets are winning tickets.
 async fn set_being_redeemed<Db>(db: &mut Db, ticket: &Ticket, tx_hash: Hash) -> Result<()>
 where
     Db: HoprCoreEthereumDbActions,
@@ -222,13 +222,14 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
-    async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
+    async fn redeem_ticket(&self, mut ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {
             if ack_ticket.status == AcknowledgedTicketStatus::Untouched
-                && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
+                && channel.channel_epoch == ack_ticket.ticket.channel_epoch.into()
             {
                 set_being_redeemed(self.db.write().await.deref_mut(), &ack_ticket.ticket, *EMPTY_TX_HASH).await?;
+                ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
                 self.tx_sender.send(Action::RedeemTicket(ack_ticket)).await
             } else {
                 Err(WrongTicketState(ack_ticket.to_string()))
@@ -256,8 +257,10 @@ mod tests {
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
+    use crate::{
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -346,6 +349,65 @@ mod tests {
             .unwrap();
 
         (channel, input_tickets)
+    }
+
+    #[async_std::test]
+    async fn test_redeem_ticket_twice() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let rdb = CurrentDbShim::new_in_memory().await;
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
+        // ticket redemption requires a domain separator
+        set_domain_separator(rdb.clone()).await;
+
+        let (channel_from_bob, bob_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), 1usize, &BOB, U256::from(4u32)).await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut tx_exec = MockTransactionExecutor::new();
+
+        let first_ticket_bob = bob_tickets[0].clone();
+
+        tx_exec
+            .expect_redeem_ticket()
+            .times(1)
+            .withf(move |_, _| true)
+            .returning(move |_, _| Ok(random_hash));
+
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .return_once(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: TicketRedeemed(channel_from_bob, Some(first_ticket_bob)),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+
+        async_std::task::spawn(async move {
+            tx_queue.action_loop().await;
+        });
+
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender);
+
+        let _ = actions
+            .redeem_ticket(bob_tickets[0].clone())
+            .await
+            .expect("redeem_all_tickets should succeed")
+            .await
+            .expect("must resolve confirmations");
+
+        // let's try to redeem the ticket twice
+        assert!(actions.redeem_ticket(bob_tickets[0].clone()).await.is_err());
     }
 
     #[async_std::test]
