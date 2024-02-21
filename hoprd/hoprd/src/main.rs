@@ -9,7 +9,7 @@ use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, Instrument};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -163,6 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             if !inbox_clone
                                 .write()
+                                .instrument(tracing::debug_span!("inbox: push data to inbox"))
                                 .await
                                 .push(ApplicationData {
                                     application_tag: data.application_tag,

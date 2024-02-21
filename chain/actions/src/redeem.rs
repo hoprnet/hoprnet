@@ -99,20 +99,21 @@ where
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
 }
 
+#[tracing::instrument(level = "debug")]
 async fn unchecked_ticket_redeem<Db>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
     on_chain_tx_sender: ActionSender,
 ) -> Result<PendingAction>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::fmt::Debug,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> TicketRedeemActions for ChainActions<Db> {
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(
@@ -156,6 +157,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     }
 
     /// Redeems all redeemable tickets in the given channel.
+    #[tracing::instrument(level = "debug")]
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,

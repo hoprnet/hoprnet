@@ -13,7 +13,7 @@ use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn, Instrument};
 
 use async_std::task::spawn;
 
@@ -162,6 +162,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 // replace the un-acked ticket with acked ticket.
                 self.db
                     .write()
+                    .instrument(tracing::debug_span!(
+                        "db: pending as relayer (replace unack tickets with ack)"
+                    ))
                     .await
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;

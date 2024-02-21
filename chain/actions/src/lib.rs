@@ -103,13 +103,13 @@ pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
-pub struct ChainActions<Db: HoprCoreEthereumDbActions + Clone> {
+pub struct ChainActions<Db: HoprCoreEthereumDbActions + Clone + std::fmt::Debug> {
     me: Address,
     db: Arc<RwLock<Db>>,
     tx_sender: ActionSender,
 }
 
-impl<Db: HoprCoreEthereumDbActions + Clone> ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + std::fmt::Debug> ChainActions<Db> {
     ///! Creates new instance.
     pub fn new(me: Address, db: Arc<RwLock<Db>>, tx_sender: ActionSender) -> Self {
         Self { me, db, tx_sender }

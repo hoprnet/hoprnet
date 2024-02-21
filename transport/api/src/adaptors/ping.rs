@@ -7,7 +7,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use core_network::{network::Network, ping::PingExternalAPI, ping::PingResult, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
-use tracing::{debug, error};
+use tracing::{debug, error, Instrument};
 
 use crate::adaptors::network::ExternalNetworkInteractions;
 
@@ -56,7 +56,11 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
                 if let Ok(pk) = OffchainPublicKey::try_from(peer) {
                     let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                     if let Some(chain_key) = maybe_chain_key {
-                        let mut g = self.channel_graph.write().await;
+                        let mut g = self
+                            .channel_graph
+                            .write()
+                            .instrument(tracing::debug_span!("on finished ping update channel graph"))
+                            .await;
                         let self_addr = g.my_address();
                         g.update_channel_quality(self_addr, chain_key, updated.get_quality())
                     } else {

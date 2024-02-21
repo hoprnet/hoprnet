@@ -5,7 +5,7 @@ use std::error::Error;
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;

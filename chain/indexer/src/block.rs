@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, Instrument};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
@@ -194,6 +194,7 @@ where
                 .then(|block_with_logs| async {
                     if let Err(error) = db
                         .write()
+                        .instrument(tracing::debug_span!("indexer: update latest block number"))
                         .await
                         .update_latest_block_number(block_with_logs.block_id as u32)
                         .await

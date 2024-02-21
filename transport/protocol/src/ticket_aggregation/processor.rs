@@ -21,7 +21,7 @@ use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn, Instrument};
 
 use futures::stream::FuturesUnordered;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus;
@@ -75,7 +75,7 @@ pub enum AggregationList {
 }
 
 impl AggregationList {
-    pub async fn rollback<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<()> {
+    pub async fn rollback<Db: HoprCoreEthereumDbActions + std::fmt::Debug>(self, db: Arc<RwLock<Db>>) -> Result<()> {
         let tickets = match self {
             AggregationList::WholeChannel(channel) => {
                 db.read()
@@ -102,7 +102,13 @@ impl AggregationList {
             .map(|t| async {
                 let mut ticket = t.clone();
                 ticket.status = AcknowledgedTicketStatus::Untouched;
-                if let Err(e) = db.write().await.update_acknowledged_ticket(&ticket).await {
+                if let Err(e) = db
+                    .write()
+                    .instrument(tracing::debug_span!("db: rollback (update acknowledged ticket)"))
+                    .await
+                    .update_acknowledged_ticket(&ticket)
+                    .await
+                {
                     error!("failed to revert {ticket} : {e}");
                     false
                 } else {
@@ -110,17 +116,19 @@ impl AggregationList {
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
             .filter(|r| *r)
-            .count();
+            .count()
+            .await;
 
         warn!("reverted {reverted} ack tickets to untouched state");
         Ok(())
     }
 
-    async fn into_vec<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<Vec<AcknowledgedTicket>> {
+    #[tracing::instrument(level = "debug")]
+    async fn into_vec<Db: HoprCoreEthereumDbActions + std::fmt::Debug>(
+        self,
+        db: Arc<RwLock<Db>>,
+    ) -> Result<Vec<AcknowledgedTicket>> {
         let list = match self {
             AggregationList::WholeChannel(channel) => {
                 db.write()
@@ -203,12 +211,12 @@ pub enum TicketAggregationProcessed<T, U> {
 }
 
 /// Implements protocol ticket aggregation logic for acknowledgements
-pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions> {
+pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions + std::fmt::Debug> {
     db: Arc<RwLock<Db>>,
     chain_key: ChainKeypair,
 }
 
-impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
+impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> Clone for TicketAggregationProcessor<Db> {
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
@@ -217,7 +225,7 @@ impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
+impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor<Db> {
     pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
         Self {
             db,
@@ -338,11 +346,16 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
-        self.db
-            .write()
-            .await
-            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
-            .await?;
+        {
+            self.db
+                .write()
+                .instrument(tracing::debug_span!(
+                    "db: aggregate tickets (ensure current ticket index gte)"
+                ))
+                .await
+                .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
+                .await?;
+        }
 
         Ticket::new(
             &destination,
@@ -455,17 +468,22 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             return Err(ProtocolTicketAggregation("Aggregated ticket is invalid".into()));
         }
 
-        info!("storing received aggregated {acked_aggregated_ticket}");
-
         self.db
             .write()
+            .instrument(tracing::debug_span!(
+                "storing received aggregated ticket",
+                ticket = acked_aggregated_ticket.to_string()
+            ))
             .await
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
-        info!("ensure the current ticket index is not smaller than the the aggregated ticket index + offset");
         self.db
             .write()
+            .instrument(tracing::info_span!(
+                "ensure the current ticket index is not smaller than the the aggregated ticket",
+                ticket_index = current_ticket_index_from_aggregated_ticket.to_string()
+            ))
             .await
             .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
             .await?;
@@ -625,7 +643,7 @@ where
     U: Send,
 {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db: Arc<RwLock<Db>>,
         chain_key: &ChainKeypair,
     ) -> Self {

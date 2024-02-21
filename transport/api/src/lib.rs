@@ -113,7 +113,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -174,7 +174,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
@@ -357,6 +357,7 @@ impl HoprTransport {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug")]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
         if !self.is_allowed_to_access_network(peer).await {
             return Err(errors::HoprTransportError::Api(format!(

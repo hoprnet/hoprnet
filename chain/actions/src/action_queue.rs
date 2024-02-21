@@ -19,7 +19,7 @@ use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn, Instrument};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{
@@ -380,7 +380,16 @@ where
                         if let Action::RedeemTicket(mut ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
-                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
+
+                            if let Err(e) = db_clone
+                                .write()
+                                .instrument(tracing::debug_span!(
+                                    "db: action execution (update_acknowledged_ticket)",
+                                ))
+                                .await
+                                .update_acknowledged_ticket(&ack)
+                                .await
+                            {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
                         }

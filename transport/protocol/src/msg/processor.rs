@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn, Instrument};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -88,9 +88,10 @@ pub enum MsgProcessed {
 }
 
 /// Implements protocol acknowledgement logic for msg packets
+#[derive(Debug)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -98,7 +99,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -111,7 +112,7 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     type Input = ApplicationData;
 
@@ -164,6 +165,9 @@ where
                 } => {
                     self.db
                         .write()
+                        .instrument(tracing::debug_span!(
+                            "db: outgoing packet (store pending acknowledgement)"
+                        ))
                         .await
                         .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
                         .await?;
@@ -304,7 +308,12 @@ where
 
                 if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
-                    self.db.write().await.mark_rejected(&ticket).await?;
+                    self.db
+                        .write()
+                        .instrument(tracing::debug_span!("db: forwarded packet (mark rejected)"))
+                        .await
+                        .mark_rejected(&ticket)
+                        .await?;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_REJECTED_TICKETS_COUNT.increment();
@@ -313,8 +322,14 @@ where
                 }
 
                 {
-                    debug!("storing pending acknowledgement for channel {}", channel.get_id());
-                    let mut g = self.db.write().await;
+                    let mut g = self
+                        .db
+                        .write()
+                        .instrument(tracing::debug_span!(
+                            "db: forwarded packet (store pending acknowledgement)",
+                            channel = channel.get_id().to_string()
+                        ))
+                        .await;
                     g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
                         .await?;
 
@@ -371,13 +386,14 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
     }
 
+    #[tracing::instrument(level = "debug")]
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
         trace!("begin creating multihop ticket for destination {destination}");
 
@@ -598,7 +614,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -652,7 +668,12 @@ impl PacketInteraction {
                         if let Some(tag) = packet_tag {
                             // There is a 0.1% chance that the positive result is not a replay
                             // because a Bloom filter is used
-                            if tbf.write().await.check_and_set(tag) {
+                            if tbf
+                                .write()
+                                .instrument(tracing::debug_span!("tbf: check tag replay"))
+                                .await
+                                .check_and_set(tag)
+                            {
                                 return (Err(TagReplay), metadata);
                             }
                         }

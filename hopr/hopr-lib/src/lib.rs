@@ -74,7 +74,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, Instrument};
 use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 
@@ -226,7 +226,12 @@ where
                 ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
                 ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
-                    let change = channel_graph.write().await.update_channel(channel);
+
+                    let change = channel_graph
+                        .write()
+                        .instrument(tracing::debug_span!("graph: update_channel in the channel graph"))
+                        .await
+                        .update_channel(channel);
 
                     // Check if this is our own channel
                     if let Some(own_channel_direction) = maybe_direction {
@@ -873,7 +878,15 @@ impl Hopr {
             info!("Syncing channels from the previous runs");
             let locked_db = self.chain_api.db();
             let db = locked_db.read().await;
-            if let Err(e) = self.chain_api.channel_graph().write().await.sync_channels(&*db).await {
+            if let Err(e) = self
+                .chain_api
+                .channel_graph()
+                .write()
+                .instrument(tracing::debug_span!("graph: load channel graph from DB"))
+                .await
+                .sync_channels(&*db)
+                .await
+            {
                 error!("failed to initialize channel graph from the DB: {e}");
             }
         }
