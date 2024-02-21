@@ -1,7 +1,6 @@
 {
   description = "hoprnet monorepo";
 
-
   inputs.flake-utils.url = github:numtide/flake-utils;
   inputs.flake-parts.url = github:hercules-ci/flake-parts;
   inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
@@ -11,7 +10,8 @@
   # using a fork with an added source filter
   inputs.crane.url = github:hoprnet/crane/tb/20240117-find-filter;
   inputs.foundry.url = github:shazow/foundry.nix/monthly;
-  inputs.solc.url = github:hellwolf/solc.nix;
+  # use change to add solc 0.8.24
+  inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
 
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
