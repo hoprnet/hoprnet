@@ -233,16 +233,16 @@ impl HoprKeys {
     pub fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
         match retrieval_mode {
             IdentityRetrievalModes::FromFile { password, id_path } => {
-                let identity_file_exists = metadata(&id_path).is_ok();
+                let identity_file_exists = metadata(id_path).is_ok();
 
                 if identity_file_exists {
                     info!("identity file exists at {}", id_path);
 
-                    match HoprKeys::read_eth_keystore(&id_path, &password) {
+                    match HoprKeys::read_eth_keystore(id_path, password) {
                         Ok((keys, needs_migration)) => {
                             info!("migration needed = {}", needs_migration);
                             if needs_migration {
-                                keys.write_eth_keystore(&id_path, &password)?
+                                keys.write_eth_keystore(id_path, password)?
                             }
                             Ok(keys)
                         }
@@ -258,7 +258,7 @@ impl HoprKeys {
                     info!("created a new set of keypairs at {}", id_path);
                     info!("{}", keys);
 
-                    keys.write_eth_keystore(&id_path, &password)?;
+                    keys.write_eth_keystore(id_path, password)?;
                     Ok(keys)
                 }
             }
@@ -269,7 +269,7 @@ impl HoprKeys {
             }
             #[cfg(any(feature = "hopli", test))]
             IdentityRetrievalModes::FromIdIntoFile { id, password, id_path } => {
-                let identity_file_exists = metadata(&id_path).is_ok();
+                let identity_file_exists = metadata(id_path).is_ok();
 
                 if identity_file_exists {
                     info!("identity file exists at {}", id_path);
@@ -285,7 +285,7 @@ impl HoprKeys {
                         chain_key: ChainKeypair::random(),
                     };
 
-                    keys.write_eth_keystore(&id_path, &password)?;
+                    keys.write_eth_keystore(id_path, password)?;
 
                     Ok(keys)
                 }
