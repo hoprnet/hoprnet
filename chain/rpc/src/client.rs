@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 use validator::Validate;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
@@ -253,12 +253,14 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
+        debug!("sending rpc request {method}");
+
         // Perform the actual request
         let start = std::time::Instant::now();
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
