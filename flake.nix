@@ -1,5 +1,6 @@
 {
   description = "hoprnet monorepo";
+
   inputs.flake-utils.url = github:numtide/flake-utils;
   inputs.flake-parts.url = github:hercules-ci/flake-parts;
   inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
@@ -43,7 +44,7 @@
             version = pkgs.lib.strings.concatStringsSep "."
               (pkgs.lib.lists.take 3 (builtins.splitVersion hoprdCrateInfoOriginal.version));
           };
-          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_24);
+          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           depsSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
