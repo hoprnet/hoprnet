@@ -70,8 +70,8 @@ impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> Display for AutoRede
 }
 
 impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<A, Db> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, chain_actions: A, db: Arc<RwLock<Db>>) -> Self {
-        Self { cfg, chain_actions, db }
+    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Arc<RwLock<Db>>, chain_actions: A) -> Self {
+        Self { cfg, db, chain_actions }
     }
 }
 
@@ -282,7 +282,7 @@ mod tests {
             ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, actions, db);
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket).await.unwrap();
     }
 
@@ -310,7 +310,7 @@ mod tests {
             ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, actions, db);
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
             .await
             .expect_err("non-agg ticket should not satisfy");
@@ -364,7 +364,7 @@ mod tests {
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, actions, db);
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
@@ -415,7 +415,7 @@ mod tests {
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, actions, db);
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
@@ -477,7 +477,7 @@ mod tests {
             on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, actions, db);
+        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
