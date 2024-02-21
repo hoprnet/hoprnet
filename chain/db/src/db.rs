@@ -1363,12 +1363,17 @@ mod tests {
     use std::str::FromStr;
     use utils_db::{db::serialize_to_bytes, CurrentDbShim};
 
-    const ALICE: [u8; 32] = hex!("37eafd5038311f90fc08d13ff9ee16c6709be666e7d96808ba9a786c18f868a8");
-    const BOB: [u8; 32] = hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26");
-
     lazy_static! {
-        static ref ALICE_KEYPAIR: ChainKeypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        static ref BOB_KEYPAIR: ChainKeypair = ChainKeypair::from_secret(&BOB).unwrap();
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "37eafd5038311f90fc08d13ff9ee16c6709be666e7d96808ba9a786c18f868a8"
+        ))
+        .unwrap();
+        static ref ALICE_ADDR: Address = ALICE.public().to_address();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26"
+        ))
+        .unwrap();
+        static ref BOB_ADDR: Address = BOB.public().to_address();
     }
 
     const PRICE_PER_PACKET: u128 = 10000000000000000_u128;
@@ -1442,8 +1447,8 @@ mod tests {
     #[test]
     fn test_chain_db_iterable_type_channelentry_must_have_fixed_key_length() {
         let channel_entry = ChannelEntry::new(
-            Address::random(),
-            Address::random(),
+            *ALICE_ADDR,
+            *BOB_ADDR,
             Balance::zero(BalanceType::HOPR),
             U256::from(0u64),
             ChannelStatus::Open,
@@ -1458,7 +1463,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1469,7 +1474,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1480,7 +1485,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1501,7 +1506,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1529,8 +1534,8 @@ mod tests {
             let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
             let ticket = mock_ticket(
-                &ALICE_KEYPAIR,
-                &BOB_KEYPAIR.public().to_address(),
+                &ALICE,
+                &BOB.public().to_address(),
                 None,
                 Some(i.into()),
                 None,
@@ -1561,12 +1566,7 @@ mod tests {
                 .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap())
                 .unwrap();
 
-            assert!(validate_ticket(
-                &acked_ticket.ticket,
-                &BOB_KEYPAIR.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
+            assert!(validate_ticket(&acked_ticket.ticket, &BOB.public().to_address(), &Hash::default()).is_ok());
             assert!(validate_acknowledged_ticket(&acked_ticket).is_ok());
 
             acked_tickets.push(acked_ticket.clone());
@@ -1587,7 +1587,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_mark_acknowledged_tickets_neglected() {
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), *ALICE_ADDR);
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1595,8 +1595,8 @@ mod tests {
 
         // set channel to current epoch
         let mut channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
@@ -1611,7 +1611,7 @@ mod tests {
         let acked_tickets = create_acknowledged_tickets(&mut db, tickets_to_generate, channel_epoch, start_index).await;
 
         // assert channel id
-        let channel_id = generate_channel_id(&ALICE_KEYPAIR.public().to_address(), &BOB_KEYPAIR.public().to_address());
+        let channel_id = generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address());
         assert_eq!(channel_id, acked_tickets[0].ticket.channel_id);
         assert_eq!(channel_id, channel.get_id());
 
@@ -1636,10 +1636,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_aggregatable_acknowledged_tickets() {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            BOB_KEYPAIR.public().to_address(),
-        );
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), BOB.public().to_address());
 
         let start_index = 23u64;
         let tickets_to_generate = 3u64;
@@ -1650,7 +1647,7 @@ mod tests {
 
         let acked_tickets_from_db = db.get_acknowledged_tickets(None).await.unwrap();
         let acked_tickets_count = db.get_acknowledged_tickets_count(None).await.unwrap();
-        let tickets_from_db = db.get_tickets(Some(ALICE_KEYPAIR.public().to_address())).await.unwrap();
+        let tickets_from_db = db.get_tickets(Some(ALICE.public().to_address())).await.unwrap();
 
         for i in 0usize..tickets_to_generate as usize {
             assert_eq!(acked_tickets[i], acked_tickets_from_db[i]);
@@ -1661,7 +1658,7 @@ mod tests {
         assert_eq!(acked_tickets_count, acked_tickets_from_db.len());
         assert_eq!(acked_tickets_count, tickets_from_db.len());
 
-        let channel_id = generate_channel_id(&ALICE_KEYPAIR.public().to_address(), &BOB_KEYPAIR.public().to_address());
+        let channel_id = generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address());
 
         assert_eq!(channel_id, acked_tickets[0].ticket.channel_id);
 
@@ -1675,8 +1672,8 @@ mod tests {
 
         // now aggregate them
         let aggregated_ticket = mock_ticket(
-            &ALICE_KEYPAIR,
-            &BOB_KEYPAIR.public().to_address(),
+            &ALICE,
+            &BOB.public().to_address(),
             None,
             Some(start_index.into()),
             Some(2u64.into()),
@@ -1710,8 +1707,8 @@ mod tests {
                 Challenge::from(CurvePoint::from_exponent(&challenge_seed).unwrap()).to_ethereum_challenge();
 
             let ticket = mock_ticket(
-                &ALICE_KEYPAIR,
-                &(&*BOB_KEYPAIR).into(),
+                &ALICE,
+                &(&*BOB).into(),
                 Some(domain_separator),
                 Some(i.into()),
                 Some(1_u64.into()),
@@ -1729,8 +1726,8 @@ mod tests {
         }
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             total_balance,
             amount.into(),
             ChannelStatus::Open,
@@ -1758,7 +1755,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
         let stored_acked_tickets = db
             .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
             .await
@@ -1789,7 +1786,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
         let stored_acked_tickets = db
             .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
             .await
@@ -1821,7 +1818,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
         let stored_acked_tickets = db
             .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
             .await
@@ -1852,7 +1849,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
         let stored_acked_tickets = db
             .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
             .await
@@ -1863,12 +1860,9 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_have_0_unrealized_balance_non_existing_channels() {
-        let db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            BOB_KEYPAIR.public().to_address(),
-        );
+        let db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), BOB.public().to_address());
 
-        let channel = generate_channel_id(&ALICE_KEYPAIR.public().to_address(), &BOB_KEYPAIR.public().to_address());
+        let channel = generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address());
 
         let unrealized_balance = db.get_unrealized_balance(&channel).await;
         assert_eq!(unrealized_balance, Ok(Balance::zero(BalanceType::HOPR)));
@@ -1877,7 +1871,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_contain_unrealized_balance_for_the_tickets_present() {
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let tickets_to_generate = 2u64;
         let channel_epoch = 7u32;
@@ -1886,8 +1880,8 @@ mod tests {
         let expected_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -1912,7 +1906,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_reset_channel_balance_for_newly_opened_channels() {
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let channel_epoch = 7u32;
         let start_index = 17u64;
@@ -1920,8 +1914,8 @@ mod tests {
         let expected_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -1939,7 +1933,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_reset_unrealized_channel_balance_for_reopened_channels_to_channel_balance() {
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let channel_epoch = 7u32;
         let start_index = 17u64;
@@ -1947,8 +1941,8 @@ mod tests {
         let expected_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -1962,8 +1956,8 @@ mod tests {
         // let _acked_tickets = create_acknowledged_tickets(&mut db, tickets_to_generate, channel_epoch, start_index).await;
 
         let newer_channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -1984,10 +1978,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_move_the_outstanding_unrealized_value_to_unrealized_channel_balance_on_channel_update_with_the_same_channel_epoch_on_redeem(
     ) {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            BOB_KEYPAIR.public().to_address(),
-        );
+        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), BOB.public().to_address());
 
         let tickets_to_generate = 2u64;
         let channel_epoch = 7u32;
@@ -1996,8 +1987,8 @@ mod tests {
         let expected_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -2021,8 +2012,8 @@ mod tests {
         let post_redeem_balance = expected_balance.sub(&acked_tickets[1].ticket.amount);
 
         let post_redeem_channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             post_redeem_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -2051,7 +2042,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_not_update_the_unrealized_balance_on_redeem() {
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let tickets_to_generate = 2u64;
         let channel_epoch = 7u32;
@@ -2060,8 +2051,8 @@ mod tests {
         let channel_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             channel_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -2098,7 +2089,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_decrease_unrealized_balance_on_losing_ticket() {
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let tickets_to_generate = 2u64;
         let channel_epoch = 7u32;
@@ -2107,8 +2098,8 @@ mod tests {
         let expected_balance = Balance::new(U256::from(1_000_000_000_000_000_000u128), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             expected_balance,
             start_index.into(),
             ChannelStatus::Open,
@@ -2154,7 +2145,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
 
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         assert_eq!(unrealized_balance, Ok(channel.balance));
@@ -2179,7 +2170,7 @@ mod tests {
         let current_channel_total_balance = Balance::new_from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
 
         let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let mut db = CoreEthereumDb::new(inner_db, BOB.public().to_address());
         let _tickets_from_previous_epoch = create_acknowledged_tickets(
             &mut db,
             tickets_to_generate_per_epoch,
@@ -2204,8 +2195,8 @@ mod tests {
         let ticket_balance = tickets_from_current_epoch[0].ticket.amount;
 
         let channel = ChannelEntry::new(
-            ALICE_KEYPAIR.public().to_address(),
-            BOB_KEYPAIR.public().to_address(),
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
             current_channel_total_balance,
             current_channel_ticket_index.into(),
             ChannelStatus::Open,

@@ -116,6 +116,7 @@ mod tests {
         static ref ALICE_ADDR: Address = ALICE.public().to_address();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("92019229229fff4c36c52fb1257f3ca710c73502ec7f6111eda4c1b5b8e84810")).unwrap();
         static ref BOB_ADDR: Address = BOB.public().to_address();
+        static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).unwrap();
     }
 
     #[async_std::test]
@@ -123,7 +124,6 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
-        let keypair = OffchainKeypair::random();
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -132,7 +132,7 @@ mod tests {
         )));
 
         let ma = announce_multiaddr.clone();
-        let pubkey_clone = keypair.public().clone();
+        let pubkey_clone = ALICE_OFFCHAIN.public().clone();
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_announce()
@@ -144,7 +144,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         let ma = announce_multiaddr.clone();
-        let pk = keypair.public().clone();
+        let pk = ALICE_OFFCHAIN.public().clone();
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
             .expect_register_expectation()
@@ -169,7 +169,7 @@ mod tests {
 
         let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
         let tx_res = actions
-            .announce(&[announce_multiaddr], &keypair)
+            .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
             .expect("announcement call should not fail")
             .await
@@ -187,21 +187,19 @@ mod tests {
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let keypair = OffchainKeypair::random();
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
 
         db.write()
             .await
             .update_account_and_snapshot(
                 &AccountEntry::new(
-                    *keypair.public(),
-                    self_addr,
+                    *ALICE_OFFCHAIN.public(),
+                    *ALICE,
                     AccountType::Announced {
                         multiaddr: announce_multiaddr.clone(),
                         updated_block: 0,
@@ -222,7 +220,7 @@ mod tests {
 
         let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&[announce_multiaddr], &keypair).await;
+        let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"

@@ -30,7 +30,7 @@ hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-hex-literal = "0.4.1"
+hex-literal = { workspace = true }
 parameterized = "1.0"
 subtle = "2.5.0"
 
