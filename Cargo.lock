@@ -1455,7 +1455,7 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
 name = "core-network"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-std",
  "async-stream",
@@ -1595,7 +1595,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "core-transport"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-lock 2.8.0",
  "async-std",
@@ -3432,7 +3432,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "bincode",
  "hex",
