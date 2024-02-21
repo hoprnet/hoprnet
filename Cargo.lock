@@ -1048,7 +1048,7 @@ dependencies = [
 name = "chain-actions"
 version = "0.5.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
@@ -1080,7 +1080,7 @@ dependencies = [
 name = "chain-api"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
@@ -1121,7 +1121,7 @@ dependencies = [
 name = "chain-indexer"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
@@ -1535,7 +1535,7 @@ dependencies = [
 name = "core-path"
 version = "0.3.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1560,7 +1560,7 @@ dependencies = [
 name = "core-protocol"
 version = "0.2.3"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1597,7 +1597,7 @@ dependencies = [
 name = "core-strategy"
 version = "0.7.1"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
@@ -1633,7 +1633,7 @@ dependencies = [
 name = "core-transport"
 version = "0.5.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -3376,7 +3376,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.1.0-rc.3"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "atomic_enum",
  "chain-actions",
@@ -3451,7 +3451,7 @@ name = "hoprd"
 version = "2.1.0"
 dependencies = [
  "async-broadcast",
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "chrono",
  "clap",
@@ -3512,7 +3512,7 @@ dependencies = [
 name = "hoprd-inbox"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "hopr-internal-types",
