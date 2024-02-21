@@ -45,7 +45,7 @@ pub struct AutoRedeemingStrategyConfig {
     /// Default is 2 HOPR.
     #[serde_as(as = "DisplayFromStr")]
     #[default(Balance::new_from_str("2000000000000000000", BalanceType::HOPR))]
-    pub on_close_redeem_single_tickets_worth_min: Balance,
+    pub on_close_redeem_single_tickets_value_min: Balance,
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
@@ -122,7 +122,7 @@ where
                 .into_iter()
                 .filter(|t| {
                     t.status == AcknowledgedTicketStatus::Untouched
-                        && t.ticket.amount >= self.cfg.on_close_redeem_single_tickets_worth_min
+                        && t.ticket.amount >= self.cfg.on_close_redeem_single_tickets_value_min
                 })
                 .collect::<Vec<_>>();
 
@@ -140,7 +140,7 @@ where
                 debug!(
                     "not auto-redeeming single ticket in {channel}: there are {} redeemable tickets worth >= {}",
                     ack_ticket_in_db.len(),
-                    self.cfg.on_close_redeem_single_tickets_worth_min
+                    self.cfg.on_close_redeem_single_tickets_value_min
                 );
                 Err(CriteriaNotSatisfied)
             }
@@ -361,7 +361,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
-            on_close_redeem_single_tickets_worth_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, actions, db);
@@ -412,7 +412,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            on_close_redeem_single_tickets_worth_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, actions, db);
@@ -474,7 +474,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            on_close_redeem_single_tickets_worth_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            on_close_redeem_single_tickets_value_min: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, actions, db);
