@@ -77,10 +77,10 @@ pub enum IdentityRetrievalModes<'a> {
     },
     /// takes a private key and create an identity file at the
     /// provided file destination
-    #[cfg(any(advanced, test))]
-    FromPrivateKeyIntoFile {
-        /// hex string containing the private key
-        private_key: &'a str,
+    #[cfg(any(feature = "hopli", test))]
+    FromIdIntoFile {
+        /// identifier of this keypair
+        id: Uuid,
         /// Used encrypt / decrypt identity file
         password: &'a str,
         /// path to store / load identity file
@@ -221,9 +221,14 @@ impl HoprKeys {
             id: Uuid::new_v4(),
         }
     }
-}
 
-impl HoprKeys {
+    /// Used to derive a UUID as used as a filename in case none
+    /// is specified
+    #[cfg(any(feature = "hopli", test))]
+    pub fn get_random_uuid() -> Uuid {
+        Uuid::new_v4()
+    }
+
     /// Initializes HoprKeys using the provided retrieval mode
     pub fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
         match retrieval_mode {
@@ -262,12 +267,8 @@ impl HoprKeys {
 
                 private_key.try_into()
             }
-            #[cfg(any(advanced, test))]
-            IdentityRetrievalModes::FromPrivateKeyIntoFile {
-                private_key,
-                password,
-                id_path,
-            } => {
+            #[cfg(any(feature = "hopli", test))]
+            IdentityRetrievalModes::FromIdIntoFile { id, password, id_path } => {
                 let identity_file_exists = metadata(&id_path).is_ok();
 
                 if identity_file_exists {
@@ -278,7 +279,11 @@ impl HoprKeys {
                         id_path
                     )))
                 } else {
-                    let keys: HoprKeys = private_key.try_into()?;
+                    let keys: HoprKeys = HoprKeys {
+                        id,
+                        packet_key: OffchainKeypair::random(),
+                        chain_key: ChainKeypair::random(),
+                    };
 
                     keys.write_eth_keystore(&id_path, &password)?;
 
@@ -291,7 +296,7 @@ impl HoprKeys {
     /// Reads a keystore file using custom FS operations
     ///
     /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
-    pub fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
+    fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
         let json_string = read_to_string(path)?;
         let keystore: EthKeystore = from_json_string(&json_string)?;
 
@@ -381,7 +386,7 @@ impl HoprKeys {
     /// Writes a keystore file using custom FS operation and custom entropy source
     ///
     /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
-    pub fn write_eth_keystore(&self, path: &str, password: &str) -> Result<()> {
+    fn write_eth_keystore(&self, path: &str, password: &str) -> Result<()> {
         if USE_WEAK_CRYPTO {
             warn!("USING WEAK CRYPTO -> this build is not meant for production!");
         }
@@ -599,16 +604,14 @@ mod tests {
         let tmp = tempdir().unwrap();
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
         let identity_path = identity_dir.to_str().unwrap();
-        let private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+        let id = super::HoprKeys::get_random_uuid();
 
-        assert!(
-            super::HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKeyIntoFile {
-                password: "local",
-                id_path: identity_path,
-                private_key: private_key
-            })
-            .is_ok()
-        );
+        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
+            password: "local",
+            id_path: identity_path,
+            id
+        })
+        .is_ok());
 
         let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(identity_path, "local").unwrap();
 
@@ -619,13 +622,11 @@ mod tests {
         );
 
         // Overwriting existing keys must not be possible
-        assert!(
-            super::HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKeyIntoFile {
-                password: "local",
-                id_path: identity_path,
-                private_key
-            })
-            .is_err()
-        );
+        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
+            password: "local",
+            id_path: identity_path,
+            id
+        })
+        .is_err());
     }
 }

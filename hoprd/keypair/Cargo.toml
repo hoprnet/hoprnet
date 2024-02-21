@@ -34,4 +34,5 @@ tempfile = "3"
 
 [features]
 default = []
+hopli = []
 js = ["hopr-platform/js"]
