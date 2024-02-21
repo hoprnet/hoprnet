@@ -8,8 +8,9 @@ use aes::{
 };
 use hex;
 use hopr_crypto_random::random_bytes;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_primitive_types::traits::ToHex;
+use hopr_crypto_types::prelude::*;
+use hopr_platform::file::native::{metadata, read_to_string, write};
+use hopr_primitive_types::prelude::*;
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
@@ -18,9 +19,6 @@ use std::fmt::Debug;
 use tracing::{error, info, warn};
 use typenum::Unsigned;
 use uuid::Uuid;
-
-use crate::errors::KeyPairError::KeyDerivationError;
-use hopr_platform::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;
@@ -61,11 +59,33 @@ impl Aes128Ctr {
     }
 }
 
-pub struct IdentityOptions {
-    pub initialize: bool,
-    pub id_path: String,
-    pub password: String,
-    pub private_key: Option<Box<[u8]>>,
+pub enum IdentityRetrievalModes<'a> {
+    /// hoprd starts with a previously generated identitiy file.
+    /// If none is present, create a new one
+    FromFile {
+        /// Used encrypt / decrypt identity file
+        password: &'a str,
+        /// path to store / load identity file
+        id_path: &'a str,
+    },
+    /// hoprd receives at startup a private which it will use
+    /// for the entire runtime. The private stays in memory and
+    /// thus remains fluent
+    FromPrivateKey {
+        /// hex string containing the private key
+        private_key: &'a str,
+    },
+    /// takes a private key and create an identity file at the
+    /// provided file destination
+    #[cfg(any(advanced, test))]
+    FromPrivateKeyIntoFile {
+        /// hex string containing the private key
+        private_key: &'a str,
+        /// Used encrypt / decrypt identity file
+        password: &'a str,
+        /// path to store / load identity file
+        id_path: &'a str,
+    },
 }
 
 pub struct HoprKeys {
@@ -117,10 +137,7 @@ impl TryFrom<&str> for HoprKeys {
     /// assert!(HoprKeys::try_from(priv_keys).is_ok());
     /// ```
     fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
-        let maybe_priv_key = match s.strip_prefix("0x") {
-            Some(priv_without_prefix) => priv_without_prefix,
-            None => s,
-        };
+        let maybe_priv_key = s.strip_prefix("0x").unwrap_or(s);
 
         if maybe_priv_key.len() != 2 * (PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH) {
             return Err(KeyPairError::InvalidPrivateKeySize {
@@ -181,9 +198,8 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// ```
     fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
         Ok(HoprKeys {
-            packet_key: OffchainKeypair::from_secret(&value.0)
-                .map_err(|e| KeyDerivationError { err: e.to_string() })?,
-            chain_key: ChainKeypair::from_secret(&value.1).map_err(|e| KeyDerivationError { err: e.to_string() })?,
+            packet_key: OffchainKeypair::from_secret(&value.0)?,
+            chain_key: ChainKeypair::from_secret(&value.1)?,
             id: Uuid::new_v4(),
         })
     }
@@ -196,6 +212,8 @@ impl PartialEq for HoprKeys {
 }
 
 impl HoprKeys {
+    /// Creates two new keypairs, one for off-chain affairs and
+    /// another one to be used within the smart contract
     pub fn random() -> Self {
         Self {
             packet_key: OffchainKeypair::random(),
@@ -206,69 +224,68 @@ impl HoprKeys {
 }
 
 impl HoprKeys {
-    pub fn init(opts: IdentityOptions) -> Result<Self> {
-        let exists = metadata(&opts.id_path).map_or_else(
-            |e| {
-                info!("identity file {} not found: {}", &opts.id_path, e);
-                false
-            },
-            |_v| true,
-        );
+    /// Initializes HoprKeys using the provided retrieval mode
+    pub fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
+        match retrieval_mode {
+            IdentityRetrievalModes::FromFile { password, id_path } => {
+                let identity_file_exists = metadata(&id_path).is_ok();
 
-        if !exists && opts.private_key.is_some() {
-            info!("using provided private key and writing new identity file");
-            let keys = if let Some(private_key) = opts.private_key {
-                if private_key.len() != PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH {
-                    return Err(KeyPairError::InvalidPrivateKeySize {
-                        actual: private_key.len(),
-                        expected: 64,
-                    });
-                }
+                if identity_file_exists {
+                    info!("identity file exists at {}", id_path);
 
-                let mut priv_keys = [0u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH];
-                priv_keys.clone_from_slice(&private_key);
+                    match HoprKeys::read_eth_keystore(&id_path, &password) {
+                        Ok((keys, needs_migration)) => {
+                            info!("migration needed = {}", needs_migration);
+                            if needs_migration {
+                                keys.write_eth_keystore(&id_path, &password)?
+                            }
+                            Ok(keys)
+                        }
+                        Err(e) => {
+                            error!("{}", e.to_string());
 
-                priv_keys.try_into()?
-            } else {
-                HoprKeys::random()
-            };
-            keys.write_eth_keystore(&opts.id_path, &opts.password)?;
-
-            return Ok(keys);
-        }
-
-        if exists {
-            match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
-                Ok((keys, needs_migration)) => {
-                    info!("migration needed = {}", needs_migration);
-                    if needs_migration {
-                        keys.write_eth_keystore(&opts.id_path, &opts.password)?
+                            Err(KeyPairError::GeneralError(format!("An identity file is present at {} but the provided password <REDACTED> is not sufficient to decrypt it", id_path)))
+                        }
                     }
-                    return Ok(keys);
+                } else {
+                    let keys = HoprKeys::random();
+
+                    info!("created a new set of keypairs at {}", id_path);
+                    info!("{}", keys);
+
+                    keys.write_eth_keystore(&id_path, &password)?;
+                    Ok(keys)
                 }
-                Err(e) => {
-                    error!("{}", e.to_string());
+            }
+            IdentityRetrievalModes::FromPrivateKey { private_key } => {
+                info!("initializing HoprKeys with provided private keys <REDACTED>");
+
+                private_key.try_into()
+            }
+            #[cfg(any(advanced, test))]
+            IdentityRetrievalModes::FromPrivateKeyIntoFile {
+                private_key,
+                password,
+                id_path,
+            } => {
+                let identity_file_exists = metadata(&id_path).is_ok();
+
+                if identity_file_exists {
+                    info!("identity file exists at {}", id_path);
+
+                    Err(KeyPairError::GeneralError(format!(
+                        "Cannot create identity file at {} because the file already exists.",
+                        id_path
+                    )))
+                } else {
+                    let keys: HoprKeys = private_key.try_into()?;
+
+                    keys.write_eth_keystore(&id_path, &password)?;
+
+                    Ok(keys)
                 }
             }
         }
-
-        if !exists && opts.initialize {
-            info!(
-                "identity file {} not found, initializing and writing new identity file",
-                &opts.id_path
-            );
-            let keys = HoprKeys::random();
-            keys.write_eth_keystore(&opts.id_path, &opts.password)?;
-
-            return Ok(keys);
-        }
-
-        Err(KeyPairError::GeneralError(
-            String::from("Key store file does not exist or could not decrypt it. ")
-                + "Maybe using the wrong '--password'? "
-                + "Otherwise try again with '--initialize' to overwrite the existing key store. "
-                + "THIS WILL DESTROY THE PREVIOUS KEY",
-        ))
     }
 
     /// Reads a keystore file using custom FS operations
@@ -283,9 +300,10 @@ impl HoprKeys {
                 let mut key = vec![0u8; dklen as usize];
                 let log_n = (n as f32).log2() as u8;
                 let scrypt_params = ScryptParams::new(log_n, r, p, dklen.into())
-                    .map_err(|err| KeyPairError::KeyDerivationError { err: err.to_string() })?;
-                scrypt(password.as_ref(), &salt, &scrypt_params, key.as_mut_slice())
-                    .map_err(|err| KeyPairError::KeyDerivationError { err: err.to_string() })?;
+                    .map_err(|err| KeyPairError::KeyDerivationError(err.to_string()))?;
+                // derive "master key" and store it in `key`
+                scrypt(password.as_ref(), &salt, &scrypt_params, &mut key)
+                    .map_err(|err| KeyPairError::KeyDerivationError(err.to_string()))?;
                 key
             }
             _ => panic!("HOPR only supports scrypt"),
@@ -297,7 +315,7 @@ impl HoprKeys {
             .chain(&keystore.crypto.ciphertext)
             .finalize();
 
-        if derived_mac.as_slice() != keystore.crypto.mac.as_slice() {
+        if *derived_mac != *keystore.crypto.mac {
             return Err(KeyPairError::MacMismatch);
         }
 
@@ -378,10 +396,11 @@ impl HoprKeys {
             HOPR_KDF_PARAMS_P,
             HOPR_KDF_PARAMS_DKLEN.into(),
         )
-        .map_err(|e| KeyPairError::KeyDerivationError { err: e.to_string() })?;
+        .map_err(|e| KeyPairError::KeyDerivationError(e.to_string()))?;
 
-        scrypt(password.as_ref(), &salt, &scrypt_params, key.as_mut_slice())
-            .map_err(|e| KeyPairError::KeyDerivationError { err: e.to_string() })?;
+        // derive "master key" and store it in `key`
+        scrypt(password.as_ref(), &salt, &scrypt_params, &mut key)
+            .map_err(|e| KeyPairError::KeyDerivationError(e.to_string()))?;
 
         // Encrypt the private key using AES-128-CTR.
         let iv: [u8; HOPR_IV_SIZE] = random_bytes();
@@ -449,15 +468,16 @@ impl Debug for HoprKeys {
 mod tests {
     use std::fs;
 
-    use super::HoprKeys;
-    use hopr_crypto_types::keypairs::Keypair;
+    use hopr_crypto_types::prelude::*;
     use tempfile::tempdir;
+
+    use super::HoprKeys;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 
     #[test]
     fn create_keys() {
-        println!("{:?}", HoprKeys::random())
+        println!("{:?}", super::HoprKeys::random())
     }
 
     #[test]
@@ -466,13 +486,13 @@ mod tests {
 
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
 
-        let keys = HoprKeys::random();
+        let keys = super::HoprKeys::random();
 
         keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD)
             .unwrap();
 
         let (deserialized, needs_migration) =
-            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD).unwrap();
+            super::HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD).unwrap();
 
         assert!(!needs_migration);
         assert_eq!(deserialized, keys);
@@ -489,7 +509,7 @@ mod tests {
         fs::write(identity_dir.to_str().unwrap(), old_keystore_file.as_bytes()).unwrap();
 
         let (deserialized, needs_migration) =
-            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
+            super::HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
 
         assert!(needs_migration);
         assert_eq!(
@@ -502,25 +522,110 @@ mod tests {
     fn test_auto_migration() {
         let tmp = tempdir().unwrap();
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
+        let identity_path: &str = identity_dir.to_str().unwrap();
 
         let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
-        fs::write(identity_dir.to_str().unwrap(), old_keystore_file.as_bytes()).unwrap();
+        fs::write(identity_path, old_keystore_file.as_bytes()).unwrap();
 
-        assert!(HoprKeys::init(super::IdentityOptions {
-            initialize: false,
-            id_path: identity_dir.to_str().unwrap().into(),
+        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
             password: "local".into(),
-            private_key: None,
+            id_path: identity_path.into()
         })
         .is_ok());
 
-        let (deserialized, needs_migration) =
-            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
+        let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(identity_path, "local").unwrap();
 
         assert!(!needs_migration);
         assert_eq!(
             deserialized.chain_key.public().0.to_address().to_string(),
             "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
+        );
+    }
+
+    #[test]
+    fn test_should_not_overwrite_existing() {
+        let tmp = tempdir().unwrap();
+        let identity_dir = tmp.path().join("hopr-unit-test-identity");
+        let identity_path: &str = identity_dir.to_str().unwrap();
+
+        fs::write(identity_path, "".as_bytes()).unwrap();
+
+        // Overwriting existing keys must not be possible
+        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
+            password: "local".into(),
+            id_path: identity_path.into()
+        })
+        .is_err());
+    }
+    #[test]
+    fn test_from_privatekey() {
+        let private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+
+        let from_private_key = HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey { private_key }).unwrap();
+
+        let private_key_without_prefix = "56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+
+        let from_private_key_without_prefix = HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+            private_key: private_key_without_prefix,
+        })
+        .unwrap();
+
+        // both ways should work
+        assert_eq!(from_private_key, from_private_key_without_prefix);
+
+        let too_short_private_key = "0xb29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+
+        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+            private_key: too_short_private_key
+        })
+        .is_err());
+
+        let too_long_private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52aeae";
+
+        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+            private_key: too_long_private_key
+        })
+        .is_err());
+
+        let non_hex_private = "this is the story of hopr: in 2018 ...";
+        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+            private_key: non_hex_private
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn test_from_privatekey_into_file() {
+        let tmp = tempdir().unwrap();
+        let identity_dir = tmp.path().join("hopr-unit-test-identity");
+        let identity_path = identity_dir.to_str().unwrap();
+        let private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+
+        assert!(
+            super::HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKeyIntoFile {
+                password: "local",
+                id_path: identity_path,
+                private_key: private_key
+            })
+            .is_ok()
+        );
+
+        let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(identity_path, "local").unwrap();
+
+        assert!(!needs_migration);
+        assert_eq!(
+            deserialized.chain_key.public().0.to_address().to_string(),
+            "0x05801834fd089afe070dab49b2111b92a4725893"
+        );
+
+        // Overwriting existing keys must not be possible
+        assert!(
+            super::HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKeyIntoFile {
+                password: "local",
+                id_path: identity_path,
+                private_key
+            })
+            .is_err()
         );
     }
 }

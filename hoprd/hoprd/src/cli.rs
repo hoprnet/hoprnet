@@ -1,9 +1,7 @@
-use std::str::FromStr;
-
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{ArgAction, Parser};
-use hex;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use strum::VariantNames;
 
 use hopr_lib::{looks_like_domain, HostConfig, Strategy};
@@ -22,25 +20,6 @@ fn parse_host(s: &str) -> Result<HostConfig, String> {
     }
 
     HostConfig::from_str(s)
-}
-
-/// Parse a hex string private key to a boxed u8 slice
-pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
-    if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 64];
-
-        let priv_key = match s.strip_prefix("0x") {
-            Some(priv_without_prefix) => priv_without_prefix,
-            None => s,
-        };
-
-        // no errors because filtered by regex
-        hex::decode_to_slice(priv_key, &mut decoded).unwrap();
-
-        Ok(Box::new(decoded))
-    } else {
-        Err("Given string is not a private key. A private key must contain 128 hex chars.".into())
-    }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
@@ -393,67 +372,4 @@ pub struct CliArgs {
         help = "DEPRECATED",
     )]
     pub health_check_port: Option<u16>,
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parse_private_key() {
-        let parsed =
-            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
-
-        let priv_key: Vec<u8> = vec![
-            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
-            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
-            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
-        ];
-
-        assert_eq!(parsed, priv_key.into())
-    }
-
-    #[test]
-    fn parse_private_key_with_prefix() {
-        let parsed_with_prefix =
-            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
-
-        let priv_key: Vec<u8> = vec![
-            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
-            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
-            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
-        ];
-
-        assert_eq!(parsed_with_prefix, priv_key.into())
-    }
-
-    #[test]
-    fn parse_too_short_private_key() {
-        let parsed =
-            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
-
-    #[test]
-    fn parse_too_long_private_key() {
-        let parsed =
-            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52aeae").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
-
-    #[test]
-    fn parse_non_hex_values() {
-        let parsed = super::parse_private_key("really not a private key").unwrap_err();
-
-        assert_eq!(
-            parsed,
-            "Given string is not a private key. A private key must contain 128 hex chars."
-        )
-    }
 }
