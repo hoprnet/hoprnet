@@ -19,23 +19,16 @@
 //! For details on default parameters see [MultiStrategyConfig].
 use async_lock::RwLock;
 use async_trait::async_trait;
-use chain_actions::channels::ChannelActions;
 use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::Sub;
 use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use tracing::{error, warn};
 use validator::Validate;
-
-use hopr_platform::time::native::current_time;
 
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
@@ -44,17 +37,12 @@ use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
+use crate::channel_finalizer::ClosureFinalizerStrategy;
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_metrics::metrics::{MultiGauge, SimpleCounter},
-    strum::VariantNames,
-};
+use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter =
-        SimpleCounter::new("hopr_strategy_closure_auto_finalization_count", "Count of channels where closure finalizing was initiated automatically").unwrap();
-
     static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
         MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
 }
@@ -84,65 +72,6 @@ pub trait SingularStrategy: Display {
     }
 }
 
-/// Internal strategy which runs per tick and finalizes `PendingToClose` channels
-/// which have elapsed the grace period.
-/// This is enabled in a [MultiStrategy] when [configured](MultiStrategyConfig) with the `finalize_channel_closure` set.
-struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
-    db: Arc<RwLock<Db>>,
-    chain_actions: ChainActions<Db>,
-}
-
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "channel_closure_finalizer")
-    }
-}
-
-#[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
-    async fn on_tick(&self) -> Result<()> {
-        // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
-        let ts_limit = current_time().sub(Duration::from_secs(3600));
-
-        let to_close = self
-            .db
-            .read()
-            .await
-            .get_outgoing_channels()
-            .await?
-            .iter()
-            .filter(|channel| {
-                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
-                    && channel.closure_time_passed(current_time())
-            })
-            .map(|channel| async {
-                let channel_cpy = *channel;
-                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
-                match self
-                    .chain_actions
-                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
-                    .await
-                {
-                    Ok(_) => {
-                        // Currently, we're not interested in awaiting the Close transactions to confirmation
-                        debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
-                    }
-                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
-                }
-            })
-            .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .len();
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
-
-        debug!("channel closure finalizer: initiated closure finalization of {to_close} channels");
-        Ok(())
-    }
-}
-
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
@@ -162,15 +91,6 @@ pub struct MultiStrategyConfig {
     /// Default is true.
     #[default = true]
     pub allow_recursive: bool,
-
-    /// Indicates if the strategy should check for `PendingToClose` channels which have
-    /// elapsed the closure grace period, to issue another channel closing transaction to close them.
-    /// If not set, the user has to trigger the channel closure manually once again after the grace period
-    /// is over.
-    ///
-    /// Default is false.
-    #[default = false]
-    pub finalize_channel_closure: bool,
 
     /// Configuration of individual sub-strategies.
     ///
@@ -204,13 +124,6 @@ impl MultiStrategy {
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
-        if cfg.finalize_channel_closure {
-            strategies.push(Box::new(ChannelCloseFinalizer {
-                db: db.clone(),
-                chain_actions: chain_actions.clone(),
-            }));
-        }
-
         #[cfg(all(feature = "prometheus", not(test)))]
         Strategy::VARIANTS
             .iter()
@@ -236,6 +149,11 @@ impl MultiStrategy {
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, chain_actions.clone())))
                 }
+                Strategy::ClosureFinalizer(sub_cfg) => strategies.push(Box::new(ClosureFinalizerStrategy::new(
+                    *sub_cfg,
+                    db.clone(),
+                    chain_actions.clone(),
+                ))),
                 Strategy::Multi(sub_cfg) => {
                     if cfg.allow_recursive {
                         let mut cfg_clone = sub_cfg.clone();
@@ -252,6 +170,7 @@ impl MultiStrategy {
                         error!("recursive multi-strategy not allowed and skipped")
                     }
                 }
+
                 // Passive strategy = empty MultiStrategy
                 Strategy::Passive => strategies.push(Box::new(Self {
                     cfg: Default::default(),
@@ -352,7 +271,6 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: true,
             allow_recursive: true,
-            finalize_channel_closure: false,
             strategies: Vec::new(),
         };
 
@@ -379,7 +297,6 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
             allow_recursive: true,
-            finalize_channel_closure: false,
             strategies: Vec::new(),
         };
 

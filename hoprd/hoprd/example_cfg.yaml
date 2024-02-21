@@ -164,6 +164,14 @@ hopr:
       # the `strategies` array empty.
       #- !Passive
 
+      # Strategy that monitors channels that are in `PendingToClose` state and
+      # their channel closure grace period has already elapsed, and on more issuing
+      # channel close transaction on these channels to finalize the closure.
+      # - !ClosureFinalizer
+        # Do not attempt to finalize closure of channels that have been overdue for closure for more than
+        # this amount of seconds.
+        # max_closure_overdue: 3600
+
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.
   heartbeat:

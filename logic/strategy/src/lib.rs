@@ -46,6 +46,7 @@ use strum::{Display, EnumString, EnumVariantNames};
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;
 use crate::auto_redeeming::AutoRedeemingStrategyConfig;
+use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
 use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
@@ -53,6 +54,7 @@ use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
 pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
+mod channel_finalizer;
 pub mod errors;
 pub mod promiscuous;
 pub mod strategy;
@@ -65,6 +67,7 @@ pub enum Strategy {
     Aggregating(AggregatingStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
+    ClosureFinalizer(ClosureFinalizerStrategyConfig),
     Multi(MultiStrategyConfig),
     Passive,
 }
@@ -85,7 +88,6 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
-        finalize_channel_closure: false,
         strategies: vec![
             AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),

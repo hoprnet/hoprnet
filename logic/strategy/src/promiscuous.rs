@@ -264,7 +264,7 @@ where
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .filter_map(|x| async move { x })
+            .filter_map(futures::future::ready)
             .collect::<HashMap<_, _>>()
             .await
     }
