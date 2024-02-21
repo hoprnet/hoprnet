@@ -104,13 +104,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
         // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
         let ts_limit = current_time().sub(Duration::from_secs(3600));
 
-        let to_close = self
-            .db
-            .read()
-            .await
-            .get_outgoing_channels()
-            .await?
-            .iter()
+        let out_channels = self.db.read().await.get_outgoing_channels().await?;
+
+        let to_close = out_channels
+            .into_iter()
             .filter(|channel| {
                 matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
                     && channel.closure_time_passed(current_time())
@@ -131,9 +128,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for C
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .len();
+            .count()
+            .await;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
