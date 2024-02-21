@@ -191,7 +191,7 @@ mod tests {
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
+            *ALICE_ADDR,
         )));
 
         db.write()
@@ -199,7 +199,7 @@ mod tests {
             .update_account_and_snapshot(
                 &AccountEntry::new(
                     *ALICE_OFFCHAIN.public(),
-                    *ALICE,
+                    *ALICE_ADDR,
                     AccountType::Announced {
                         multiaddr: announce_multiaddr.clone(),
                         updated_block: 0,
