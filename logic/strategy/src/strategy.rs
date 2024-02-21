@@ -143,9 +143,11 @@ impl MultiStrategy {
                     chain_actions.clone(),
                     ticket_aggregator.clone(),
                 ))),
-                Strategy::AutoRedeeming(sub_cfg) => {
-                    strategies.push(Box::new(AutoRedeemingStrategy::new(*sub_cfg, chain_actions.clone())))
-                }
+                Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
+                    *sub_cfg,
+                    chain_actions.clone(),
+                    db.clone(),
+                ))),
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, chain_actions.clone())))
                 }

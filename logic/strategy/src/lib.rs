@@ -80,6 +80,7 @@ pub enum Strategy {
 ///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
 /// Auto-redeem Strategy
 /// - redeem only aggregated tickets
+/// - redeem single tickets on channel close if worth at least 2 HOPR
 /// Auto-funding Strategy
 /// - funding amount: 10 HOPR
 /// - lower limit: 1 HOPR
@@ -101,6 +102,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
+                on_close_redeem_single_tickets_worth_min: Balance::new_from_str(
+                    "2000000000000000000",
+                    BalanceType::HOPR,
+                ),
             }),
         ],
     }
