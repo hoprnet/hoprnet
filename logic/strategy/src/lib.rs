@@ -72,16 +72,16 @@ pub enum Strategy {
     Passive,
 }
 
-/// Default HOPR node strategies:
+/// Default HOPR node strategies (in order).
 ///
-/// Aggregation strategy:
+/// ## Aggregation strategy
 ///  - aggregate every 100 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
 ///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
-/// Auto-redeem Strategy
+/// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
 /// - redeem single tickets on channel close if worth at least 2 HOPR
-/// Auto-funding Strategy
+/// ## Auto-funding Strategy
 /// - funding amount: 10 HOPR
 /// - lower limit: 1 HOPR
 /// - the strategy will fund channels which fall below the lower limit with the funding amount
