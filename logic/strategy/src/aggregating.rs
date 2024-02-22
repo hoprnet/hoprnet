@@ -44,7 +44,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tracing::{debug, error, info, trace, warn, Instrument};
+use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -174,9 +174,6 @@ where
         let tickets_to_agg = self
             .db
             .write()
-            .instrument(tracing::debug_span!(
-                "db: start aggregation (prepare aggregatable tickets)"
-            ))
             .await
             .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;

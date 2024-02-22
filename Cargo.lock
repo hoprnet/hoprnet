@@ -1659,6 +1659,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "utils-db",
+ "uuid 1.7.0",
  "validator",
 ]
 
@@ -3544,7 +3545,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "typenum",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -3641,7 +3642,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml 0.8.8",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -7280,7 +7281,7 @@ dependencies = [
  "tide",
  "tracing",
  "tracing-futures",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -7865,11 +7866,12 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
+checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
 dependencies = [
  "getrandom 0.2.12",
+ "rand 0.8.5",
  "serde",
 ]
 

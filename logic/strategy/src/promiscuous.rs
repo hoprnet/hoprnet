@@ -24,7 +24,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn, Instrument};
+use tracing::{debug, error, info, warn};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -193,11 +193,7 @@ where
     }
 
     async fn sample_size_and_evaluate_avg(&self, sample: u32) -> Option<u32> {
-        self.sma
-            .write()
-            .instrument(tracing::debug_span!("sma: push new sample"))
-            .await
-            .push(sample);
+        self.sma.write().await.push(sample);
         info!("evaluated qualities of {sample} peers seen in the network");
 
         let sma = self.sma.read().await;

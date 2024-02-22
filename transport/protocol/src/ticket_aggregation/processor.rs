@@ -104,7 +104,7 @@ impl AggregationList {
                 ticket.status = AcknowledgedTicketStatus::Untouched;
                 if let Err(e) = db
                     .write()
-                    .instrument(tracing::debug_span!("db: rollback (update acknowledged ticket)"))
+                    // .instrument(tracing::debug_span!("db: rollback (update acknowledged ticket)"))
                     .await
                     .update_acknowledged_ticket(&ticket)
                     .await
@@ -349,9 +349,9 @@ impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor
         {
             self.db
                 .write()
-                .instrument(tracing::debug_span!(
-                    "db: aggregate tickets (ensure current ticket index gte)"
-                ))
+                // .instrument(tracing::debug_span!(
+                //     "db: aggregate tickets (ensure current ticket index gte)"
+                // ))
                 .await
                 .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
                 .await?;
@@ -470,10 +470,10 @@ impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor
 
         self.db
             .write()
-            .instrument(tracing::debug_span!(
-                "storing received aggregated ticket",
-                ticket = acked_aggregated_ticket.to_string()
-            ))
+            // .instrument(tracing::debug_span!(
+            //     "storing received aggregated ticket",
+            //     ticket = acked_aggregated_ticket.to_string()
+            // ))
             .await
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;

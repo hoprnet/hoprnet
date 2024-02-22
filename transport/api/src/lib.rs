@@ -394,7 +394,7 @@ impl HoprTransport {
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
-    #[tracing::instrument(level = "info", skip(self, msg))]
+    #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
@@ -409,12 +409,19 @@ impl HoprTransport {
             let mut full_path = intermediate_path;
             full_path.push(destination);
 
+            debug!(
+                full_path = format!("{:?}", full_path),
+                "Sending a message using full path"
+            );
+
             let cg = self.channel_graph.read().await;
 
             TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
+            debug!(hops, "Sending a message using hops");
+
             let pk = OffchainPublicKey::try_from(destination)?;
 
             if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {

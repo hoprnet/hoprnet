@@ -7,7 +7,7 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use core_network::{network::Network, ping::PingExternalAPI, ping::PingResult, PeerId};
 use core_path::channel_graph::ChannelGraph;
 use hopr_internal_types::protocol::PeerAddressResolver;
-use tracing::{debug, error, Instrument};
+use tracing::{debug, error};
 
 use crate::adaptors::network::ExternalNetworkInteractions;
 
@@ -19,13 +19,13 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct PingExternalInteractions<R: PeerAddressResolver> {
+pub struct PingExternalInteractions<R: PeerAddressResolver + std::fmt::Debug> {
     network: Arc<Network<ExternalNetworkInteractions>>,
     resolver: R,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 }
 
-impl<R: PeerAddressResolver> PingExternalInteractions<R> {
+impl<R: PeerAddressResolver + std::fmt::Debug> PingExternalInteractions<R> {
     pub fn new(
         network: Arc<Network<ExternalNetworkInteractions>>,
         resolver: R,
@@ -40,7 +40,8 @@ impl<R: PeerAddressResolver> PingExternalInteractions<R> {
 }
 
 #[async_trait]
-impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExternalInteractions<R> {
+impl<R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug> PingExternalAPI for PingExternalInteractions<R> {
+    #[tracing::instrument(level = "debug")]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
         match self
             .network
@@ -56,13 +57,13 @@ impl<R: PeerAddressResolver + std::marker::Sync> PingExternalAPI for PingExterna
                 if let Ok(pk) = OffchainPublicKey::try_from(peer) {
                     let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                     if let Some(chain_key) = maybe_chain_key {
-                        let mut g = self
-                            .channel_graph
-                            .write()
-                            .instrument(tracing::debug_span!("on finished ping update channel graph"))
-                            .await;
+                        let mut g = self.channel_graph.write().await;
                         let self_addr = g.my_address();
-                        g.update_channel_quality(self_addr, chain_key, updated.get_quality())
+                        g.update_channel_quality(self_addr, chain_key, updated.get_quality());
+                        debug!(
+                            "update channel {self_addr} -> {chain_key} with quality {}",
+                            updated.get_quality()
+                        );
                     } else {
                         error!("could not resolve chain key for '{peer}'");
                     }

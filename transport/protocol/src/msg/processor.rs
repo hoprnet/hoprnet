@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use tracing::{debug, error, trace, warn, Instrument};
+use tracing::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -165,9 +165,6 @@ where
                 } => {
                     self.db
                         .write()
-                        .instrument(tracing::debug_span!(
-                            "db: outgoing packet (store pending acknowledgement)"
-                        ))
                         .await
                         .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
                         .await?;
@@ -308,12 +305,7 @@ where
 
                 if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
-                    self.db
-                        .write()
-                        .instrument(tracing::debug_span!("db: forwarded packet (mark rejected)"))
-                        .await
-                        .mark_rejected(&ticket)
-                        .await?;
+                    self.db.write().await.mark_rejected(&ticket).await?;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_REJECTED_TICKETS_COUNT.increment();
@@ -322,14 +314,7 @@ where
                 }
 
                 {
-                    let mut g = self
-                        .db
-                        .write()
-                        .instrument(tracing::debug_span!(
-                            "db: forwarded packet (store pending acknowledgement)",
-                            channel = channel.get_id().to_string()
-                        ))
-                        .await;
+                    let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
                         .await?;
 
@@ -394,6 +379,27 @@ where
     }
 
     #[tracing::instrument(level = "debug")]
+    pub async fn to_transport_packet_with_metadata(
+        &self,
+        event: MsgToProcess,
+        pkt_keypair: &OffchainKeypair,
+    ) -> (Result<TransportPacket>, PacketMetadata) {
+        let mut metadata = PacketMetadata::default();
+
+        let packet = match event {
+            MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
+                self.from_incoming(data, pkt_keypair, &peer).await
+            }
+            MsgToProcess::ToSend(data, path, finalizer) => {
+                metadata.send_finalizer.replace(finalizer);
+
+                self.into_outgoing(data, &path).await
+            }
+        };
+
+        (packet, metadata)
+    }
+
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
         trace!("begin creating multihop ticket for destination {destination}");
 
@@ -632,18 +638,7 @@ impl PacketInteraction {
                 let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let mut metadata = PacketMetadata::default();
-
-                    let packet = match event {
-                        MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                            processor.from_incoming(data, &pkt_keypair, &peer).await
-                        }
-                        MsgToProcess::ToSend(data, path, finalizer) => {
-                            metadata.send_finalizer.replace(finalizer);
-
-                            processor.into_outgoing(data, &path).await
-                        }
-                    };
+                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event, &pkt_keypair).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
@@ -658,6 +653,8 @@ impl PacketInteraction {
                 let tbf = tbf.clone();
 
                 async move {
+                    tracing::debug!("tbf: check tag replay");
+
                     if let Ok(p) = &packet {
                         let packet_tag = match p {
                             TransportPacket::Final { packet_tag, .. } => Some(packet_tag),
@@ -668,12 +665,7 @@ impl PacketInteraction {
                         if let Some(tag) = packet_tag {
                             // There is a 0.1% chance that the positive result is not a replay
                             // because a Bloom filter is used
-                            if tbf
-                                .write()
-                                .instrument(tracing::debug_span!("tbf: check tag replay"))
-                                .await
-                                .check_and_set(tag)
-                            {
+                            if tbf.write().await.check_and_set(tag) {
                                 return (Err(TagReplay), metadata);
                             }
                         }
@@ -747,7 +739,7 @@ impl PacketInteraction {
                     Ok((processed, metadata)) => match processed {
                         MsgProcessed::Send(..) | MsgProcessed::Forward(..) => {
                             let random_delay = mixer_cfg.random_delay();
-                            debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
+                            debug!("Mixer created a random packet delay {}ms", random_delay.as_millis());
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_QUEUE_SIZE.increment(1.0f64);
@@ -792,7 +784,7 @@ impl PacketInteraction {
 
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
-                                    Ok(_) => {}
+                                    Ok(_) => debug!("Pipeline resulted in a processed msg"),
                                     Err(e) => error!("Failed to pass a processed ack message: {}", e),
                                 },
                                 Err(e) => {
