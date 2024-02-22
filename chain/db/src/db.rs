@@ -3,10 +3,10 @@ use std::ops::{Add, Sub};
 
 use async_trait::async_trait;
 use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::AcknowledgedTicketStatus::Untouched;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, trace};
-use hopr_internal_types::prelude::AcknowledgedTicketStatus::Untouched;
 use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
