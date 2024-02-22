@@ -3484,7 +3484,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-keypair"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aes 0.8.3",
  "ctr 0.9.2",

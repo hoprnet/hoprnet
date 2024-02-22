@@ -19,9 +19,13 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
             .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
 
         match HoprKeys::init(IdentityRetrievalModes::FromFile { password, id_path }) {
-            Ok(keys) => results.insert(id_path.into(), keys),
-            Err(e) => warn!("Could not read keystore file at {} due to {}", id_path, e.to_string()),
-        };
+            Ok(keys) => {
+                results.insert(id_path.into(), keys);
+            }
+            Err(e) => {
+                warn!("Could not read keystore file at {} due to {}", id_path, e.to_string())
+            }
+        }
     }
 
     Ok(results)

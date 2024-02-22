@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 clap = { version = "4.4", features = ["derive", "env", "string"] }
 ethers = { workspace = true }
 serde = "1.0"
-serde_json = "1.0"
+serde_json = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hoprd-keypair = { features = ["hopli"], workspace = true }
 hopr-internal-types = { workspace = true }
