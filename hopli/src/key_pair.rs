@@ -19,14 +19,9 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
             .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
 
         match HoprKeys::init(IdentityRetrievalModes::FromFile { password, id_path }) {
-            Ok(keys) => {
-                results.insert(id_path.into(), keys);
-            }
-            Err(e) => {
-                warn!("Could not read keystore file at {} due to {}", id_path, e.to_string());
-                return Err(e.into());
-            }
-        }
+            Ok(keys) => results.insert(id_path.into(), keys),
+            Err(e) => warn!("Could not read keystore file at {} due to {}", id_path, e.to_string()),
+        };
     }
 
     Ok(results)
@@ -100,7 +95,6 @@ mod tests {
             Ok(_) => assert!(true),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -123,8 +117,6 @@ mod tests {
         // print the read id
         println!("Debug {:#?}", read_id);
         println!("Display {}", read_id.values().next().unwrap());
-
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -140,7 +132,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -167,7 +158,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -182,7 +172,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -197,7 +186,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -213,7 +201,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
     #[test]
@@ -247,16 +234,6 @@ mod tests {
                 .to_string(),
             alice_address
         );
-
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
-    }
-
-    fn remove_json_keystore(path: &str) -> Result<(), HelperErrors> {
-        println!("remove_json_keystore {:?}", path);
-        match fs::remove_dir_all(path) {
-            Ok(_) => Ok(()),
-            _ => Err(HelperErrors::UnableToDeleteIdentity),
-        }
     }
 
     fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {
