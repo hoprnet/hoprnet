@@ -5,7 +5,7 @@ use std::error::Error;
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
@@ -829,7 +829,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
+    use hopr_lib::{HoprTransportError, Multiaddr};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -930,8 +930,8 @@ mod peers {
                         latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                         reported_version: hopr
                             .network_peer_info(&peer)
-                            .await
-                            .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                            .await?
+                            .and_then(|p| p.peer_version)
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
@@ -2223,7 +2223,7 @@ mod tickets {
 mod node {
     use super::*;
     use futures::StreamExt;
-    use hopr_lib::{Health, Multiaddr};
+    use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
     use {std::str::FromStr, tide::Body};
 
@@ -2334,12 +2334,12 @@ mod node {
         let hopr = req.state().hopr.clone();
 
         let quality = query_params.quality.unwrap_or(0f64);
-        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await)
+        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await?)
             .filter_map(|peer| {
                 let hopr = hopr.clone();
 
                 async move {
-                    if let Some(info) = hopr.network_peer_info(&peer).await {
+                    if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
                         if info.get_average_quality() >= quality {
                             Some((peer, info))
                         } else {
@@ -2370,16 +2370,12 @@ mod node {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
                 },
-                last_seen: info.last_seen as u128,
-                last_seen_latency: info.last_seen_latency as u128,
+                last_seen: info.last_seen.as_unix_timestamp().as_millis(),
+                last_seen_latency: info.last_seen_latency.as_millis(),
                 quality: info.get_average_quality(),
                 backoff: info.backoff,
                 is_new: info.heartbeats_sent == 0u64,
-                reported_version: info
-                    .metadata()
-                    .get(&"protocol_version".to_owned())
-                    .cloned()
-                    .unwrap_or("UNKNOWN".to_string()),
+                reported_version: info.peer_version.unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
             .await;

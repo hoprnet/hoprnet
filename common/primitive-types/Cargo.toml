@@ -1,6 +1,6 @@
 [package]
 name = "hopr-primitive-types"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Generic types used through the entire code base"
@@ -17,7 +17,6 @@ hex = { workspace = true }
 primitive-types = { version = "0.12.1", features = ["serde"] }
 rlp = "0.5.2" # TODO: remove in 3.0
 regex = { workspace = true }
-ringbuffer = "0.15.0"
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = "1.0"

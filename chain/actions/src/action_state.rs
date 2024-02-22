@@ -101,6 +101,7 @@ impl Default for IndexerActionTracker {
 
 #[async_trait]
 impl ActionState for IndexerActionTracker {
+    #[tracing::instrument(level = "debug")]
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
         let matched_keys = self
             .expectations
@@ -115,7 +116,6 @@ impl ActionState for IndexerActionTracker {
         if matched_keys.is_empty() {
             return Vec::new();
         }
-
         let mut db = self.expectations.write().await;
         matched_keys
             .into_iter()
@@ -137,6 +137,7 @@ impl ActionState for IndexerActionTracker {
             .collect()
     }
 
+    #[tracing::instrument(level = "debug")]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
         match self.expectations.write().await.entry(exp.tx_hash) {
             Entry::Occupied(_) => {
@@ -154,6 +155,7 @@ impl ActionState for IndexerActionTracker {
         }
     }
 
+    #[tracing::instrument(level = "debug")]
     async fn unregister_expectation(&self, tx_hash: Hash) {
         self.expectations.write().await.remove(&tx_hash);
     }

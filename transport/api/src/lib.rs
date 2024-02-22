@@ -67,7 +67,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
@@ -88,19 +88,21 @@ use {async_std::task::sleep, hopr_platform::time::native::current_time};
 /// and telemetry about network connections.
 pub fn build_network(
     peer_id: PeerId,
+    addresses: Vec<Multiaddr>,
     cfg: NetworkConfig,
 ) -> (
-    Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
     Receiver<NetworkEvent>,
 ) {
     let (network_events_tx, network_events_rx) =
         futures::channel::mpsc::channel::<NetworkEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
-    let network = Arc::new(RwLock::new(Network::new(
+    let network = Arc::new(Network::new(
         peer_id,
+        addresses,
         cfg,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
-    )));
+    ));
 
     (network, network_events_rx)
 }
@@ -111,7 +113,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -125,7 +127,7 @@ type HoprPingComponents = (
 /// Build the ping infrastructure to run manual pings from the interface.
 pub fn build_manual_ping(
     cfg: core_protocol::config::ProtocolConfig,
-    network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> HoprPingComponents {
@@ -152,7 +154,7 @@ pub fn build_manual_ping(
 /// Build the index updater mechanism for indexer generated behavior inclusion.
 pub fn build_index_updater<Db>(
     db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -172,7 +174,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + 'static,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
@@ -195,7 +197,7 @@ type HoprHeartbeatComponents = (
 pub fn build_heartbeat(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
-    network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> HoprHeartbeatComponents {
@@ -280,7 +282,7 @@ pub struct HoprTransport {
     cfg: config::TransportConfig,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
-    network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
@@ -296,7 +298,7 @@ impl HoprTransport {
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-        network: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+        network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
@@ -342,10 +344,12 @@ impl HoprTransport {
                     .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
                     .await;
 
-                let mut net = self.network.write().await;
-                if !net.has(&peer) {
-                    net.add(&peer, PeerOrigin::Initialization);
-                    net.store_peer_multiaddresses(&peer, multiaddresses);
+                if let Err(e) = self
+                    .network
+                    .add(&peer, PeerOrigin::Initialization, multiaddresses)
+                    .await
+                {
+                    error!("Failed to store the peer observation: {e}");
                 }
             }
         }
@@ -353,6 +357,7 @@ impl HoprTransport {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug")]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
         if !self.is_allowed_to_access_network(peer).await {
             return Err(errors::HoprTransportError::Api(format!(
@@ -368,9 +373,8 @@ impl HoprTransport {
 
         pin_mut!(timeout, ping);
 
-        let has_peer = self.network.read().await.has(peer);
-        if !has_peer {
-            self.network.write().await.add(peer, PeerOrigin::ManualPing)
+        if let Err(e) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
+            error!("Failed to store the peer observation: {e}");
         }
 
         let start = current_time().as_unix_timestamp();
@@ -385,12 +389,12 @@ impl HoprTransport {
 
         Ok(self
             .network
-            .read()
-            .await
-            .get_peer_status(peer)
-            .map(|status| std::time::Duration::from_millis(status.last_seen).saturating_sub(start)))
+            .get(peer)
+            .await?
+            .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
+    #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
@@ -405,12 +409,19 @@ impl HoprTransport {
             let mut full_path = intermediate_path;
             full_path.push(destination);
 
+            debug!(
+                full_path = format!("{:?}", full_path),
+                "Sending a message using full path"
+            );
+
             let cg = self.channel_graph.read().await;
 
             TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
+            debug!(hops, "Sending a message using hops");
+
             let pk = OffchainPublicKey::try_from(destination)?;
 
             if let Some(chain_key) = self.db.read().await.get_chain_key(&pk).await? {
@@ -512,7 +523,13 @@ impl HoprTransport {
     }
 
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(&self.me)
+        // TODO: can fail with the Result?
+        self.network
+            .get(&self.me)
+            .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
+            .unwrap_or(vec![])
     }
 
     pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
@@ -548,23 +565,33 @@ impl HoprTransport {
     }
 
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(peer)
+        self.network
+            .get(peer)
+            .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
+            .unwrap_or(vec![])
     }
 
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        self.network.read().await.get_peer_multiaddresses(peer)
+        self.network
+            .get(peer)
+            .await
+            .unwrap_or(None)
+            .map(|peer| peer.multiaddresses)
+            .unwrap_or(vec![])
     }
 
     pub async fn network_health(&self) -> Health {
-        self.network.read().await.health()
+        self.network.health().await
     }
 
-    pub async fn network_connected_peers(&self) -> Vec<PeerId> {
-        self.network.read().await.get_all_peers()
+    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
+        Ok(self.network.peer_filter(|peer| async move { Some(peer.id) }).await?)
     }
 
-    pub async fn network_peer_info(&self, peer: &PeerId) -> Option<PeerStatus> {
-        self.network.read().await.get_peer_status(peer)
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
+        Ok(self.network.get(peer).await?)
     }
 
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
