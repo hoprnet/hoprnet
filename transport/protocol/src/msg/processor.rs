@@ -292,7 +292,7 @@ where
                 debug!("price per packet is {price_per_packet}");
 
                 let validation_res = validate_unacknowledged_ticket::<Db>(
-                    &*self.db.read().await,
+                    self.db.clone(),
                     &ticket,
                     &channel,
                     &previous_hop_addr,

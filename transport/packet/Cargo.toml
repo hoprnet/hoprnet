@@ -13,6 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-std = { workspace = true }
+async-lock = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 thiserror = "1.0"
