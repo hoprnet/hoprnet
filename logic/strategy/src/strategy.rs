@@ -33,11 +33,11 @@ use validator::Validate;
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
 use crate::auto_redeeming::AutoRedeemingStrategy;
+use crate::channel_finalizer::ClosureFinalizerStrategy;
 use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
-use crate::channel_finalizer::ClosureFinalizerStrategy;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 
@@ -68,65 +68,6 @@ pub trait SingularStrategy: Display {
         _direction: ChannelDirection,
         _change: ChannelChange,
     ) -> Result<()> {
-        Ok(())
-    }
-}
-
-/// Internal strategy which runs per tick and finalizes `PendingToClose` channels
-/// which have elapsed the grace period.
-/// This is enabled in a [MultiStrategy] when [configured](MultiStrategyConfig) with the `finalize_channel_closure` set.
-struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
-    db: Arc<RwLock<Db>>,
-    chain_actions: ChainActions<Db>,
-}
-
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "channel_closure_finalizer")
-    }
-}
-
-#[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
-    async fn on_tick(&self) -> Result<()> {
-        // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
-        let ts_limit = current_time().sub(Duration::from_secs(3600));
-
-        let to_close = self
-            .db
-            .read()
-            .await
-            .get_outgoing_channels()
-            .await?
-            .iter()
-            .filter(|channel| {
-                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
-                    && channel.closure_time_passed(current_time())
-            })
-            .map(|channel| async {
-                let channel_cpy = *channel;
-                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
-                match self
-                    .chain_actions
-                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
-                    .await
-                {
-                    Ok(_) => {
-                        // Currently, we're not interested in awaiting the Close transactions to confirmation
-                        debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
-                    }
-                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
-                }
-            })
-            .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .len();
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
-
-        debug!("channel closure finalizer: initiated closure finalization of {to_close} channels");
         Ok(())
     }
 }
