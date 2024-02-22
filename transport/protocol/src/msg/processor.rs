@@ -88,9 +88,10 @@ pub enum MsgProcessed {
 }
 
 /// Implements protocol acknowledgement logic for msg packets
+#[derive(Debug)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -98,7 +99,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -111,7 +112,7 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     type Input = ApplicationData;
 
@@ -313,7 +314,6 @@ where
                 }
 
                 {
-                    debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
                         .await?;
@@ -371,11 +371,33 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self, pkt_keypair))]
+    pub async fn to_transport_packet_with_metadata(
+        &self,
+        event: MsgToProcess,
+        pkt_keypair: &OffchainKeypair,
+    ) -> (Result<TransportPacket>, PacketMetadata) {
+        let mut metadata = PacketMetadata::default();
+
+        let packet = match event {
+            MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
+                self.from_incoming(data, pkt_keypair, &peer).await
+            }
+            MsgToProcess::ToSend(data, path, finalizer) => {
+                metadata.send_finalizer.replace(finalizer);
+
+                self.into_outgoing(data, &path).await
+            }
+        };
+
+        (packet, metadata)
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
@@ -598,7 +620,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -616,18 +638,7 @@ impl PacketInteraction {
                 let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let mut metadata = PacketMetadata::default();
-
-                    let packet = match event {
-                        MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                            processor.from_incoming(data, &pkt_keypair, &peer).await
-                        }
-                        MsgToProcess::ToSend(data, path, finalizer) => {
-                            metadata.send_finalizer.replace(finalizer);
-
-                            processor.into_outgoing(data, &path).await
-                        }
-                    };
+                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event, &pkt_keypair).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
@@ -642,6 +653,8 @@ impl PacketInteraction {
                 let tbf = tbf.clone();
 
                 async move {
+                    tracing::debug!("tbf: check tag replay");
+
                     if let Ok(p) = &packet {
                         let packet_tag = match p {
                             TransportPacket::Final { packet_tag, .. } => Some(packet_tag),
@@ -726,7 +739,7 @@ impl PacketInteraction {
                     Ok((processed, metadata)) => match processed {
                         MsgProcessed::Send(..) | MsgProcessed::Forward(..) => {
                             let random_delay = mixer_cfg.random_delay();
-                            debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
+                            debug!("Mixer created a random packet delay {}ms", random_delay.as_millis());
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_QUEUE_SIZE.increment(1.0f64);
@@ -771,7 +784,7 @@ impl PacketInteraction {
 
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
-                                    Ok(_) => {}
+                                    Ok(_) => debug!("Pipeline resulted in a processed msg"),
                                     Err(e) => error!("Failed to pass a processed ack message: {}", e),
                                 },
                                 Err(e) => {

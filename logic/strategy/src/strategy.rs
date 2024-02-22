@@ -72,6 +72,65 @@ pub trait SingularStrategy: Display {
     }
 }
 
+/// Internal strategy which runs per tick and finalizes `PendingToClose` channels
+/// which have elapsed the grace period.
+/// This is enabled in a [MultiStrategy] when [configured](MultiStrategyConfig) with the `finalize_channel_closure` set.
+struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> {
+    db: Arc<RwLock<Db>>,
+    chain_actions: ChainActions<Db>,
+}
+
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> Display for ChannelCloseFinalizer<Db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "channel_closure_finalizer")
+    }
+}
+
+#[async_trait]
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> SingularStrategy for ChannelCloseFinalizer<Db> {
+    async fn on_tick(&self) -> Result<()> {
+        // Do not attempt to finalize closure of channels that have been overdue for closure for more than an hour
+        let ts_limit = current_time().sub(Duration::from_secs(3600));
+
+        let to_close = self
+            .db
+            .read()
+            .await
+            .get_outgoing_channels()
+            .await?
+            .iter()
+            .filter(|channel| {
+                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
+                    && channel.closure_time_passed(current_time())
+            })
+            .map(|channel| async {
+                let channel_cpy = *channel;
+                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                match self
+                    .chain_actions
+                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
+                    .await
+                {
+                    Ok(_) => {
+                        // Currently, we're not interested in awaiting the Close transactions to confirmation
+                        debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                    }
+                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
+                }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .len();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
+
+        debug!("channel closure finalizer: initiated closure finalization of {to_close} channels");
+        Ok(())
+    }
+}
+
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
@@ -114,12 +173,12 @@ impl MultiStrategy {
     pub fn new<Db, Net>(
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<Net>>>,
+        network: Arc<Network<Net>>,
         chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
         Net: NetworkExternalActions + Send + Sync + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();

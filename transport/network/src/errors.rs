@@ -12,6 +12,15 @@ pub enum NetworkingError {
     #[error("error while decoding message data")]
     DecodingError,
 
+    #[error("error while performing an operation on own PeerId")]
+    DisallowedOperationOnOwnPeerIdError,
+
+    #[error("backend error: {0}")]
+    BackendError(#[from] sqlx::Error),
+
+    #[error("peer does not exist")]
+    NonExistingPeer,
+
     #[error("{0}")]
     Other(String),
 }

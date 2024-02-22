@@ -42,7 +42,8 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> NodeActions for ChainActions<Db> {
+    #[tracing::instrument(level = "debug")]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
@@ -54,6 +55,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainA
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
+    #[tracing::instrument(level = "debug")]
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data =

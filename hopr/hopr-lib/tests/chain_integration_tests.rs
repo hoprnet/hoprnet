@@ -1,4 +1,4 @@
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_std::task::JoinHandle;
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};

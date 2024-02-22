@@ -1,4 +1,4 @@
-use ringbuffer::{AllocRingBuffer, RingBuffer};
+use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
 use std::iter::Sum;
 use std::marker::PhantomData;
@@ -38,9 +38,10 @@ pub trait SMA<T> {
 /// Useful mainly for floating-point types, as it does not accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(N)` for average computation, `N` being window size.
 /// The divisor argument `D` is used only for such types `T` that do not implement `From<u32>` (such as `Duration`,...).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NoSumSMA<T, D = T> {
-    window: AllocRingBuffer<T>,
+    window: VecDeque<T>,
+    window_size: usize,
     _div: PhantomData<D>,
 }
 
@@ -50,7 +51,10 @@ where
     D: From<u32>,
 {
     fn push(&mut self, sample: T) {
-        self.window.push(sample);
+        if self.is_window_full() {
+            self.window.pop_front();
+        }
+        self.window.push_back(sample);
     }
 
     fn average(&self) -> Option<T> {
@@ -62,7 +66,7 @@ where
     }
 
     fn window_size(&self) -> usize {
-        self.window.capacity()
+        self.window_size
     }
 
     fn len(&self) -> usize {
@@ -81,16 +85,17 @@ where
 {
     /// Creates an empty SMA instance with the given window size.
     /// The maximum window size is u32::MAX and must be greater than 1.
-    pub fn new(window_size: u32) -> Self {
+    pub fn new(window_size: usize) -> Self {
         assert!(window_size > 1, "window size must be greater than 1");
         Self {
-            window: AllocRingBuffer::new(window_size as usize),
+            window: VecDeque::with_capacity(window_size),
+            window_size,
             _div: PhantomData,
         }
     }
 
     /// Creates SMA instance given window size and some initial samples.
-    pub fn new_with_samples<I>(window_size: u32, initial_samples: I) -> Self
+    pub fn new_with_samples<I>(window_size: usize, initial_samples: I) -> Self
     where
         I: IntoIterator<Item = T>,
     {
@@ -116,9 +121,10 @@ where
 /// Useful mainly for integer types, as it does accumulate floating point error with each sample.
 /// Requires `O(N)` of memory and `O(1)` for average computation, `N` being window size.
 /// The divisor argument `D` is used only for such types `T` that do not implement `From<u32>` (such as `Duration`,...).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SingleSumSMA<T, D = T> {
-    window: AllocRingBuffer<T>,
+    window: VecDeque<T>,
+    window_size: usize,
     sum: T,
     _div: PhantomData<D>,
 }
@@ -132,12 +138,12 @@ where
         self.sum += sample;
 
         if self.is_window_full() {
-            if let Some(shifted_sample) = self.window.dequeue() {
+            if let Some(shifted_sample) = self.window.pop_front() {
                 self.sum -= shifted_sample;
             }
         }
 
-        self.window.enqueue(sample);
+        self.window.push_back(sample);
     }
 
     fn average(&self) -> Option<T> {
@@ -149,7 +155,7 @@ where
     }
 
     fn window_size(&self) -> usize {
-        self.window.capacity()
+        self.window_size
     }
 
     fn len(&self) -> usize {
@@ -168,17 +174,18 @@ where
 {
     /// Creates an empty SMA instance with the given window size.
     /// The maximum window size is u32::MAX and must be greater than 1.
-    pub fn new(window_size: u32) -> Self {
+    pub fn new(window_size: usize) -> Self {
         assert!(window_size > 1, "window size must be greater than 1");
         Self {
-            window: AllocRingBuffer::new(window_size as usize),
+            window: VecDeque::with_capacity(window_size),
+            window_size,
             sum: T::default(),
             _div: PhantomData,
         }
     }
 
     /// Creates SMA instance given window size and some initial samples.
-    pub fn new_with_samples<I>(window_size: u32, initial_samples: I) -> Self
+    pub fn new_with_samples<I>(window_size: usize, initial_samples: I) -> Self
     where
         I: IntoIterator<Item = T>,
     {

@@ -1,4 +1,3 @@
-use async_lock::RwLock;
 use futures::{
     channel::mpsc::{Receiver, UnboundedSender},
     select, StreamExt,
@@ -164,7 +163,7 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 pub async fn p2p_loop(
     version: String,
     me: libp2p::identity::Keypair,
-    network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
+    network: Arc<Network<crate::adaptors::network::ExternalNetworkInteractions>>,
     network_update_input: Receiver<NetworkEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
@@ -182,6 +181,7 @@ pub async fn p2p_loop(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
+    let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
         .await
         .expect("swarm must be constructible");
@@ -359,19 +359,21 @@ pub async fn p2p_loop(
                         }
                     },
                     IndexerProcessed::Announce(peer, multiaddresses) => {
-                        trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
-                        for multiaddress in multiaddresses.iter() {
-                            if !swarm.is_connected(&peer) {
-                                match swarm.dial(multiaddress.clone()) {
-                                    Ok(_) => {
-                                        debug!("transport input - indexer - storing '{multiaddress}' as valid for '{peer}'");
-                                        swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
-                                    },
-                                    Err(e) => {
-                                        warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the the address '{multiaddress}'");
+                        if peer != me_peer_id {
+                            trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
+                            for multiaddress in multiaddresses.iter() {
+                                if !swarm.is_connected(&peer) {
+                                    match swarm.dial(multiaddress.clone()) {
+                                        Ok(_) => {
+                                            debug!("transport input - indexer - storing '{multiaddress}' as valid for '{peer}'");
+                                            swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
+                                        },
+                                        Err(e) => {
+                                            warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the the address '{multiaddress}'");
+                                        }
                                     }
                                 }
                             }
@@ -555,9 +557,9 @@ pub async fn p2p_loop(
 
                     // TODO: async await in the event dispatch loop can block it, the await should be removed
                     if allowed_peers.contains(&peer_id) {
-                        let has_peer = network.read().await.has(&peer_id);
-                        if !has_peer {
-                            network.write().await.add(&peer_id, PeerOrigin::IncomingConnection)
+                        // TODO: async spawn local and remove the RWLOCK
+                        if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                            error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                         }
                     } else {
                         warn!("transport - p2p - DISCONNECTING '{peer_id}' (reason: network registry)");

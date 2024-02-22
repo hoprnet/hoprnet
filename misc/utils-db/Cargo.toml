@@ -19,7 +19,7 @@ hex-literal = { workspace = true }
 pin-project-lite = "0.2.13"
 rusty-leveldb = { version = "3.0.0", default-features = false, optional = true }
 serde = { version = "1.0", features = ["derive"] }
-sqlx = { version = "0.7.3", optional = true, default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
+sqlx = { workspace = true, optional = true }
 thiserror = "1.0"
 
 tracing = { workspace = true }

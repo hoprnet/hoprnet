@@ -316,7 +316,7 @@ pub fn build_chain_components<Db>(
     RpcOperations<JsonRpcClient>,
 )
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
     // TODO: extract this from the global config type
     let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();

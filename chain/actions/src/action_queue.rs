@@ -380,6 +380,7 @@ where
                         if let Action::RedeemTicket(mut ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
+
                             if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }

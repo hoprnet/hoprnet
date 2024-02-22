@@ -1,0 +1,5 @@
+error[E0223]: ambiguous associated type
+  --> tests/ui/associated-type.rs:15:15
+   |
+15 |     fn f() -> Self::Assoc {}
+   |               ^^^^^^^^^^^ help: use fully-qualified syntax: `<Struct as Trait>::Assoc`

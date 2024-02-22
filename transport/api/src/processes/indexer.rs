@@ -52,7 +52,7 @@ pub struct IndexerActions {
 impl IndexerActions {
     pub fn new<Db>(
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+        network: Arc<Network<ExternalNetworkInteractions>>,
         emitter: Sender<IndexerProcessed>,
     ) -> Self
     where
@@ -70,14 +70,19 @@ impl IndexerActions {
                     IndexerToProcess::EligibilityUpdate(peer, eligibility) => match eligibility {
                         PeerEligibility::Eligible => IndexerProcessed::Allow(peer),
                         PeerEligibility::Ineligible => {
-                            network.write().await.remove(&peer);
+                            if let Err(e) = network.remove(&peer).await {
+                                error!("failed to remove '{peer}' from the local registry: {e}")
+                            }
                             IndexerProcessed::Ban(peer)
                         }
                     },
                     IndexerToProcess::Announce(peer, multiaddress) => IndexerProcessed::Announce(peer, multiaddress),
                     // TODO: when is this even triggered? network registry missing?
                     IndexerToProcess::RegisterStatusUpdate => {
-                        let peers = network.read().await.get_all_peers();
+                        let peers = network
+                            .peer_filter(|peer| async move { Some(peer.id) })
+                            .await
+                            .unwrap_or(vec![]);
 
                         for peer in peers.into_iter() {
                             let is_allowed = {
@@ -112,7 +117,9 @@ impl IndexerActions {
                             let event = if is_allowed {
                                 IndexerProcessed::Allow(peer)
                             } else {
-                                network.write().await.remove(&peer);
+                                if let Err(e) = network.remove(&peer).await {
+                                    error!("failed to remove '{peer}' from the local registry: {e}");
+                                }
                                 IndexerProcessed::Ban(peer)
                             };
 

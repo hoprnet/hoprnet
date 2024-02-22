@@ -24,6 +24,9 @@ pub enum HoprTransportError {
 
     #[error("Type error: {0}")]
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
+
+    #[error("Network monitoring error: {0}")]
+    NetworkError(#[from] core_network::errors::NetworkingError),
 }
 
 /// Result produced by the crate, uses the [HoprTransportError] as the error type.
