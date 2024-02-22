@@ -84,6 +84,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<Reply> {
         /*
             There are three cases:
