@@ -72,6 +72,16 @@ pub trait SingularStrategy: Display {
     }
 }
 
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
+#[inline]
+fn empty_vector() -> Vec<Strategy> {
+    vec![]
+}
+
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
@@ -84,18 +94,21 @@ pub struct MultiStrategyConfig {
     ///
     /// Default is true.
     #[default = true]
+    #[serde(default = "just_true")]
     pub on_fail_continue: bool,
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
     ///
     /// Default is true.
     #[default = true]
+    #[serde(default = "just_true")]
     pub allow_recursive: bool,
 
     /// Configuration of individual sub-strategies.
     ///
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     #[default(_code = "vec![]")]
+    #[serde(default = "empty_vector")]
     pub strategies: Vec<Strategy>,
 }
 
