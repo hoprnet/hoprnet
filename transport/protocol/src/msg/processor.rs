@@ -378,7 +378,7 @@ where
         Self { db, cfg }
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self, pkt_keypair))]
     pub async fn to_transport_packet_with_metadata(
         &self,
         event: MsgToProcess,
