@@ -181,6 +181,7 @@ pub async fn p2p_loop(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
+    let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
         .await
         .expect("swarm must be constructible");
@@ -358,19 +359,21 @@ pub async fn p2p_loop(
                         }
                     },
                     IndexerProcessed::Announce(peer, multiaddresses) => {
-                        trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
-                        for multiaddress in multiaddresses.iter() {
-                            if !swarm.is_connected(&peer) {
-                                match swarm.dial(multiaddress.clone()) {
-                                    Ok(_) => {
-                                        debug!("transport input - indexer - storing '{multiaddress}' as valid for '{peer}'");
-                                        swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
-                                    },
-                                    Err(e) => {
-                                        warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the the address '{multiaddress}'");
+                        if peer != me_peer_id {
+                            trace!("transport input - indexer - processing announcement for '{peer}' with addresses: '{multiaddresses:?}'");
+                            for multiaddress in multiaddresses.iter() {
+                                if !swarm.is_connected(&peer) {
+                                    match swarm.dial(multiaddress.clone()) {
+                                        Ok(_) => {
+                                            debug!("transport input - indexer - storing '{multiaddress}' as valid for '{peer}'");
+                                            swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
+                                            swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
+                                        },
+                                        Err(e) => {
+                                            warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the the address '{multiaddress}'");
+                                        }
                                     }
                                 }
                             }

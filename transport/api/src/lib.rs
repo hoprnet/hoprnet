@@ -394,6 +394,7 @@ impl HoprTransport {
             .map(|status| status.last_seen.as_unix_timestamp().saturating_sub(start)))
     }
 
+    #[tracing::instrument(level = "info", skip(self, msg))]
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
