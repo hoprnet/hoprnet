@@ -42,6 +42,7 @@ core-packet = { workspace = true }
 core-protocol = { workspace = true }
 utils-db = { workspace = true}
 tracing = { workspace = true }
+hopr-cache = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

@@ -31,14 +31,14 @@ pub enum TransportOutput {
 
 use std::ops::Add;
 pub use {
+    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
+    core_p2p::libp2p,
     crate::{
         adaptors::network::ExternalNetworkInteractions,
         multiaddrs::decapsulate_p2p_protocol,
-        processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
+        processes::indexer::IndexerProcessed,
     },
-    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
-    core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -52,7 +52,7 @@ pub use {
 use async_lock::RwLock;
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
-use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
+use core_network::{heartbeat::HeartbeatConfig, PeerId, ping::PingConfig};
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
@@ -265,14 +265,17 @@ use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
-#[cfg(all(feature = "prometheus", not(test)))]
-use core_path::traits::Path;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
-use futures::future::{select, Either};
+use futures::future::{Either, select};
 use futures::pin_mut;
+
+use hopr_cache::resolver::CachedPeerAddressResolver;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use core_path::traits::Path;
 
 /// Currently used resolver to resolve between offchain and onchain public keys.
 pub type DefaultPeerAddressResolver = CachedPeerAddressResolver<DbPeerAddressResolver>;

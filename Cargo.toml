@@ -7,6 +7,7 @@ exclude = [
 resolver = "2"
 
 members = [
+    "common/cache",
     "common/internal-types",
     "common/primitive-types",
     "crypto/sphinx",
@@ -56,6 +57,7 @@ libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] 
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
 multiaddr = "0.18.0"
+mockall = "0.12.1"
 regex = "1"
 rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }
@@ -86,6 +88,7 @@ core-protocol = { path = "transport/protocol", default-features = false }
 core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
+hopr-cache = { path = "common/cache", default-features = false }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
