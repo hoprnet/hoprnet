@@ -43,7 +43,7 @@ pub trait NodeActions {
 
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> NodeActions for ChainActions<Db> {
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
@@ -55,7 +55,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Node
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data =
@@ -82,6 +82,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Node
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction> {
         info!("initiating safe address registration of {safe_address}");
         self.tx_sender.send(Action::RegisterSafe(safe_address)).await

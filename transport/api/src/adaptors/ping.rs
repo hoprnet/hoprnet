@@ -41,7 +41,7 @@ impl<R: PeerAddressResolver + std::fmt::Debug> PingExternalInteractions<R> {
 
 #[async_trait]
 impl<R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug> PingExternalAPI for PingExternalInteractions<R> {
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "info", skip(self))]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
         match self
             .network
