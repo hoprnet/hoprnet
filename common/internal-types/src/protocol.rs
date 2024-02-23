@@ -207,13 +207,13 @@ mod tests {
     use crate::prelude::{CachedPeerAddressResolver, PeerAddressResolver};
     use crate::protocol::{ApplicationData, TagBloomFilter};
     use async_trait::async_trait;
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair, OffchainPublicKey};
     use hopr_primitive_types::prelude::Address;
     use hopr_primitive_types::traits::BinarySerializable;
     use mockall::mock;
     use std::time::Duration;
-    use hex_literal::hex;
 
     #[test]
     fn test_application_data() {

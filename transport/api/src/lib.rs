@@ -70,7 +70,7 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
+use hopr_metrics::metrics::SimpleHistogram;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -265,6 +265,8 @@ use core_network::ping::Pinging;
 use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
+#[cfg(all(feature = "prometheus", not(test)))]
+use core_path::traits::Path;
 use core_protocol::errors::ProtocolError;
 use core_protocol::ticket_aggregation::processor::AggregationList;
 use futures::future::{select, Either};

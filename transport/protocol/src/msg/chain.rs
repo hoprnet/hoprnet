@@ -3,7 +3,8 @@ use core_packet::{
     packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
-use core_path::path::{Path, TransportPath};
+use core_path::path::TransportPath;
+use core_path::traits::Path;
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -205,6 +206,7 @@ mod tests {
     use async_trait::async_trait;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
+    use core_path::traits::ChannelQualityGraph;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -285,7 +287,7 @@ mod tests {
                 ChannelStatus::Open,
                 0u32.into(),
             );
-            cg.update_channel(c);
+            cg.upsert_channel(c, None);
             last_addr = *addr;
         }
 

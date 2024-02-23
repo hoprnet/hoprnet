@@ -15,7 +15,7 @@ use core_packet::errors::PacketError::{
 };
 use core_packet::errors::Result;
 use core_packet::validation::validate_unacknowledged_ticket;
-use core_path::path::{Path, TransportPath};
+use core_path::path::TransportPath;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -26,6 +26,7 @@ use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
 use async_std::task::{sleep, spawn};
+use core_path::traits::Path;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
@@ -827,7 +828,8 @@ mod tests {
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
-    use core_path::path::{Path, TransportPath};
+    use core_path::path::TransportPath;
+    use core_path::traits::{ChannelQualityGraph, Path};
     use core_path::DbPeerAddressResolver;
     use futures::{
         future::{select, Either},
@@ -1233,7 +1235,7 @@ mod tests {
                 ChannelStatus::Open,
                 0u32.into(),
             );
-            cg.update_channel(c);
+            cg.upsert_channel(c, None);
             last_addr = *addr;
         }
 

@@ -85,6 +85,7 @@ use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
+use core_path::traits::ChannelQualityGraph;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
@@ -231,7 +232,7 @@ where
                 ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
                 ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
-                    let change = channel_graph.write().await.update_channel(channel);
+                    let change = channel_graph.write().await.upsert_channel(channel, None);
 
                     // Check if this is our own channel
                     if let Some(own_channel_direction) = maybe_direction {

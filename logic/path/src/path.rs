@@ -7,45 +7,13 @@ use hopr_internal_types::protocol::PeerAddressResolver;
 use hopr_primitive_types::primitives::Address;
 use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::hash::Hash;
 
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-
-/// Base implementation of an abstract path.
-/// Must contain always at least a single entry.
-pub trait Path<N>: Display + Clone + Eq + PartialEq
-where
-    N: Copy + Clone + Eq + PartialEq + Hash,
-{
-    /// Individual hops in the path.
-    /// There must be always at least one hop.
-    fn hops(&self) -> &[N];
-
-    /// Shorthand for number of hops.
-    fn length(&self) -> usize {
-        self.hops().len()
-    }
-
-    /// Gets the last hop
-    fn last_hop(&self) -> &N {
-        // Path must contain at least one hop
-        self.hops().last().expect("path is invalid")
-    }
-
-    /// Checks if all the hops in this path are to distinct addresses.
-    /// Returns `true` if there are duplicate Addresses on this path.
-    /// Note that the duplicate Addresses can never be adjacent.
-    fn contains_cycle(&self) -> bool {
-        let set = HashSet::<&N, RandomState>::from_iter(self.hops().iter());
-        set.len() != self.hops().len()
-    }
-}
+use crate::traits::{ChannelQualityGraph, Path};
 
 /// Represents an on-chain path in the [ChannelGraph].
 ///
@@ -86,7 +54,8 @@ impl ChannelPath {
             // Check if the channel is opened
             let channel = graph
                 .get_channel(ticket_issuer, ticket_receiver)
-                .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
+                .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?
+                .channel;
 
             if channel.status != ChannelStatus::Open {
                 return Err(ChannelNotOpened(ticket_issuer.to_hex(), ticket_receiver.to_hex()));
@@ -131,12 +100,6 @@ impl ChannelPath {
     }
 }
 
-impl Path<Address> for ChannelPath {
-    fn hops(&self) -> &[Address] {
-        &self.hops
-    }
-}
-
 impl Display for ChannelPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -145,6 +108,12 @@ impl Display for ChannelPath {
             self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
             self.hops.len()
         )
+    }
+}
+
+impl Path<Address> for ChannelPath {
+    fn hops(&self) -> &[Address] {
+        &self.hops
     }
 }
 
@@ -214,14 +183,6 @@ impl TransportPath {
     }
 }
 
-impl Path<PeerId> for TransportPath {
-    /// The `TransportPath` always returns one extra hop to the destination.
-    /// So it contains one more hop than a [ChannelPath] (the final hop does not require a channel).
-    fn hops(&self) -> &[PeerId] {
-        &self.hops
-    }
-}
-
 impl<T> TryFrom<&TransportPath> for Vec<T>
 where
     T: TryFrom<PeerId>,
@@ -248,9 +209,19 @@ impl Display for TransportPath {
     }
 }
 
+impl Path<PeerId> for TransportPath {
+    /// The `TransportPath` always returns one extra hop to the destination.
+    /// So it contains one more hop than a [ChannelPath] (the final hop does not require a channel).
+    fn hops(&self) -> &[PeerId] {
+        &self.hops
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::ChannelQualityGraph;
+    use crate::traits::Path;
     use async_trait::async_trait;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -293,12 +264,15 @@ mod tests {
         let ts = SystemTime::now().add(Duration::from_secs(10));
 
         // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
-        cg.update_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)));
+        cg.upsert_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open), None);
+        cg.upsert_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open), None);
+        cg.upsert_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open), None);
+        cg.upsert_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open), None);
+        cg.upsert_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open), None);
+        cg.upsert_channel(
+            dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)),
+            None,
+        );
 
         (cg, addrs)
     }

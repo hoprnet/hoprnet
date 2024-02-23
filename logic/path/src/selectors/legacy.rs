@@ -1,7 +1,3 @@
-use crate::channel_graph::{ChannelEdge, ChannelGraph};
-use crate::errors::{PathError, Result};
-use crate::path::ChannelPath;
-use crate::selectors::{EdgeWeighting, PathSelector};
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -10,6 +6,12 @@ use std::cmp::{max, Ordering};
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use tracing::warn;
+
+use crate::channel_graph::ChannelGraph;
+use crate::errors::{PathError, Result};
+use crate::path::ChannelPath;
+use crate::selectors::{EdgeWeighting, PathSelector};
+use crate::traits::{ChannelEdge, ChannelQualityGraph};
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -55,17 +57,17 @@ impl Ord for WeightedChannelPath {
 /// It also favors nodes with higher stake.
 pub struct RandomizedEdgeWeighting;
 
-impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
+impl EdgeWeighting<U256, f64> for RandomizedEdgeWeighting {
     /// Multiply all channel stake with a random float in the interval [0,1).
     /// Given that the floats are uniformly distributed, nodes with higher
     /// stake have a higher probability of reaching a higher value.
     ///
     /// Sorting the list of weights thus moves nodes with higher stakes more
     /// often to the front.
-    fn calculate_weight(channel: &ChannelEntry) -> U256 {
+    fn calculate_weight(edge: &ChannelEdge<f64>) -> U256 {
         max(
             U256::one(),
-            channel
+            edge.channel
                 .balance
                 .amount()
                 .mul_f64(random_float())
@@ -78,7 +80,7 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
 #[derive(Clone, Debug)]
 pub struct DfsPathSelector<CW>
 where
-    CW: EdgeWeighting<U256>,
+    CW: EdgeWeighting<U256, f64>,
 {
     /// Maximum number of iterations before a path selection fails
     /// Default is 100
@@ -96,7 +98,7 @@ where
 
 impl<CW> Default for DfsPathSelector<CW>
 where
-    CW: EdgeWeighting<U256>,
+    CW: EdgeWeighting<U256, f64>,
 {
     fn default() -> Self {
         Self {
@@ -110,7 +112,7 @@ where
 
 impl<CW> DfsPathSelector<CW>
 where
-    CW: EdgeWeighting<U256>,
+    CW: EdgeWeighting<U256, f64>,
 {
     /// Determines whether a node is considered "interesting".
     ///
@@ -121,7 +123,7 @@ where
     /// drop them.
     fn filter_channel(
         &self,
-        channel: &ChannelEdge,
+        channel: &ChannelEdge<f64>,
         source: &Address,
         destination: &Address,
         current_path: &[Address],
@@ -139,7 +141,7 @@ where
 
         // Check node reliability, new nodes are considered reliable
         // unless the opposite has been observed
-        if channel.quality.unwrap_or(1.0f64) < self.quality_threshold {
+        if channel.quality.clone().unwrap_or(1.0f64) < self.quality_threshold {
             // Only use nodes that have shown to be somewhat reliable
             return false;
         }
@@ -161,7 +163,7 @@ where
 
 impl<CW> PathSelector<CW> for DfsPathSelector<CW>
 where
-    CW: EdgeWeighting<U256>,
+    CW: EdgeWeighting<U256, f64>,
 {
     /// Attempts to find a path with at least `min_hops` hops and at most `max_hops` hops
     /// that goes from `source` to `destination`. There does not need to be a
@@ -186,15 +188,19 @@ where
 
         let mut queue = BinaryHeap::new();
 
-        queue.extend(graph.open_channels_from(source).filter_map(|channel| {
-            let w = channel.weight();
-            self.filter_channel(w, &source, &destination, &[])
-                .then(|| WeightedChannelPath {
-                    path: vec![w.channel.destination],
-                    weight: CW::calculate_weight(&w.channel),
-                    fully_explored: false,
-                })
-        }));
+        queue.extend(
+            graph
+                .opened_channels_at(source, ChannelDirection::Outgoing)
+                .filter_map(|channel| {
+                    let w = channel.weight();
+                    self.filter_channel(w, &source, &destination, &[])
+                        .then(|| WeightedChannelPath {
+                            path: vec![w.channel.destination],
+                            weight: CW::calculate_weight(w),
+                            fully_explored: false,
+                        })
+                }),
+        );
 
         let mut iters = 0;
         while let Some(mut current) = queue.pop() {
@@ -221,7 +227,7 @@ where
 
             let last_peer = *current.path.last().unwrap();
             let mut new_channels = graph
-                .open_channels_from(last_peer)
+                .opened_channels_at(last_peer, ChannelDirection::Outgoing)
                 .filter(|channel| self.filter_channel(channel.weight(), &source, &destination, &current.path))
                 .peekable();
 
@@ -229,7 +235,7 @@ where
                 queue.extend(new_channels.map(|new_channel| {
                     let mut next_path_variant = WeightedChannelPath {
                         path: Vec::with_capacity(current_len + 1),
-                        weight: current.weight + CW::calculate_weight(&new_channel.weight().channel),
+                        weight: current.weight + CW::calculate_weight(new_channel.weight()),
                         fully_explored: false,
                     };
                     next_path_variant.path.extend(&current.path);
@@ -261,10 +267,11 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
-    use crate::path::{ChannelPath, Path};
+    use crate::path::ChannelPath;
     use crate::selectors::legacy::DfsPathSelector;
     use crate::selectors::legacy::RandomizedEdgeWeighting;
     use crate::selectors::{EdgeWeighting, PathSelector};
+    use crate::traits::{ChannelEdge, ChannelQualityGraph, Path};
     use core::panic;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -325,18 +332,19 @@ mod tests {
             if stake_caps.get(0).is_none() {
                 panic!("no matching stake. got {}", stake_str);
             }
-            graph.update_channel(create_channel(
-                src,
-                dest,
-                ChannelStatus::Open,
-                Balance::new(
-                    U256::from_str(stake_caps.get(1).unwrap().as_str())
-                        .expect("failed to create U256 from given stake"),
-                    BalanceType::HOPR,
+            graph.upsert_channel(
+                create_channel(
+                    src,
+                    dest,
+                    ChannelStatus::Open,
+                    Balance::new(
+                        U256::from_str(stake_caps.get(1).unwrap().as_str())
+                            .expect("failed to create U256 from given stake"),
+                        BalanceType::HOPR,
+                    ),
                 ),
-            ));
-
-            graph.update_channel_quality(src, dest, quality(src, dest));
+                Some(quality(src, dest)),
+            );
         };
 
         for edge in def.split(",") {
@@ -392,10 +400,10 @@ mod tests {
         graph
     }
 
-    pub struct TestWeights;
-    impl EdgeWeighting<U256> for TestWeights {
-        fn calculate_weight(channel: &ChannelEntry) -> U256 {
-            channel.balance.amount() + 1u32
+    struct TestWeights;
+    impl EdgeWeighting<U256, f64> for TestWeights {
+        fn calculate_weight(edge: &ChannelEdge<f64>) -> U256 {
+            edge.channel.balance.amount() + 1_u32
         }
     }
 

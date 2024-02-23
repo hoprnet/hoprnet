@@ -1,7 +1,4 @@
-use crate::errors::Result;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::primitives::Address;
 use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeFiltered, EdgeRef};
@@ -10,11 +7,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::{debug, info};
 
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
+
+use crate::errors::Result;
+use crate::traits::{ChannelEdge, ChannelQualityGraph};
+
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
-    hopr_primitive_types::traits::ToHex,
-};
+use hopr_metrics::metrics::MultiGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -30,38 +30,25 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Structure that adds additional data to a `ChannelEntry`, which
-/// can be used to compute edge weights and traverse the `ChannelGraph`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ChannelEdge {
-    /// Underlying channel
-    pub channel: ChannelEntry,
-    /// Network quality of this channel at the transport level (if any).
-    /// This value is currently present only for *own channels*.
-    pub quality: Option<f64>,
-}
-
-/// Implements a HOPR payment channel graph (directed) cached in-memory.
+/// Implements a HOPR payment channel graph (directed) using an in-memory structure.
 ///
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
 /// The structure is updated only from the Indexer and therefore contains only
 /// the channels that were *seen* on-chain. The network qualities are also
-/// added to the graph on the fly.
+/// added to the graph on the fly and are represented as `f64` values.
+///
 /// Using this structure is much faster than querying the DB and therefore
 /// is preferred for per-packet path-finding computations.
-/// Per default, the graph does not track channels in `Closed` state, and therefore
+/// This graph does not track channels in `Closed` state, and therefore
 /// cannot detect channel re-openings.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    graph: DiGraphMap<Address, ChannelEdge>,
+    graph: DiGraphMap<Address, ChannelEdge<f64>>,
 }
 
 impl ChannelGraph {
-    /// Maximum number of intermediate hops the automatic path finding algorithm will look for.
-    pub const INTERMEDIATE_HOPS: usize = 3;
-
     /// Creates a new instance with the given self `Address`.
     pub fn new(me: Address) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -86,30 +73,52 @@ impl ChannelGraph {
         self.me
     }
 
+    /// Synchronizes the channel entries in this graph with the database.
+    /// The synchronization is one-way from DB to the graph, not vice versa.
+    pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
+        db.get_channels().await?.into_iter().for_each(|c| {
+            self.upsert_channel(c, None);
+        });
+        info!("synced {} channels to the graph", self.graph.edge_count());
+        Ok(())
+    }
+}
+
+impl ChannelQualityGraph<f64> for ChannelGraph {
     /// Looks up an `Open` or `PendingToClose` channel given the source and destination.
     /// Returns `None` if no such edge exists in the graph.
-    pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
-        self.graph.edge_weight(source, destination).map(|w| &w.channel)
+    fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEdge<f64>> {
+        self.graph.edge_weight(source, destination)
     }
 
-    /// Gets all `Open` outgoing channels going from the given `Address`
-    pub fn open_channels_from(&self, source: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
+    fn opened_channels_at<'a>(
+        &'a self,
+        target: Address,
+        direction: ChannelDirection,
+    ) -> impl Iterator<Item = (Address, Address, &'a ChannelEdge<f64>)>
+    where
+        f64: 'a,
+    {
+        let dir = match direction {
+            ChannelDirection::Incoming => Direction::Incoming,
+            ChannelDirection::Outgoing => Direction::Outgoing,
+        };
+
         self.graph
-            .edges_directed(source, Direction::Outgoing)
+            .edges_directed(target, dir)
             .filter(|c| c.weight().channel.status == ChannelStatus::Open)
     }
 
-    /// Checks whether there's any path via Open channels that connects `source` and `destination`
-    /// This does not need to be necessarily a multi-hop path.
-    pub fn has_path(&self, source: Address, destination: Address) -> bool {
+    fn has_path(&self, source: Address, destination: Address) -> bool {
         let only_open_graph = EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
         has_path_connecting(&only_open_graph, source, destination, None)
     }
 
-    /// Inserts or updates the given channel in the channel graph.
-    /// Returns a set of changes if the channel was already present in the graphs or
-    /// None if the channel was not previously present in the channel graph.
-    pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
+    fn contains_channel(&self, source: Address, destination: Address) -> bool {
+        self.graph.contains_edge(source, destination)
+    }
+
+    fn upsert_channel(&mut self, channel: ChannelEntry, quality: Option<f64>) -> Option<Vec<ChannelChange>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             if let Some(direction) = channel.direction(&self.me) {
@@ -170,6 +179,11 @@ impl ChannelGraph {
             let old_channel = old_value.channel;
             old_value.channel = channel;
 
+            // Update the quality only if it was given
+            if let Some(new_quality) = quality {
+                old_value.quality = Some(new_quality);
+            }
+
             let ret = ChannelChange::diff_channels(&old_channel, &channel);
             info!(
                 "updated {channel}: {}",
@@ -177,7 +191,7 @@ impl ChannelGraph {
             );
             Some(ret)
         } else {
-            let weighted = ChannelEdge { channel, quality: None };
+            let weighted = ChannelEdge { channel, quality };
             self.graph.add_edge(channel.source, channel.destination, weighted);
             info!("new {channel}");
 
@@ -185,9 +199,7 @@ impl ChannelGraph {
         }
     }
 
-    /// Updates the quality value of network connection between `source` and `destination`
-    /// The given quality value must be always non-negative
-    pub fn update_channel_quality(&mut self, source: Address, destination: Address, quality: f64) {
+    fn set_channel_quality(&mut self, source: Address, destination: Address, quality: f64) {
         assert!(quality >= 0_f64, "quality must be non-negative");
         if let Some(channel) = self.graph.edge_weight_mut(source, destination) {
             if quality != channel.quality.unwrap_or(-1_f64) {
@@ -196,32 +208,12 @@ impl ChannelGraph {
             }
         }
     }
-
-    /// Gets quality of the given channel. Returns `None` if no such channel exists or no
-    /// quality has been set for that channel.
-    pub fn get_channel_quality(&self, source: Address, destination: Address) -> Option<f64> {
-        self.graph.edge_weight(source, destination).and_then(|w| w.quality)
-    }
-
-    /// Synchronizes the channel entries in this graph with the database.
-    /// The synchronization is one-way from DB to the graph, not vice versa.
-    pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
-        db.get_channels().await?.into_iter().for_each(|c| {
-            self.update_channel(c);
-        });
-        info!("synced {} channels to the graph", self.graph.edge_count());
-        Ok(())
-    }
-
-    /// Checks whether the given channel is in the graph already.
-    pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
-        self.graph.contains_edge(channel.source, channel.destination)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
+    use crate::traits::ChannelQualityGraph;
     use chain_db::db::CoreEthereumDb;
     use chain_db::traits::HoprCoreEthereumDbActions;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
@@ -266,9 +258,9 @@ mod tests {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
-        cg.update_channel(c);
+        cg.upsert_channel(c, None);
 
-        assert!(cg.contains_channel(&c), "must contain channel");
+        assert!(cg.contains_channel(c.source, c.destination), "must contain channel");
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[1]), "must have simple path");
         assert!(
             !cg.has_path(ADDRESSES[0], ADDRESSES[2]),
@@ -277,24 +269,50 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_graph_update_quality() {
+    fn test_channel_graph_set_quality() {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
-        cg.update_channel(c);
+        cg.upsert_channel(c.clone(), None);
 
-        assert!(cg.contains_channel(&c), "must contain channel");
+        assert!(cg.contains_channel(c.source, c.destination), "must contain channel");
         assert!(
-            cg.get_channel_quality(ADDRESSES[0], ADDRESSES[1]).is_none(),
+            cg.get_channel(ADDRESSES[0], ADDRESSES[1])
+                .expect("must have channel")
+                .quality
+                .is_none(),
             "must start with no quality info"
         );
 
-        cg.update_channel_quality(ADDRESSES[0], ADDRESSES[1], 0.5_f64);
+        cg.set_channel_quality(ADDRESSES[0], ADDRESSES[1], 0.5_f64);
 
         let q = cg
-            .get_channel_quality(ADDRESSES[0], ADDRESSES[1])
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must have channel")
+            .quality
+            .clone()
             .expect("must have quality when set");
         assert_eq!(0.5_f64, q, "quality must be equal");
+
+        cg.upsert_channel(c, None);
+
+        let q = cg
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must have channel")
+            .quality
+            .clone()
+            .expect("must not unsed quality");
+        assert_eq!(0.5_f64, q, "quality must be equal");
+
+        cg.upsert_channel(c, Some(0.85));
+
+        let q = cg
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must have channel")
+            .quality
+            .clone()
+            .expect("must not unsed quality");
+        assert_eq!(0.85_f64, q, "quality must be equal");
     }
 
     #[test]
@@ -303,8 +321,8 @@ mod tests {
 
         let c1 = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         let c2 = dummy_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open);
-        cg.update_channel(c1);
-        cg.update_channel(c2);
+        cg.upsert_channel(c1, None);
+        cg.upsert_channel(c2, None);
 
         assert!(cg.is_own_channel(&c1), "must detect as own channel");
         assert!(!cg.is_own_channel(&c2), "must not detect as own channel");
@@ -316,18 +334,18 @@ mod tests {
 
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
 
-        let changes = cg.update_channel(c);
+        let changes = cg.upsert_channel(c, None);
         assert!(changes.is_none(), "must not produce changes for a new channel");
 
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
             .expect("must contain channel");
-        assert!(c.eq(cr), "channels must be equal");
+        assert!(c.eq(&cr.channel), "channels must be equal");
 
         let ts = SystemTime::now().add(Duration::from_secs(10));
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::PendingToClose(ts);
-        let changes = cg.update_channel(c).expect("must contain changes");
+        let changes = cg.upsert_channel(c, None).expect("must contain changes");
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
@@ -351,7 +369,7 @@ mod tests {
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
             .expect("must contain channel");
-        assert!(c.eq(cr), "channels must be equal");
+        assert!(c.eq(&cr.channel), "channels must be equal");
     }
 
     #[test]
@@ -361,17 +379,17 @@ mod tests {
         let ts = SystemTime::now().add(Duration::from_secs(10));
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose(ts));
 
-        let changes = cg.update_channel(c);
+        let changes = cg.upsert_channel(c, None);
         assert!(changes.is_none(), "must not produce changes for a new channel");
 
         let cr = cg
             .get_channel(ADDRESSES[0], ADDRESSES[1])
             .expect("must contain channel");
-        assert!(c.eq(cr), "channels must be equal");
+        assert!(c.eq(&cr.channel), "channels must be equal");
 
         c.balance = Balance::zero(BalanceType::HOPR);
         c.status = ChannelStatus::Closed;
-        let changes = cg.update_channel(c).expect("must contain changes");
+        let changes = cg.upsert_channel(c, None).expect("must contain changes");
         assert_eq!(2, changes.len(), "must contain 2 changes");
 
         for change in changes {
@@ -403,7 +421,7 @@ mod tests {
     #[test]
     fn test_channel_graph_update_should_not_allow_closed_channels() {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        let changes = cg.update_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Closed));
+        let changes = cg.upsert_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Closed), None);
         assert!(changes.is_none(), "must not produce changes for a closed channel");
 
         let c = cg.get_channel(ADDRESSES[0], ADDRESSES[1]);
@@ -414,11 +432,10 @@ mod tests {
     fn test_channel_graph_update_should_allow_pending_to_close_channels() {
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
         let ts = SystemTime::now().add(Duration::from_secs(10));
-        let changes = cg.update_channel(dummy_channel(
-            ADDRESSES[0],
-            ADDRESSES[1],
-            ChannelStatus::PendingToClose(ts),
-        ));
+        let changes = cg.upsert_channel(
+            dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose(ts)),
+            None,
+        );
         assert!(changes.is_none(), "must not produce changes for a closed channel");
 
         cg.get_channel(ADDRESSES[0], ADDRESSES[1])
@@ -461,7 +478,7 @@ mod tests {
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.status != ChannelStatus::Closed)
-                .all(|c| cg.contains_channel(&c)),
+                .all(|c| cg.contains_channel(c.source, c.destination)),
             "must contain all non-closed channels"
         );
     }

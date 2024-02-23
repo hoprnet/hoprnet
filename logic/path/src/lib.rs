@@ -7,6 +7,8 @@ pub mod errors;
 pub mod path;
 /// Implements different path selectors in the [ChannelGraph](crate::channel_graph::ChannelGraph).
 pub mod selectors;
+/// Generic public traits exported from this trait.
+pub mod traits;
 
 use async_lock::RwLock;
 use async_trait::async_trait;

@@ -3,22 +3,26 @@ pub mod legacy;
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError::ChannelNotOpened;
 use crate::errors::{PathError::MissingChannel, Result};
-use crate::path::{ChannelPath, Path};
+use crate::path::ChannelPath;
+use crate::traits::{ChannelEdge, ChannelQualityGraph, Path};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
 use std::ops::Add;
 
-/// Computes weights of edges corresponding to `ChannelEntry`.
-pub trait EdgeWeighting<W>
+/// Computes weights `W` of edges corresponding to [`ChannelEdge<Q>`].
+pub trait EdgeWeighting<W, Q>
 where
     W: Default + Add<W, Output = W>,
 {
     /// Edge weighting function.
-    fn calculate_weight(channel: &ChannelEntry) -> W;
+    fn calculate_weight(edge: &ChannelEdge<Q>) -> W;
 
     /// Calculates the total weight of the given outgoing channel path.
-    fn total_path_weight(graph: &ChannelGraph, path: ChannelPath) -> Result<W> {
-        let mut initial_addr = graph.my_address();
+    fn total_path_weight<G>(graph: &G, start: Address, path: ChannelPath) -> Result<W>
+    where
+        G: ChannelQualityGraph<Q>,
+    {
+        let mut initial_addr = start;
         let mut weight = W::default();
 
         for hop in path.hops() {
@@ -26,7 +30,7 @@ where
                 .get_channel(initial_addr, *hop)
                 .ok_or(MissingChannel(initial_addr.to_string(), hop.to_string()))?;
 
-            if w.status != ChannelStatus::Open {
+            if w.channel.status != ChannelStatus::Open {
                 return Err(ChannelNotOpened(initial_addr.to_string(), hop.to_string()));
             }
 
@@ -39,9 +43,9 @@ where
 }
 
 /// Trait for implementing custom path selection algorithm from the channel graph.
-pub trait PathSelector<CW, W = U256>
+pub trait PathSelector<CW, Q = f64, W = U256>
 where
-    CW: EdgeWeighting<W>,
+    CW: EdgeWeighting<W, Q>,
     W: Default + Add<W, Output = W>,
 {
     /// Select path of maximum `max_hops` from `source` to `destination` in the given channel graph.
