@@ -425,9 +425,10 @@ where
             .await?;
 
         let ticket = {
-            let db = self.db.read().await;
-
-            let price_per_packet = db
+            let price_per_packet = self
+                .db
+                .read()
+                .await
                 .get_ticket_price()
                 .await
                 .unwrap_or_else(|_| {

@@ -114,6 +114,7 @@ where
 
 #[async_trait]
 impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> TicketRedeemActions for ChainActions<Db> {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(
@@ -143,6 +144,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Tick
     }
 
     /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_with_counterparty(
         &self,
         counterparty: &Address,
@@ -157,7 +159,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Tick
     }
 
     /// Redeems all redeemable tickets in the given channel.
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,
@@ -238,6 +240,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Tick
 
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {

@@ -21,7 +21,7 @@ use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::ops::Add;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use tracing::{debug, error, info, trace, warn, Instrument};
+use tracing::{debug, error, info, trace, warn};
 
 use futures::stream::FuturesUnordered;
 use hopr_internal_types::acknowledgement::AcknowledgedTicketStatus;
@@ -102,13 +102,7 @@ impl AggregationList {
             .map(|t| async {
                 let mut ticket = t.clone();
                 ticket.status = AcknowledgedTicketStatus::Untouched;
-                if let Err(e) = db
-                    .write()
-                    // .instrument(tracing::debug_span!("db: rollback (update acknowledged ticket)"))
-                    .await
-                    .update_acknowledged_ticket(&ticket)
-                    .await
-                {
+                if let Err(e) = db.write().await.update_acknowledged_ticket(&ticket).await {
                     error!("failed to revert {ticket} : {e}");
                     false
                 } else {
@@ -124,7 +118,7 @@ impl AggregationList {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self, db))]
     async fn into_vec<Db: HoprCoreEthereumDbActions + std::fmt::Debug>(
         self,
         db: Arc<RwLock<Db>>,
@@ -349,9 +343,6 @@ impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor
         {
             self.db
                 .write()
-                // .instrument(tracing::debug_span!(
-                //     "db: aggregate tickets (ensure current ticket index gte)"
-                // ))
                 .await
                 .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
                 .await?;
@@ -470,20 +461,12 @@ impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor
 
         self.db
             .write()
-            // .instrument(tracing::debug_span!(
-            //     "storing received aggregated ticket",
-            //     ticket = acked_aggregated_ticket.to_string()
-            // ))
             .await
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
         self.db
             .write()
-            .instrument(tracing::info_span!(
-                "ensure the current ticket index is not smaller than the the aggregated ticket",
-                ticket_index = current_ticket_index_from_aggregated_ticket.to_string()
-            ))
             .await
             .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
             .await?;

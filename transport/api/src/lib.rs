@@ -357,7 +357,7 @@ impl HoprTransport {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<Option<std::time::Duration>> {
         if !self.is_allowed_to_access_network(peer).await {
             return Err(errors::HoprTransportError::Api(format!(
