@@ -1,4 +1,6 @@
 //! This module contains errors produced in this crate
+use chain_rpc::errors::RpcError;
+// use ethers::providers::{Http, JsonRpcClient, ProviderError};
 use hoprd_keypair::errors::KeyPairError;
 use thiserror::Error;
 
@@ -72,4 +74,16 @@ pub enum HelperErrors {
     /// Error with the keystore file
     #[error(transparent)]
     KeyStoreError(#[from] KeyPairError),
+
+    #[error("deserialization Error: {0}")]
+    /// Serde JSON Error
+    SerdeJson(#[from] serde_json::Error),
+
+    /// Cannot find network details from the given network name
+    #[error("unable to find network details from the given network name ")]
+    UnknownNetwork,
+
+    /// Error with HTTP Json RPC provider
+    #[error(transparent)]
+    RpcError(#[from] RpcError),
 }

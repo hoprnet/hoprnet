@@ -3223,6 +3223,9 @@ dependencies = [
 name = "hopli"
 version = "0.4.0"
 dependencies = [
+ "async-std",
+ "chain-api",
+ "chain-rpc",
  "clap",
  "ethers",
  "hopr-crypto-types",

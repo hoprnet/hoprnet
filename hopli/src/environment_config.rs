@@ -10,8 +10,19 @@
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
 //! the deployed contract addresses in [NetworkContractAddresses]
 
+use crate::utils::HelperErrors;
+use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
+use chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
+use clap::Parser;
+use ethers::providers::{Middleware, Provider};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, path::Path};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fmt,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 /// Type of environment that HOPR node is running in
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
@@ -80,28 +91,132 @@ pub struct NetworkConfig {
     networks: HashMap<String, NetworkDetail>,
 }
 
+/// Arguments for getting network and ethereum RPC provider.
+///
+/// RPC provider specifies an endpoint that enables an application to communicate with a blockchain network
+/// If not specified, it uses the default value according to the environment config
+/// Network specifies a set of contracts used in HOPR network.
+#[derive(Debug, Clone, Parser)]
+pub struct NetworkProviderArgs {
+    /// Name of the network that the node is running on
+    #[clap(help = "Network name. E.g. monte_rosa", long)]
+    network: String,
+
+    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
+    #[clap(
+        help = "Specify path pointing to the contracts root",
+        long,
+        short,
+        default_value = None
+    )]
+    contracts_root: Option<String>,
+
+    /// Customized RPC provider endpoint
+    #[clap(help = "Blockchain RPC provider endpoint.", long)]
+    provider_url: Option<String>,
+}
+
+impl Default for NetworkProviderArgs {
+    fn default() -> Self {
+        Self {
+            network: "anvil-localhost".into(),
+            contracts_root: None,
+            provider_url: None,
+        }
+    }
+}
+
+impl NetworkProviderArgs {
+    /// Get the NetworkDetail (contract addresses, environment type) from network names
+    pub fn get_network_details_from_name(&self) -> Result<NetworkDetail, HelperErrors> {
+        // read `contracts-addresses.json` at make_root_dir_path
+        let contract_environment_config_path = self
+            .contracts_root
+            .as_ref()
+            .map_or_else(|| std::env::current_dir().unwrap(), |p| PathBuf::from(OsStr::new(&p)))
+            .to_owned()
+            .join("contracts-addresses.json");
+
+        let file_read =
+            std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
+
+        let network_config = serde_json::from_str::<NetworkConfig>(&file_read).map_err(HelperErrors::SerdeJson)?;
+
+        network_config
+            .networks
+            .get(&self.network)
+            .cloned()
+            .ok_or_else(|| HelperErrors::UnknownNetwork)
+    }
+
+    /// get default provider according to environment type of a network
+    pub fn get_default_provider_url(&self) -> Result<String, HelperErrors> {
+        let network_detail = self.get_network_details_from_name()?.environment_type;
+
+        let default_provider_url = match network_detail {
+            EnvironmentType::Production => "https://gnosis-provider.rpch.tech/",
+            EnvironmentType::Staging => "https://gnosis-provider.rpch.tech/",
+            EnvironmentType::Development => "http://127.0.0.1:8545",
+            EnvironmentType::Local => "http://127.0.0.1:8545",
+        };
+
+        Ok(default_provider_url.into())
+    }
+
+    /// get the provider object
+    pub async fn get_provider(&self) -> Result<Arc<Provider<JsonRpcClient>>, HelperErrors> {
+        // default values
+        let default_rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
+        let default_rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
+
+        // Build default JSON RPC client
+        let default_rpc_client = JsonRpcClient::new(
+            &self.get_default_provider_url()?,
+            DefaultHttpPostRequestor::new(default_rpc_http_config.clone()),
+            default_rpc_http_retry_policy.clone(),
+        );
+        // Build default JSON RPC provider
+        let default_provider =
+            Arc::new(Provider::new(default_rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval));
+
+        // validate that the rpc client connects to the expected chain
+        let chain_id = default_provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+
+        // if a customized provider is given
+        if let Some(customized_provider_url) = &self.provider_url {
+            // check if the provided url matches with the network
+            let customized_proivder_client = JsonRpcClient::new(
+                customized_provider_url,
+                DefaultHttpPostRequestor::new(default_rpc_http_config),
+                default_rpc_http_retry_policy,
+            );
+            // Build default JSON RPC provider
+            let customized_proivder = Arc::new(
+                Provider::new(customized_proivder_client).interval(RpcOperationsConfig::default().tx_polling_interval),
+            );
+
+            let customized_chain_id = customized_proivder
+                .get_chainid()
+                .await
+                .map_err(RpcError::ProviderError)?;
+            if customized_chain_id.eq(&chain_id) {
+                return Ok(customized_proivder);
+            }
+        }
+        Ok(default_provider)
+    }
+}
+
 /// ensures that the network and environment_type exist
 /// in `contracts-addresses.json` and are matched
 pub fn ensure_environment_and_network_are_set(
     make_root_dir_path: &Path,
     network: &str,
     environment_type: &str,
-) -> Result<bool, String> {
-    // read `contracts-addresses.json` at make_root_dir_path
-    let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
+) -> Result<bool, HelperErrors> {
+    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
 
-    let file_read = std::fs::read_to_string(contract_environment_config_path)
-        .expect("Unable to read contracts-addresses.json file");
-
-    let env_config =
-        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
-
-    let env_detail = env_config
-        .networks
-        .get(network)
-        .expect("Unable to find environment details");
-
-    if env_detail.environment_type.to_string() == environment_type {
+    if network_detail.environment_type.to_string() == environment_type {
         Ok(true)
     } else {
         Ok(false)
@@ -110,27 +225,33 @@ pub fn ensure_environment_and_network_are_set(
 
 /// Returns the environment type from the network name
 /// according to `contracts-addresses.json`
-pub fn get_environment_type_from_name(make_root_dir_path: &Path, network: &str) -> Result<EnvironmentType, String> {
+pub fn get_environment_type_from_name(
+    make_root_dir_path: &Path,
+    network: &str,
+) -> Result<EnvironmentType, HelperErrors> {
+    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
+    Ok(network_detail.environment_type)
+}
+
+/// Get the NetworkDetail (contract addresses, environment type) from network names
+pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -> Result<NetworkDetail, HelperErrors> {
     // read `contracts-addresses.json` at make_root_dir_path
     let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
 
-    let file_read = std::fs::read_to_string(contract_environment_config_path)
-        .expect("Unable to read contracts-addresses.json file");
+    let file_read =
+        std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
 
-    let env_config =
-        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
+    let network_config = serde_json::from_str::<NetworkConfig>(&file_read).map_err(HelperErrors::SerdeJson)?;
 
-    let env_detail = env_config
+    network_config
         .networks
         .get(network)
-        .expect("Unable to find environment details");
-
-    Ok(env_detail.environment_type)
+        .cloned()
+        .ok_or_else(|| HelperErrors::UnknownNetwork)
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -156,7 +277,7 @@ mod tests {
         let environment_type = "local";
         let result =
             std::panic::catch_unwind(|| ensure_environment_and_network_are_set(wrong_dir, network, environment_type));
-        assert!(result.is_err());
+        assert!(result.unwrap().is_err());
     }
 
     #[test]
@@ -171,7 +292,7 @@ mod tests {
         let result = std::panic::catch_unwind(|| {
             ensure_environment_and_network_are_set(correct_dir, "non-existing", "development")
         });
-        assert!(result.is_err());
+        assert!(result.unwrap().is_err());
     }
 
     #[test]
@@ -188,5 +309,23 @@ mod tests {
             Ok(result) => assert!(!result),
             _ => assert!(false),
         }
+    }
+
+    #[async_std::test]
+    async fn use_default_rpc_url_for_anvil_when_no_provide_is_given() {
+        let anvil = ethers::utils::Anvil::new().port(8545u16).spawn();
+
+        let network_provider_args = NetworkProviderArgs {
+            network: "anvil-localhost".into(),
+            contracts_root: Some("../ethereum/contracts".into()),
+            provider_url: None,
+        };
+
+        let provider = network_provider_args.get_provider().await.unwrap();
+
+        let test_output = provider.client_version().await.unwrap();
+        let chain_id = provider.get_chainid().await.unwrap();
+        assert_eq!(chain_id, anvil.chain_id().into());
+        drop(anvil);
     }
 }
