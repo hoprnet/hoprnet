@@ -23,8 +23,8 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Channel::Destination).string_len(40).not_null())
                     .col(ColumnDef::new(Channel::Balance).string_len(50).not_null())
                     .col(ColumnDef::new(Channel::Status).tiny_integer().not_null())
-                    .col(ColumnDef::new(Channel::Epoch).integer().unsigned().default(1))
-                    .col(ColumnDef::new(Channel::TicketIndex).integer().unsigned().default(1))
+                    .col(ColumnDef::new(Channel::Epoch).integer().unsigned().not_null().default(1))
+                    .col(ColumnDef::new(Channel::TicketIndex).integer().unsigned().not_null().default(0))
                     .to_owned(),
             )
             .await?;

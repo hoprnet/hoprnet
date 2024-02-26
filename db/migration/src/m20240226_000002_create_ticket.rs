@@ -23,7 +23,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Ticket::Index).integer().unsigned().not_null())
                     .col(ColumnDef::new(Ticket::IndexOffset).integer().unsigned().not_null())
                     .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
-                    .col(ColumnDef::new(Ticket::ChannelEpoch).integer().unsigned().default(1))
+                    .col(ColumnDef::new(Ticket::ChannelEpoch).integer().unsigned().not_null().default(1))
                     .col(ColumnDef::new(Ticket::EthereumChallenge).binary_len(64).not_null())
                     .col(ColumnDef::new(Ticket::Signature).binary_len(60).not_null())
                     .col(ColumnDef::new(Ticket::Acknowledgement).binary().null())
