@@ -36,7 +36,7 @@ members = [
     "transport/packet",
     "transport/protocol",
     "transport/p2p",
-    "transport/api", "db/entity",
+    "transport/api",
 ]
 
 [workspace.dependencies]
@@ -68,6 +68,7 @@ serde_json = "1.0"
 serde_with = { version = "3.3" }
 smart-default = "0.7"
 sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-async-std", "with-chrono"] }
+sea-orm-migration = { version = "0.12", features = ["runtime-async-std-rustls", "sqlx-sqlite", "with-chrono"]}
 sqlx = { version = "0.7.3", default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
 strum = { version = "0.25.0", features = ["derive"] }
 thiserror = "1.0"
