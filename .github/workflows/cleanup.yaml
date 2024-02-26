@@ -11,7 +11,7 @@ on:
 jobs:
   stale:
     name: Close stale issues
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 10
     steps:
         # See docs: https://github.com/actions/stale
@@ -27,7 +27,7 @@ jobs:
 
   cleanup-docker:
     name: Cleanup Docker images
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 30
     steps:
       - name: Set up Google Cloud Credentials
@@ -65,7 +65,7 @@ jobs:
 
   # cleanup-git:
   #   name: Cleanup Git
-  #   runs-on: ubuntu-2-core
+  #   runs-on: self-hosted-hoprnet-small
   #   steps:
   #     - name: Checkout hoprnet repository
   #       uses: actions/checkout@v3
