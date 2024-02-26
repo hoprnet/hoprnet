@@ -24,23 +24,27 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        manager.create_index(
-            Index::create()
-                .if_not_exists()
-                .name("idx_account_chain_key")
-                .table(Account::Table)
-                .col(Account::ChainKey)
-                .to_owned(),
-        ).await?;
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_account_chain_key")
+                    .table(Account::Table)
+                    .col(Account::ChainKey)
+                    .to_owned(),
+            )
+            .await?;
 
-        manager.create_index(
-            Index::create()
-                .if_not_exists()
-                .name("idx_account_packet_key")
-                .table(Account::Table)
-                .col(Account::PacketKey)
-                .to_owned(),
-        ).await?;
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_account_packet_key")
+                    .table(Account::Table)
+                    .col(Account::PacketKey)
+                    .to_owned(),
+            )
+            .await?;
 
         manager
             .create_table(
@@ -61,43 +65,52 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        manager.create_index(
-            Index::create()
-                .if_not_exists()
-                .name("idx_announcement_multi_address")
-                .table(Announcement::Table)
-                .col(Announcement::Multiaddress)
-                .to_owned(),
-        ).await?;
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_announcement_multi_address")
+                    .table(Announcement::Table)
+                    .col(Announcement::Multiaddress)
+                    .to_owned(),
+            )
+            .await?;
 
-        manager.create_foreign_key(
-            ForeignKey::create()
-                .name("fk_announcement_account")
-                .from(Announcement::Table, Announcement::AccountId)
-                .to(Account::Table, Account::Id)
-                .on_delete(ForeignKeyAction::Cascade)
-                .on_update(ForeignKeyAction::Restrict)
-                .to_owned()
-        ).await
+        manager
+            .create_foreign_key(
+                ForeignKey::create()
+                    .name("fk_announcement_account")
+                    .from(Announcement::Table, Announcement::AccountId)
+                    .to(Account::Table, Account::Id)
+                    .on_delete(ForeignKeyAction::Cascade)
+                    .on_update(ForeignKeyAction::Restrict)
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.drop_index(Index::drop().name("idx_announcement_multi_address").to_owned())
+        manager
+            .drop_foreign_key(ForeignKey::drop().name("fk_announcement_account").to_owned())
+            .await?;
+
+        manager
+            .drop_index(Index::drop().name("idx_announcement_multi_address").to_owned())
             .await?;
 
         manager
             .drop_table(Table::drop().table(Announcement::Table).to_owned())
             .await?;
 
-        manager.drop_index(Index::drop().name("idx_account_chain_key").to_owned())
-            .await?;
-
-        manager.drop_index(Index::drop().name("idx_account_packet_key").to_owned())
+        manager
+            .drop_index(Index::drop().name("idx_account_chain_key").to_owned())
             .await?;
 
         manager
-            .drop_table(Table::drop().table(Account::Table).to_owned())
-            .await
+            .drop_index(Index::drop().name("idx_account_packet_key").to_owned())
+            .await?;
+
+        manager.drop_table(Table::drop().table(Account::Table).to_owned()).await
     }
 }
 
@@ -115,5 +128,5 @@ enum Announcement {
     Id,
     AccountId,
     Multiaddress,
-    AtBlock
+    AtBlock,
 }

@@ -18,7 +18,12 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(NodeInfo::ChainAddress).string_len(40).unique_key().not_null())
+                    .col(
+                        ColumnDef::new(NodeInfo::ChainAddress)
+                            .string_len(40)
+                            .unique_key()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(NodeInfo::PeerId).binary_len(40))
                     .col(ColumnDef::new(NodeInfo::SafeBalance).string_len(50).not_null())
                     .col(ColumnDef::new(NodeInfo::SafeAllowance).string_len(50).not_null())
@@ -45,5 +50,5 @@ enum NodeInfo {
     SafeBalance,
     SafeAllowance,
     OnChainData, // safe address, module address, domain separators, nr status
-    AdditionalData
+    AdditionalData,
 }

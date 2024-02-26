@@ -18,7 +18,12 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(NetworkRegistryEntry::ChainAddress).string_len(40).unique_key().not_null())
+                    .col(
+                        ColumnDef::new(NetworkRegistryEntry::ChainAddress)
+                            .string_len(40)
+                            .unique_key()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await

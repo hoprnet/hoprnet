@@ -7,69 +7,60 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let mut sql = Table::create()
-            .table(NetworkPeer::Table)
-            .if_not_exists()
-            .col(
-                ColumnDef::new(NetworkPeer::Id)
-                    .integer()
-                    .not_null()
-                    .auto_increment()
-                    .primary_key(),
+        manager
+            .create_table(
+                Table::create()
+                    .table(NetworkPeer::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(NetworkPeer::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(NetworkPeer::PeerId)
+                            .binary_len(40)
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(ColumnDef::new(NetworkPeer::MultiAddresses).string().not_null())
+                    .col(ColumnDef::new(NetworkPeer::Origin).tiny_integer().not_null())
+                    .col(ColumnDef::new(NetworkPeer::Version).string_len(20))
+                    .col(
+                        ColumnDef::new(NetworkPeer::LastSeen)
+                            .timestamp()
+                            .not_null()
+                            .default(ChronoDateTimeUtc::UNIX_EPOCH),
+                    )
+                    .col(
+                        ColumnDef::new(NetworkPeer::LastSeenLatency)
+                            .integer()
+                            .unsigned()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(NetworkPeer::Ignored).timestamp())
+                    .col(ColumnDef::new(NetworkPeer::Public).boolean().default(true))
+                    .col(ColumnDef::new(NetworkPeer::Quality).float().default(0.0))
+                    .col(ColumnDef::new(NetworkPeer::QualitySma).binary().null())
+                    .col(ColumnDef::new(NetworkPeer::Backoff).float().null())
+                    .col(
+                        ColumnDef::new(NetworkPeer::HeartbeatsSent)
+                            .integer()
+                            .unsigned()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(NetworkPeer::HeartbeatsSuccessful)
+                            .integer()
+                            .unsigned()
+                            .default(0),
+                    )
+                    .to_owned(),
             )
-            .col(
-                ColumnDef::new(NetworkPeer::PeerId)
-                    .binary_len(40)
-                    .not_null()
-                    .unique_key(),
-            )
-            .col(ColumnDef::new(NetworkPeer::MultiAddresses).string().not_null())
-            .col(ColumnDef::new(NetworkPeer::Origin).tiny_integer().not_null())
-            .col(ColumnDef::new(NetworkPeer::Version).string_len(20))
-            .col(
-                ColumnDef::new(NetworkPeer::LastSeen)
-                    .timestamp()
-                    .default(ChronoDateTimeUtc::UNIX_EPOCH),
-            )
-            .col(
-                ColumnDef::new(NetworkPeer::LastSeenLatency)
-                    .integer()
-                    .unsigned()
-                    .default(0),
-            )
-            .col(ColumnDef::new(NetworkPeer::Ignored).timestamp())
-            .col(ColumnDef::new(NetworkPeer::Public).boolean().default(true))
-            .col(ColumnDef::new(NetworkPeer::Quality).float().default(0.0))
-            .col(
-                ColumnDef::new(NetworkPeer::QualitySma)
-                    .binary()
-                    .null()
-            )
-            .col(
-                ColumnDef::new(NetworkPeer::Backoff)
-                    .float()
-                    .null(),
-            )
-            .col(
-                ColumnDef::new(NetworkPeer::HeartbeatsSent)
-                    .integer()
-                    .unsigned()
-                    .default(0),
-            )
-            .col(
-                ColumnDef::new(NetworkPeer::HeartbeatsSuccessful)
-                    .integer()
-                    .unsigned()
-                    .default(0),
-            )
-            .build(SqliteQueryBuilder);
-
-        sql = sql.replace("CREATE", "CREATE VIRTUAL");
-
-        let db = manager.get_connection();
-        db.execute_unprepared(&sql).await?;
-
-        Ok(())
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -95,5 +86,5 @@ enum NetworkPeer {
     QualitySma,
     Backoff,
     HeartbeatsSent,
-    HeartbeatsSuccessful
+    HeartbeatsSuccessful,
 }

@@ -18,13 +18,30 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Channel::ChannelId).string_len(64).not_null().unique_key())
+                    .col(
+                        ColumnDef::new(Channel::ChannelId)
+                            .string_len(64)
+                            .not_null()
+                            .unique_key(),
+                    )
                     .col(ColumnDef::new(Channel::Source).string_len(40).not_null())
                     .col(ColumnDef::new(Channel::Destination).string_len(40).not_null())
                     .col(ColumnDef::new(Channel::Balance).string_len(50).not_null())
                     .col(ColumnDef::new(Channel::Status).tiny_integer().not_null())
-                    .col(ColumnDef::new(Channel::Epoch).integer().unsigned().not_null().default(1))
-                    .col(ColumnDef::new(Channel::TicketIndex).integer().unsigned().not_null().default(0))
+                    .col(
+                        ColumnDef::new(Channel::Epoch)
+                            .integer()
+                            .unsigned()
+                            .not_null()
+                            .default(1),
+                    )
+                    .col(
+                        ColumnDef::new(Channel::TicketIndex)
+                            .integer()
+                            .unsigned()
+                            .not_null()
+                            .default(0),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -53,15 +70,15 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.drop_index(Index::drop().name("idx_channel_source").to_owned())
-            .await?;
-
-        manager.drop_index(Index::drop().name("idx_channel_destination").to_owned())
+        manager
+            .drop_index(Index::drop().name("idx_channel_source").to_owned())
             .await?;
 
         manager
-            .drop_table(Table::drop().table(Channel::Table).to_owned())
-            .await
+            .drop_index(Index::drop().name("idx_channel_destination").to_owned())
+            .await?;
+
+        manager.drop_table(Table::drop().table(Channel::Table).to_owned()).await
     }
 }
 
@@ -75,5 +92,5 @@ enum Channel {
     Status,
     Balance,
     TicketIndex,
-    Epoch
+    Epoch,
 }
