@@ -26,3 +26,13 @@ contracts/report
 
 # Ignore generated bindings source files
 bindings/src/codegen/
+
+# Prevent automatically editted foundry.toml
+# from being committed.
+# To change the Solidity version:
+#   1. comment next line
+#   2. alter the solc entry
+#   3. commit the new version
+#   4. uncomment next line
+#   5. commit new .gitignore
+contracts/foundry.toml
