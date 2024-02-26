@@ -1,2 +1,2 @@
 *.db
-entity/src/*.rs
+entity/src/codegen/*.rs
