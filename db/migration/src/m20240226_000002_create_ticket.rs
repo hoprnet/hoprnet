@@ -37,7 +37,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_ticket_channel")
                             .from(Ticket::Table, Ticket::ChannelId)
-                            .to(Channel::Table, Channel::ChannelId)
+                            .to(Channel::Table, Channel::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Restrict),
                     )
@@ -69,5 +69,5 @@ enum Ticket {
 #[derive(DeriveIden)]
 enum Channel {
     Table,
-    ChannelId,
+    Id,
 }
