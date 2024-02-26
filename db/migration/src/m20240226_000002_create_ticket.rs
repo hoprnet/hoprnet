@@ -13,12 +13,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Ticket::Id)
-                            .big_integer()
+                            .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Ticket::ChannelId).string_len(40).not_null())
+                    .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
                     .col(ColumnDef::new(Ticket::Amount).string_len(50).not_null())
                     .col(ColumnDef::new(Ticket::Index).integer().unsigned().not_null())
                     .col(ColumnDef::new(Ticket::IndexOffset).integer().unsigned().not_null())

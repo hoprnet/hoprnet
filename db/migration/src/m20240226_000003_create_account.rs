@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Account::Id)
-                            .big_integer()
+                            .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
@@ -53,12 +53,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Announcement::Id)
-                            .big_integer()
+                            .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Announcement::AccountId).big_integer().not_null())
+                    .col(ColumnDef::new(Announcement::AccountId).integer().not_null())
                     .col(ColumnDef::new(Announcement::Multiaddress).string().not_null())
                     .col(ColumnDef::new(Announcement::AtBlock).integer().unsigned().not_null())
                     .foreign_key(
