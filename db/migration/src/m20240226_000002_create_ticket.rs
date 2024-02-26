@@ -33,28 +33,20 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Ticket::EthereumChallenge).binary_len(64).not_null())
                     .col(ColumnDef::new(Ticket::Signature).binary_len(60).not_null())
                     .col(ColumnDef::new(Ticket::AcknowledgementData).binary().not_null())
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_foreign_key(
-                ForeignKey::create()
-                    .name("fk_ticket_channel")
-                    .from(Ticket::Table, Ticket::ChannelId)
-                    .to(Channel::Table, Channel::ChannelId)
-                    .on_delete(ForeignKeyAction::Cascade)
-                    .on_update(ForeignKeyAction::Restrict)
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_ticket_channel")
+                            .from(Ticket::Table, Ticket::ChannelId)
+                            .to(Channel::Table, Channel::ChannelId)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Restrict),
+                    )
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_foreign_key(ForeignKey::drop().name("fk_ticket_channel").to_owned())
-            .await?;
-
         manager.drop_table(Table::drop().table(Ticket::Table).to_owned()).await
     }
 }

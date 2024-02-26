@@ -11,5 +11,5 @@ path = "src/lib.rs"
 
 [dependencies]
 async-std = { version = "1", features = ["attributes", "tokio1"] }
-sea-orm-migration = { version = "0.12.0", features = ["runtime-async-std-rustls", "sqlx-sqlite"]}
+sea-orm-migration = { version = "0.12.0", features = ["runtime-async-std-rustls", "sqlx-sqlite", "with-chrono"]}
 

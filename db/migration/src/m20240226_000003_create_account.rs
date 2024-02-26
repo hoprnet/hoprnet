@@ -61,6 +61,14 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Announcement::AccountId).big_integer().not_null())
                     .col(ColumnDef::new(Announcement::Multiaddress).string().not_null())
                     .col(ColumnDef::new(Announcement::AtBlock).integer().unsigned().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_announcement_account")
+                            .from(Announcement::Table, Announcement::AccountId)
+                            .to(Account::Table, Account::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Restrict),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -74,26 +82,10 @@ impl MigrationTrait for Migration {
                     .col(Announcement::Multiaddress)
                     .to_owned(),
             )
-            .await?;
-
-        manager
-            .create_foreign_key(
-                ForeignKey::create()
-                    .name("fk_announcement_account")
-                    .from(Announcement::Table, Announcement::AccountId)
-                    .to(Account::Table, Account::Id)
-                    .on_delete(ForeignKeyAction::Cascade)
-                    .on_update(ForeignKeyAction::Restrict)
-                    .to_owned(),
-            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_foreign_key(ForeignKey::drop().name("fk_announcement_account").to_owned())
-            .await?;
-
         manager
             .drop_index(Index::drop().name("idx_announcement_multi_address").to_owned())
             .await?;
