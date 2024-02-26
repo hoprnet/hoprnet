@@ -2366,13 +2366,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "entity"
-version = "0.1.0"
-dependencies = [
- "sea-orm",
-]
-
-[[package]]
 name = "enum-as-inner"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3458,6 +3451,13 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "sea-orm-migration",
+]
+
+[[package]]
+name = "hopr-entity"
+version = "0.1.0"
+dependencies = [
+ "sea-orm",
 ]
 
 [[package]]

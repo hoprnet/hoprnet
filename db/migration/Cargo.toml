@@ -4,6 +4,10 @@ description = "Contains database migrations for a HOPR node database"
 version = "0.1.0"
 edition = "2021"
 publish = false
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
 
 [lib]
 name = "migration"

@@ -1,9 +1,11 @@
 [package]
-name = "entity"
+name = "hopr-entity"
+description = "Contains all HOPR database entities"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
 
 [dependencies]
 sea-orm = { workspace = true }
