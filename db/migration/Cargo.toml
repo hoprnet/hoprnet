@@ -1,0 +1,15 @@
+[package]
+name = "hopr-db-migration"
+description = "Contains database migrations for a HOPR node database"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[dependencies]
+async-std = { version = "1", features = ["attributes", "tokio1"] }
+sea-orm-migration = { version = "0.12.0", features = ["runtime-async-std-rustls", "sqlx-sqlite"]}
+
