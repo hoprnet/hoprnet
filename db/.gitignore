@@ -1,0 +1,2 @@
+*.db
+entity/src/*.rs
