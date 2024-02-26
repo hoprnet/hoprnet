@@ -13,15 +13,15 @@ mod tests {
     fn test_get_file_stem() {
         let pair = vec![
             (
-                "m20220101_000001_create_schema_1",
+                "m20220101_000001_create_table.rs",
                 "m20220101_000001_create_table",
             ),
             (
-                "src/m20220101_000001_create_schema_1",
+                "src/m20220101_000001_create_table.rs",
                 "m20220101_000001_create_table",
             ),
             (
-                "migration/src/m20220101_000001_create_schema_1",
+                "migration/src/m20220101_000001_create_table.rs",
                 "m20220101_000001_create_table",
             ),
             (
