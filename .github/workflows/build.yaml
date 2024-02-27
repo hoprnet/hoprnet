@@ -64,11 +64,12 @@ jobs:
         run: |
           set -x
           short_sha=$(git rev-parse --short HEAD)
-          if [[ " ${{ steps.pr-labels.outputs.labels }} " =~ [[:space:]]release[[:space:]] ]]; then
+          # if [[ " ${{ steps.pr-labels.outputs.labels }} " =~ [[:space:]]release[[:space:]] ]]; then
+          if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
             docker_tag=$(./scripts/get-current-version.sh docker)
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           else
-            next_version=$(./scripts/get-next-version.sh Build ${short_sha}
+            next_version=$(./scripts/get-next-version.sh Build ${short_sha})
             ./scripts/bump-version.sh ${next_version}
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
