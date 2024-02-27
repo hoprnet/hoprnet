@@ -26,21 +26,21 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Channel::Source).string_len(40).not_null())
                     .col(ColumnDef::new(Channel::Destination).string_len(40).not_null())
-                    .col(ColumnDef::new(Channel::Balance).string_len(50).not_null())
-                    .col(ColumnDef::new(Channel::Status).tiny_integer().not_null())
+                    .col(ColumnDef::new(Channel::Balance).binary_len(12).not_null())
+                    .col(ColumnDef::new(Channel::Status).tiny_unsigned().not_null())
                     .col(
                         ColumnDef::new(Channel::Epoch)
                             .integer()
                             .unsigned()
                             .not_null()
-                            .default(1),
+                            .default(1), // Default set in the SC
                     )
                     .col(
                         ColumnDef::new(Channel::TicketIndex)
                             .integer()
                             .unsigned()
                             .not_null()
-                            .default(0),
+                            .default(0), // Default set in the SC
                     )
                     .to_owned(),
             )
@@ -49,8 +49,33 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .name("idx_channel_id_channel_epoch")
                     .if_not_exists()
+                    .table(Channel::Table)
+                    .col(Channel::ChannelId)
+                    .col(Channel::Epoch)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_channel_source_destination")
+                    .if_not_exists()
+                    .unique()
+                    .table(Channel::Table)
+                    .col(Channel::Source)
+                    .col(Channel::Destination)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
                     .name("idx_channel_source")
+                    .if_not_exists()
                     .table(Channel::Table)
                     .col(Channel::Source)
                     .to_owned(),
@@ -60,8 +85,8 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .if_not_exists()
                     .name("idx_channel_destination")
+                    .if_not_exists()
                     .table(Channel::Table)
                     .col(Channel::Destination)
                     .to_owned(),
@@ -71,17 +96,26 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_index(Index::drop().name("idx_channel_destination").to_owned())
+            .await?;
+
+        manager
             .drop_index(Index::drop().name("idx_channel_source").to_owned())
             .await?;
 
         manager
-            .drop_index(Index::drop().name("idx_channel_destination").to_owned())
+            .drop_index(Index::drop().name("idx_channel_source_destination").to_owned())
+            .await?;
+
+        manager
+            .drop_index(Index::drop().name("idx_channel_id_channel_epoch").to_owned())
             .await?;
 
         manager.drop_table(Table::drop().table(Channel::Table).to_owned()).await
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(DeriveIden)]
 enum Channel {
     Table,

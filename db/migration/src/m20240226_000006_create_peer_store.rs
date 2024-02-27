@@ -25,9 +25,9 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .unique_key(),
                     )
-                    .col(ColumnDef::new(NetworkPeer::MultiAddresses).string().not_null())
+                    .col(ColumnDef::new(NetworkPeer::MultiAddresses).json().not_null())
                     .col(ColumnDef::new(NetworkPeer::Origin).tiny_integer().not_null())
-                    .col(ColumnDef::new(NetworkPeer::Version).string_len(20))
+                    .col(ColumnDef::new(NetworkPeer::Version).string_len(50))
                     .col(
                         ColumnDef::new(NetworkPeer::LastSeen)
                             .timestamp()
@@ -41,9 +41,9 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(NetworkPeer::Ignored).timestamp())
-                    .col(ColumnDef::new(NetworkPeer::Public).boolean().default(true))
-                    .col(ColumnDef::new(NetworkPeer::Quality).float().default(0.0))
+                    .col(ColumnDef::new(NetworkPeer::Ignored).timestamp().null())
+                    .col(ColumnDef::new(NetworkPeer::Public).boolean().not_null().default(true))
+                    .col(ColumnDef::new(NetworkPeer::Quality).float().not_null().default(0.0))
                     .col(ColumnDef::new(NetworkPeer::QualitySma).binary().null())
                     .col(ColumnDef::new(NetworkPeer::Backoff).float().null())
                     .col(

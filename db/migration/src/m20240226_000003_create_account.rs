@@ -47,6 +47,19 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_account_chain_packet_key")
+                    .table(Account::Table)
+                    .col(Account::ChainKey)
+                    .col(Account::PacketKey)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .create_table(
                 Table::create()
                     .table(Announcement::Table)
@@ -59,7 +72,12 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Announcement::AccountId).integer().not_null())
-                    .col(ColumnDef::new(Announcement::Multiaddress).string().not_null())
+                    .col(
+                        ColumnDef::new(Announcement::Multiaddress)
+                            .string()
+                            .unique_key()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Announcement::AtBlock).integer().unsigned().not_null())
                     .foreign_key(
                         ForeignKey::create()
@@ -76,10 +94,10 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .name("idx_announcement_account_id")
                     .if_not_exists()
-                    .name("idx_announcement_multi_address")
                     .table(Announcement::Table)
-                    .col(Announcement::Multiaddress)
+                    .col(Announcement::AccountId)
                     .to_owned(),
             )
             .await
@@ -87,11 +105,15 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name("idx_announcement_multi_address").to_owned())
+            .drop_index(Index::drop().name("idx_announcement_account_id").to_owned())
             .await?;
 
         manager
             .drop_table(Table::drop().table(Announcement::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_index(Index::drop().name("idx_account_chain_packet_key").to_owned())
             .await?;
 
         manager

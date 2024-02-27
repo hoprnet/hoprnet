@@ -19,34 +19,47 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
-                    .col(ColumnDef::new(Ticket::Amount).string_len(50).not_null())
+                    .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
                     .col(ColumnDef::new(Ticket::Index).integer().unsigned().not_null())
                     .col(ColumnDef::new(Ticket::IndexOffset).integer().unsigned().not_null())
                     .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
-                    .col(
-                        ColumnDef::new(Ticket::ChannelEpoch)
-                            .integer()
-                            .unsigned()
-                            .not_null()
-                            .default(1),
-                    )
-                    .col(ColumnDef::new(Ticket::EthereumChallenge).binary_len(64).not_null())
-                    .col(ColumnDef::new(Ticket::Signature).binary_len(60).not_null())
-                    .col(ColumnDef::new(Ticket::AcknowledgementData).binary().not_null())
+                    .col(ColumnDef::new(Ticket::ChannelEpoch).integer().unsigned().not_null())
+                    .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
+                    .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_ticket_channel")
-                            .from(Ticket::Table, Ticket::ChannelId)
-                            .to(Channel::Table, Channel::Id)
+                            .from_tbl(Ticket::Table)
+                            .from_col(Ticket::ChannelId)
+                            .from_col(Ticket::ChannelEpoch)
+                            .to_tbl(Channel::Table)
+                            .to_col(Channel::ChannelId)
+                            .to_col(Channel::Epoch)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Restrict),
                     )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_fk_ticket_channel")
+                    .if_not_exists()
+                    .table(Ticket::Table)
+                    .col(Ticket::ChannelId)
+                    .col(Ticket::ChannelEpoch)
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(Index::drop().name("idx_fk_ticket_channel").to_owned())
+            .await?;
+
         manager.drop_table(Table::drop().table(Ticket::Table).to_owned()).await
     }
 }
@@ -61,13 +74,14 @@ enum Ticket {
     IndexOffset,
     WinningProbability,
     ChannelEpoch,
-    EthereumChallenge,
     Signature,
-    AcknowledgementData,
+    Response,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(DeriveIden)]
 enum Channel {
     Table,
-    Id,
+    ChannelId,
+    Epoch,
 }

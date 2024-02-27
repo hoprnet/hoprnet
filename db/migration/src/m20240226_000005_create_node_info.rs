@@ -25,8 +25,8 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(NodeInfo::PeerId).binary_len(40))
-                    .col(ColumnDef::new(NodeInfo::SafeBalance).string_len(50).not_null())
-                    .col(ColumnDef::new(NodeInfo::SafeAllowance).string_len(50).not_null())
+                    .col(ColumnDef::new(NodeInfo::SafeBalance).binary_len(12).not_null())
+                    .col(ColumnDef::new(NodeInfo::SafeAllowance).binary_len(12).not_null())
                     .col(ColumnDef::new(NodeInfo::OnChainData).json().not_null())
                     .col(ColumnDef::new(NodeInfo::AdditionalData).json().null())
                     .to_owned(),
