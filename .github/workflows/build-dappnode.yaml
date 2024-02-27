@@ -19,7 +19,7 @@ jobs:
 
   build:
     name: package
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository

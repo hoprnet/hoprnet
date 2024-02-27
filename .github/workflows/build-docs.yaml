@@ -19,7 +19,7 @@ concurrency:
 jobs:
   rust:
     name: Rust docs
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
