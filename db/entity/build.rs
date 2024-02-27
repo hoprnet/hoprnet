@@ -88,7 +88,7 @@ fn main() {
         "generate",
         "entity",
         "-o",
-        format!("{codegen_path}").as_str(),
+        &codegen_path,
         "-u",
         format!(
             "sqlite://{}?mode=rwc",
