@@ -33,7 +33,7 @@ jobs:
       - name: "Test script"
         run: |
           set -x
-          if [[ ${{ steps.pr-labels.outputs.labels }} =~ [[:space:]]devops[[:space:]] ]]; then
+          if [[ " ${{ steps.pr-labels.outputs.labels }} " =~ [[:space:]]devops[[:space:]] ]]; then
             echo "Found"
           else
             echo "Not found"
