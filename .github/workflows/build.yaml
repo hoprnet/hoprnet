@@ -25,6 +25,21 @@ jobs:
           - hoprd-debug
           - hopli
     steps:
+
+      - name: Get PR labels
+        id: pr-labels
+        uses: joerick/pr-labels-action@v1.0.8
+
+      - name: "Update version"
+        id: update
+        run: |
+          set -x
+          if [[ ${{ steps.pr-labels.outputs.labels }} =~ [[:space:]]devops[[:space:]] ]]; then
+            echo "Found"
+          else
+            echo "Not found"
+          fi
+          exit 1
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -54,9 +69,7 @@ jobs:
         env:
           USER: runner
 
-      - name: Get PR labels
-        id: pr-labels
-        uses: joerick/pr-labels-action@v1.0.8
+
 
       - name: "Update version"
         id: update
