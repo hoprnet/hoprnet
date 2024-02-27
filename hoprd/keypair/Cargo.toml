@@ -30,7 +30,7 @@ hopr-primitive-types = { workspace = true}
 tracing = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 
 [features]
 default = []

@@ -47,6 +47,7 @@ async-stream = "0.3.5"
 async-trait = "0.1"
 atomic_enum = "0.2.0"
 base64 = "0.21.7"
+clap = { version = "4.4", features = ["derive", "env", "string"] }
 ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"
 futures-lite = "1.12.0"
@@ -68,9 +69,11 @@ serde_json = "1.0"
 serde_with = { version = "3.3" }
 smart-default = "0.7"
 sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-async-std", "with-chrono"] }
+sea-orm-cli = { version = "0.12", features = ["codegen", "runtime-async-std-rustls"] }
 sea-orm-migration = { version = "0.12", features = ["runtime-async-std-rustls", "sqlx-sqlite", "with-chrono"]}
 sqlx = { version = "0.7.3", default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
 strum = { version = "0.25.0", features = ["derive"] }
+tempfile = "3"
 thiserror = "1.0"
 tracing = { version = "0.1" }
 tracing-futures = { version = "0.2" }
@@ -96,13 +99,14 @@ core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
+hopr-db-entity = { path = "db/entity" }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
-hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hoprd-inbox = { path = "hoprd/inbox", default-features = false }
-hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
+hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hoprd-inbox = { path = "hoprd/inbox", default-features = false }
+hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
 
 # [build]
