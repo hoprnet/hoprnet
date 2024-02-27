@@ -27,7 +27,7 @@ jobs:
     steps:
 
       - name: "Testing"
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }} && ${{ matrix.target }} == "hoprd"
+        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') && matrix.target == 'hoprd'
         run: |
           set -x
           if ${{ contains(github.event.pull_request.labels.*.name, ' deploy_nodes ') }} && ${{ matrix.target }} == "hoprd"; then
