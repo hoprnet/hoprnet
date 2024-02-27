@@ -9,6 +9,7 @@ env:
 
 on:
   merge_group:
+    types: [checks_requested]
   pull_request:
     types:
       - synchronize
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   lint:
     name: Linter
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 30
     if: github.event.pull_request.draft == false
     steps:

@@ -15,7 +15,7 @@ on:
 jobs:
   cleanup-pr:
     name: Remove cache
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 10
     steps:
       - name: Checkout hoprnet repository

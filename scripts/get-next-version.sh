@@ -100,7 +100,7 @@ fi
 
 # Adds Build information if needed
 if [ "${release_type}" = "Build" ]; then
-    new_version="${new_version}+pr.${build}"
+    new_version="${new_version}+commit.${build}"
 fi
 
 # Print results
