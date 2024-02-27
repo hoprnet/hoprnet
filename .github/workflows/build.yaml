@@ -26,17 +26,6 @@ jobs:
           - hopli
     steps:
 
-      - name: "Testing"
-        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') && matrix.target == 'hoprd'
-        run: |
-          set -x
-          if ${{ contains(github.event.pull_request.labels.*.name, ' deploy_nodes ') }} && ${{ matrix.target }} == "hoprd"; then
-            echo "OK"
-          else
-            echo "KO"
-          fi
-          exit 1
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -91,7 +80,7 @@ jobs:
           IMAGE_TARGET: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${{ matrix.target }}:${{ steps.update.outputs.DOCKER_TAG }}
 
       - name: "Restart PR deployment"
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }} && ${{ matrix.target }} == "hoprd"
+        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes') && matrix.target == 'hoprd'
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
