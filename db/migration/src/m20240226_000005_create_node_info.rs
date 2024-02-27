@@ -24,11 +24,11 @@ impl MigrationTrait for Migration {
                             .unique_key()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(NodeInfo::PeerId).binary_len(40))
+                    .col(ColumnDef::new(NodeInfo::PacketKey).binary_len(32))
                     .col(ColumnDef::new(NodeInfo::SafeBalance).binary_len(12).not_null())
                     .col(ColumnDef::new(NodeInfo::SafeAllowance).binary_len(12).not_null())
-                    .col(ColumnDef::new(NodeInfo::OnChainData).json().not_null())
-                    .col(ColumnDef::new(NodeInfo::AdditionalData).json().null())
+                    .col(ColumnDef::new(NodeInfo::SafeAddress).string_len(40).not_null())
+                    .col(ColumnDef::new(NodeInfo::ModuleAddress).string_len(40).not_null())
                     .to_owned(),
             )
             .await
@@ -45,10 +45,10 @@ impl MigrationTrait for Migration {
 enum NodeInfo {
     Table,
     Id,
-    ChainAddress, // on-chain address
-    PeerId,
+    ChainAddress,
+    PacketKey,
     SafeBalance,
     SafeAllowance,
-    OnChainData, // safe address, module address, domain separators, nr status
-    AdditionalData,
+    SafeAddress,
+    ModuleAddress,
 }

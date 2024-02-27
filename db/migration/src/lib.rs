@@ -6,6 +6,7 @@ mod m20240226_000003_create_account;
 mod m20240226_000004_create_network_registry;
 mod m20240226_000005_create_node_info;
 mod m20240226_000006_create_peer_store;
+mod m20240226_000007_create_settings;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240226_000004_create_network_registry::Migration),
             Box::new(m20240226_000005_create_node_info::Migration),
             Box::new(m20240226_000006_create_peer_store::Migration),
+            Box::new(m20240226_000007_create_settings::Migration),
         ]
     }
 }

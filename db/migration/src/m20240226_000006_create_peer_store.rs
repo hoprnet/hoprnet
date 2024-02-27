@@ -20,8 +20,8 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(NetworkPeer::PeerId)
-                            .binary_len(40)
+                        ColumnDef::new(NetworkPeer::PacketKey)
+                            .binary_len(32)
                             .not_null()
                             .unique_key(),
                     )
@@ -74,7 +74,7 @@ impl MigrationTrait for Migration {
 enum NetworkPeer {
     Table,
     Id,
-    PeerId,
+    PacketKey,
     MultiAddresses,
     Origin,
     Version,

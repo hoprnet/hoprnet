@@ -72,12 +72,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Announcement::AccountId).integer().not_null())
-                    .col(
-                        ColumnDef::new(Announcement::Multiaddress)
-                            .string()
-                            .unique_key()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Announcement::Multiaddress).string().not_null())
                     .col(ColumnDef::new(Announcement::AtBlock).integer().unsigned().not_null())
                     .foreign_key(
                         ForeignKey::create()
