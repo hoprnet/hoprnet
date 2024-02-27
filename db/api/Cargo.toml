@@ -1,0 +1,17 @@
+[package]
+name = "hopr-db-api"
+version = "0.1.0"
+edition = "2021"
+description = "Contains general DB functionality to be used by other crates in the code base"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+
+[dependencies]
+sqlx = { workspace = true }
+
+hopr-db-entity = { workspace = true }
+hopr-db-migration = { workspace = true }
+
+
