@@ -26,19 +26,6 @@ jobs:
           - hopli
     steps:
 
-      - name: Get PR labels
-        id: pr-labels
-        uses: joerick/pr-labels-action@v1.0.8
-
-      - name: "Test script"
-        run: |
-          set -x
-          if [[ " ${{ steps.pr-labels.outputs.labels }} " =~ [[:space:]]devops[[:space:]] ]]; then
-            echo "Found"
-          else
-            echo "Not found"
-          fi
-          exit 1
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -68,19 +55,17 @@ jobs:
         env:
           USER: runner
 
-
+      - name: Get PR labels
+        id: pr-labels
+        uses: joerick/pr-labels-action@v1.0.8
 
       - name: "Update version"
         id: update
         run: |
           set -x
           short_sha=$(git rev-parse --short HEAD)
-          if ${{ contains(steps.pr-labels.outputs.labels, 'devops') }} then
-            # docker_tag=$(./scripts/get-current-version.sh docker)
-            # echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
-            next_version=$(./scripts/get-next-version.sh Build ${short_sha}
-            ./scripts/bump-version.sh ${next_version}
-            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+          if [[ " ${{ steps.pr-labels.outputs.labels }} " =~ [[:space:]]release[[:space:]] ]]; then
+            docker_tag=$(./scripts/get-current-version.sh docker)
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           else
             next_version=$(./scripts/get-next-version.sh Build ${short_sha}
