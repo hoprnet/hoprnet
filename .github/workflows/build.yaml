@@ -62,10 +62,13 @@ jobs:
         id: update
         run: |
           set -x
-          echo ${{ steps.pr-labels.outputs.labels }}
           short_sha=$(git rev-parse --short HEAD)
-          if ${{ contains(steps.pr-labels.outputs.labels, 'release') }}; then
-            docker_tag=$(./scripts/get-current-version.sh docker)
+          if ${{ contains(steps.pr-labels.outputs.labels, 'devops') }} then
+            # docker_tag=$(./scripts/get-current-version.sh docker)
+            # echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
+            next_version=$(./scripts/get-next-version.sh Build ${short_sha}
+            ./scripts/bump-version.sh ${next_version}
+            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           else
             next_version=$(./scripts/get-next-version.sh Build ${short_sha}
