@@ -3,6 +3,7 @@ use std::ops::{Add, Sub};
 
 use async_trait::async_trait;
 use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::AcknowledgedTicketStatus::Untouched;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, trace};
@@ -51,7 +52,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         }
     }
 
-    pub async fn init_cache(&mut self) -> Result<()> {
+    pub async fn init_tickets_and_cache(&mut self) -> Result<()> {
         // let channels = self.get_channels().await?;
         // info!("Cleaning up invalid tickets from {} tracked channels...", channels.len());
         // for channel in channels.iter() {
@@ -68,7 +69,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone + Send + Sync
         let tickets = self.get_acknowledged_tickets(None).await?;
         debug!("Calculating unrealized balance for {} tickets...", tickets.len());
 
-        for ack_ticket in tickets.into_iter() {
+        for mut ack_ticket in tickets.into_iter() {
+            if ack_ticket.status != Untouched {
+                ack_ticket.status = Untouched;
+                self.update_acknowledged_ticket(&ack_ticket).await?;
+                debug!("reset state of {ack_ticket} back to untouched at init");
+            }
+
             let ticket = ack_ticket.ticket;
             // get the corresponding channel info from the cached_channel, or from the db
             let (channel_epoch, ticket_index) = {
@@ -2143,7 +2150,7 @@ mod tests {
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         assert_eq!(unrealized_balance, Ok(channel.balance));
 
-        db.init_cache()
+        db.init_tickets_and_cache()
             .await
             .expect("should initialize cache without any issues");
 
@@ -2203,7 +2210,7 @@ mod tests {
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         assert_eq!(unrealized_balance, Ok(current_channel_total_balance));
 
-        db.init_cache()
+        db.init_tickets_and_cache()
             .await
             .expect("should initialize cache without any issues");
 

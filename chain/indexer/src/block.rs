@@ -191,6 +191,18 @@ where
                         block_with_logs
                     }
                 })
+                .then(|block_with_logs| async {
+                    if let Err(error) = db
+                        .write()
+                        .await
+                        .update_latest_block_number(block_with_logs.block_id as u32)
+                        .await
+                    {
+                        error!("failed to write the latest block number into the database: {error}");
+                    }
+
+                    block_with_logs
+                })
                 .flat_map(|mut block_with_logs| {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
@@ -198,15 +210,6 @@ where
                     stream::iter(block_with_logs.logs)
                 })
                 .then(|log| async {
-                    if let Err(error) = db
-                        .write()
-                        .await
-                        .update_latest_block_number(log.block_number as u32)
-                        .await
-                    {
-                        error!("failed to write the latest block number into the database: {error}");
-                    }
-
                     let snapshot = Snapshot::new(
                         U256::from(log.block_number),
                         U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB

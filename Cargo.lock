@@ -1048,7 +1048,7 @@ dependencies = [
 name = "chain-actions"
 version = "0.5.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
@@ -1080,7 +1080,7 @@ dependencies = [
 name = "chain-api"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
@@ -1121,7 +1121,7 @@ dependencies = [
 name = "chain-indexer"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
@@ -1455,10 +1455,14 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
 name = "core-network"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-std",
+ "async-stream",
  "async-trait",
+ "atomic_enum",
+ "bincode",
+ "chrono",
  "futures",
  "futures-lite 1.13.0",
  "hopr-crypto-random",
@@ -1472,9 +1476,13 @@ dependencies = [
  "mockall",
  "more-asserts",
  "multiaddr",
+ "num_enum",
+ "sea-query",
+ "sea-query-binder",
  "serde",
  "serde_with",
  "smart-default",
+ "sqlx",
  "strum 0.25.0",
  "thiserror",
  "tracing",
@@ -1503,6 +1511,7 @@ dependencies = [
 name = "core-packet"
 version = "0.7.0"
 dependencies = [
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1527,7 +1536,7 @@ dependencies = [
 name = "core-path"
 version = "0.3.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1552,7 +1561,7 @@ dependencies = [
 name = "core-protocol"
 version = "0.2.3"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1587,9 +1596,9 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
@@ -1623,9 +1632,9 @@ dependencies = [
 
 [[package]]
 name = "core-transport"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-db",
@@ -1651,6 +1660,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "utils-db",
+ "uuid 1.7.0",
  "validator",
 ]
 
@@ -1890,12 +1900,36 @@ dependencies = [
 
 [[package]]
 name = "darling"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b750cb3417fd1b327431a470f388520309479ab0bf5e323505daf0290cd3850"
+dependencies = [
+ "darling_core 0.14.4",
+ "darling_macro 0.14.4",
+]
+
+[[package]]
+name = "darling"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
 dependencies = [
- "darling_core",
- "darling_macro",
+ "darling_core 0.20.3",
+ "darling_macro 0.20.3",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "109c1ca6e6b7f82cc233a97004ea8ed7ca123a9af07a8230878fcfda9b158bf0"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1914,11 +1948,22 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
+dependencies = [
+ "darling_core 0.14.4",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "darling_macro"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
 dependencies = [
- "darling_core",
+ "darling_core 0.20.3",
  "quote",
  "syn 2.0.48",
 ]
@@ -3333,7 +3378,7 @@ dependencies = [
 name = "hopr-lib"
 version = "2.1.0-rc.3"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "atomic_enum",
  "chain-actions",
@@ -3389,7 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "bincode",
  "hex",
@@ -3397,7 +3442,6 @@ dependencies = [
  "hopr-crypto-random",
  "primitive-types",
  "regex",
- "ringbuffer",
  "rlp",
  "serde",
  "strum 0.25.0",
@@ -3409,7 +3453,7 @@ name = "hoprd"
 version = "2.1.0"
 dependencies = [
  "async-broadcast",
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "chrono",
  "clap",
@@ -3442,6 +3486,7 @@ name = "hoprd-api"
 version = "0.2.1"
 dependencies = [
  "async-broadcast",
+ "async-lock 3.3.0",
  "async-std",
  "const_format",
  "futures",
@@ -3470,7 +3515,7 @@ dependencies = [
 name = "hoprd-inbox"
 version = "0.2.0"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "hopr-internal-types",
@@ -3501,7 +3546,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "typenum",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -3598,7 +3643,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml 0.8.8",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -3786,6 +3831,17 @@ name = "infer"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64e9829a50b42bb782c1df523f78d332fe371b10c661e78b7a3c34b0198e9fac"
+
+[[package]]
+name = "inherent"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0122b7114117e64a63ac49f752a5ca4624d534c7b1c7de796ac196381cd2d947"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
 
 [[package]]
 name = "inout"
@@ -5915,6 +5971,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
+dependencies = [
+ "base64 0.21.7",
+]
+
+[[package]]
 name = "rustls-webpki"
 version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6053,6 +6118,54 @@ checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
 dependencies = [
  "ring 0.17.7",
  "untrusted 0.9.0",
+]
+
+[[package]]
+name = "sea-query"
+version = "0.30.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4166a1e072292d46dc91f31617c2a1cdaf55a8be4b5c9f4bf2ba248e3ac4999b"
+dependencies = [
+ "chrono",
+ "inherent",
+ "sea-query-attr",
+ "sea-query-derive",
+]
+
+[[package]]
+name = "sea-query-attr"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "878cf3d57f0e5bfacd425cdaccc58b4c06d68a7b71c63fc28710a20c88676808"
+dependencies = [
+ "darling 0.14.4",
+ "heck",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "sea-query-binder"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36bbb68df92e820e4d5aeb17b4acd5cc8b5d18b2c36a4dd6f4626aabfa7ab1b9"
+dependencies = [
+ "chrono",
+ "sea-query",
+ "sqlx",
+]
+
+[[package]]
+name = "sea-query-derive"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a82fcb49253abcb45cdcb2adf92956060ec0928635eb21b4f7a6d8f25ab0bc"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+ "thiserror",
 ]
 
 [[package]]
@@ -6230,7 +6343,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93634eb5f75a2323b16de4748022ac4297f9e76b6dced2be287a099f41b5e788"
 dependencies = [
- "darling",
+ "darling 0.20.3",
  "proc-macro2",
  "quote",
  "syn 2.0.48",
@@ -6600,6 +6713,7 @@ dependencies = [
  "atoi",
  "byteorder",
  "bytes 1.5.0",
+ "chrono",
  "crc 3.0.1",
  "crossbeam-queue",
  "dotenvy",
@@ -6618,6 +6732,8 @@ dependencies = [
  "once_cell",
  "paste",
  "percent-encoding",
+ "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -6626,6 +6742,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "url",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -6660,6 +6777,8 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "sqlx-core",
+ "sqlx-mysql",
+ "sqlx-postgres",
  "sqlx-sqlite",
  "syn 1.0.109",
  "tempfile",
@@ -6677,6 +6796,7 @@ dependencies = [
  "bitflags 2.4.2",
  "byteorder",
  "bytes 1.5.0",
+ "chrono",
  "crc 3.0.1",
  "digest 0.10.7",
  "dotenvy",
@@ -6697,6 +6817,7 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "rsa",
+ "serde",
  "sha1 0.10.6",
  "sha2 0.10.8",
  "smallvec",
@@ -6717,6 +6838,7 @@ dependencies = [
  "base64 0.21.7",
  "bitflags 2.4.2",
  "byteorder",
+ "chrono",
  "crc 3.0.1",
  "dotenvy",
  "etcetera",
@@ -6753,6 +6875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "210976b7d948c7ba9fced8ca835b11cbb2d677c59c79de41ac0d397e14547490"
 dependencies = [
  "atoi",
+ "chrono",
  "flume 0.11.0",
  "futures-channel",
  "futures-core",
@@ -7159,7 +7282,7 @@ dependencies = [
  "tide",
  "tracing",
  "tracing-futures",
- "uuid 1.6.1",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -7744,11 +7867,12 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
+checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
 dependencies = [
  "getrandom 0.2.12",
+ "rand 0.8.5",
  "serde",
 ]
 
