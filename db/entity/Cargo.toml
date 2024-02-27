@@ -1,5 +1,5 @@
 [package]
-name = "hopr-entity"
+name = "hopr-db-entity"
 description = "Contains all HOPR database entities"
 version = "0.1.0"
 edition = "2021"

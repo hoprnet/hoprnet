@@ -3461,15 +3461,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-migration"
+name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
- "async-std",
- "sea-orm-migration",
+ "hopr-db-entity",
+ "hopr-db-migration",
+ "sqlx",
 ]
 
 [[package]]
-name = "hopr-entity"
+name = "hopr-db-entity"
 version = "0.1.0"
 dependencies = [
  "async-std",
@@ -3477,6 +3478,14 @@ dependencies = [
  "hopr-db-migration",
  "sea-orm",
  "sea-orm-cli",
+ "sea-orm-migration",
+]
+
+[[package]]
+name = "hopr-db-migration"
+version = "0.1.0"
+dependencies = [
+ "async-std",
  "sea-orm-migration",
 ]
 

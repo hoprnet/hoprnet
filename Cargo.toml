@@ -18,6 +18,7 @@ members = [
     "chain/indexer",
     "chain/types",
     "chain/rpc",
+    "db/api",
     "db/migration",
     "db/entity",
     "ethereum/bindings",
@@ -36,7 +37,7 @@ members = [
     "transport/packet",
     "transport/protocol",
     "transport/p2p",
-    "transport/api",
+    "transport/api", "db/api",
 ]
 
 [workspace.dependencies]
@@ -99,7 +100,9 @@ core-p2p = { path = "transport/p2p", default-features = false }
 core-strategy = { path = "logic/strategy", default-features = false }
 core-transport = { path = "transport/api", default-features = false }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
+hopr-db-api = { path = "db/api" }
 hopr-db-entity = { path = "db/entity" }
+hopr-db-migration = { path = "db/migration" }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-platform = { path = "misc/platform" }
