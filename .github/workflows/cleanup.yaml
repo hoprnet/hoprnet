@@ -55,7 +55,7 @@ jobs:
           date=`date +%Y-%m-%d'T'%H:%M'Z' -d "60 days ago"`
           images=('hopli' 'hoprd')
           for image in "${images[@]}"; do
-            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-pr.")).version')
+            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-commit.")).version')
             old_untagged_images=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | length == 0).version')
             old_image_tags=($(echo -e "${old_pr_image_tags}\n${old_untagged_images}" | sed '/^$/d' | tr '\n' ' '))
             for old_image_tag in "$old_image_tags[@]"; do
