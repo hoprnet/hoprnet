@@ -9,7 +9,13 @@ license = "GPL-3.0-only"
 
 
 [dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
 sqlx = { workspace = true }
+sea-orm = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }

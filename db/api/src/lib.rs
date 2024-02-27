@@ -1,1 +1,40 @@
+pub mod channels;
+pub mod db;
+pub mod errors;
+pub mod tickets;
 
+pub use sea_orm::DatabaseTransaction;
+
+use async_trait::async_trait;
+use futures::future::BoxFuture;
+use sea_orm::TransactionTrait;
+
+use crate::db::HoprDb;
+use crate::errors::Result;
+
+#[async_trait]
+pub trait HoprDbGeneralModelOperations {
+    async fn begin_transaction(&self) -> Result<DatabaseTransaction>;
+
+    async fn transaction<F, T, E>(&self, callback: F) -> Result<T>
+    where
+        F: for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, std::result::Result<T, E>> + Send,
+        T: Send,
+        E: std::error::Error + Send;
+}
+
+#[async_trait]
+impl HoprDbGeneralModelOperations for HoprDb {
+    async fn begin_transaction(&self) -> Result<DatabaseTransaction> {
+        Ok(self.db.begin_with_config(None, None).await?)
+    }
+
+    async fn transaction<F, T, E>(&self, callback: F) -> Result<T>
+    where
+        F: for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, std::result::Result<T, E>> + Send,
+        T: Send,
+        E: std::error::Error + Send,
+    {
+        Ok(self.db.transaction_with_config(callback, None, None).await?)
+    }
+}

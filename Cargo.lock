@@ -3464,9 +3464,15 @@ dependencies = [
 name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "futures",
  "hopr-db-entity",
  "hopr-db-migration",
+ "sea-orm",
+ "smart-default",
  "sqlx",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
