@@ -1,5 +1,6 @@
 use sea_orm_codegen::{
-    DateTimeCrate as CodegenDateTimeCrate, EntityTransformer, EntityWriterContext, OutputFile, WithSerde,
+    DateTimeCrate as CodegenDateTimeCrate, EntityTransformer, EntityWriterContext, OutputFile,
+    WithSerde,
 };
 use std::{error::Error, fs, io::Write, path::Path, process::Command, str::FromStr};
 use tracing_subscriber::{prelude::*, EnvFilter};
@@ -7,7 +8,10 @@ use url::Url;
 
 use crate::{DateTimeCrate, GenerateSubcommands};
 
-pub async fn run_generate_command(command: GenerateSubcommands, verbose: bool) -> Result<(), Box<dyn Error>> {
+pub async fn run_generate_command(
+    command: GenerateSubcommands,
+    verbose: bool,
+) -> Result<(), Box<dyn Error>> {
     match command {
         GenerateSubcommands::Entity {
             compact_format: _,
@@ -60,7 +64,8 @@ pub async fn run_generate_command(command: GenerateSubcommands, verbose: bool) -
             let is_sqlite = url.scheme() == "sqlite";
 
             // Closures for filtering tables
-            let filter_tables = |table: &String| -> bool { tables.is_empty() || tables.contains(table) };
+            let filter_tables =
+                |table: &String| -> bool { tables.is_empty() || tables.contains(table) };
 
             let filter_hidden_tables = |table: &str| -> bool {
                 if include_hidden_tables {
@@ -80,13 +85,21 @@ pub async fn run_generate_command(command: GenerateSubcommands, verbose: bool) -
                 // information from a particular database
                 let database_name = url
                     .path_segments()
-                    .unwrap_or_else(|| panic!("There is no database name as part of the url path: {}", url.as_str()))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "There is no database name as part of the url path: {}",
+                            url.as_str()
+                        )
+                    })
                     .next()
                     .unwrap();
 
                 // An empty string as the database name is also an error
                 if database_name.is_empty() {
-                    panic!("There is no database name as part of the url path: {}", url.as_str());
+                    panic!(
+                        "There is no database name as part of the url path: {}",
+                        url.as_str()
+                    );
                 }
 
                 database_name
@@ -139,7 +152,8 @@ pub async fn run_generate_command(command: GenerateSubcommands, verbose: bool) -
 
                     println!("Connecting to Postgres ...");
                     let schema = &database_schema;
-                    let connection = connect::<Postgres>(max_connections, url.as_str(), Some(schema)).await?;
+                    let connection =
+                        connect::<Postgres>(max_connections, url.as_str(), Some(schema)).await?;
                     println!("Discovering schema ...");
                     let schema_discovery = SchemaDiscovery::new(connection, schema);
                     let schema = schema_discovery.discover().await?;
@@ -200,7 +214,11 @@ pub async fn run_generate_command(command: GenerateSubcommands, verbose: bool) -
     Ok(())
 }
 
-async fn connect<DB>(max_connections: u32, url: &str, schema: Option<&str>) -> Result<sqlx::Pool<DB>, Box<dyn Error>>
+async fn connect<DB>(
+    max_connections: u32,
+    url: &str,
+    schema: Option<&str>,
+) -> Result<sqlx::Pool<DB>, Box<dyn Error>>
 where
     DB: sqlx::Database,
     for<'a> &'a mut <DB as sqlx::Database>::Connection: sqlx::Executor<'a>,
@@ -212,7 +230,11 @@ where
         let sql = format!("SET search_path = '{schema}'");
         pool_options = pool_options.after_connect(move |conn, _| {
             let sql = sql.clone();
-            Box::pin(async move { sqlx::Executor::execute(conn, sql.as_str()).await.map(|_| ()) })
+            Box::pin(async move {
+                sqlx::Executor::execute(conn, sql.as_str())
+                    .await
+                    .map(|_| ())
+            })
         });
     }
     pool_options.connect(url).await.map_err(Into::into)
@@ -235,7 +257,9 @@ mod tests {
     use crate::{Cli, Commands};
 
     #[test]
-    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: RelativeUrlWithoutBase")]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: RelativeUrlWithoutBase"
+    )]
     fn test_generate_entity_no_protocol() {
         let cli = Cli::parse_from([
             "sea-orm-cli",
@@ -275,7 +299,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "There is no database name as part of the url path: mysql://root:root@localhost:3306/")]
+    #[should_panic(
+        expected = "There is no database name as part of the url path: mysql://root:root@localhost:3306/"
+    )]
     fn test_generate_entity_no_database_path() {
         let cli = Cli::parse_from([
             "sea-orm-cli",
