@@ -20,4 +20,9 @@ tracing = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 
+[features]
+default = ["ticket", "registry", "peers"]
+ticket = []
+registry = []
+peers = []
 

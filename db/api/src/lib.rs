@@ -1,7 +1,14 @@
 pub mod channels;
 pub mod db;
 pub mod errors;
+
+#[cfg(feature = "peers")]
+pub mod peers;
+#[cfg(feature = "ticket")]
 pub mod tickets;
+
+#[cfg(feature = "registry")]
+pub mod registry;
 
 pub use sea_orm::DatabaseTransaction;
 
