@@ -1,3 +1,4 @@
+use migration::{Migrator, MigratorTrait};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -43,16 +44,32 @@ impl HoprDb {
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        Self::new_sqlx_sqlite(pool)
+        Self::new_sqlx_sqlite(pool).await
     }
 
     pub async fn new_in_memory() -> Self {
-        Self::new_sqlx_sqlite(SqlitePool::connect(":memory:").await.unwrap())
+        Self::new_sqlx_sqlite(SqlitePool::connect(":memory:").await.unwrap()).await
     }
 
-    fn new_sqlx_sqlite(pool: SqlitePool) -> Self {
-        Self {
-            db: SqlxSqliteConnector::from_sqlx_sqlite_pool(pool),
-        }
+    async fn new_sqlx_sqlite(pool: SqlitePool) -> Self {
+        let db = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
+
+        Migrator::up(&db, None).await.expect("cannot apply database migration");
+
+        Self { db }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::HoprDb;
+    use crate::HoprDbGeneralModelOperations;
+    use migration::{Migrator, MigratorTrait};
+
+    #[async_std::test]
+    async fn test_basic_db_init() {
+        let db = HoprDb::new_in_memory().await;
+
+        Migrator::status(db.conn()).await.expect("status must be ok");
     }
 }

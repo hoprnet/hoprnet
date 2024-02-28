@@ -24,6 +24,9 @@ hopr-db-migration = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
+[dev-dependencies]
+async-std = { workspace = true, features = ["attributes"] }
+
 [features]
 default = ["ticket", "registry", "peers"]
 ticket = []

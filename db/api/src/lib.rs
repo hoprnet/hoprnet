@@ -10,6 +10,7 @@ pub mod tickets;
 #[cfg(feature = "registry")]
 pub mod registry;
 
+pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 
 use async_trait::async_trait;
@@ -21,6 +22,8 @@ use crate::errors::Result;
 
 #[async_trait]
 pub trait HoprDbGeneralModelOperations {
+    fn conn(&self) -> &DatabaseConnection;
+
     async fn begin_transaction(&self) -> Result<DatabaseTransaction>;
 
     async fn transaction<F, T, E>(&self, callback: F) -> Result<T>
@@ -32,6 +35,10 @@ pub trait HoprDbGeneralModelOperations {
 
 #[async_trait]
 impl HoprDbGeneralModelOperations for HoprDb {
+    fn conn(&self) -> &DatabaseConnection {
+        &self.db
+    }
+
     async fn begin_transaction(&self) -> Result<DatabaseTransaction> {
         Ok(self.db.begin_with_config(None, None).await?)
     }
