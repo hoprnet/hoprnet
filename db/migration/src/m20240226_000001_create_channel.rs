@@ -42,6 +42,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0), // Default set in the SC
                     )
+                    .col(ColumnDef::new(Channel::ClosureTime).timestamp().null())
                     .to_owned(),
             )
             .await?;
@@ -127,4 +128,5 @@ enum Channel {
     Balance,
     TicketIndex,
     Epoch,
+    ClosureTime,
 }

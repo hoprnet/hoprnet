@@ -10,6 +10,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-trait = { workspace = true }
+chrono = { workspace = true }
 futures = { workspace = true }
 sqlx = { workspace = true }
 sea-orm = { workspace = true }
@@ -17,8 +18,11 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [features]
 default = ["ticket", "registry", "peers"]

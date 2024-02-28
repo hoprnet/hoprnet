@@ -3465,9 +3465,13 @@ name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "futures",
+ "hopr-crypto-types",
  "hopr-db-entity",
  "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "sea-orm",
  "smart-default",
  "sqlx",
