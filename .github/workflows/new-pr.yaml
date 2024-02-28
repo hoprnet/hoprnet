@@ -14,7 +14,7 @@ concurrency:
 jobs:
   draft:
     name: Convert to draft
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 10
     if: ${{ github.event.pull_request.draft == false && ! contains(github.event.sender.login, 'hopr-bot') }}
     steps:

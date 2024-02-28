@@ -165,7 +165,7 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
@@ -229,7 +229,7 @@ where
 #[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + Sync + 'static,
     T: Send + Sync,
     U: Send + Sync,
@@ -511,7 +511,7 @@ mod tests {
         dbs
     }
 
-    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db_alice: Arc<RwLock<Db>>,
         db_bob: Arc<RwLock<Db>>,
         key_alice: &ChainKeypair,

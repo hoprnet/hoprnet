@@ -75,7 +75,7 @@ pub enum AggregationList {
 }
 
 impl AggregationList {
-    pub async fn rollback<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<()> {
+    pub async fn rollback<Db: HoprCoreEthereumDbActions + std::fmt::Debug>(self, db: Arc<RwLock<Db>>) -> Result<()> {
         let tickets = match self {
             AggregationList::WholeChannel(channel) => {
                 db.read()
@@ -110,17 +110,19 @@ impl AggregationList {
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
             .filter(|r| *r)
-            .count();
+            .count()
+            .await;
 
         warn!("reverted {reverted} ack tickets to untouched state");
         Ok(())
     }
 
-    async fn into_vec<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<Vec<AcknowledgedTicket>> {
+    #[tracing::instrument(level = "debug", skip(self, db))]
+    async fn into_vec<Db: HoprCoreEthereumDbActions + std::fmt::Debug>(
+        self,
+        db: Arc<RwLock<Db>>,
+    ) -> Result<Vec<AcknowledgedTicket>> {
         let list = match self {
             AggregationList::WholeChannel(channel) => {
                 db.write()
@@ -203,12 +205,12 @@ pub enum TicketAggregationProcessed<T, U> {
 }
 
 /// Implements protocol ticket aggregation logic for acknowledgements
-pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions> {
+pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions + std::fmt::Debug> {
     db: Arc<RwLock<Db>>,
     chain_key: ChainKeypair,
 }
 
-impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
+impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> Clone for TicketAggregationProcessor<Db> {
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
@@ -217,7 +219,7 @@ impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
+impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor<Db> {
     pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
         Self {
             db,
@@ -338,11 +340,13 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
-        self.db
-            .write()
-            .await
-            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
-            .await?;
+        {
+            self.db
+                .write()
+                .await
+                .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
+                .await?;
+        }
 
         Ticket::new(
             &destination,
@@ -455,15 +459,12 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             return Err(ProtocolTicketAggregation("Aggregated ticket is invalid".into()));
         }
 
-        info!("storing received aggregated {acked_aggregated_ticket}");
-
         self.db
             .write()
             .await
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
-        info!("ensure the current ticket index is not smaller than the the aggregated ticket index + offset");
         self.db
             .write()
             .await
@@ -625,7 +626,7 @@ where
     U: Send,
 {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db: Arc<RwLock<Db>>,
         chain_key: &ChainKeypair,
     ) -> Self {

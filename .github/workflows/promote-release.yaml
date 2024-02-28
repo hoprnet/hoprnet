@@ -26,7 +26,7 @@ concurrency:
 jobs:
   promote_release:
     name: Promote Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
 
       - name: Checkout hoprnet repository

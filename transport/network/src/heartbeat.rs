@@ -29,7 +29,6 @@ lazy_static::lazy_static! {
 
 use async_std::task::sleep;
 use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
@@ -75,7 +74,7 @@ fn default_heartbeat_variance() -> std::time::Duration {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HeartbeatExternalApi {
-    async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
+    async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<PeerId>;
 }
 
 /// Heartbeat mechanism providing the regular trigger and processing for the heartbeat protocol.
@@ -112,14 +111,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let start = current_time();
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-            info!(
-                "Starting a heartbeat round for peers since timestamp {:?}",
-                from_timestamp.as_unix_timestamp()
-            );
-            let peers = self
-                .external_api
-                .get_peers(from_timestamp.as_unix_timestamp().as_millis() as u64)
-                .await;
+            info!("Starting a heartbeat round for peers since timestamp {from_timestamp:?}");
+            let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
             let this_round_planned_duration = std::time::Duration::from_millis({
@@ -205,7 +198,7 @@ mod tests {
             ..simple_heartbeat_config()
         };
 
-        let ping_delay = 2 * config.interval;
+        let ping_delay = 2 * config.interval + config.interval / 2;
         let expected_loop_count = 2;
 
         let mut mock = MockHeartbeatExternalApi::new();

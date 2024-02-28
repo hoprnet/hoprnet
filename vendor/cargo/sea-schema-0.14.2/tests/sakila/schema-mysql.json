@@ -1,0 +1,2510 @@
+{
+    "tables": [
+        {
+            "name": "actor",
+            "columns": [
+                {
+                    "name": "actor_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "first_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_actor_last_name",
+                    "columns": [
+                        "last_name"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "actor_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": []
+        },
+        {
+            "name": "address",
+            "columns": [
+                {
+                    "name": "address_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "city_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "address",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "address2",
+                    "type": "string",
+                    "notNull": false,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "district",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 20,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "postal_code",
+                    "type": "string",
+                    "notNull": false,
+                    "default": null,
+                    "length": 10,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "phone",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 20,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "location",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_city_id",
+                    "columns": [
+                        "city_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_location",
+                    "columns": [
+                        "location"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [
+                        "spatial"
+                    ],
+                    "options": {
+                        "lengths": [
+                            32
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "address_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_address_city",
+                    "localTable": "address",
+                    "foreignTable": "city",
+                    "localColumns": [
+                        "city_id"
+                    ],
+                    "foreignColumns": [
+                        "city_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "category",
+            "columns": [
+                {
+                    "name": "category_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 25,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "category_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": []
+        },
+        {
+            "name": "city",
+            "columns": [
+                {
+                    "name": "city_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "country_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "city",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_country_id",
+                    "columns": [
+                        "country_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "city_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_city_country",
+                    "localTable": "city",
+                    "foreignTable": "country",
+                    "localColumns": [
+                        "country_id"
+                    ],
+                    "foreignColumns": [
+                        "country_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "country",
+            "columns": [
+                {
+                    "name": "country_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "country",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "country_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": []
+        },
+        {
+            "name": "customer",
+            "columns": [
+                {
+                    "name": "customer_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "store_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "address_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "first_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "email",
+                    "type": "string",
+                    "notNull": false,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": "1",
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "create_date",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": false,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_address_id",
+                    "columns": [
+                        "address_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_store_id",
+                    "columns": [
+                        "store_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_last_name",
+                    "columns": [
+                        "last_name"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "customer_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_customer_address",
+                    "localTable": "customer",
+                    "foreignTable": "address",
+                    "localColumns": [
+                        "address_id"
+                    ],
+                    "foreignColumns": [
+                        "address_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_customer_store",
+                    "localTable": "customer",
+                    "foreignTable": "store",
+                    "localColumns": [
+                        "store_id"
+                    ],
+                    "foreignColumns": [
+                        "store_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "film",
+            "columns": [
+                {
+                    "name": "film_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "language_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "original_language_id",
+                    "type": "boolean",
+                    "notNull": false,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "title",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 128,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "notNull": false,
+                    "default": null,
+                    "length": 65535,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "release_year",
+                    "type": "date",
+                    "notNull": false,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "rental_duration",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": "3",
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "rental_rate",
+                    "type": "decimal",
+                    "notNull": true,
+                    "default": "4.99",
+                    "length": null,
+                    "fixed": false,
+                    "precision": 4,
+                    "scale": 2,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "length",
+                    "type": "smallint",
+                    "notNull": false,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "replacement_cost",
+                    "type": "decimal",
+                    "notNull": true,
+                    "default": "19.99",
+                    "length": null,
+                    "fixed": false,
+                    "precision": 5,
+                    "scale": 2,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "rating",
+                    "type": "string",
+                    "notNull": false,
+                    "default": "G",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "special_features",
+                    "type": "simple_array",
+                    "notNull": false,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_language_id",
+                    "columns": [
+                        "language_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_original_language_id",
+                    "columns": [
+                        "original_language_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_title",
+                    "columns": [
+                        "title"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "film_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_film_language",
+                    "localTable": "film",
+                    "foreignTable": "language",
+                    "localColumns": [
+                        "language_id"
+                    ],
+                    "foreignColumns": [
+                        "language_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_film_language_original",
+                    "localTable": "film",
+                    "foreignTable": "language",
+                    "localColumns": [
+                        "original_language_id"
+                    ],
+                    "foreignColumns": [
+                        "language_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "film_actor",
+            "columns": [
+                {
+                    "name": "actor_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "film_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_film_id",
+                    "columns": [
+                        "film_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "actor_id",
+                        "film_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null,
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "IDX_DD19A8A910DAF24A",
+                    "columns": [
+                        "actor_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": []
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_film_actor_actor",
+                    "localTable": "film_actor",
+                    "foreignTable": "actor",
+                    "localColumns": [
+                        "actor_id"
+                    ],
+                    "foreignColumns": [
+                        "actor_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_film_actor_film",
+                    "localTable": "film_actor",
+                    "foreignTable": "film",
+                    "localColumns": [
+                        "film_id"
+                    ],
+                    "foreignColumns": [
+                        "film_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "film_category",
+            "columns": [
+                {
+                    "name": "film_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "category_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "fk_film_category_category",
+                    "columns": [
+                        "category_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "film_id",
+                        "category_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null,
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "IDX_A4CBD6A8567F5183",
+                    "columns": [
+                        "film_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": []
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_film_category_category",
+                    "localTable": "film_category",
+                    "foreignTable": "category",
+                    "localColumns": [
+                        "category_id"
+                    ],
+                    "foreignColumns": [
+                        "category_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_film_category_film",
+                    "localTable": "film_category",
+                    "foreignTable": "film",
+                    "localColumns": [
+                        "film_id"
+                    ],
+                    "foreignColumns": [
+                        "film_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "film_text",
+            "columns": [
+                {
+                    "name": "film_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "title",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 255,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "notNull": false,
+                    "default": null,
+                    "length": 65535,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_title_description",
+                    "columns": [
+                        "title",
+                        "description"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [
+                        "fulltext"
+                    ],
+                    "options": {
+                        "lengths": [
+                            null,
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "film_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": []
+        },
+        {
+            "name": "inventory",
+            "columns": [
+                {
+                    "name": "inventory_id",
+                    "type": "integer",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "film_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "store_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_film_id",
+                    "columns": [
+                        "film_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_store_id_film_id",
+                    "columns": [
+                        "store_id",
+                        "film_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null,
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "inventory_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "IDX_B12D4A36B092A811",
+                    "columns": [
+                        "store_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": []
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_inventory_film",
+                    "localTable": "inventory",
+                    "foreignTable": "film",
+                    "localColumns": [
+                        "film_id"
+                    ],
+                    "foreignColumns": [
+                        "film_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_inventory_store",
+                    "localTable": "inventory",
+                    "foreignTable": "store",
+                    "localColumns": [
+                        "store_id"
+                    ],
+                    "foreignColumns": [
+                        "store_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "language",
+            "columns": [
+                {
+                    "name": "language_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 20,
+                    "fixed": true,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "language_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": []
+        },
+        {
+            "name": "payment",
+            "columns": [
+                {
+                    "name": "payment_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "customer_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "staff_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "rental_id",
+                    "type": "integer",
+                    "notNull": false,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "amount",
+                    "type": "decimal",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 5,
+                    "scale": 2,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "payment_date",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": false,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "fk_payment_rental",
+                    "columns": [
+                        "rental_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_customer_id",
+                    "columns": [
+                        "customer_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_staff_id",
+                    "columns": [
+                        "staff_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "payment_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_payment_customer",
+                    "localTable": "payment",
+                    "foreignTable": "customer",
+                    "localColumns": [
+                        "customer_id"
+                    ],
+                    "foreignColumns": [
+                        "customer_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_payment_rental",
+                    "localTable": "payment",
+                    "foreignTable": "rental",
+                    "localColumns": [
+                        "rental_id"
+                    ],
+                    "foreignColumns": [
+                        "rental_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": "SET NULL",
+                    "options": []
+                },
+                {
+                    "name": "fk_payment_staff",
+                    "localTable": "payment",
+                    "foreignTable": "staff",
+                    "localColumns": [
+                        "staff_id"
+                    ],
+                    "foreignColumns": [
+                        "staff_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "rental",
+            "columns": [
+                {
+                    "name": "rental_id",
+                    "type": "integer",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "inventory_id",
+                    "type": "integer",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "customer_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "staff_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "rental_date",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "return_date",
+                    "type": "datetime",
+                    "notNull": false,
+                    "default": null,
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_customer_id",
+                    "columns": [
+                        "customer_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_inventory_id",
+                    "columns": [
+                        "inventory_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_staff_id",
+                    "columns": [
+                        "staff_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "rental_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "rental_date",
+                    "columns": [
+                        "rental_date",
+                        "inventory_id",
+                        "customer_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null,
+                            null,
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_rental_customer",
+                    "localTable": "rental",
+                    "foreignTable": "customer",
+                    "localColumns": [
+                        "customer_id"
+                    ],
+                    "foreignColumns": [
+                        "customer_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_rental_inventory",
+                    "localTable": "rental",
+                    "foreignTable": "inventory",
+                    "localColumns": [
+                        "inventory_id"
+                    ],
+                    "foreignColumns": [
+                        "inventory_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_rental_staff",
+                    "localTable": "rental",
+                    "foreignTable": "staff",
+                    "localColumns": [
+                        "staff_id"
+                    ],
+                    "foreignColumns": [
+                        "staff_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "staff",
+            "columns": [
+                {
+                    "name": "staff_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "address_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "store_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "first_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_name",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 45,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "picture",
+                    "type": "blob",
+                    "notNull": false,
+                    "default": null,
+                    "length": 65535,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "email",
+                    "type": "string",
+                    "notNull": false,
+                    "default": null,
+                    "length": 50,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": "1",
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "username",
+                    "type": "string",
+                    "notNull": true,
+                    "default": null,
+                    "length": 16,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_0900_ai_ci"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "password",
+                    "type": "string",
+                    "notNull": false,
+                    "default": null,
+                    "length": 40,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": {
+                        "charset": "utf8mb4",
+                        "collation": "utf8mb4_bin"
+                    },
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_address_id",
+                    "columns": [
+                        "address_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_fk_store_id",
+                    "columns": [
+                        "store_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "staff_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_staff_address",
+                    "localTable": "staff",
+                    "foreignTable": "address",
+                    "localColumns": [
+                        "address_id"
+                    ],
+                    "foreignColumns": [
+                        "address_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_staff_store",
+                    "localTable": "staff",
+                    "foreignTable": "store",
+                    "localColumns": [
+                        "store_id"
+                    ],
+                    "foreignColumns": [
+                        "store_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        },
+        {
+            "name": "store",
+            "columns": [
+                {
+                    "name": "store_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": true,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "manager_staff_id",
+                    "type": "boolean",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "address_id",
+                    "type": "smallint",
+                    "notNull": true,
+                    "default": null,
+                    "length": null,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": true,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                },
+                {
+                    "name": "last_update",
+                    "type": "datetime",
+                    "notNull": true,
+                    "default": "CURRENT_TIMESTAMP",
+                    "length": 0,
+                    "fixed": false,
+                    "precision": 10,
+                    "scale": 0,
+                    "unsigned": false,
+                    "platformOptions": [],
+                    "autoincrement": false,
+                    "definition": null,
+                    "comment": null
+                }
+            ],
+            "indexes": [
+                {
+                    "name": "idx_fk_address_id",
+                    "columns": [
+                        "address_id"
+                    ],
+                    "isUnique": false,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "idx_unique_manager",
+                    "columns": [
+                        "manager_staff_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": false,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                },
+                {
+                    "name": "PRIMARY",
+                    "columns": [
+                        "store_id"
+                    ],
+                    "isUnique": true,
+                    "isPrimary": true,
+                    "flags": [],
+                    "options": {
+                        "lengths": [
+                            null
+                        ]
+                    }
+                }
+            ],
+            "foreignKeys": [
+                {
+                    "name": "fk_store_address",
+                    "localTable": "store",
+                    "foreignTable": "address",
+                    "localColumns": [
+                        "address_id"
+                    ],
+                    "foreignColumns": [
+                        "address_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                },
+                {
+                    "name": "fk_store_staff",
+                    "localTable": "store",
+                    "foreignTable": "staff",
+                    "localColumns": [
+                        "manager_staff_id"
+                    ],
+                    "foreignColumns": [
+                        "staff_id"
+                    ],
+                    "onUpdate": "CASCADE",
+                    "onDelete": null,
+                    "options": []
+                }
+            ]
+        }
+    ]
+}

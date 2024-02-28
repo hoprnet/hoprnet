@@ -25,7 +25,7 @@ concurrency:
 jobs:
   publish-release:
     name: Publish Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
 
       - name: Set up Google Cloud Credentials

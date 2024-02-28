@@ -31,7 +31,6 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
@@ -166,7 +165,7 @@ where
     A: ChannelActions,
 {
     db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<Net>>>,
+    network: Arc<Network<Net>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
@@ -181,14 +180,14 @@ where
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<Net>>>,
+        network: Arc<Network<Net>>,
         chain_actions: A,
     ) -> Self {
         Self {
             db,
             network,
             chain_actions,
-            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples)),
+            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
         }
     }
@@ -211,36 +210,25 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        let all_peers = self
-            .network
-            .read()
-            .await
-            .all_peers()
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>();
-
-        all_peers
-            .into_iter()
-            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
-                Ok(offchain_key) => {
-                    // Do peer version matching against minimum required version by this strategy
-                    let reported_version = status.metadata().get(PEER_METADATA_PROTOCOL_VERSION);
-                    match reported_version.and_then(|v| semver::Version::from_str(v).ok()) {
-                        Some(v) => self
-                            .cfg
-                            .minimum_peer_version
-                            .matches(&v)
-                            .then_some((offchain_key, status.get_average_quality())),
-                        None => {
-                            debug!(
-                                "peer {} has invalid or missing version info: {:?}",
-                                status.id, reported_version
-                            );
-                            None
-                        }
+        self.network
+            .peer_filter(|status| async move {
+                match status
+                    .peer_version
+                    .clone()
+                    .and_then(|v| semver::Version::from_str(&v).ok())
+                {
+                    Some(v) => self.cfg.minimum_peer_version.matches(&v).then_some(status),
+                    None => {
+                        debug!("peer {} has invalid or missing version info", status.id);
+                        None
                     }
                 }
+            })
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
+            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
+                Ok(offchain_key) => Some((offchain_key, status.get_average_quality())),
                 Err(_) => {
                     error!("encountered invalid peer id: {}", status.id);
                     None
@@ -264,7 +252,7 @@ where
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .filter_map(|x| async move { x })
+            .filter_map(futures::future::ready)
             .collect::<HashMap<_, _>>()
             .await
     }
@@ -574,9 +562,6 @@ mod tests {
 
     struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
-        fn is_public(&self, _: &PeerId) -> bool {
-            false
-        }
         fn emit(&self, _: NetworkEvent) {}
     }
 
@@ -601,27 +586,28 @@ mod tests {
         channel
     }
 
-    async fn prepare_network(network: Arc<RwLock<Network<MockNetworkExternalActions>>>, qualities: Vec<f64>) {
+    async fn prepare_network(network: Arc<Network<MockNetworkExternalActions>>, qualities: Vec<f64>) {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
-        let mut net = network.write().await;
+        let net = network;
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
-            net.add(peer, PeerOrigin::Initialization);
+            net.add(peer, PeerOrigin::Initialization, vec![]).await.unwrap();
 
-            while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
-                net.update_with_metadata(
+            while net.get(peer).await.unwrap().unwrap().get_average_quality() < quality {
+                net.update(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                    Some(metadata.into()),
-                );
+                    Some("2.0.0".into()),
+                )
+                .await
+                .expect("no errors should occur");
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
                 PEERS[i + 1].0,
-                net.get_peer_status(peer).unwrap().get_average_quality()
+                net.get(peer).await.unwrap().unwrap().get_average_quality()
             );
         }
     }
@@ -679,11 +665,12 @@ mod tests {
             PEERS[0].0,
         )));
 
-        let network = Arc::new(RwLock::new(Network::new(
+        let network = Arc::new(Network::new(
             PEERS[0].1,
+            vec![],
             NetworkConfig::default(),
             MockNetworkExternalActions {},
-        )));
+        ));
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
@@ -697,11 +684,14 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         // Peer 10 has an old node version
-        network.write().await.update_with_metadata(
-            &PEERS[9].1,
-            Ok(current_time().as_unix_timestamp().as_millis() as u64),
-            Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
-        );
+        network
+            .update(
+                &PEERS[9].1,
+                Ok(current_time().as_unix_timestamp().as_millis() as u64),
+                Some("1.92.0".into()),
+            )
+            .await
+            .expect("no errors should occur");
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels

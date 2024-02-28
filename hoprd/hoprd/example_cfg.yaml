@@ -79,12 +79,6 @@ hopr:
     # Allows nesting strategy chains via !MultiStrategy
     allow_recursive: false
 
-    # Activates a strategy which will issue channel closure transaction
-    # whenever a channel transitions to `PendingToClose` state.
-    # Otherwise, the user must manually issue such transaction manually
-    # on `PendingToClose` channels.
-    finalize_channel_closure: false
-
     # Contains the actual chain of strategies to execute in the given order.
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
@@ -160,9 +154,22 @@ hopr:
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
 
+        # The strategy will automatically redeem if there's a single ticket left when a channel
+        # transitions to `PendingToClose` and it has at least this value of HOPR.
+        # This happens regardless the `redeem_only_aggregated` setting.
+        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+
       # Passive strategy does nothing. This is equivalent as leaving
       # the `strategies` array empty.
       #- !Passive
+
+      # Strategy that monitors channels that are in `PendingToClose` state and
+      # their channel closure grace period has already elapsed, and on more issuing
+      # channel close transaction on these channels to finalize the closure.
+      # - !ClosureFinalizer
+        # Do not attempt to finalize closure of channels that have been overdue for closure for more than
+        # this amount of seconds.
+        # max_closure_overdue: 3600
 
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.

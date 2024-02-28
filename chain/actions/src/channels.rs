@@ -54,7 +54,8 @@ pub trait ChannelActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> ChannelActions for ChainActions<Db> {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
@@ -95,6 +96,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments("invalid balance or balance type given".into()));
@@ -126,6 +128,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> ChannelActions for Cha
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn close_channel(
         &self,
         counterparty: Address,
