@@ -160,10 +160,10 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 ///
 /// This future can only be resolved by an unrecoverable error or a panic.
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub async fn p2p_loop(
+pub async fn p2p_loop<T>(
     version: String,
     me: libp2p::identity::Keypair,
-    network: Arc<Network<crate::adaptors::network::ExternalNetworkInteractions>>,
+    network: Arc<Network<crate::adaptors::network::ExternalNetworkInteractions, T>>,
     network_update_input: Receiver<NetworkEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
@@ -180,7 +180,9 @@ pub async fn p2p_loop(
     protocol_cfg: ProtocolConfig,
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-) {
+) where
+    T: hopr_db_api::peers::HoprDbPeersOperations,
+{
     let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
         .await

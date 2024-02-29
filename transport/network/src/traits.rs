@@ -2,38 +2,11 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
+pub use sea_query::SimpleExpr;
+
+use hopr_db_api::peers::{PeerOrigin, PeerStatus, Stats};
 
 use crate::errors::Result;
-use crate::network::{PeerOrigin, PeerStatus};
-
-/// Object containing statistics on all peer entries stored
-/// in the [crate::network::Network] object.
-/// See [crate::network::NetworkConfig] on information about the quality thresholds
-/// (i.e. when is a peer considered of good/bad quality).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Stats {
-    /// Number of good quality public nodes.
-    pub good_quality_public: u32,
-    /// Number of bad quality public nodes.
-    pub bad_quality_public: u32,
-    /// Number of good quality nodes non-public nodes.
-    pub good_quality_non_public: u32,
-    /// Number of bad quality nodes non-public nodes.
-    pub bad_quality_non_public: u32,
-}
-
-#[cfg(all(feature = "prometheus", not(test)))]
-impl Stats {
-    /// Returns count of all peers.
-    pub fn all_count(&self) -> usize {
-        self.good_quality_public as usize
-            + self.bad_quality_public as usize
-            + self.good_quality_non_public as usize
-            + self.bad_quality_non_public as usize
-    }
-}
-
-pub use sea_query::SimpleExpr;
 
 /// An abstraction over a backend that stores the peer information.
 #[async_trait]

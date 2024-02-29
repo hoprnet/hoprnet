@@ -9,20 +9,28 @@ license = "GPL-3.0-only"
 
 
 [dependencies]
+async-stream = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+bincode = "1.3.3"
 futures = { workspace = true }
-sqlx = { workspace = true }
+libp2p-identity = { workspace = true, optional = true }
+multiaddr = { workspace = true, optional = true }
+num_enum = { workspace = true, optional = true }
 sea-orm = { workspace = true }
+sea-query = { version = "0", default-features = false, features = ["with-chrono", "derive", "backend-sqlite", "attr"]}
+sea-query-binder = { version = "0",  default-features = false, features = ["with-chrono", "sqlx-sqlite", "runtime-async-std-rustls"]}
+sqlx = { workspace = true }
 smart-default = { workspace = true }
+strum = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-crypto-types = { workspace = true, optional = true}
+hopr-primitive-types = { workspace = true, optional = true}
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
@@ -32,5 +40,7 @@ default = ["accounts", "ticket", "registry", "peers"]
 accounts = []
 ticket = []
 registry = []
-peers = []
-
+peers = [
+    "dep:libp2p-identity", "dep:multiaddr", "dep:num_enum", "dep:strum",
+    "dep:hopr-crypto-types", "dep:hopr-primitive-types"
+]

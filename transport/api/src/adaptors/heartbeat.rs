@@ -14,18 +14,27 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 /// aggregating all necessary heartbeat resources without leaking them into the
 /// `Heartbeat` object and keeping both the adaptor and the heartbeat object
 /// OCP and SRP compliant.
-pub struct HeartbeatExternalInteractions {
-    network: Arc<Network<ExternalNetworkInteractions>>,
+pub struct HeartbeatExternalInteractions<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations,
+{
+    network: Arc<Network<ExternalNetworkInteractions, T>>,
 }
 
-impl HeartbeatExternalInteractions {
-    pub fn new(network: Arc<Network<ExternalNetworkInteractions>>) -> Self {
+impl<T> HeartbeatExternalInteractions<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations,
+{
+    pub fn new(network: Arc<Network<ExternalNetworkInteractions, T>>) -> Self {
         Self { network }
     }
 }
 
 #[async_trait]
-impl HeartbeatExternalApi for HeartbeatExternalInteractions {
+impl<T> HeartbeatExternalApi for HeartbeatExternalInteractions<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations,
+{
     /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.

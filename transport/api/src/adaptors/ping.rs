@@ -19,15 +19,23 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct PingExternalInteractions<R: PeerAddressResolver + std::fmt::Debug> {
-    network: Arc<Network<ExternalNetworkInteractions>>,
+pub struct PingExternalInteractions<R, T>
+where
+    R: PeerAddressResolver + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug,
+{
+    network: Arc<Network<ExternalNetworkInteractions, T>>,
     resolver: R,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 }
 
-impl<R: PeerAddressResolver + std::fmt::Debug> PingExternalInteractions<R> {
+impl<R, T> PingExternalInteractions<R, T>
+where
+    R: PeerAddressResolver + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug,
+{
     pub fn new(
-        network: Arc<Network<ExternalNetworkInteractions>>,
+        network: Arc<Network<ExternalNetworkInteractions, T>>,
         resolver: R,
         channel_graph: Arc<RwLock<ChannelGraph>>,
     ) -> Self {
@@ -40,7 +48,11 @@ impl<R: PeerAddressResolver + std::fmt::Debug> PingExternalInteractions<R> {
 }
 
 #[async_trait]
-impl<R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug> PingExternalAPI for PingExternalInteractions<R> {
+impl<R, T> PingExternalAPI for PingExternalInteractions<R, T>
+where
+    R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::marker::Sync + std::fmt::Debug,
+{
     #[tracing::instrument(level = "info", skip(self))]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
         match self

@@ -7,14 +7,14 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use tracing::{debug, warn};
+use tracing::{debug, error};
 use validator::Validate;
 
-use crate::backend::{SqliteNetworkBackend, SqliteNetworkBackendConfig};
-use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
-use crate::traits::{NetworkBackend, Stats};
+pub use hopr_db_api::peers::{PeerOrigin, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
+
+use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiGauge, SimpleGauge};
@@ -90,30 +90,6 @@ impl Default for NetworkConfig {
     }
 }
 
-/// Actual origin - first occurence of the peer in the network mechanism
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
-#[repr(u8)]
-pub enum PeerOrigin {
-    #[strum(to_string = "node initialization")]
-    Initialization = 0,
-    #[strum(to_string = "network registry")]
-    NetworkRegistry = 1,
-    #[strum(to_string = "incoming connection")]
-    IncomingConnection = 2,
-    #[strum(to_string = "outgoing connection attempt")]
-    OutgoingConnection = 3,
-    #[strum(to_string = "strategy monitors existing channel")]
-    StrategyExistingChannel = 4,
-    #[strum(to_string = "strategy considers opening a channel")]
-    StrategyConsideringChannel = 5,
-    #[strum(to_string = "strategy decided to open new channel")]
-    StrategyNewChannel = 6,
-    #[strum(to_string = "manual ping")]
-    ManualPing = 7,
-    #[strum(to_string = "testing")]
-    Testing = 8,
-}
-
 /// Network health represented with colors, where green is the best and red
 /// is the worst possible observed nework quality.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, strum::Display, strum::EnumString)]
@@ -143,71 +119,6 @@ pub trait NetworkExternalActions {
     fn emit(&self, event: NetworkEvent);
 }
 
-/// Status of the peer as recorded by the [Network].
-#[derive(Debug, Clone, PartialEq)]
-pub struct PeerStatus {
-    pub id: PeerId,
-    pub origin: PeerOrigin,
-    pub is_public: bool,
-    pub last_seen: std::time::SystemTime,
-    pub last_seen_latency: Duration,
-    pub heartbeats_sent: u64,
-    pub heartbeats_succeeded: u64,
-    pub backoff: f64,
-    pub ignored: Option<std::time::SystemTime>,
-    pub peer_version: Option<String>,
-    pub multiaddresses: Vec<Multiaddr>,
-    pub(crate) quality: f64,
-    pub(crate) quality_avg: SingleSumSMA<f64>,
-}
-
-impl PeerStatus {
-    fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
-        PeerStatus {
-            id,
-            origin,
-            is_public: true,
-            heartbeats_sent: 0,
-            heartbeats_succeeded: 0,
-            last_seen: SystemTime::UNIX_EPOCH,
-            last_seen_latency: Duration::default(),
-            ignored: None,
-            backoff,
-            quality: 0.0,
-            peer_version: None,
-            quality_avg: SingleSumSMA::new(quality_window as usize),
-            multiaddresses: vec![],
-        }
-    }
-
-    // Update both the immediate last quality and the average windowed quality
-    pub fn update_quality(&mut self, new_value: f64) {
-        if (0.0f64..=1.0f64).contains(&new_value) {
-            self.quality = new_value;
-            self.quality_avg.push(new_value);
-        } else {
-            warn!("Quality failed to update with value outside the [0,1] range")
-        }
-    }
-
-    /// Gets the average quality of this peer
-    pub fn get_average_quality(&self) -> f64 {
-        self.quality_avg.average().unwrap_or_default()
-    }
-
-    /// Gets the immediate node quality
-    pub fn get_quality(&self) -> f64 {
-        self.quality
-    }
-}
-
-impl std::fmt::Display for PeerStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
-            self.id, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
-    }
-}
-
 /// Calculate the health factor for network from the available stats
 fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
     let mut health = Health::Red;
@@ -230,22 +141,31 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
 /// The network object storing information about the running observed state of the network,
 /// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]
-pub struct Network<T: NetworkExternalActions> {
+pub struct Network<T, U>
+where
+    T: NetworkExternalActions,
+    U: hopr_db_api::peers::HoprDbPeersOperations,
+{
     me: PeerId,
     me_addresses: Vec<Multiaddr>,
     am_i_public: bool,
     cfg: NetworkConfig,
-    db: crate::backend::SqliteNetworkBackend,
+    db: U,
     network_actions_api: T,
     #[cfg(all(feature = "prometheus", not(test)))]
     started_at: std::time::Duration,
 }
 
-impl<T: NetworkExternalActions> Network<T> {
+impl<T, U> Network<T, U>
+where
+    T: NetworkExternalActions,
+    U: hopr_db_api::peers::HoprDbPeersOperations,
+{
     pub fn new(
         my_peer_id: PeerId,
         my_multiaddresses: Vec<Multiaddr>,
         cfg: NetworkConfig,
+        db: U,
         network_actions_api: T,
     ) -> Self {
         if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
@@ -265,14 +185,16 @@ impl<T: NetworkExternalActions> Network<T> {
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
         }
 
+        if let Err(e) = async_std::task::block_on(db.cleanup()) {
+            error!("Failed to initially cleanup the 'peers' database: {e}")
+        }
+
         Self {
             me: my_peer_id,
             me_addresses: my_multiaddresses,
             am_i_public: true,
             cfg: cfg.clone(),
-            db: async_std::task::block_on(SqliteNetworkBackend::new(SqliteNetworkBackendConfig {
-                network_options: cfg.clone(),
-            })),
+            db,
             network_actions_api,
             #[cfg(all(feature = "prometheus", not(test)))]
             started_at: current_time().as_unix_timestamp(),
@@ -307,22 +229,23 @@ impl<T: NetworkExternalActions> Network<T> {
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
-                self.db.update(&peer_status).await?;
+                self.db.update(peer_status).await?;
             }
         } else {
-            // TODO: this operation is suboptimal, but can be refactored once the entire Network object changes
-            // the mechanism and logic of monitoring the peers
-            self.db.add(peer, origin, addrs).await?;
-            if let Some(mut record) = self.db.get(peer).await? {
-                record.backoff = self.cfg.backoff_min;
-                record.quality_avg = SingleSumSMA::new(self.cfg.quality_avg_window_size as usize);
-                self.db.update(&record).await?;
-            }
+            self.db
+                .add(
+                    peer,
+                    origin,
+                    addrs,
+                    self.cfg.backoff_exponent,
+                    self.cfg.quality_avg_window_size,
+                )
+                .await?;
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.stats().await?;
+            let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
             self.refresh_metrics(&stats)
         }
 
@@ -331,9 +254,10 @@ impl<T: NetworkExternalActions> Network<T> {
 
     pub async fn get(&self, peer: &PeerId) -> crate::errors::Result<Option<PeerStatus>> {
         if peer == &self.me {
-            Ok(Some(PeerStatus {
-                multiaddresses: self.me_addresses.clone(),
-                ..PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 0u32)
+            Ok(Some({
+                let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 0u32);
+                ps.multiaddresses = self.me_addresses.clone();
+                ps
             }))
         } else {
             Ok(self
@@ -354,7 +278,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.stats().await?;
+            let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
             self.refresh_metrics(&stats)
         }
 
@@ -385,26 +309,26 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.last_seen_latency = Duration::from_millis(latency);
                 entry.heartbeats_succeeded += 1;
                 entry.backoff = self.cfg.backoff_min;
-                entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
+                entry.update_quality(1.0_f64.min(entry.get_quality() + self.cfg.quality_step));
             } else {
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
-                entry.update_quality(0.0_f64.max(entry.quality - self.cfg.quality_step));
+                entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
-                if entry.quality < (self.cfg.quality_step / 2.0) {
+                if entry.get_quality() < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api.emit(NetworkEvent::CloseConnection(entry.id));
                     // TODO: the current logic does not really assume any removals, will need to change with an autojob
                     self.db.remove(&entry.id).await?;
                     return Ok(Some(entry));
-                } else if entry.quality < self.cfg.quality_bad_threshold {
+                } else if entry.get_quality() < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
 
-            self.db.update(&entry).await?;
+            self.db.update(entry.clone()).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
-                let stats = self.db.stats().await?;
+                let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
                 self.refresh_metrics(&stats)
             }
 
@@ -418,7 +342,7 @@ impl<T: NetworkExternalActions> Network<T> {
     /// Returns the quality of the network as a network health indicator.
     pub async fn health(&self) -> Health {
         self.db
-            .stats()
+            .stats(self.cfg.quality_bad_threshold)
             .await
             .map(|stats| health_from_stats(&stats, self.am_i_public))
             .unwrap_or(Health::Unknown)
@@ -443,10 +367,10 @@ impl<T: NetworkExternalActions> Network<T> {
     }
 
     // ======
-    pub async fn peer_filter<Fut, U, F>(&self, filter: F) -> crate::errors::Result<Vec<U>>
+    pub async fn peer_filter<Fut, V, F>(&self, filter: F) -> crate::errors::Result<Vec<V>>
     where
         F: FnMut(PeerStatus) -> Fut,
-        Fut: std::future::Future<Output = Option<U>>,
+        Fut: std::future::Future<Output = Option<V>>,
     {
         let stream = self.db.get_multiple(None, false).await?;
         futures::pin_mut!(stream);
@@ -458,8 +382,11 @@ impl<T: NetworkExternalActions> Network<T> {
             .db
             .get_multiple(
                 Some(
-                    sea_query::Expr::col(crate::backend::NetworkPeerIden::LastSeen)
-                        .lte(chrono::DateTime::<chrono::Utc>::from(threshold)),
+                    sea_query::Expr::col(hopr_db_entity::network_peer::Column::LastSeen).lte(chrono::DateTime::<
+                        chrono::Utc,
+                    >::from(
+                        threshold
+                    )),
                 ),
                 true,
             )
@@ -505,6 +432,7 @@ mod tests {
     use crate::network::{
         Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
     };
+    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
@@ -528,10 +456,16 @@ mod tests {
         fn emit(&self, _: NetworkEvent) {}
     }
 
-    fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
+    async fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction, hopr_db_api::db::HoprDb> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(*my_id, vec![], cfg, DummyNetworkAction {})
+        Network::new(
+            *my_id,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory().await,
+            DummyNetworkAction {},
+        )
     }
 
     #[test]
@@ -547,7 +481,7 @@ mod tests {
     async fn test_network_should_not_be_able_to_add_self_reference() {
         let me = PeerId::random();
 
-        let peers = basic_network(&me);
+        let peers = basic_network(&me).await;
 
         assert!(peers.add(&me, PeerOrigin::IncomingConnection, vec![]).await.is_err());
 
@@ -564,9 +498,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_contain_a_registered_peer() {
-        let expected = PeerId::random();
+        let expected: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers
             .add(&expected, PeerOrigin::IncomingConnection, vec![])
@@ -586,9 +521,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_remove_a_peer_on_unregistration() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -607,9 +543,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers
             .update(&peer, Ok(current_time().as_unix_timestamp().as_millis() as u64), None)
@@ -629,9 +566,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_be_able_to_register_a_succeeded_heartbeat_result() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -651,9 +589,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_update_should_merge_metadata() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         let expected_version = Some("1.2.4".to_string());
 
@@ -698,9 +637,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -725,8 +665,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_be_able_to_register_a_failed_heartbeat_result() {
-        let peer = PeerId::random();
-        let peers = basic_network(&PeerId::random());
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -759,9 +701,11 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference() {
-        let first = PeerId::random();
-        let second = PeerId::random();
-        let peers = basic_network(&PeerId::random());
+        let first: PeerId = OffchainKeypair::random().public().into();
+        let second: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await;
 
         peers.add(&first, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         peers
@@ -803,16 +747,19 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_have_red_health_without_any_registered_peers() {
-        let peers = basic_network(&PeerId::random());
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await;
 
         assert_eq!(peers.health().await, Health::Red);
     }
 
     #[async_std::test]
     async fn test_network_should_be_unhealthy_without_any_heartbeat_updates() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -822,9 +769,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_be_unhealthy_without_any_peers_once_the_health_was_known() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
-        let peers = basic_network(&PeerId::random());
+        let peers = basic_network(&me).await;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         let _ = peers.health();
@@ -835,12 +783,19 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let peers = Network::new(PeerId::random(), vec![], cfg, MockNetworkExternalActions::new());
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory().await,
+            MockNetworkExternalActions::new(),
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -854,8 +809,9 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
-        let peer = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
+        let me: PeerId = OffchainKeypair::random().public().into();
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
@@ -864,7 +820,7 @@ mod tests {
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer)))
             .return_const(());
-        let peers = Network::new(PeerId::random(), vec![], cfg, mock);
+        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -879,13 +835,19 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
-        let me = PeerId::random();
-        let peer = PeerId::random();
+        let me: PeerId = OffchainKeypair::random().public().into();
+        let peer: PeerId = OffchainKeypair::random().public().into();
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let peers = Network::new(me, vec![], cfg, MockNetworkExternalActions::new());
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory().await,
+            MockNetworkExternalActions::new(),
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -902,13 +864,19 @@ mod tests {
     #[async_std::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_another_high_quality_non_public(
     ) {
-        let peer = PeerId::random();
-        let peer2 = PeerId::random();
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let peer2: PeerId = OffchainKeypair::random().public().into();
 
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let peers = Network::new(PeerId::random(), vec![], cfg, MockNetworkExternalActions::new());
+        let peers = Network::new(
+            OffchainKeypair::random().public().into(),
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory().await,
+            MockNetworkExternalActions::new(),
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
         peers.add(&peer2, PeerOrigin::IncomingConnection, vec![]).await.unwrap();

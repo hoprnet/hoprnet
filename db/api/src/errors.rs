@@ -6,10 +6,18 @@ use thiserror::Error;
 pub enum DbError {
     #[error("row(s) were not found in the db")]
     NotFound,
+
     #[error("db contains data which cannot be converted to business object")]
     CorruptedData,
+
     #[error("transaction error: {0}")]
     TransactionError(String),
+
+    #[error("error while decoding db entity")]
+    DecodingError,
+
+    #[error("logical error: {0}")]
+    LogicalError(String),
 
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),

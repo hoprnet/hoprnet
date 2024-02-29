@@ -16,7 +16,7 @@ pub struct HoprDbConfig {
     pub log_slow_queries: Duration,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
 }

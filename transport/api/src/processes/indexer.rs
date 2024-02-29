@@ -50,13 +50,14 @@ pub struct IndexerActions {
 }
 
 impl IndexerActions {
-    pub fn new<Db>(
+    pub fn new<Db, T>(
         db: Arc<RwLock<Db>>,
-        network: Arc<Network<ExternalNetworkInteractions>>,
+        network: Arc<Network<ExternalNetworkInteractions, T>>,
         emitter: Sender<IndexerProcessed>,
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+        T: hopr_db_api::peers::HoprDbPeersOperations + Send + Sync + 'static,
     {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
