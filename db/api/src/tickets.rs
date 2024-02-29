@@ -6,17 +6,13 @@ use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use std::ops::Add;
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
-
-use crate::db::HoprDb;
-use crate::errors::Result;
 
 #[async_trait]
 pub trait HoprDbTicketOperations {

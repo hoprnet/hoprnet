@@ -18,7 +18,6 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-internal-types = { workspace = true }
