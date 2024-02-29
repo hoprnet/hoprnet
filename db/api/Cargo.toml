@@ -28,7 +28,8 @@ hopr-primitive-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 
 [features]
-default = ["ticket", "registry", "peers"]
+default = ["accounts", "ticket", "registry", "peers"]
+accounts = []
 ticket = []
 registry = []
 peers = []

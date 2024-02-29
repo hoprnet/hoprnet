@@ -7,6 +7,8 @@ pub mod peers;
 #[cfg(feature = "ticket")]
 pub mod tickets;
 
+#[cfg(feature = "accounts")]
+pub mod accounts;
 #[cfg(feature = "registry")]
 pub mod registry;
 
