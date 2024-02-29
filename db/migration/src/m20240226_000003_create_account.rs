@@ -95,10 +95,31 @@ impl MigrationTrait for Migration {
                     .col(Announcement::AccountId)
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_announcement_account_id_multiaddress")
+                    .if_not_exists()
+                    .table(Announcement::Table)
+                    .col(Announcement::AccountId)
+                    .col(Announcement::Multiaddress)
+                    .unique()
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_announcement_account_id_multiaddress")
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_index(Index::drop().name("idx_announcement_account_id").to_owned())
             .await?;
