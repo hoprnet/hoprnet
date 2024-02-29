@@ -49,6 +49,7 @@ async-trait = "0.1"
 atomic_enum = "0.2.0"
 base64 = "0.21.7"
 clap = { version = "4.4", features = ["derive", "env", "string"] }
+chrono = { version = "0.4" }
 ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"
 futures-lite = "1.12.0"
@@ -62,6 +63,7 @@ libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] 
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
 multiaddr = "0.18.0"
+num_enum = "0.7"
 regex = "1"
 rust-stream-ext-concurrent = "1"
 serde = { version = "1.0", features = ["derive"] }

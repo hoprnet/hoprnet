@@ -3464,7 +3464,9 @@ dependencies = [
 name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "async-trait",
+ "chrono",
  "futures",
  "hopr-crypto-types",
  "hopr-db-entity",

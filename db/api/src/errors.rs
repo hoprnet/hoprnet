@@ -4,6 +4,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
+    #[error("row(s) were not found in the db")]
+    NotFound,
+    #[error("db contains data which cannot be converted to business object")]
+    CorruptedData,
     #[error("transaction error: {0}")]
     TransactionError(String),
 
@@ -12,6 +16,9 @@ pub enum DbError {
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),
+
+    #[error(transparent)]
+    NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
 impl<E: std::error::Error> From<TransactionError<E>> for DbError {
