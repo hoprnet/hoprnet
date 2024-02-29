@@ -118,4 +118,8 @@ impl Cmd for MoveNodeToSafeModuleArgs {
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_moving_safe_module()
     }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
+    }
 }

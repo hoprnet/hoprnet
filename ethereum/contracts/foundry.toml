@@ -3,7 +3,7 @@
 [profile.default]
 # Don't commit changes to this line which point to /nix/store/...
 # These are part of the `nix develop` shell setup.
-solc = "0.8.19"
+solc = "/nix/store/ys92ch70xd3hzd24cq5gc0kh3id4w908-solc-default/bin/solc"
 src = 'src'
 test = 'test'
 out = 'out'

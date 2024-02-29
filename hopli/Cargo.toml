@@ -12,6 +12,8 @@ clap = { version = "4.4", features = ["derive", "env", "string"] }
 ethers = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
+hex = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-internal-types = { workspace = true }
@@ -20,7 +22,10 @@ thiserror = { workspace = true }
 log = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
+chain-types = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
+hex-literal = { workspace = true }
+bindings = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
-async-std = { version = "1.12.0", features = ["attributes", "unstable"] }

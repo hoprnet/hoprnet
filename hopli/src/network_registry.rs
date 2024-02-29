@@ -146,4 +146,8 @@ impl Cmd for RegisterInNetworkRegistryArgs {
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_manager_register()
     }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
+    }
 }

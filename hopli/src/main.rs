@@ -14,6 +14,7 @@ pub mod environment_config;
 pub mod faucet;
 pub mod identity;
 pub mod key_pair;
+pub mod methods;
 pub mod migrate_safe_module;
 pub mod move_node_to_safe_module;
 pub mod network_registry;
@@ -80,7 +81,8 @@ enum Commands {
     SyncNetworkRegistry(SyncNetworkRegistryArgs),
 }
 
-fn main() -> Result<(), HelperErrors> {
+#[async_std::main]
+async fn main() -> Result<(), HelperErrors> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -88,7 +90,7 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::Faucet(opt) => {
-            opt.run()?;
+            opt.async_run().await?;
         }
         Commands::RegisterInNetworkRegistry(opt) => {
             opt.run()?;

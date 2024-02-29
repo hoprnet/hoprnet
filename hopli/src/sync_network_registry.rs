@@ -132,4 +132,8 @@ impl Cmd for SyncNetworkRegistryArgs {
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_sync_eligibility()
     }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
+    }
 }

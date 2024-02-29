@@ -108,4 +108,8 @@ impl Cmd for MigrateSafeModuleArgs {
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_safe_module_migration()
     }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
+    }
 }

@@ -14,8 +14,17 @@ use crate::utils::HelperErrors;
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
 use chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
 use clap::Parser;
-use ethers::providers::{Middleware, Provider};
+use ethers::{
+    core::k256::ecdsa::SigningKey,
+    middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
+    providers::{Middleware, Provider},
+    signers::{LocalWallet, Signer, Wallet},
+};
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -61,27 +70,37 @@ pub struct NetworkDetail {
 }
 
 /// Contract addresses (directly from deployment logic)
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkContractAddresses {
     /// address of contract that manages authorization to access the Hopr network
-    pub network_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry: Address,
     /// address of contract that maps to the requirements that need to be fulfilled
     /// in order to access the network, upgradeable
-    pub network_registry_proxy: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub network_registry_proxy: Address,
     /// HoprChannels contract address, implementation of mixnet incentives
-    pub channels: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub channels: Address,
     /// Hopr token contract address
-    pub token: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub token: Address,
     /// contract address of Safe capability module implementation
-    pub module_implementation: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub module_implementation: Address,
     /// address of contract that maps between Safe instances and node addresses
-    pub node_safe_registry: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_safe_registry: Address,
     /// address of contract that allows Hopr Association to dictate price per packet in Hopr
-    pub ticket_price_oracle: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub ticket_price_oracle: Address,
     /// address of contract that manages transport announcements in the hopr network
-    pub announcements: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub announcements: Address,
     /// factory contract to produce Safe instances
-    pub node_stake_v2_factory: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub node_stake_v2_factory: Address,
 }
 
 /// mapping of networks with its details
@@ -205,6 +224,58 @@ impl NetworkProviderArgs {
         }
         Ok(default_provider)
     }
+
+    /// get the provider object
+    pub async fn get_provider_with_signer(
+        &self,
+        chain_key: &ChainKeypair,
+    ) -> Result<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>, HelperErrors>
+    {
+        // default values
+        let default_rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
+        let default_rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
+
+        // Build default JSON RPC client
+        let default_rpc_client = JsonRpcClient::new(
+            &self.get_default_provider_url()?,
+            DefaultHttpPostRequestor::new(default_rpc_http_config.clone()),
+            default_rpc_http_retry_policy.clone(),
+        );
+        // Build default JSON RPC provider
+        let default_provider =
+            Provider::new(default_rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
+
+        // validate that the rpc client connects to the expected chain
+        let chain_id = default_provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+
+        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(chain_id.as_u64());
+
+        // if a customized provider is given
+        if let Some(customized_provider_url) = &self.provider_url {
+            // check if the provided url matches with the network
+            let customized_rpc_client = JsonRpcClient::new(
+                customized_provider_url,
+                DefaultHttpPostRequestor::new(default_rpc_http_config),
+                default_rpc_http_retry_policy,
+            );
+            // Build default JSON RPC provider
+            let customized_proivder =
+                Provider::new(customized_rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
+
+            let customized_chain_id = customized_proivder
+                .get_chainid()
+                .await
+                .map_err(RpcError::ProviderError)?;
+            if customized_chain_id.eq(&chain_id) {
+                return Ok(customized_proivder
+                    .with_signer(wallet)
+                    .nonce_manager(chain_key.public().to_address().into()));
+            }
+        }
+        Ok(default_provider
+            .with_signer(wallet)
+            .nonce_manager(chain_key.public().to_address().into()))
+    }
 }
 
 /// ensures that the network and environment_type exist
@@ -253,6 +324,25 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn create_anvil_at_default_port(port_number: Option<u16>) -> ethers::utils::AnvilInstance {
+        let output = std::process::Command::new(env!("CARGO"))
+            .arg("locate-project")
+            .arg("--workspace")
+            .arg("--message-format=plain")
+            .output()
+            .unwrap()
+            .stdout;
+        let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
+        let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
+
+        let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
+
+        if port_number.is_some() {
+            anvil = anvil.port(8545u16)
+        }
+        anvil.spawn()
+    }
 
     #[test]
     fn read_anvil_localhost_at_right_path() {
@@ -313,7 +403,7 @@ mod tests {
 
     #[async_std::test]
     async fn use_default_rpc_url_for_anvil_when_no_provide_is_given() {
-        let anvil = ethers::utils::Anvil::new().port(8545u16).spawn();
+        let anvil = create_anvil_at_default_port(Some(8545));
 
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
@@ -323,9 +413,30 @@ mod tests {
 
         let provider = network_provider_args.get_provider().await.unwrap();
 
-        let test_output = provider.client_version().await.unwrap();
         let chain_id = provider.get_chainid().await.unwrap();
         assert_eq!(chain_id, anvil.chain_id().into());
-        drop(anvil);
+    }
+
+    #[async_std::test]
+    async fn test_network_provider_with_signer() {
+        // create an identity
+        let chain_key = ChainKeypair::random();
+
+        // launch local anvil instance
+        let anvil = create_anvil_at_default_port(None);
+
+        let network_provider_args = NetworkProviderArgs {
+            network: "anvil-localhost".into(),
+            contracts_root: Some("../ethereum/contracts".into()),
+            provider_url: anvil.endpoint().into(),
+        };
+
+        let provider = network_provider_args
+            .get_provider_with_signer(&chain_key)
+            .await
+            .unwrap();
+
+        let chain_id = provider.get_chainid().await.unwrap();
+        assert_eq!(chain_id, anvil.chain_id().into());
     }
 }

@@ -5,23 +5,23 @@
 //! HOPR token contract addresses vary on the network.
 
 use crate::{
+    environment_config::NetworkProviderArgs,
     identity::{IdentityFileArgs, PrivateKeyArgs},
-    process::{child_process_call_foundry_faucet, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use ethers::{types::U256, utils::parse_units};
 use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
-use log::{log, Level};
+use log::info;
 use std::str::FromStr;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
-    /// Name of HOPR newtork
-    #[clap(help = "Network name. E.g. monte_rosa", long)]
-    network: String,
+    /// Network name, contracts config file root, and customized provider, if available
+    #[clap(flatten)]
+    pub network_provider: NetworkProviderArgs,
 
     /// Additional addresses (comma-separated) to receive funds.
     #[clap(
@@ -35,15 +35,6 @@ pub struct FaucetArgs {
     /// Argument to locate identity file(s)
     #[clap(flatten)]
     local_identity: IdentityFileArgs,
-
-    /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
-    #[clap(
-        help = "Specify path pointing to the contracts root",
-        long,
-        short,
-        default_value = None
-    )]
-    contracts_root: Option<String>,
 
     /// The amount of HOPR tokens (in floating number) to be funded per wallet
     #[clap(
@@ -73,19 +64,15 @@ pub struct FaucetArgs {
 
 impl FaucetArgs {
     /// Execute the faucet command, which funds addresses with required amount of tokens
-    fn execute_faucet(self) -> Result<(), HelperErrors> {
+    async fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
-            network,
+            network_provider,
             address,
             local_identity,
-            contracts_root,
             hopr_amount,
             native_amount,
             private_key,
         } = self;
-
-        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        private_key.read()?;
 
         // Include provided address
         let mut addresses_all = Vec::new();
@@ -108,10 +95,14 @@ impl FaucetArgs {
                 .map(|adr| adr.to_string()),
         );
 
-        log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
+        info!("All the addresses: {:?}", addresses_all);
 
-        // set directory and environment variables
-        set_process_path_env(&contracts_root, &network)?;
+        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
+        let signer_private_key = private_key.read()?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
 
         // convert hopr_amount and native_amount from f64 to uint256 string
         let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
@@ -119,16 +110,23 @@ impl FaucetArgs {
         let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
-        // iterate and collect execution result. If error occurs, the entire operation failes.
-        addresses_all.into_iter().try_for_each(|a| {
-            child_process_call_foundry_faucet(&network, &a, &hopr_amount_uint256_string, &native_amount_uint256_string)
-        })
+        // TODO: complete actions as defined in `transferOrMintHoprAndSendNativeToAmount` in `SingleActions.s.sol`
+        // get token and native balances for addresses
+        // Get the amount of HOPR tokens that addresses need to receive to reach the desired amount
+        // Get the amount of native tokens that addresses need to receive to reach the desired amount
+        // transfer of mint HOPR tokens
+        // send native tokens
+        Ok(())
     }
 }
 
 impl Cmd for FaucetArgs {
     /// Run the execute_faucet function
     fn run(self) -> Result<(), HelperErrors> {
-        self.execute_faucet()
+        Ok(())
+    }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        self.execute_faucet().await
     }
 }

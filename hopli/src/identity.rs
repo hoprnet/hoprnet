@@ -9,7 +9,7 @@
 //!
 //! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].
 use clap::{builder::RangedU64ValueParser, Parser, ValueHint};
-use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::{debug, error, info};
@@ -60,7 +60,7 @@ pub struct PrivateKeyArgs {
 
 impl PrivateKeyArgs {
     /// Read the private key and return an address string
-    pub fn read(self) -> Result<String, HelperErrors> {
+    pub fn read(self) -> Result<ChainKeypair, HelperErrors> {
         let private_key = if let Some(pk) = self.private_key {
             info!("reading private key from cli");
             pk
@@ -69,13 +69,10 @@ impl PrivateKeyArgs {
             env::var("PRIVATE_KEY").map_err(HelperErrors::UnableToReadPrivateKey)?
         };
 
-        // FIXME: temporarily set as env variable
-        env::set_var("PRIVATE_KEY", &private_key);
-
         // TODO:
         info!("To validate the private key");
 
-        Ok(private_key)
+        Ok(ChainKeypair::from_secret(hex::decode(&private_key).unwrap().as_slice()).unwrap())
     }
 }
 
@@ -314,7 +311,6 @@ impl IdentityArgs {
         }
 
         info!("Identities: {:?}", node_identities);
-        println!("{}", serde_json::to_string(&node_identities).unwrap());
         Ok(())
     }
 }
@@ -324,161 +320,161 @@ impl Cmd for IdentityArgs {
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_identity_creation_loop()
     }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::identity;
+    use ethers::core::k256::elliptic_curve::subtle::ConstantTimeEq;
+    use tempfile::tempdir;
 
-    const DUMMY_PRIVATE_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-
-    #[test]
-    fn revert_when_no_private_key_is_supplied() {
-        let pk_args = PrivateKeyArgs { private_key: None };
-        env::remove_var("PRIVATE_KEY");
-        match pk_args.read() {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
-        }
-    }
+    const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
     #[test]
-    fn ok_when_no_private_key_is_supplied_but_env_is_supplied() {
-        let pk_args = PrivateKeyArgs { private_key: None };
+    fn private_key_args_can_read_env_or_cli_args_in_different_scenarios() {
+        // possible private key args
+        let pk_args_none = PrivateKeyArgs { private_key: None };
+        let pk_args_some = PrivateKeyArgs {
+            private_key: Some(DUMMY_PRIVATE_KEY.into()),
+        };
+
+        // when env is set but no cli arg, it returns the env value
         env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
-        match pk_args.read() {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
+        if let Ok(kp_1) = pk_args_none.clone().read() {
+            assert_eq!(
+                DUMMY_PRIVATE_KEY,
+                hex::encode(kp_1.secret().as_ref()),
+                "read a wrong private key from env"
+            );
+        } else {
+            panic!("cannot read private key from env when no cli arg is provied");
         }
-    }
 
-    #[test]
-    fn ok_when_no_env_is_supplied_but_private_key_is_supplied() {
-        let pk_args = PrivateKeyArgs {
-            private_key: Some(DUMMY_PRIVATE_KEY.into()),
-        };
-        env::remove_var("PRIVATE_KEY");
-        match pk_args.read() {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
-    }
-
-    #[test]
-    fn take_cli_private_key_when_both_cli_arg_and_env_are_supplied() {
-        let pk_args = PrivateKeyArgs {
-            private_key: Some(DUMMY_PRIVATE_KEY.into()),
-        };
+        // when both env and cli args are set, it still uses cli
         env::set_var("PRIVATE_KEY", "0123");
-        match pk_args.read() {
-            Ok(pk) => assert_eq!(pk, DUMMY_PRIVATE_KEY.to_string()),
-            Err(_) => assert!(false),
+        if let Ok(kp_2) = pk_args_some.clone().read() {
+            assert_eq!(
+                DUMMY_PRIVATE_KEY,
+                hex::encode(kp_2.secret().as_ref()),
+                "read a wrong private key from cli"
+            );
+        } else {
+            panic!("cannot read private key from cli when both are provied");
+        }
+
+        // when no env and no cli arg, it returns error
+        env::remove_var("PRIVATE_KEY");
+        assert!(pk_args_none.read().is_err());
+
+        // when no env is supplied, but private key is supplied
+        if let Ok(kp_3) = pk_args_some.read() {
+            assert_eq!(
+                DUMMY_PRIVATE_KEY,
+                hex::encode(kp_3.secret().as_ref()),
+                "read a wrong private key from env"
+            );
+        } else {
+            panic!("cannot read private key from env when no cli arg is provied");
         }
     }
 
     #[test]
-    fn revert_when_no_password_path_nor_identity_password_env_is_supplied() {
-        let pwd_args = PasswordArgs { password_path: None };
+    fn password_args_can_read_env_or_cli_args_in_different_scenarios() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        create_file(path, None, 1);
+
+        // possible password args
+        let pwd_args_some = PasswordArgs {
+            password_path: Some(PathBuf::from(path).join("fileid1")),
+        };
+        let pwd_args_none = PasswordArgs { password_path: None };
+
+        env::set_var("IDENTITY_PASSWORD", "Hello");
+        // fail to take cli password path when both cli arg and env are supplied
+        if let Ok(kp_1) = pwd_args_some.clone().read() {
+            assert_eq!(kp_1, "Hello".to_string(), "read a wrong password from env");
+        } else {
+            panic!("cannot read password from env when cli arg is also provied");
+        }
+        // ok when no password path is supplied but env is supplied
+        if let Ok(kp_2) = pwd_args_none.clone().read() {
+            assert_eq!(kp_2, "Hello".to_string(), "read a wrong password from env");
+        } else {
+            panic!("cannot read password from env when no cli arg is provied");
+        }
+
+        // revert when no password path or identity password env is supplied
         env::remove_var("IDENTITY_PASSWORD");
-        match pwd_args.read() {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
+        assert!(pwd_args_none.read().is_err());
+
+        // ok when no env is supplied but password path is supplied
+        if let Ok(kp_3) = pwd_args_some.clone().read() {
+            assert_eq!(kp_3, "Hello".to_string(), "read a wrong password from path");
+        } else {
+            panic!("cannot read password from path when no env is provied");
         }
-    }
-
-    #[test]
-    fn ok_when_no_password_path_is_supplied_but_env_is_supplied() {
-        let pk_args = PrivateKeyArgs { private_key: None };
-        env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
-        match pk_args.read() {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
-    }
-
-    #[test]
-    fn ok_when_no_env_is_supplied_but_password_path_is_supplied() {
-        let path = "./tmp_pwd_1";
-        create_file(path, None, 0);
-
-        let pk_args = PrivateKeyArgs {
-            private_key: Some(DUMMY_PRIVATE_KEY.into()),
-        };
-        env::remove_var("PRIVATE_KEY");
-        match pk_args.read() {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
-        remove_file(path);
-    }
-
-    #[test]
-    fn take_cli_password_path_when_both_cli_arg_and_env_are_supplied() {
-        let path = "./tmp_pwd_2";
-        create_file(path, None, 0);
-
-        let pk_args = PrivateKeyArgs {
-            private_key: Some(DUMMY_PRIVATE_KEY.into()),
-        };
-        env::set_var("PRIVATE_KEY", "0123");
-        match pk_args.read() {
-            Ok(pk) => assert_eq!(pk, DUMMY_PRIVATE_KEY.to_string()),
-            Err(_) => assert!(false),
-        }
-        remove_file(path);
     }
 
     #[test]
     fn revert_get_dir_from_non_existing_dir() {
         let path = "./tmp_non_exist";
+
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 
-        match dir_args.get_files_from_directory() {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
-        }
+        assert!(dir_args.get_files_from_directory().is_err());
     }
 
     #[test]
     fn pass_get_empty_dir_from_existing_dir() {
-        let path = "./tmp_exist_1";
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().to_str().unwrap();
         create_file(path, None, 0);
+
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 
-        match dir_args.get_files_from_directory() {
-            Ok(vp) => assert!(vp.is_empty()),
-            Err(_) => assert!(false),
+        if let Ok(vp) = dir_args.get_files_from_directory() {
+            assert!(vp.is_empty())
+        } else {
+            panic!("failed to revert when the path contains no file")
         }
-        remove_file(path);
     }
 
     #[test]
     fn pass_get_dir_from_existing_dir() {
-        let path = "./tmp_exist_2";
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().to_str().unwrap();
         create_file(path, None, 4);
+
         let dir_args = IdentityFromDirectoryArgs {
             identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 
-        match dir_args.get_files_from_directory() {
-            Ok(vp) => assert_eq!(4, vp.len()),
-            Err(_) => assert!(false),
+        if let Ok(vp) = dir_args.get_files_from_directory() {
+            assert_eq!(4, vp.len())
+        } else {
+            panic!("failed to get files")
         }
-        remove_file(path);
     }
 
     #[test]
     fn pass_get_path_from_existing_path() {
-        let path = "./tmp_exist_3";
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().to_str().unwrap();
         create_file(path, None, 4);
+
         let id_path = PathBuf::from(format!("{path}/fileid1"));
         let path_args: IdentityFileArgs = IdentityFileArgs {
             identity_from_directory: None,
@@ -488,7 +484,6 @@ mod tests {
 
         let vp = path_args.get_files();
         assert_eq!(1, vp.len());
-        remove_file(path);
     }
 
     fn create_file(dir_name: &str, prefix: Option<String>, num: u32) {
@@ -506,9 +501,5 @@ mod tests {
                 fs::write(&file_path, "Hello").unwrap();
             }
         }
-    }
-
-    fn remove_file(dir: &str) {
-        fs::remove_dir_all(dir).unwrap();
     }
 }
