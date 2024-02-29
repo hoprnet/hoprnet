@@ -20,10 +20,10 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
                     .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
-                    .col(ColumnDef::new(Ticket::Index).integer().unsigned().not_null())
-                    .col(ColumnDef::new(Ticket::IndexOffset).integer().unsigned().not_null())
+                    .col(ColumnDef::new(Ticket::Index).big_integer().not_null())
+                    .col(ColumnDef::new(Ticket::IndexOffset).unsigned().not_null())
                     .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
-                    .col(ColumnDef::new(Ticket::ChannelEpoch).integer().unsigned().not_null())
+                    .col(ColumnDef::new(Ticket::ChannelEpoch).unsigned().not_null())
                     .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
                     .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
                     .foreign_key(

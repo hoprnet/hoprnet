@@ -7,6 +7,8 @@ pub mod account;
 pub mod acknowledgement;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
+/// Custom encoding of numbers
+pub mod arithmetic;
 /// Implements types related to HOPR payment channels.
 pub mod channels;
 /// Enumerates all errors in this crate.
@@ -19,6 +21,7 @@ pub mod prelude {
     pub use super::account::*;
     pub use super::acknowledgement::*;
     pub use super::announcement::*;
+    pub use super::arithmetic::*;
     pub use super::channels::*;
     pub use super::errors::CoreTypesError;
     pub use super::protocol::*;

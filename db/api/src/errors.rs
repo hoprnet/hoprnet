@@ -1,3 +1,4 @@
+use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
 use thiserror::Error;
 
@@ -5,8 +6,12 @@ use thiserror::Error;
 pub enum DbError {
     #[error("transaction error: {0}")]
     TransactionError(String),
+
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),
+
+    #[error(transparent)]
+    CoreTypesError(#[from] CoreTypesError),
 }
 
 impl<E: std::error::Error> From<TransactionError<E>> for DbError {

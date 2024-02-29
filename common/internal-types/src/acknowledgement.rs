@@ -1,4 +1,5 @@
 use hopr_crypto_types::prelude::*;
+use hopr_db_entity::ticket::Model as DbTicket;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -6,9 +7,10 @@ use tracing::debug;
 
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
+    arithmetic::{i32_to_u32, i64_to_u64},
     channels::{generate_channel_id, Ticket},
     errors::{
-        CoreTypesError::{InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
+        CoreTypesError::{self, InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
         Result as CoreTypesResult,
     },
 };
@@ -206,6 +208,50 @@ impl AcknowledgedTicket {
         computed_ticket_luck[1..].copy_from_slice(&self.get_luck(domain_separator).expect("unsigned ticket"));
 
         u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+    }
+
+    /// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
+    pub fn try_from_with_domain_separator_and_chain_keypair(
+        db_ticket: DbTicket,
+        domain_separator: &Hash,
+        chain_keypair: &ChainKeypair,
+    ) -> CoreTypesResult<Self> {
+        if db_ticket.winning_probability.len() != 7 {
+            return Err(CoreTypesError::ParseError(format!(
+                "Invalid winning probability length. Expected {} bytes but recevied {}",
+                7,
+                db_ticket.winning_probability.len()
+            )));
+        }
+        let mut encoded_win_prob = [0u8; 7];
+        encoded_win_prob.copy_from_slice(&db_ticket.winning_probability);
+
+        let response = Response::from_bytes(&db_ticket.response)?;
+
+        // To be refactored with https://github.com/hoprnet/hoprnet/pull/6018
+        let mut ticket = Ticket::default();
+
+        ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
+        ticket.amount = Balance::new(U256::default(), BalanceType::HOPR);
+        ticket.index = i64_to_u64(db_ticket.index);
+        ticket.index_offset = i32_to_u32(db_ticket.index_offset);
+        ticket.channel_epoch = i32_to_u32(db_ticket.channel_epoch);
+        ticket.encoded_win_prob = encoded_win_prob;
+        ticket.challenge = response.to_challenge().to_ethereum_challenge();
+        ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
+
+        Ok(Self {
+            response,
+            signer: ticket.recover_signer(domain_separator)?.to_address(),
+            vrf_params: derive_vrf_parameters(
+                &ticket.get_hash(domain_separator).into(),
+                chain_keypair,
+                domain_separator.as_slice(),
+            )?,
+            ticket,
+            // To be removed with https://github.com/hoprnet/hoprnet/pull/6018
+            status: AcknowledgedTicketStatus::Untouched,
+        })
     }
 }
 
