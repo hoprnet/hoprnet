@@ -13,13 +13,38 @@ use std::time::SystemTime;
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 
+pub fn model_to_acknowledged_ticket(ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
+    todo!()
+}
+
+pub async fn mark_ticket_redeemed<C: ConnectionTrait>(conn_or_tx: &C, ticket: &ticket::Model) -> Result<()> {
+    let ticket_value = U256::from_be_bytes(&ticket.amount);
+
+    let stats = ticket_statistics::Entity::find_by_id(1)
+        .one(conn_or_tx)
+        .await?
+        .ok_or(DbError::CorruptedData)?;
+
+    let current_redeemed_count = stats.redeemed_tickets;
+    let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
+
+    let mut active_stats = stats.into_active_model();
+    active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
+    active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
+
+    ticket_statistics::Entity::update(active_stats).exec(conn_or_tx).await?;
+    ticket::Entity::delete_by_id(ticket.id).exec(conn_or_tx).await?;
+
+    Ok(())
+}
+
 pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(conn_or_tx: &C, channel_id: &Hash, epoch: u32) -> Result<()> {
     let (neglectable_count, neglectable_value) = ticket::Entity::find()
         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
         .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
         .stream(conn_or_tx)
         .await?
-        .try_fold((0_u32, U256::zero()), |(count, value), t| async move {
+        .try_fold((0, U256::zero()), |(count, value), t| async move {
             Ok((count + 1, value + U256::from_be_bytes(t.amount)))
         })
         .await?;
@@ -30,10 +55,10 @@ pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(c
         .ok_or(DbError::CorruptedData)?;
 
     let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
-    let current_neglected_count = stats.neglected_tickets as u32;
+    let current_neglected_count = stats.neglected_tickets;
 
     let mut active_stats = stats.into_active_model();
-    active_stats.neglected_tickets = Set((current_neglected_count + neglectable_count) as i32);
+    active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
     active_stats.neglected_value = Set((current_neglected_value + neglectable_value).to_be_bytes().into());
 
     ticket_statistics::Entity::update(active_stats).exec(conn_or_tx).await?;
@@ -49,9 +74,6 @@ pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(c
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
-    // async fn get_tickets(channel_id: &Hash, epoch: u32);
-
-    async fn add_ticket(&self, ticket: &AcknowledgedTicket) -> Result<()>;
 
     async fn get_ticket(
         &self,
@@ -116,13 +138,6 @@ impl HoprDbTicketOperations for HoprDb {
             )),
             None => Ok(None),
         }
-    }
-
-    async fn add_ticket(&self, _ticket: &AcknowledgedTicket) -> Result<()> {
-        // ticket::Entity::insert(todo!()).exec(&self.db).await?;
-
-        // Ok(())
-        todo!()
     }
 
     async fn get_ticket_statistics(&self) -> Result<AllTicketStatistics> {

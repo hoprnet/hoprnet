@@ -9,21 +9,16 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(NetworkRegistry::Table)
+                    .table(NetworkEligibility::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(NetworkRegistry::Id)
+                        ColumnDef::new(NetworkEligibility::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(NetworkRegistry::ChainAddress)
-                            .string_len(40)
-                            .unique_key()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(NetworkEligibility::SafeAddress).string().not_null())
                     .to_owned(),
             )
             .await
@@ -31,14 +26,14 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(NetworkRegistry::Table).to_owned())
+            .drop_table(Table::drop().table(NetworkEligibility::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum NetworkRegistry {
+enum NetworkEligibility {
     Table,
     Id,
-    ChainAddress,
+    SafeAddress
 }

@@ -232,9 +232,9 @@ impl AcknowledgedTicket {
 
         ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
         ticket.amount = BalanceType::HOPR.zero();
-        ticket.index = U256::from_big_endian(&db_ticket.index).as_u64();
+        ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
         ticket.index_offset = db_ticket.index_offset as u32;
-        ticket.channel_epoch = U256::from_big_endian(&db_ticket.channel_epoch).as_u32();
+        ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
         ticket.encoded_win_prob = encoded_win_prob;
         ticket.challenge = response.to_challenge().to_ethereum_challenge();
         ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
