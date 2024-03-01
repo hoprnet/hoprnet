@@ -2,6 +2,7 @@
 use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
+use crate::identity_update::IdentityUpdateArgs;
 use crate::initialize_node::InitializeNodeArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
@@ -15,6 +16,7 @@ pub mod environment_config;
 pub mod faucet;
 pub mod identity;
 pub mod identity_input;
+pub mod identity_update;
 pub mod initialize_node;
 pub mod key_pair;
 pub mod migrate_safe_module;
@@ -42,6 +44,8 @@ struct Cli {
 enum Commands {
     #[clap(about = "Create and store identity files")]
     Identity(IdentityArgs),
+    #[clap(about = "Update identity password")]
+    UpdateIdentityPassword(IdentityUpdateArgs),
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
@@ -77,6 +81,9 @@ fn main() -> Result<(), HelperErrors> {
 
     match cli.command {
         Commands::Identity(opt) => {
+            opt.run()?;
+        }
+        Commands::UpdateIdentityPassword(opt) => {
             opt.run()?;
         }
         Commands::Faucet(opt) => {
