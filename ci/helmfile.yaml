@@ -1,0 +1,37 @@
+environments:
+  staging:
+    values:
+      - values-common.yaml
+      - values-rotsee.yaml
+      - values-dufour.yaml
+    secrets:
+      - secrets.sops.yaml
+---
+repositories:
+ - name: hoprassociation
+   url: europe-west3-docker.pkg.dev/hoprassociation/helm-charts
+   oci: true
+releases:
+- name: hoprd-core-rotsee
+  namespace: core-team
+  chart: hoprassociation/cluster-hoprd
+  version: 0.3.0
+  wait: true
+  timeout: 5
+  values:
+    - values-common.yaml
+    - values-rotsee.yaml
+  secrets:
+    - secrets.sops.yaml
+- name: hoprd-core-dufour
+  namespace: core-team
+  chart: hoprassociation/cluster-hoprd
+  version: 0.3.0
+  wait: true
+  timeout: 5
+  values:
+    - values-common.yaml
+    - values-dufour.yaml
+  secrets:
+    - secrets.sops.yaml
+
