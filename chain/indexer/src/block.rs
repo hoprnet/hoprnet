@@ -49,7 +49,7 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 ///
 /// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
 /// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
-/// streamed outside of the indexer by the unbounded channel.
+/// streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
 /// 1. prime the RPC endpoinnt
@@ -298,6 +298,7 @@ pub mod tests {
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
+    use hopr_db_api::db::HoprDb;
     use utils_db::{db::DB, CurrentDbShim};
 
     use crate::traits::MockChainLogHandler;
@@ -316,11 +317,8 @@ pub mod tests {
         };
     }
 
-    async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
-        Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )))
+    async fn create_stub_db() -> HoprDb {
+        HoprDb::new_in_memory().await
     }
 
     fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {

@@ -7,7 +7,7 @@ use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
     Set, StreamTrait,
 };
 use std::str::FromStr;
@@ -15,73 +15,17 @@ use std::time::SystemTime;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
+use crate::HoprDbGeneralModelOperations;
 
 pub fn model_to_acknowledged_ticket(_ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
     todo!()
 }
 
-pub async fn mark_ticket_redeemed<C: ConnectionTrait>(conn_or_tx: &C, ticket: &ticket::Model) -> Result<()> {
-    let ticket_value = U256::from_be_bytes(&ticket.amount);
-
-    let stats = ticket_statistics::Entity::find_by_id(1)
-        .one(conn_or_tx)
-        .await?
-        .ok_or(DbError::CorruptedData)?;
-
-    let current_redeemed_count = stats.redeemed_tickets;
-    let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
-
-    let mut active_stats = stats.into_active_model();
-    active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
-    active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
-    active_stats.save(conn_or_tx).await?;
-
-    ticket::Entity::delete_by_id(ticket.id).exec(conn_or_tx).await?;
-
-    Ok(())
-}
-
-pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(
-    conn_or_tx: &C,
-    channel_id: &Hash,
-    epoch: u32,
-) -> Result<()> {
-    let (neglectable_count, neglectable_value) = ticket::Entity::find()
-        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
-        .stream(conn_or_tx)
-        .await?
-        .try_fold((0, U256::zero()), |(count, value), t| async move {
-            Ok((count + 1, value + U256::from_be_bytes(t.amount)))
-        })
-        .await?;
-
-    let stats = ticket_statistics::Entity::find_by_id(1)
-        .one(conn_or_tx)
-        .await?
-        .ok_or(DbError::CorruptedData)?;
-
-    let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
-    let current_neglected_count = stats.neglected_tickets;
-
-    let mut active_stats = stats.into_active_model();
-    active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
-    active_stats.neglected_value = Set((current_neglected_value + neglectable_value).to_be_bytes().into());
-    active_stats.save(conn_or_tx).await?;
-
-    ticket::Entity::delete_many()
-        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
-        .exec(conn_or_tx)
-        .await?;
-
-    Ok(())
-}
-
 #[async_trait]
 pub trait HoprDbTicketOperations {
-    async fn get_ticket(
-        &self,
+    async fn get_ticket<'a, C: ConnectionTrait>(
+        &'a self,
+        txc: Option<&'a C>,
         channel_id: &Hash,
         epoch: u32,
         ticket_index: u64,
@@ -97,7 +41,16 @@ pub trait HoprDbTicketOperations {
 
     // async fn get_ticket_stats(channel_id: &Hash, epoch: u32);
 
-    async fn get_ticket_statistics(&self) -> Result<AllTicketStatistics>;
+    async fn mark_ticket_redeemed<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>, ticket: &ticket::Model) -> Result<()>;
+
+    async fn mark_tickets_neglected_in_epoch<'a, C: ConnectionTrait + StreamTrait>(
+        &'a self,
+        txc: Option<&'a C>,
+        channel_id: &Hash,
+        epoch: u32,
+    ) -> Result<()>;
+
+    async fn get_ticket_statistics<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>) -> Result<AllTicketStatistics>;
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -116,8 +69,9 @@ pub struct AllTicketStatistics {
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
-    async fn get_ticket(
-        &self,
+    async fn get_ticket<'a, C: ConnectionTrait>(
+        &'a self,
+        txc: Option<&'a C>,
         channel_id: &Hash,
         epoch: u32,
         ticket_index: u64,
@@ -126,12 +80,13 @@ impl HoprDbTicketOperations for HoprDb {
         // To be removed with https://github.com/hoprnet/hoprnet/pull/6018
         chain_keypair: &ChainKeypair,
     ) -> Result<Option<AcknowledgedTicket>> {
-        // let ticket
+        let conn_or_tx = txc.unwrap_or_else(|| self.conn());
+
         match ticket::Entity::find()
             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
             .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
             .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().as_ref()))
-            .one(&self.db)
+            .one(conn_or_tx)
             .await?
         {
             Some(db_ticket) => Ok(Some(
@@ -145,10 +100,70 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn get_ticket_statistics(&self) -> Result<AllTicketStatistics> {
-        let stats = TicketStatistics::find()
-            .order_by_desc(ticket_statistics::Column::LastUpdated)
-            .limit(1)
+    async fn mark_ticket_redeemed<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>, ticket: &ticket::Model) -> Result<()> {
+        let conn_or_tx = txc.unwrap_or_else(|| self.conn());
+
+        let stats = ticket_statistics::Entity::find_by_id(1)
+            .one(conn_or_tx)
+            .await?
+            .ok_or(DbError::CorruptedData)?;
+
+        let current_redeemed_count = stats.redeemed_tickets;
+        let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
+        let ticket_value = U256::from_be_bytes(&ticket.amount);
+
+        let mut active_stats = stats.into_active_model();
+        active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
+        active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
+        active_stats.save(conn_or_tx).await?;
+
+        ticket::Entity::delete_by_id(ticket.id).exec(conn_or_tx).await?;
+
+        Ok(())
+    }
+
+    async fn mark_tickets_neglected_in_epoch<'a, C: ConnectionTrait + StreamTrait>(
+        &'a self,
+        txc: Option<&'a C>,
+        channel_id: &Hash,
+        epoch: u32,
+    ) -> Result<()> {
+        let conn_or_tx= txc.unwrap_or_else(|| self.conn());
+
+        let (neglectable_count, neglectable_value) = ticket::Entity::find()
+            .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+            .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+            .stream(conn_or_tx)
+            .await?
+            .try_fold((0, U256::zero()), |(count, value), t| async move {
+                Ok((count + 1, value + U256::from_be_bytes(t.amount)))
+            })
+            .await?;
+
+        let stats = ticket_statistics::Entity::find_by_id(1)
+            .one(conn_or_tx)
+            .await?
+            .ok_or(DbError::CorruptedData)?;
+
+        let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
+        let current_neglected_count = stats.neglected_tickets;
+
+        let mut active_stats = stats.into_active_model();
+        active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
+        active_stats.neglected_value = Set((current_neglected_value + neglectable_value).to_be_bytes().into());
+        active_stats.save(conn_or_tx).await?;
+
+        ticket::Entity::delete_many()
+            .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+            .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+            .exec(conn_or_tx)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn get_ticket_statistics<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>) -> Result<AllTicketStatistics> {
+        let stats = TicketStatistics::find_by_id(1)
             .one(&self.db)
             .await?
             .ok_or(DbError::NotFound)?;

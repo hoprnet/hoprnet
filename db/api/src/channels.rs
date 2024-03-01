@@ -4,12 +4,12 @@ use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use std::str::FromStr;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
-use crate::DbTimestamp;
+use crate::{DbTimestamp, HoprDbGeneralModelOperations};
 
 /// Updates given active model of a channel with the given status.
 pub fn channel_status_to_model(model: &mut channel::ActiveModel, new_status: ChannelStatus) {
@@ -65,15 +65,15 @@ pub fn channel_entry_to_model(channel: ChannelEntry) -> channel::ActiveModel {
 
 #[async_trait]
 pub trait HoprDbChannelOperations {
-    async fn get_channel_by_id(&self, id: &Hash) -> Result<ChannelEntry>;
+    async fn get_channel_by_id<'a, C: ConnectionTrait>(&'a self, txc: Option<&C>, id: &Hash) -> Result<ChannelEntry>;
 }
 
 #[async_trait]
 impl HoprDbChannelOperations for HoprDb {
-    async fn get_channel_by_id(&self, id: &Hash) -> Result<ChannelEntry> {
+    async fn get_channel_by_id<'a, C: ConnectionTrait>(&'a self, txc: Option<&C>, id: &Hash) -> Result<ChannelEntry> {
         let channel: channel::Model = Channel::find()
             .filter(channel::Column::ChannelId.eq(id.to_string()))
-            .one(&self.db)
+            .one(txc.unwrap_or_else(|| self.conn()))
             .await?
             .ok_or(DbError::NotFound)?;
 
