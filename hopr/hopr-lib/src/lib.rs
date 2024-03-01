@@ -68,11 +68,11 @@ use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{
-    build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, execute_on_tick, p2p_loop,
+    build_index_updater, build_network, build_packet_actions, build_ticket_aggregation, build_transport_components,
+    execute_on_tick, p2p_loop,
 };
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
-use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
+use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info};
 use utils_db::db::DB;
@@ -171,7 +171,7 @@ pub fn to_chain_events_refresh_process<Db, S, T>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<Network<ExternalNetworkInteractions, T>>,
+    network: Arc<Network<T>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -329,7 +329,8 @@ where
         "Creating local network registry and registering own external multiaddresses: {:?}",
         my_multiaddresses
     );
-    let (network, network_events_rx) = build_network(
+
+    let network = build_network(
         identity.public().to_peer_id(),
         my_multiaddresses.clone(),
         cfg.network_options,
@@ -416,20 +417,14 @@ where
 
     let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone());
 
-    let (ping, ping_rx, pong_tx) = build_manual_ping(
-        cfg.protocol,
-        network.clone(),
-        addr_resolver.clone(),
-        channel_graph.clone(),
-    );
-
-    let (mut heartbeat, hb_ping_rx, hb_pong_tx) = build_heartbeat(
-        cfg.protocol,
-        cfg.heartbeat,
-        network.clone(),
-        addr_resolver.clone(),
-        channel_graph.clone(),
-    );
+    let ((ping, ping_rx, pong_tx), (mut heartbeat, hb_ping_rx, hb_pong_tx), network_events_rx) =
+        build_transport_components(
+            cfg.protocol,
+            cfg.heartbeat,
+            network.clone(),
+            addr_resolver.clone(),
+            channel_graph.clone(),
+        );
 
     let hopr_transport_api = HoprTransport::new(
         identity.clone(),

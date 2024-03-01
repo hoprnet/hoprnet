@@ -44,7 +44,7 @@ impl From<ChannelStatus> for u8 {
         match value {
             ChannelStatus::Closed => 0,
             ChannelStatus::Open => 1,
-            ChannelStatus::PendingToClose(_) => 2
+            ChannelStatus::PendingToClose(_) => 2,
         }
     }
 }

@@ -6,14 +6,16 @@ use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, StreamTrait};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, StreamTrait,
+};
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 
-pub fn model_to_acknowledged_ticket(ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
+pub fn model_to_acknowledged_ticket(_ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
     todo!()
 }
 
@@ -38,7 +40,11 @@ pub async fn mark_ticket_redeemed<C: ConnectionTrait>(conn_or_tx: &C, ticket: &t
     Ok(())
 }
 
-pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(conn_or_tx: &C, channel_id: &Hash, epoch: u32) -> Result<()> {
+pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(
+    conn_or_tx: &C,
+    channel_id: &Hash,
+    epoch: u32,
+) -> Result<()> {
     let (neglectable_count, neglectable_value) = ticket::Entity::find()
         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
         .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
@@ -74,7 +80,6 @@ pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(c
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
-
     async fn get_ticket(
         &self,
         channel_id: &Hash,
@@ -151,15 +156,9 @@ impl HoprDbTicketOperations for HoprDb {
         let (unredeemed_tickets, unredeemed_value) = Ticket::find()
             .stream(&self.db)
             .await?
-            .try_fold(
-                (0_u64, U256::zero()),
-                |(count, amount), x| async move {
-                    Ok((
-                        count + 1,
-                        amount + U256::from_be_bytes(x.amount)
-                    ))
-                },
-            )
+            .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
+                Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+            })
             .await?;
 
         Ok(AllTicketStatistics {
@@ -168,7 +167,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .into(),
             losing_tickets: stats.losing_tickets as u64,
             neglected_tickets: stats.neglected_tickets as u64,
-            neglected_value:  BalanceType::HOPR.balance_bytes(stats.neglected_value),
+            neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
             redeemed_tickets: stats.redeemed_tickets as u64,
             redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
             unredeemed_tickets,

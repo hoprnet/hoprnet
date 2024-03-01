@@ -11,8 +11,6 @@ use async_std::task::spawn;
 
 use chain_types::chain_events::NetworkRegistryStatus;
 
-use crate::adaptors::network::ExternalNetworkInteractions;
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
     Eligible,
@@ -50,11 +48,7 @@ pub struct IndexerActions {
 }
 
 impl IndexerActions {
-    pub fn new<Db, T>(
-        db: Arc<RwLock<Db>>,
-        network: Arc<Network<ExternalNetworkInteractions, T>>,
-        emitter: Sender<IndexerProcessed>,
-    ) -> Self
+    pub fn new<Db, T>(db: Arc<RwLock<Db>>, network: Arc<Network<T>>, emitter: Sender<IndexerProcessed>) -> Self
     where
         Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
         T: hopr_db_api::peers::HoprDbPeersOperations + Send + Sync + 'static + std::fmt::Debug,

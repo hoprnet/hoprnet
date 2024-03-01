@@ -1,5 +1,5 @@
-use sea_orm_migration::prelude::*;
 use crate::sea_orm::prelude::ChronoDateTimeUtc;
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -19,23 +19,48 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(TicketStatistics::LastUpdated).timestamp().not_null().default(ChronoDateTimeUtc::UNIX_EPOCH),)
-                    .col(ColumnDef::new(TicketStatistics::LosingTickets).not_null().integer().default(0))
-                    .col(ColumnDef::new(TicketStatistics::RedeemedTickets).not_null().integer().default(0))
+                    .col(
+                        ColumnDef::new(TicketStatistics::LastUpdated)
+                            .timestamp()
+                            .not_null()
+                            .default(ChronoDateTimeUtc::UNIX_EPOCH),
+                    )
+                    .col(
+                        ColumnDef::new(TicketStatistics::LosingTickets)
+                            .not_null()
+                            .integer()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(TicketStatistics::RedeemedTickets)
+                            .not_null()
+                            .integer()
+                            .default(0),
+                    )
                     .col(
                         ColumnDef::new(TicketStatistics::RedeemedValue)
                             .binary_len(12)
                             .not_null()
                             .default(vec![0u8; 12]),
                     )
-                    .col(ColumnDef::new(TicketStatistics::NeglectedTickets).not_null().integer().default(0))
+                    .col(
+                        ColumnDef::new(TicketStatistics::NeglectedTickets)
+                            .not_null()
+                            .integer()
+                            .default(0),
+                    )
                     .col(
                         ColumnDef::new(TicketStatistics::NeglectedValue)
                             .binary_len(12)
                             .not_null()
                             .default(vec![0u8; 12]),
                     )
-                    .col(ColumnDef::new(TicketStatistics::RejectedTickets).not_null().integer().default(0))
+                    .col(
+                        ColumnDef::new(TicketStatistics::RejectedTickets)
+                            .not_null()
+                            .integer()
+                            .default(0),
+                    )
                     .col(
                         ColumnDef::new(TicketStatistics::RejectedValue)
                             .binary_len(12)

@@ -5,8 +5,6 @@ use async_trait::async_trait;
 use core_network::{heartbeat::HeartbeatExternalApi, network::Network, PeerId};
 use tracing::error;
 
-use crate::adaptors::network::ExternalNetworkInteractions;
-
 /// Implementor of the heartbeat external API.
 ///
 /// Heartbeat requires functionality from external components in order to obtain
@@ -18,14 +16,14 @@ pub struct HeartbeatExternalInteractions<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    network: Arc<Network<ExternalNetworkInteractions, T>>,
+    network: Arc<Network<T>>,
 }
 
 impl<T> HeartbeatExternalInteractions<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    pub fn new(network: Arc<Network<ExternalNetworkInteractions, T>>) -> Self {
+    pub fn new(network: Arc<Network<T>>) -> Self {
         Self { network }
     }
 }
