@@ -169,7 +169,7 @@ where
     let heartbeat = Heartbeat::new(
         hb_cfg,
         hb_pinger,
-        adaptors::heartbeat::HeartbeatExternalInteractions::new(network),
+        core_network::heartbeat::HeartbeatExternalInteractions::new(network),
     );
 
     (
@@ -213,7 +213,7 @@ where
 
 type HoprHearbeat<T> = Heartbeat<
     Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
-    adaptors::heartbeat::HeartbeatExternalInteractions<T>,
+    core_network::heartbeat::HeartbeatExternalInteractions<T>,
 >;
 
 type HoprHeartbeatComponents<T> = (
