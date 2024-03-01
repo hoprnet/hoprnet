@@ -39,10 +39,10 @@ pub fn model_to_channel_entry(model: &channel::Model) -> Result<ChannelEntry> {
     Ok(ChannelEntry::new(
         model.source.parse()?,
         model.destination.parse()?,
-        BalanceType::HOPR.balance_bytes(&model.balance)?,
-        U256::from_big_endian(&model.ticket_index),
+        BalanceType::HOPR.balance_bytes(&model.balance),
+        U256::from_be_bytes(&model.ticket_index),
         model_to_channel_status(model)?,
-        U256::from_big_endian(&model.epoch),
+        U256::from_be_bytes(&model.epoch),
     ))
 }
 
@@ -52,9 +52,9 @@ pub fn channel_entry_to_model(channel: ChannelEntry) -> channel::ActiveModel {
         channel_id: Set(channel.get_id().to_hex()),
         source: Set(channel.source.to_hex()),
         destination: Set(channel.destination.to_hex()),
-        balance: Set(channel.balance.amount().to_bytes().to_vec()),
-        epoch: Set(channel.channel_epoch.to_bytes().to_vec()),
-        ticket_index: Set(channel.ticket_index.to_bytes().to_vec()),
+        balance: Set(channel.balance.amount().to_be_bytes().into()),
+        epoch: Set(channel.channel_epoch.to_be_bytes().into()),
+        ticket_index: Set(channel.ticket_index.to_be_bytes().into()),
         ..Default::default()
     };
     channel_status_to_model(&mut r, channel.status);

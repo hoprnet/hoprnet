@@ -6,13 +6,46 @@ use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
-use std::ops::Add;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, StreamTrait};
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
+
+pub async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(conn_or_tx: &C, channel_id: &Hash, epoch: u32) -> Result<()> {
+    let (neglectable_count, neglectable_value) = ticket::Entity::find()
+        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+        .stream(conn_or_tx)
+        .await?
+        .try_fold((0_u32, U256::zero()), |(count, value), t| async move {
+            Ok((count + 1, value + U256::from_be_bytes(t.amount)))
+        })
+        .await?;
+
+    let stats = ticket_statistics::Entity::find_by_id(1)
+        .one(conn_or_tx)
+        .await?
+        .ok_or(DbError::CorruptedData)?;
+
+    let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
+    let current_neglected_count = stats.neglected_tickets as u32;
+
+    let mut active_stats = stats.into_active_model();
+    active_stats.neglected_tickets = Set((current_neglected_count + neglectable_count) as i32);
+    active_stats.neglected_value = Set((current_neglected_value + neglectable_value).to_be_bytes().into());
+
+    ticket_statistics::Entity::update(active_stats).exec(conn_or_tx).await?;
+
+    ticket::Entity::delete_many()
+        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+        .exec(conn_or_tx)
+        .await?;
+
+    Ok(())
+}
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
@@ -105,11 +138,11 @@ impl HoprDbTicketOperations for HoprDb {
             .stream(&self.db)
             .await?
             .try_fold(
-                (0_u64, BalanceType::HOPR.zero()),
+                (0_u64, U256::zero()),
                 |(count, amount), x| async move {
                     Ok((
                         count + 1,
-                        amount.add(BalanceType::HOPR.balance_bytes(x.amount).map_err(|_| sea_orm::DbErr::Custom("invalid balance".into()))?),
+                        amount + U256::from_be_bytes(x.amount)
                     ))
                 },
             )
@@ -121,13 +154,13 @@ impl HoprDbTicketOperations for HoprDb {
                 .into(),
             losing_tickets: stats.losing_tickets as u64,
             neglected_tickets: stats.neglected_tickets as u64,
-            neglected_value:  BalanceType::HOPR.balance_bytes(stats.neglected_value)?,
+            neglected_value:  BalanceType::HOPR.balance_bytes(stats.neglected_value),
             redeemed_tickets: stats.redeemed_tickets as u64,
-            redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value)?,
+            redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
             unredeemed_tickets,
-            unredeemed_value,
+            unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
             rejected_tickets: stats.rejected_tickets as u64,
-            rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value)?,
+            rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
         })
     }
 }
