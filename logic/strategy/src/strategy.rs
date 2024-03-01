@@ -21,7 +21,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_network::network::{Network, NetworkExternalActions};
+use core_network::network::Network;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -124,16 +124,15 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, Net, T>(
+    pub fn new<Db, T>(
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<Network<Net, T>>,
+        network: Arc<Network<T>>,
         chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
-        Net: NetworkExternalActions + Send + Sync + 'static,
         T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();

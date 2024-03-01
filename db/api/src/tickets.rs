@@ -16,7 +16,7 @@ use std::time::SystemTime;
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 
-pub fn model_to_acknowledged_ticket(ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
+pub fn model_to_acknowledged_ticket(_ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
     todo!()
 }
 

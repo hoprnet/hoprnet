@@ -2,14 +2,18 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_crypto_types::types::OffchainPublicKey;
-
-use core_network::{network::Network, ping::PingExternalAPI, ping::PingResult, PeerId};
-use core_path::channel_graph::ChannelGraph;
-use hopr_internal_types::protocol::PeerAddressResolver;
+use futures::channel::mpsc::Sender;
 use tracing::{debug, error};
 
-use crate::adaptors::network::ExternalNetworkInteractions;
+use core_network::{
+    network::{Network, NetworkTriggeredEvent},
+    ping::PingExternalAPI,
+    ping::PingResult,
+    PeerId,
+};
+use core_path::channel_graph::ChannelGraph;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_internal_types::protocol::PeerAddressResolver;
 
 /// Implementor of the ping external API.
 ///
@@ -24,9 +28,12 @@ where
     R: PeerAddressResolver + std::fmt::Debug,
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    network: Arc<Network<ExternalNetworkInteractions, T>>,
+    network: Arc<Network<T>>,
     resolver: R,
     channel_graph: Arc<RwLock<ChannelGraph>>,
+    /// Implementation of the network interface allowing emitting events
+    /// based on the [core_network::network::Network] events into the p2p swarm.
+    emitter: Sender<NetworkTriggeredEvent>,
 }
 
 impl<R, T> PingExternalInteractions<R, T>
@@ -35,14 +42,16 @@ where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
-        network: Arc<Network<ExternalNetworkInteractions, T>>,
+        network: Arc<Network<T>>,
         resolver: R,
         channel_graph: Arc<RwLock<ChannelGraph>>,
+        emitter: Sender<NetworkTriggeredEvent>,
     ) -> Self {
         Self {
             network,
             resolver,
             channel_graph,
+            emitter,
         }
     }
 }
@@ -60,29 +69,33 @@ where
             .update(peer, result, result.is_ok().then_some(version))
             .await
         {
-            Ok(Some(updated)) => {
-                debug!(
-                    "peer {peer} has q = {}, avg_q = {}",
-                    updated.get_quality(),
-                    updated.get_average_quality()
-                );
-                if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                    let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
-                    if let Some(chain_key) = maybe_chain_key {
-                        let mut g = self.channel_graph.write().await;
-                        let self_addr = g.my_address();
-                        g.update_channel_quality(self_addr, chain_key, updated.get_quality());
-                        debug!(
-                            "update channel {self_addr} -> {chain_key} with quality {}",
-                            updated.get_quality()
-                        );
-                    } else {
-                        error!("could not resolve chain key for '{peer}'");
+            Ok(Some(updated)) => match updated {
+                NetworkTriggeredEvent::CloseConnection(peer) => {
+                    if let Err(e) = self
+                        .emitter
+                        .clone()
+                        .start_send(NetworkTriggeredEvent::CloseConnection(peer))
+                    {
+                        error!("Failed to emit a network event 'close connection': {}", e)
                     }
-                } else {
-                    error!("encountered invalid peer id: '{peer}'");
                 }
-            }
+                NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
+                    debug!("'{peer}' changed quality to '{quality}'");
+                    if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+                        let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
+                        if let Some(chain_key) = maybe_chain_key {
+                            let mut g = self.channel_graph.write().await;
+                            let self_addr = g.my_address();
+                            g.update_channel_quality(self_addr, chain_key, quality);
+                            debug!("update channel {self_addr} -> {chain_key} with quality {quality}");
+                        } else {
+                            error!("could not resolve chain key for '{peer}'");
+                        }
+                    } else {
+                        error!("encountered invalid peer id: '{peer}'");
+                    }
+                }
+            },
             Ok(None) => debug!("No update necessary"),
             Err(e) => error!("Encountered error on on updating the collected ping data: {e}"),
         }

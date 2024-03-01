@@ -30,7 +30,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_network::network::{Network, NetworkExternalActions};
+use core_network::network::Network;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
@@ -158,31 +158,29 @@ pub struct PromiscuousStrategyConfig {
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy<Db, Net, A, T>
+pub struct PromiscuousStrategy<Db, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
-    network: Arc<Network<Net, T>>,
+    network: Arc<Network<T>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
 }
 
-impl<Db, Net, A, T> PromiscuousStrategy<Db, Net, A, T>
+impl<Db, A, T> PromiscuousStrategy<Db, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<Network<Net, T>>,
+        network: Arc<Network<T>>,
         chain_actions: A,
     ) -> Self {
         Self {
@@ -396,10 +394,9 @@ where
     }
 }
 
-impl<Db, Net, A, T> Debug for PromiscuousStrategy<Db, Net, A, T>
+impl<Db, A, T> Debug for PromiscuousStrategy<Db, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
@@ -408,10 +405,9 @@ where
     }
 }
 
-impl<Db, Net, A, T> Display for PromiscuousStrategy<Db, Net, A, T>
+impl<Db, A, T> Display for PromiscuousStrategy<Db, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
-    Net: NetworkExternalActions,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
@@ -421,10 +417,9 @@ where
 }
 
 #[async_trait]
-impl<Db, Net, A, T> SingularStrategy for PromiscuousStrategy<Db, Net, A, T>
+impl<Db, A, T> SingularStrategy for PromiscuousStrategy<Db, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
-    Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions + Send + Sync,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
@@ -489,7 +484,7 @@ mod tests {
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use core_network::{
-        network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
+        network::{NetworkConfig, PeerOrigin},
         PeerId,
     };
     use futures::{future::ok, FutureExt};
@@ -565,11 +560,6 @@ mod tests {
         }
     }
 
-    struct MockNetworkExternalActions;
-    impl NetworkExternalActions for MockNetworkExternalActions {
-        fn emit(&self, _: NetworkEvent) {}
-    }
-
     async fn mock_channel(
         db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
         dst: Address,
@@ -591,7 +581,7 @@ mod tests {
         channel
     }
 
-    async fn prepare_network<T>(network: Arc<Network<MockNetworkExternalActions, T>>, qualities: Vec<f64>)
+    async fn prepare_network<T>(network: Arc<Network<T>>, qualities: Vec<f64>)
     where
         T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
     {
@@ -678,7 +668,6 @@ mod tests {
             vec![],
             NetworkConfig::default(),
             hopr_db_api::db::HoprDb::new_in_memory().await,
-            MockNetworkExternalActions {},
         ));
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];

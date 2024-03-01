@@ -32,12 +32,11 @@ pub enum TransportOutput {
 use std::ops::Add;
 pub use {
     crate::{
-        adaptors::network::ExternalNetworkInteractions,
         multiaddrs::decapsulate_p2p_protocol,
         processes::indexer::IndexerProcessed,
         processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
     },
-    core_network::network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerOrigin, PeerStatus},
+    core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     core_p2p::libp2p,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -86,30 +85,11 @@ use {async_std::task::sleep, hopr_platform::time::native::current_time};
 /// Build the [Network] object responsible for tracking and holding the
 /// observable state of the physical transport network, peers inside the network
 /// and telemetry about network connections.
-pub fn build_network<T>(
-    peer_id: PeerId,
-    addresses: Vec<Multiaddr>,
-    cfg: NetworkConfig,
-    db: T,
-) -> (
-    Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
-    Receiver<NetworkEvent>,
-)
+pub fn build_network<T>(peer_id: PeerId, addresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Arc<Network<T>>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    let (network_events_tx, network_events_rx) =
-        futures::channel::mpsc::channel::<NetworkEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
-
-    let network = Arc::new(Network::new(
-        peer_id,
-        addresses,
-        cfg,
-        db,
-        adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
-    ));
-
-    (network, network_events_rx)
+    Arc::new(Network::new(peer_id, addresses, cfg, db))
 }
 
 /// Build the ticket aggregation mechanism and processes.
@@ -129,40 +109,80 @@ type HoprPingComponents<T> = (
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
 
-/// Build the ping infrastructure to run manual pings from the interface.
-pub fn build_manual_ping<T>(
-    cfg: core_protocol::config::ProtocolConfig,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
+pub fn build_transport_components<T>(
+    proto_cfg: core_protocol::config::ProtocolConfig,
+    hb_cfg: HeartbeatConfig,
+    network: Arc<Network<T>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> HoprPingComponents<T>
+) -> (
+    HoprPingComponents<T>,
+    HoprHeartbeatComponents<T>,
+    Receiver<NetworkTriggeredEvent>,
+)
 where
     T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Sync + Send,
 {
+    let (network_events_tx, network_events_rx) =
+        futures::channel::mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
+
+    // manual ping
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     let ping_cfg = PingConfig {
-        timeout: cfg.heartbeat.timeout,
+        timeout: proto_cfg.heartbeat.timeout,
         ..PingConfig::default()
     };
 
-    // manual ping explicitly called by the API
     let ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>> = Ping::new(
         ping_cfg,
         ping_tx,
         pong_rx,
-        adaptors::ping::PingExternalInteractions::new(network, addr_resolver, channel_graph),
+        adaptors::ping::PingExternalInteractions::new(
+            network.clone(),
+            addr_resolver.clone(),
+            channel_graph.clone(),
+            network_events_tx.clone(),
+        ),
     );
 
-    (ping, ping_rx, pong_tx)
+    // heartbeat
+    let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+    let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
+        libp2p::identity::PeerId,
+        std::result::Result<(ControlMessage, String), ()>,
+    )>();
+
+    let ping_cfg = PingConfig {
+        timeout: proto_cfg.heartbeat.timeout,
+        ..PingConfig::default()
+    };
+
+    let hb_pinger = Ping::new(
+        ping_cfg,
+        hb_ping_tx,
+        hb_pong_rx,
+        adaptors::ping::PingExternalInteractions::new(network.clone(), addr_resolver, channel_graph, network_events_tx),
+    );
+    let heartbeat = Heartbeat::new(
+        hb_cfg,
+        hb_pinger,
+        core_network::heartbeat::HeartbeatExternalInteractions::new(network),
+    );
+
+    (
+        (ping, ping_rx, pong_tx),
+        (heartbeat, hb_ping_rx, hb_pong_tx),
+        network_events_rx,
+    )
 }
 
 /// Build the index updater mechanism for indexer generated behavior inclusion.
 pub fn build_index_updater<Db, T>(
     db: Arc<RwLock<Db>>,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
+    network: Arc<Network<T>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -193,7 +213,7 @@ where
 
 type HoprHearbeat<T> = Heartbeat<
     Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
-    adaptors::heartbeat::HeartbeatExternalInteractions<T>,
+    core_network::heartbeat::HeartbeatExternalInteractions<T>,
 >;
 
 type HoprHeartbeatComponents<T> = (
@@ -201,43 +221,6 @@ type HoprHeartbeatComponents<T> = (
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
-
-/// Build the heartbeat mechanism for network probing.
-pub fn build_heartbeat<T>(
-    proto_cfg: core_protocol::config::ProtocolConfig,
-    hb_cfg: HeartbeatConfig,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
-    addr_resolver: DbPeerAddressResolver,
-    channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> HoprHeartbeatComponents<T>
-where
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
-{
-    let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-    let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
-        libp2p::identity::PeerId,
-        std::result::Result<(ControlMessage, String), ()>,
-    )>();
-
-    let ping_cfg = PingConfig {
-        timeout: proto_cfg.heartbeat.timeout,
-        ..PingConfig::default()
-    };
-
-    let hb_pinger = Ping::new(
-        ping_cfg,
-        hb_ping_tx,
-        hb_pong_rx,
-        adaptors::ping::PingExternalInteractions::new(network.clone(), addr_resolver, channel_graph),
-    );
-    let heartbeat = Heartbeat::new(
-        hb_cfg,
-        hb_pinger,
-        adaptors::heartbeat::HeartbeatExternalInteractions::new(network),
-    );
-
-    (heartbeat, hb_ping_rx, hb_pong_tx)
-}
 
 /// Event emitter used by the indexer to emit events when an on-chain change on a
 /// channel is detected.
@@ -297,7 +280,7 @@ where
     cfg: config::TransportConfig,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
     ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>>>,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
+    network: Arc<Network<T>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
@@ -316,7 +299,7 @@ where
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
         ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
-        network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
+        network: Arc<Network<T>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,

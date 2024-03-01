@@ -26,7 +26,7 @@ pub fn model_to_channel_status(model: &channel::Model) -> Result<ChannelStatus> 
         1 => Ok(ChannelStatus::Open),
         2 => {
             if let Some(ct) = &model.closure_time {
-                let time = DbTimestamp::from_str(&ct).map_err(|_| DbError::CorruptedData)?;
+                let time = DbTimestamp::from_str(ct).map_err(|_| DbError::CorruptedData)?;
                 Ok(ChannelStatus::PendingToClose(time.into()))
             } else {
                 Err(DbError::CorruptedData)
