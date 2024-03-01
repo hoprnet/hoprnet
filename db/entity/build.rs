@@ -60,6 +60,15 @@ fn main() {
 
     let tmp_db = temp_dir().join("tmp_migration.db");
 
+    let _ = std::fs::remove_file(
+        tmp_db
+            .clone()
+            .into_os_string()
+            .into_string()
+            .expect("should contain valid temporary db path")
+            .as_str(),
+    );
+
     async_std::task::block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
         "migrate",
@@ -93,23 +102,10 @@ fn main() {
         format!(
             "sqlite://{}?mode=rwc",
             tmp_db
-                .clone()
                 .into_os_string()
                 .into_string()
                 .expect("should contain valid temporary db path")
         )
         .as_str(),
     ]));
-
-    let _ = std::fs::remove_file(
-        format!(
-            "sqlite://{}?mode=rwc",
-            tmp_db
-                .clone()
-                .into_os_string()
-                .into_string()
-                .expect("should contain valid temporary db path")
-        )
-        .as_str(),
-    );
 }
