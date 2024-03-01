@@ -495,9 +495,9 @@ impl UnitaryFloatOps for U256 {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use primitive_types::U256;
     use std::cmp::Ordering;
     use std::str::FromStr;
-    use primitive_types::U256;
 
     #[test]
     fn address_tests() {
@@ -640,8 +640,15 @@ mod tests {
         let be_bytes = num.to_be_bytes();
         let le_bytes = num.to_le_bytes();
 
-        assert_ne!(be_bytes, le_bytes, "sanity check: input number must have different endianness");
-        assert_eq!(num.to_bytes().as_ref(), be_bytes.as_ref(), "to_bytes must yield big endian");
+        assert_ne!(
+            be_bytes, le_bytes,
+            "sanity check: input number must have different endianness"
+        );
+        assert_eq!(
+            num.to_bytes().as_ref(),
+            be_bytes.as_ref(),
+            "to_bytes must yield big endian"
+        );
 
         let expected_be = hex!("0000000000000000000000000000000000000000000000000000001CBE991A08");
         assert_eq!(expected_be, be_bytes);

@@ -1,5 +1,5 @@
-use sea_orm_migration::prelude::*;
 use hopr_primitive_types::prelude::{BinarySerializable, U256};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

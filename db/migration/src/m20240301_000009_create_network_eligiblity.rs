@@ -35,5 +35,5 @@ impl MigrationTrait for Migration {
 enum NetworkEligibility {
     Table,
     Id,
-    SafeAddress
+    SafeAddress,
 }

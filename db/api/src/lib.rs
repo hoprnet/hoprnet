@@ -19,8 +19,7 @@ pub use sea_orm::DatabaseTransaction;
 
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use sea_orm::{ConnectionTrait, EntityTrait, TransactionTrait};
-use hopr_db_entity::chain_info::Model;
+use sea_orm::TransactionTrait;
 
 use crate::db::HoprDb;
 use crate::errors::Result;

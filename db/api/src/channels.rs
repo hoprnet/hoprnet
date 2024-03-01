@@ -8,8 +8,8 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::str::FromStr;
 
 use crate::db::HoprDb;
-use crate::DbTimestamp;
 use crate::errors::{DbError, Result};
+use crate::DbTimestamp;
 
 /// Updates given active model of a channel with the given status.
 pub fn channel_status_to_model(model: &mut channel::ActiveModel, new_status: ChannelStatus) {
@@ -24,13 +24,15 @@ pub fn model_to_channel_status(model: &channel::Model) -> Result<ChannelStatus> 
     match model.status {
         0 => Ok(ChannelStatus::Closed),
         1 => Ok(ChannelStatus::Open),
-        2 => if let Some(ct) = &model.closure_time {
+        2 => {
+            if let Some(ct) = &model.closure_time {
                 let time = DbTimestamp::from_str(&ct).map_err(|_| DbError::CorruptedData)?;
                 Ok(ChannelStatus::PendingToClose(time.into()))
             } else {
                 Err(DbError::CorruptedData)
-            },
-        _ => Err(DbError::CorruptedData)
+            }
+        }
+        _ => Err(DbError::CorruptedData),
     }
 }
 
@@ -75,6 +77,6 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .ok_or(DbError::NotFound)?;
 
-       model_to_channel_entry(&channel)
+        model_to_channel_entry(&channel)
     }
 }
