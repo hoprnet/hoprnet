@@ -1,5 +1,4 @@
 use crate::errors::{CoreEthereumIndexerError, Result};
-use async_lock::RwLock;
 use async_trait::async_trait;
 use bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
@@ -7,26 +6,41 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents,
 };
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
+use ethers::abi::AbiEncode;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use hopr_crypto_types::types::OffchainSignature;
+use futures::TryStreamExt;
+use hopr_crypto_types::prelude::Hash;
+use hopr_crypto_types::types::{OffchainPublicKey, OffchainSignature};
+use hopr_db_api::channels::{channel_status_to_model, model_to_channel_entry};
+use hopr_db_api::errors::DbError;
+use hopr_db_api::errors::DbError::CorruptedData;
+use hopr_db_api::tickets::{mark_ticket_redeemed, mark_tickets_neglected_in_epoch, model_to_acknowledged_ticket};
+use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_entity::{
+    account, announcement, chain_info, channel, network_eligibility, network_registry, node_info, ticket,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, StreamTrait,
+};
+use std::fmt::Formatter;
 use std::ops::{Add, Sub};
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
-use std::{str::FromStr, sync::Arc};
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Event handling object for on-chain operations
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event specific actions for each on-chain operation.
 ///
-#[derive(Debug, Clone)]
-pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions + std::fmt::Debug> {
+#[derive(Clone)]
+pub struct ContractEventHandlers<Db: HoprDbGeneralModelOperations + Clone> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: ContractAddresses,
@@ -35,11 +49,28 @@ pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions + std::fmt::Debug>
     /// own address, aka message sender
     chain_key: Address,
     /// callbacks to inform other modules
-    db: Arc<RwLock<U>>,
+    db: Db,
 }
 
-impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
-    pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: Address, db: Arc<RwLock<U>>) -> Self {
+impl<Db: HoprDbGeneralModelOperations + Clone> std::fmt::Debug for ContractEventHandlers<Db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContractEventHandler")
+            .field("addresses", &self.addresses)
+            .field("safe_address", &self.safe_address)
+            .field("chain_key", &self.chain_key)
+            .finish_non_exhaustive()
+    }
+}
+
+async fn channel_from_id<C: ConnectionTrait>(tx: &C, hash: &Hash) -> Result<Option<channel::Model>> {
+    Ok(channel::Entity::find()
+        .filter(channel::Column::ChannelId.eq(hash.to_hex()))
+        .one(tx)
+        .await?)
+}
+
+impl<Db: HoprDbGeneralModelOperations + Clone> ContractEventHandlers<Db> {
+    pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: Address, db: Db) -> Self {
         Self {
             addresses,
             safe_address,
@@ -48,16 +79,18 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
         }
     }
 
-    async fn on_announcement_event(
+    async fn on_announcement_event<C: ConnectionTrait + StreamTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprAnnouncementsEvents,
         block_number: u32,
-        snapshot: &Snapshot,
     ) -> Result<Option<ChainEventType>> {
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
-                let maybe_account = db.get_account(&address_announcement.node.into()).await?;
+                let maybe_account = account::Entity::find()
+                    .filter(account::Column::ChainKey.eq(address_announcement.node.encode_hex()))
+                    .one(tx)
+                    .await?;
 
                 trace!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
@@ -69,47 +102,45 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
                     return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
                 }
 
-                if let Some(mut account) = maybe_account {
-                    let new_entry_type = AccountType::Announced {
-                        multiaddr: Multiaddr::from_str(&address_announcement.base_multiaddr)?,
-                        updated_block: block_number,
+                return if let Some(account) = maybe_account {
+                    let new_entry_type = announcement::ActiveModel {
+                        account_id: Set(account.id),
+                        multiaddress: Set(address_announcement.base_multiaddr.clone()),
+                        at_block: Set(block_number as i32),
+                        ..Default::default()
                     };
 
-                    account.update(new_entry_type);
-                    db.update_account_and_snapshot(&account, snapshot).await?;
+                    announcement::Entity::insert(new_entry_type)
+                        .on_conflict(
+                            OnConflict::columns([announcement::Column::AccountId, announcement::Column::Multiaddress])
+                                .do_nothing()
+                                .to_owned(),
+                        )
+                        .exec(tx)
+                        .await?;
 
-                    if let Some(ma) = account.get_multiaddr() {
-                        return Ok(Some(ChainEventType::Announcement {
-                            peer: account.public_key.into(),
-                            address: account.chain_addr,
-                            multiaddresses: vec![ma],
-                        }));
-                    }
+                    Ok(Some(ChainEventType::Announcement {
+                        peer: OffchainPublicKey::from_hex(&account.packet_key)?.into(),
+                        address: Address::from_hex(&account.chain_key)?,
+                        multiaddresses: vec![Multiaddr::from_str(&address_announcement.base_multiaddr)?],
+                    }))
                 } else {
-                    return Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding);
-                }
+                    Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding)
+                };
             }
             HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
-                if db.get_account(&key_binding.chain_key.into()).await?.is_some() {
-                    return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
-                }
-
                 match KeyBinding::from_parts(
                     key_binding.chain_key.into(),
                     key_binding.ed_25519_pub_key.try_into()?,
                     OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
                 ) {
                     Ok(binding) => {
-                        let updated_account = AccountEntry::new(
-                            key_binding.ed_25519_pub_key.try_into()?,
-                            key_binding.chain_key.into(),
-                            AccountType::NotAnnounced,
-                        );
-
-                        db.link_chain_and_packet_keys(&binding.chain_key, &binding.packet_key, snapshot)
-                            .await?;
-
-                        db.update_account_and_snapshot(&updated_account, snapshot).await?;
+                        let account = account::ActiveModel {
+                            chain_key: Set(binding.chain_key.to_hex()),
+                            packet_key: Set(binding.packet_key.to_hex()),
+                            ..Default::default()
+                        };
+                        account.save(tx).await?;
                     }
                     Err(_) => {
                         warn!(
@@ -120,11 +151,16 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
                 }
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
-                let maybe_account = db.get_account(&revocation.node.into()).await?;
+                let maybe_account = account::Entity::find()
+                    .filter(account::Column::ChainKey.eq(revocation.node.encode_hex()))
+                    .one(tx)
+                    .await?;
 
-                if let Some(mut account) = maybe_account {
-                    account.update(AccountType::NotAnnounced);
-                    db.update_account_and_snapshot(&account, snapshot).await?;
+                if let Some(account) = maybe_account {
+                    announcement::Entity::delete_many()
+                        .filter(announcement::Column::AccountId.eq(account.id))
+                        .exec(tx)
+                        .await?;
                 } else {
                     return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                 }
@@ -134,47 +170,48 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
         Ok(None)
     }
 
-    async fn on_channel_event(
+    async fn on_channel_event<C: ConnectionTrait + StreamTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprChannelsEvents,
-        snapshot: &Snapshot,
     ) -> Result<Option<ChainEventType>> {
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-                let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
+                let maybe_channel = channel_from_id(tx, &balance_decreased.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
+                if let Some(channel) = maybe_channel {
+                    let channel_entry = hopr_db_api::channels::model_to_channel_entry(&channel)?;
                     let new_balance = Balance::new(balance_decreased.new_balance, BalanceType::HOPR);
-                    let diff = channel.balance.sub(&new_balance);
-                    channel.balance = new_balance;
+                    let diff = channel_entry.balance.sub(&new_balance);
 
-                    db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
-                        .await?;
+                    let mut updated = channel.into_active_model();
+                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.save(tx).await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel_entry, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-                let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
+                let maybe_channel = channel_from_id(tx, &balance_increased.channel_id.into()).await?;
 
-                if let Some(mut channel) = maybe_channel {
+                if let Some(channel) = maybe_channel {
+                    let channel_entry = hopr_db_api::channels::model_to_channel_entry(&channel)?;
                     let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
-                    let diff = new_balance.sub(&channel.balance);
-                    channel.balance = new_balance;
+                    let diff = new_balance.sub(&channel_entry.balance);
 
-                    db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
-                        .await?;
+                    let mut updated = channel.into_active_model();
+                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.save(tx).await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel_entry, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-                let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
+                let maybe_channel = channel_from_id(tx, &channel_closed.channel_id.into()).await?;
 
                 trace!(
                     "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
@@ -182,26 +219,27 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
                     maybe_channel.is_some()
                 );
 
-                if let Some(mut channel) = maybe_channel {
-                    // set all channel fields like we do on-chain on close
-                    channel.status = ChannelStatus::Closed;
-                    channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
-                    channel.ticket_index = 0u64.into();
+                if let Some(channel) = maybe_channel {
+                    let channel_entry = model_to_channel_entry(&channel)?;
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
-                    if channel.destination.eq(&self.chain_key) {
-                        db.mark_acknowledged_tickets_neglected(channel).await?;
-                    }
-
-                    db.update_channel_and_snapshot(&channel_closed.channel_id.into(), &channel, snapshot)
+                    if channel_entry.destination.eq(&self.chain_key) {
+                        mark_tickets_neglected_in_epoch(
+                            tx,
+                            &channel_entry.get_id(),
+                            channel_entry.channel_epoch.as_u32(),
+                        )
                         .await?;
-
-                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        // Reset the current_ticket_index to zero
-                        db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
-                            .await?;
                     }
-                    Ok(Some(ChainEventType::ChannelClosed(channel)))
+
+                    // set all channel fields like we do on-chain on close
+                    let mut active_channel = channel.into_active_model();
+                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_bytes().to_vec());
+                    active_channel.ticket_index = Set(U256::zero().to_bytes().to_vec());
+                    channel_status_to_model(&mut active_channel, ChannelStatus::Closed);
+                    active_channel.save(tx).await?;
+
+                    Ok(Some(ChainEventType::ChannelClosed(channel_entry)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -209,156 +247,190 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
                 let source: Address = channel_opened.source.into();
                 let destination: Address = channel_opened.destination.into();
-
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = db.get_channel(&channel_id).await?;
-                let is_reopen = maybe_channel.is_some();
-                trace!(
-                    "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}, channel known: {is_reopen}"
-                );
+                let maybe_channel = channel_from_id(tx, &channel_id).await?;
+                let new_model = if let Some(channel) = maybe_channel {
+                    trace!(
+                        "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
+                    );
 
-                let channel = maybe_channel
-                    .map(|mut channel| {
-                        // set all channel fields like we do on-chain on close
-                        channel.status = ChannelStatus::Open;
-                        channel.ticket_index = 0u64.into();
-                        channel.channel_epoch += U256::from(1u64);
-                        channel
-                    })
-                    .unwrap_or(ChannelEntry::new(
-                        source,
-                        destination,
-                        Balance::new(0_u64, BalanceType::HOPR),
-                        0u64.into(),
-                        ChannelStatus::Open,
-                        1u64.into(),
-                    ));
+                    let current_epoch = U256::from_big_endian(&channel.epoch);
 
-                db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
-
-                if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
-                    db.set_current_ticket_index(&channel_id, U256::zero()).await?;
-
-                    // Cleanup tickets from previous epochs on channel re-opening
-                    if is_reopen {
-                        db.cleanup_invalid_channel_tickets(&channel).await?;
+                    // cleanup tickets from previous epochs on channel re-opening
+                    if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        mark_tickets_neglected_in_epoch(tx, &channel.channel_id.parse()?, current_epoch.as_u32())
+                            .await?;
                     }
-                }
 
-                Ok(Some(ChainEventType::ChannelOpened(channel)))
+                    // set all channel fields like we do on-chain on close
+                    let mut existing_channel = channel.into_active_model();
+                    existing_channel.ticket_index = Set(U256::zero().to_be_bytes().into());
+                    existing_channel.epoch = Set(current_epoch.add(1).to_be_bytes().into());
+                    channel_status_to_model(&mut existing_channel, ChannelStatus::Open);
+                    channel::Entity::update(existing_channel).exec(tx).await?
+                } else {
+                    trace!(
+                        "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
+                    );
+
+                    let new_channel = channel::ActiveModel {
+                        channel_id: Set(channel_id.to_hex()),
+                        source: Set(source.to_hex()),
+                        destination: Set(destination.to_hex()),
+                        balance: Set(U256::zero().to_be_bytes().into()),
+                        status: Set(u8::from(ChannelStatus::Open) as i32),
+                        epoch: Set(U256::one().to_be_bytes().into()),
+                        ticket_index: Set(U256::zero().to_be_bytes().into()),
+                        ..Default::default()
+                    };
+
+                    // Insert new channel and retrieve its new model immediately
+                    let ir = channel::Entity::insert(new_channel).exec(tx).await?;
+                    channel::Entity::find_by_id(ir.last_insert_id)
+                        .one(tx)
+                        .await?
+                        .ok_or(DbError::CorruptedData)?
+                };
+
+                Ok(Some(ChainEventType::ChannelOpened(model_to_channel_entry(&new_model)?)))
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
+                let maybe_channel = channel_from_id(tx, &ticket_redeemed.channel_id.into()).await?;
+                if let Some(channel) = maybe_channel {
+                    let channel_entry = model_to_channel_entry(&channel)?;
 
-                if let Some(mut channel) = maybe_channel {
-                    channel.ticket_index = ticket_redeemed.new_ticket_index.into();
+                    // For channels that destination is us, it means that our ticket
+                    // has been redeemed, so mark it in the DB as redeemed
+                    let ack_ticket = if channel_entry.destination.eq(&self.chain_key) {
+                        // Filter all tickets in this channel and its current epoch
+                        let mut matching_tickets: Vec<ticket::Model> = ticket::Entity::find()
+                            .filter(ticket::Column::ChannelId.eq(&channel.channel_id))
+                            .filter(ticket::Column::ChannelEpoch.eq(channel.epoch.clone()))
+                            .stream(tx)
+                            .await?
+                            .try_filter(|ticket| {
+                                // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
+                                // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
+                                let ticket_idx = U256::from_be_bytes(&ticket.index).as_u64();
+                                let ticket_off = ticket.index_offset as u64;
 
-                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
-                        .await?;
+                                futures::future::ready(ticket_idx + ticket_off == ticket_redeemed.new_ticket_index)
+                            })
+                            .try_collect()
+                            .await?;
 
-                    // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
-                    db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.into(), channel.ticket_index)
-                        .await?;
+                        if matching_tickets.len() == 1 {
+                            let redeemed_ticket = matching_tickets.pop().unwrap();
+                            let ack_ticket = model_to_acknowledged_ticket(&redeemed_ticket)?;
+                            mark_ticket_redeemed(tx, &redeemed_ticket).await?;
 
-                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        // For channels that destination is us, it means that our ticket
-                        // has been redeemed, so mark it in the DB as redeemed
-                        let ack_ticket = if channel.destination.eq(&self.chain_key) {
-                            // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
-                            // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
-                            if let Some(ticket) = db
-                                .get_acknowledged_tickets(Some(channel))
-                                .await? // TODO: optimize this DB query and iteration
-                                .into_iter()
-                                .find(|ticket| {
-                                    ticket.ticket.index + ticket.ticket.index_offset as u64
-                                        == ticket_redeemed.new_ticket_index
-                                })
-                            {
-                                db.mark_redeemed(&ticket).await?;
-                                Some(ticket)
-                            } else {
-                                error!(
-                                    "could not find acknowledged ticket with idx {} in {channel}",
-                                    ticket_redeemed.new_ticket_index - 1
-                                );
-                                None
-                            }
-                        } else {
+                            info!("{ack_ticket} has been marked as redeemed");
+                            Some(ack_ticket)
+                        } else if matching_tickets.len() > 1 {
+                            error!(
+                                "found {} tickets matching redeemed index {} in {channel_entry}",
+                                matching_tickets.len(),
+                                ticket_redeemed.new_ticket_index - 1
+                            );
                             None
-                        };
-
-                        Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
+                        } else {
+                            error!(
+                                "could not find acknowledged ticket with idx {} in {channel_entry}",
+                                ticket_redeemed.new_ticket_index - 1
+                            );
+                            None
+                        }
                     } else {
-                        Ok(Some(ChainEventType::TicketRedeemed(channel, None)))
-                    }
+                        debug!("observed redeem event on a foreign {channel_entry}");
+                        None // Not our redeem event
+                    };
+
+                    let mut active_channel = channel.into_active_model();
+                    active_channel.ticket_index = Set(ticket_redeemed.new_ticket_index.to_be_bytes().into());
+                    active_channel.save(tx).await?;
+
+                    Ok(Some(ChainEventType::TicketRedeemed(channel_entry, ack_ticket)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-                let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
-
-                if let Some(mut channel) = maybe_channel {
-                    channel.status = ChannelStatus::PendingToClose(
+                let maybe_channel = channel_from_id(tx, &closure_initiated.channel_id.into()).await?;
+                if let Some(channel) = maybe_channel {
+                    let mut channel_entry = model_to_channel_entry(&channel)?;
+                    channel_entry.status = ChannelStatus::PendingToClose(
                         SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_initiated.closure_time as u64)),
                     );
 
-                    db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
-                        .await?;
+                    let mut active_channel = channel.into_active_model();
+                    channel_status_to_model(&mut active_channel, channel_entry.status);
+                    active_channel.save(tx).await?;
 
-                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel_entry)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                db.set_channels_domain_separator(&domain_separator_updated.domain_separator.into(), snapshot)
-                    .await?;
+                let mut info = chain_info::Entity::find_by_id(1)
+                    .one(tx)
+                    .await?
+                    .ok_or(DbError::CorruptedData)?
+                    .into_active_model();
+
+                info.channels_dst = Set(domain_separator_updated.domain_separator.into());
+                info.save(tx).await?;
 
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
-                db.set_channels_ledger_domain_separator(
-                    &ledger_domain_separator_updated.ledger_domain_separator.into(),
-                    snapshot,
-                )
-                .await?;
+                let mut info = chain_info::Entity::find_by_id(1)
+                    .one(tx)
+                    .await?
+                    .ok_or(DbError::CorruptedData)?
+                    .into_active_model();
+
+                info.ledger_dst = Set(ledger_domain_separator_updated.ledger_domain_separator.into());
+                info.save(tx).await?;
 
                 Ok(None)
             }
         }
     }
 
-    async fn on_token_event(
+    async fn on_token_event<C: ConnectionTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprTokenEvents,
-        snapshot: &Snapshot,
-    ) -> Result<Option<ChainEventType>>
-    where
-        U: HoprCoreEthereumDbActions,
-    {
+    ) -> Result<Option<ChainEventType>> {
+        let node_info = node_info::Entity::find_by_id(1).one(tx).await?.ok_or(CorruptedData)?;
+
         match event {
-            HoprTokenEvents::TransferFilter(transfered) => {
-                let from: Address = transfered.from.into();
-                let to: Address = transfered.to.into();
+            HoprTokenEvents::TransferFilter(transferred) => {
+                let from: Address = transferred.from.into();
+                let to: Address = transferred.to.into();
 
                 trace!(
                     "on_token_transfer_event - address_to_monitor: {:?} - to: {to} - from: {from}",
                     &self.safe_address,
                 );
 
+                let current_balance = U256::from_be_bytes(&node_info.safe_balance);
+                let transferred_value = transferred.value;
+
+                let mut active_node_info = node_info.into_active_model();
+
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
-                    db.add_hopr_balance(&Balance::new(transfered.value, BalanceType::HOPR), snapshot)
-                        .await?;
+                    active_node_info.safe_balance = Set((current_balance + transferred_value).to_be_bytes().into());
                 } else if from.eq(&self.safe_address) {
-                    db.sub_hopr_balance(&Balance::new(transfered.value, BalanceType::HOPR), snapshot)
-                        .await?;
+                    active_node_info.safe_balance =
+                        Set(current_balance.saturating_sub(transferred_value).to_be_bytes().into());
                 }
+
+                active_node_info.save(tx).await?;
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
                 let owner: Address = approved.owner.into();
@@ -369,10 +441,12 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
                     &self.safe_address, approved.value
                 );
 
+                let mut active_node_info = node_info.into_active_model();
+
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    db.set_staking_safe_allowance(&Balance::new(approved.value, BalanceType::HOPR), snapshot)
-                        .await?;
+                    active_node_info.safe_allowance = Set(approved.value.to_be_bytes().into());
+                    active_node_info.save(tx).await?;
                 } else {
                     return Ok(None);
                 }
@@ -383,55 +457,101 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
         Ok(None)
     }
 
-    async fn on_network_registry_event(
+    async fn on_network_registry_event<C: ConnectionTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprNetworkRegistryEvents,
-        snapshot: &Snapshot,
-    ) -> Result<Option<ChainEventType>>
-    where
-        U: HoprCoreEthereumDbActions,
-    {
+    ) -> Result<Option<ChainEventType>> {
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-                let node_address = &deregistered.node_address.into();
-                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
+                let node_address: Address = deregistered.node_address.into();
+                network_registry::Entity::delete_many()
+                    .filter(network_registry::Column::ChainAddress.eq(node_address.to_hex()))
+                    .exec(tx)
+                    .await?;
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    *node_address,
+                    node_address,
                     NetworkRegistryStatus::Denied,
                 )));
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-                let node_address = &deregistered.node_address.into();
-                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
+                let node_address: Address = deregistered.node_address.into();
+                network_registry::Entity::delete_many()
+                    .filter(network_registry::Column::ChainAddress.eq(node_address.to_hex()))
+                    .exec(tx)
+                    .await?;
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    *node_address,
+                    node_address,
                     NetworkRegistryStatus::Denied,
                 )));
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-                let node_address = &registered.node_address.into();
-                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
+                let node_address: Address = registered.node_address.into();
+                let new_entry = network_registry::ActiveModel {
+                    chain_address: Set(node_address.to_hex()),
+                    ..Default::default()
+                };
+
+                network_registry::Entity::insert(new_entry)
+                    .on_conflict(
+                        OnConflict::column(network_registry::Column::ChainAddress)
+                            .do_nothing()
+                            .to_owned(),
+                    )
+                    .exec(tx)
+                    .await?;
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    *node_address,
+                    node_address,
                     NetworkRegistryStatus::Allowed,
                 )));
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-                let node_address = &registered.node_address.into();
-                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
+                let node_address: Address = registered.node_address.into();
+                let new_entry = network_registry::ActiveModel {
+                    chain_address: Set(node_address.to_hex()),
+                    ..Default::default()
+                };
+
+                network_registry::Entity::insert(new_entry)
+                    .on_conflict(
+                        OnConflict::column(network_registry::Column::ChainAddress)
+                            .do_nothing()
+                            .to_owned(),
+                    )
+                    .exec(tx)
+                    .await?;
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    *node_address,
+                    node_address,
                     NetworkRegistryStatus::Allowed,
                 )));
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.into();
-                db.set_eligible(&account, eligibility_updated.eligibility, snapshot)
+                let new_entry = network_eligibility::ActiveModel {
+                    safe_address: Set(account.to_hex()),
+                    ..Default::default()
+                };
+                network_eligibility::Entity::insert(new_entry)
+                    .on_conflict(
+                        OnConflict::column(network_eligibility::Column::SafeAddress)
+                            .do_nothing()
+                            .to_owned(),
+                    )
+                    .exec(tx)
                     .await?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-                db.set_network_registry(enabled.is_enabled, snapshot).await?;
+                let mut chain_info = chain_info::Entity::find_by_id(1)
+                    .one(tx)
+                    .await?
+                    .ok_or(CorruptedData)?
+                    .into_active_model();
+                chain_info.network_registry_enabled = Set(enabled.is_enabled);
+                chain_info.save(tx).await?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -444,72 +564,53 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
         Ok(None)
     }
 
-    async fn on_node_safe_registry_event(
+    async fn on_node_safe_registry_event<C: ConnectionTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprNodeSafeRegistryEvents,
-        snapshot: &Snapshot,
-    ) -> Result<Option<ChainEventType>>
-    where
-        U: HoprCoreEthereumDbActions,
-    {
+    ) -> Result<Option<ChainEventType>> {
         match event {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.eq(&registered.node_address.into()) {
-                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.into()), snapshot)
-                        .await?;
+                    info!("Node safe registered: {}", registered.safe_address);
 
                     return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
                 }
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
                 if self.chain_key.eq(&deregistered.node_address.into()) {
-                    if db.is_mfa_protected().await?.is_some() {
-                        db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
-                    } else {
-                        return Err(CoreEthereumIndexerError::MFAModuleDoesNotExist);
-                    }
+                    info!("Node safe unregistered");
                 }
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                db.set_node_safe_registry_domain_separator(
-                    &(domain_separator_updated.domain_separator).into(),
-                    snapshot,
-                )
-                .await?;
+                let mut chain_info = chain_info::Entity::find_by_id(1)
+                    .one(tx)
+                    .await?
+                    .ok_or(CorruptedData)?
+                    .into_active_model();
+
+                chain_info.safe_registry_dst = Set(domain_separator_updated.domain_separator.into());
+                chain_info.save(tx).await?;
             }
         }
 
         Ok(None)
     }
 
-    async fn on_node_management_module_event(
+    async fn on_node_management_module_event<C: ConnectionTrait>(
         &self,
-        _db: &mut U,
+        _db: &C,
         _event: HoprNodeManagementModuleEvents,
-        _snapshot: &Snapshot,
-    ) -> Result<Option<ChainEventType>>
-    where
-        U: HoprCoreEthereumDbActions,
-    {
-        // match event {
-        //     _ => {
-        //         // don't care at the moment
-        //     }
-        // }
-
+    ) -> Result<Option<ChainEventType>> {
+        // Don't care at the moment
         Ok(None)
     }
 
-    async fn on_ticket_price_oracle_event(
+    async fn on_ticket_price_oracle_event<C: ConnectionTrait>(
         &self,
-        db: &mut U,
+        tx: &C,
         event: HoprTicketPriceOracleEvents,
-        _snapshot: &Snapshot,
-    ) -> Result<Option<ChainEventType>>
-    where
-        U: HoprCoreEthereumDbActions,
-    {
+    ) -> Result<Option<ChainEventType>> {
         match event {
             HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
                 trace!(
@@ -518,8 +619,16 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
                     update.1.to_string()
                 );
 
+                let mut chain_info = chain_info::Entity::find_by_id(1)
+                    .one(tx)
+                    .await?
+                    .ok_or(CorruptedData)?
+                    .into_active_model();
+
+                chain_info.ticket_price = Set(update.1.to_be_bytes().into());
+                chain_info.save(tx).await?;
+
                 info!("ticket price has been set to {}", update.1);
-                db.set_ticket_price(&update.1).await?;
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -530,8 +639,8 @@ impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
 }
 
 #[async_trait]
-impl<U: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug> crate::traits::ChainLogHandler
-    for ContractEventHandlers<U>
+impl<Db: HoprDbGeneralModelOperations + Clone + Send + Sync> crate::traits::ChainLogHandler
+    for ContractEventHandlers<Db>
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -546,55 +655,44 @@ impl<U: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug> crate::traits
     }
 
     #[tracing::instrument(level = "debug")]
-    async fn on_event(
-        &self,
-        address: Address,
-        block_number: u32,
-        log: RawLog,
-        snapshot: Snapshot,
-    ) -> Result<Option<ChainEventType>> {
-        trace!(
-            "on_event - address: {:?} - received log: {:?}",
-            address.to_string(),
-            log
-        );
+    async fn on_event(&self, address: Address, block_number: u32, log: RawLog) -> Result<Option<ChainEventType>> {
+        trace!("on_event - address: {address} - received log: {log:?}");
 
-        // NOTE: RW LOCK is unnecessary as it will block all other parts of the code
-        // but it must be done in order to make sure that operations happen in a
-        // single transaction.
-        let mut db = self.db.write().await;
+        // Enclose all operations inside transaction
+        // Cannot use `.transaction(|tx| {...})` due to impossible lifetimes.
+        let tx = self.db.begin_transaction().await?;
 
-        if address.eq(&self.addresses.announcements) {
+        let res = if address.eq(&self.addresses.announcements) {
             let event = HoprAnnouncementsEvents::decode_log(&log)?;
-            self.on_announcement_event(&mut db, event, block_number, &snapshot)
-                .await
+            self.on_announcement_event(&tx, event, block_number).await
         } else if address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&log)?;
-            self.on_channel_event(&mut db, event, &snapshot).await
+            self.on_channel_event(&tx, event).await
         } else if address.eq(&self.addresses.network_registry) {
             let event = HoprNetworkRegistryEvents::decode_log(&log)?;
-            self.on_network_registry_event(&mut db, event, &snapshot).await
+            self.on_network_registry_event(&tx, event).await
         } else if address.eq(&self.addresses.token) {
             let event = HoprTokenEvents::decode_log(&log)?;
-            self.on_token_event(&mut db, event, &snapshot).await
+            self.on_token_event(&tx, event).await
         } else if address.eq(&self.addresses.safe_registry) {
             let event = HoprNodeSafeRegistryEvents::decode_log(&log)?;
-            self.on_node_safe_registry_event(&mut db, event, &snapshot).await
+            self.on_node_safe_registry_event(&tx, event).await
         } else if address.eq(&self.addresses.module_implementation) {
             let event = HoprNodeManagementModuleEvents::decode_log(&log)?;
-            self.on_node_management_module_event(&mut db, event, &snapshot).await
+            self.on_node_management_module_event(&tx, event).await
         } else if address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&log)?;
-            self.on_ticket_price_oracle_event(&mut db, event, &snapshot).await
+            self.on_ticket_price_oracle_event(&tx, event).await
         } else {
-            error!(
-                "on_event error - unknown contract address: {:?} - received log: {:?}",
-                address.to_string(),
-                log
-            );
-
+            error!("on_event error - unknown contract address: {address} - received log: {log:?}");
             Err(CoreEthereumIndexerError::UnknownContract(address))
+        };
+
+        if res.is_ok() {
+            tx.commit().await?;
         }
+
+        res
     }
 }
 
@@ -631,6 +729,8 @@ pub mod tests {
     };
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
@@ -652,14 +752,11 @@ pub mod tests {
         static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
     }
 
-    async fn create_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
-        Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *SELF_CHAIN_ADDRESS,
-        )))
+    async fn create_db() -> HoprDb {
+        HoprDb::new_in_memory().await
     }
 
-    fn init_handlers<U: HoprCoreEthereumDbActions + std::fmt::Debug>(db: Arc<RwLock<U>>) -> ContractEventHandlers<U> {
+    fn init_handlers<Db: HoprDbGeneralModelOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
         ContractEventHandlers {
             addresses: ContractAddresses {
                 channels: *CHANNELS_ADDR,
@@ -698,12 +795,7 @@ pub mod tests {
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
-            .on_event(
-                handlers.addresses.announcements,
-                0u32,
-                keybinding_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.announcements, 0u32, keybinding_log)
             .await
             .unwrap();
 
@@ -739,12 +831,7 @@ pub mod tests {
         };
 
         let _error = handlers
-            .on_event(
-                handlers.addresses.announcements,
-                0u32,
-                address_announcement_empty_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.announcements, 0u32, address_announcement_empty_log)
             .await
             .unwrap_err();
 
@@ -773,12 +860,7 @@ pub mod tests {
         );
 
         handlers
-            .on_event(
-                handlers.addresses.announcements,
-                0u32,
-                address_announcement_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.announcements, 0u32, address_announcement_log)
             .await
             .unwrap();
 
@@ -807,12 +889,7 @@ pub mod tests {
         );
 
         handlers
-            .on_event(
-                handlers.addresses.announcements,
-                0u32,
-                address_announcement_dns_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.announcements, 0u32, address_announcement_dns_log)
             .await
             .unwrap();
 
@@ -855,12 +932,7 @@ pub mod tests {
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
         handlers
-            .on_event(
-                handlers.addresses.announcements,
-                0u32,
-                revoke_announcement_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.announcements, 0u32, revoke_announcement_log)
             .await
             .unwrap();
 
@@ -888,7 +960,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
+            .on_event(handlers.addresses.token, 0u32, transferred_log)
             .await
             .unwrap();
 
@@ -924,7 +996,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(handlers.addresses.token, 0u32, transferred_log, Snapshot::default())
+            .on_event(handlers.addresses.token, 0u32, transferred_log)
             .await
             .unwrap();
 
@@ -956,7 +1028,7 @@ pub mod tests {
         );
 
         handlers
-            .on_event(handlers.addresses.token, 0u32, log.clone(), Snapshot::default())
+            .on_event(handlers.addresses.token, 0u32, log.clone())
             .await
             .unwrap();
 
@@ -979,10 +1051,7 @@ pub mod tests {
             Balance::new(U256::from(10u64), BalanceType::HOPR)
         );
 
-        handlers
-            .on_event(handlers.addresses.token, 0u32, log, Snapshot::default())
-            .await
-            .unwrap();
+        handlers.on_event(handlers.addresses.token, 0u32, log).await.unwrap();
 
         assert_eq!(
             db.read().await.get_staking_safe_allowance().await.unwrap(),
@@ -1013,12 +1082,7 @@ pub mod tests {
             .unwrap());
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
@@ -1053,12 +1117,7 @@ pub mod tests {
             .unwrap());
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
@@ -1099,12 +1158,7 @@ pub mod tests {
             .unwrap());
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
@@ -1145,12 +1199,7 @@ pub mod tests {
             .unwrap());
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
@@ -1177,12 +1226,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                nr_enabled,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, nr_enabled)
             .await
             .unwrap();
 
@@ -1210,12 +1254,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                nr_disabled,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, nr_disabled)
             .await
             .unwrap();
 
@@ -1238,12 +1277,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                set_eligible,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, set_eligible)
             .await
             .unwrap();
 
@@ -1272,12 +1306,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.network_registry,
-                0u32,
-                set_eligible,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.network_registry, 0u32, set_eligible)
             .await
             .unwrap();
 
@@ -1320,12 +1349,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                balance_increased_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, balance_increased_log)
             .await
             .unwrap();
 
@@ -1360,10 +1384,7 @@ pub mod tests {
 
         assert!(db.read().await.get_channels_domain_separator().await.unwrap().is_none());
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, log, Snapshot::default())
-            .await
-            .unwrap();
+        handlers.on_event(handlers.addresses.channels, 0u32, log).await.unwrap();
 
         assert_eq!(
             db.read().await.get_channels_domain_separator().await.unwrap().unwrap(),
@@ -1407,12 +1428,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                balance_increased_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, balance_increased_log)
             .await
             .unwrap();
 
@@ -1464,12 +1480,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                channel_closed_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, channel_closed_log)
             .await
             .unwrap();
 
@@ -1507,12 +1518,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                channel_opened_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
             .await
             .unwrap();
 
@@ -1567,12 +1573,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                channel_opened_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
             .await
             .unwrap();
 
@@ -1629,12 +1630,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                ticket_redeemed_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, ticket_redeemed_log)
             .await
             .unwrap();
 
@@ -1690,12 +1686,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.channels,
-                0u32,
-                closure_initiated_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.channels, 0u32, closure_initiated_log)
             .await
             .unwrap();
 
@@ -1722,12 +1713,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.safe_registry,
-                0u32,
-                safe_registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.safe_registry, 0u32, safe_registered_log)
             .await
             .unwrap();
 
@@ -1761,12 +1747,7 @@ pub mod tests {
         };
 
         handlers
-            .on_event(
-                handlers.addresses.safe_registry,
-                0u32,
-                safe_registered_log,
-                Snapshot::default(),
-            )
+            .on_event(handlers.addresses.safe_registry, 0u32, safe_registered_log)
             .await
             .unwrap();
 
@@ -1789,7 +1770,7 @@ pub mod tests {
         assert_eq!(db.read().await.get_ticket_price().await.unwrap(), None);
 
         handlers
-            .on_event(handlers.addresses.price_oracle, 0u32, log, Snapshot::default())
+            .on_event(handlers.addresses.price_oracle, 0u32, log)
             .await
             .unwrap();
 

@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
-use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
+use sea_orm::prelude::Expr;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{debug, error, info, trace};
 
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_primitive_types::prelude::*;
+use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_entity::chain_info;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -58,29 +59,29 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 /// 5. store relevant data into the DB
 /// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
-pub struct Indexer<T, U, V>
+pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
-    db: Arc<RwLock<V>>,
+    db: Db,
     cfg: IndexerConfig,
     egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
 }
 
-impl<T, U, V> Indexer<T, U, V>
+impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
         db_processor: U,
-        db: Arc<RwLock<V>>,
+        db: Db,
         cfg: IndexerConfig,
         egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     ) -> Self {
@@ -97,7 +98,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        V: HoprCoreEthereumDbActions + 'static,
+        Db: HoprDbGeneralModelOperations + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -109,10 +110,12 @@ where
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
-        let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
+        let db_latest_block = chain_info::Entity::find_by_id(1)
+            .one(self.db.conn())
+            .await?
+            .map(|info| info.last_indexed_block as u64);
 
         let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
 
@@ -139,6 +142,7 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
+        let db = self.db.clone();
         spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -193,9 +197,23 @@ where
                 })
                 .then(|block_with_logs| async {
                     if let Err(error) = db
-                        .write()
-                        .await
-                        .update_latest_block_number(block_with_logs.block_id as u32)
+                        .transaction(|tx| {
+                            Box::pin(async move {
+                                let res = chain_info::Entity::update_many()
+                                    .col_expr(
+                                        chain_info::Column::LastIndexedBlock,
+                                        Expr::value(block_with_logs.block_id as i32),
+                                    )
+                                    .filter(chain_info::Column::Id.eq(1))
+                                    .exec(tx)
+                                    .await?;
+                                if res.rows_affected == 1 {
+                                    Ok(())
+                                } else {
+                                    Err(sea_orm::DbErr::RecordNotUpdated)
+                                }
+                            })
+                        })
                         .await
                     {
                         error!("failed to write the latest block number into the database: {error}");
@@ -210,16 +228,10 @@ where
                     stream::iter(block_with_logs.logs)
                 })
                 .then(|log| async {
-                    let snapshot = Snapshot::new(
-                        U256::from(log.block_number),
-                        U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                        log.log_index,
-                    );
-
                     let tx_hash = log.tx_hash;
 
                     db_processor
-                        .on_event(log.address, log.block_number as u32, log.into(), snapshot)
+                        .on_event(log.address, log.block_number as u32, log.into())
                         .await
                         .map(|v| {
                             v.map(|event_type| {

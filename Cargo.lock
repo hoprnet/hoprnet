@@ -1206,13 +1206,14 @@ dependencies = [
  "async-std",
  "async-trait",
  "bindings",
- "chain-db",
  "chain-rpc",
  "chain-types",
  "ethers",
  "futures",
  "hex-literal",
  "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-entity",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1220,10 +1221,10 @@ dependencies = [
  "mockall",
  "multiaddr",
  "primitive-types",
+ "sea-orm",
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]
