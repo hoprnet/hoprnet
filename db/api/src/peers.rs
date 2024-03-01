@@ -9,7 +9,7 @@ use futures::{stream::BoxStream, TryStreamExt};
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-use sea_query::{Asterisk, Expr, Order, SimpleExpr};
+use sea_query::{Expr, Order, SimpleExpr};
 use sqlx::types::chrono::{self, DateTime, Utc};
 use tracing::{error, info, trace, warn};
 
@@ -175,7 +175,7 @@ impl HoprDbPeersOperations for HoprDb {
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
-                    OffchainPublicKey::try_from(new_status.id.clone())
+                    OffchainPublicKey::try_from(new_status.id)
                         .map_err(|_| crate::errors::DbError::DecodingError)?
                         .to_bytes(),
                 )),
@@ -404,7 +404,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
         Ok(PeerStatus {
-            id: OffchainPublicKey::from_bytes(&value.packet_key.as_slice())
+            id: OffchainPublicKey::from_bytes(value.packet_key.as_slice())
                 .map_err(|_| Self::Error::DecodingError)?
                 .into(),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
@@ -434,11 +434,9 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
                 .map_err(|_| Self::Error::DecodingError)?,
             quality: value.quality,
             quality_avg: bincode::deserialize(
-                &value
+                value
                     .quality_sma
-                    .ok_or_else(|| {
-                        Self::Error::LogicalError(format!("the SMA should always be present for every peer"))
-                    })?
+                    .ok_or_else(|| Self::Error::LogicalError("the SMA should always be present for every peer".into()))?
                     .as_slice(),
             )
             .map_err(|_| Self::Error::DecodingError)?,

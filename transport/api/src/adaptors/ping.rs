@@ -22,7 +22,7 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 pub struct PingExternalInteractions<R, T>
 where
     R: PeerAddressResolver + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     network: Arc<Network<ExternalNetworkInteractions, T>>,
     resolver: R,
@@ -32,7 +32,7 @@ where
 impl<R, T> PingExternalInteractions<R, T>
 where
     R: PeerAddressResolver + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
         network: Arc<Network<ExternalNetworkInteractions, T>>,
@@ -51,7 +51,7 @@ where
 impl<R, T> PingExternalAPI for PingExternalInteractions<R, T>
 where
     R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::marker::Sync + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     #[tracing::instrument(level = "info", skip(self))]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {

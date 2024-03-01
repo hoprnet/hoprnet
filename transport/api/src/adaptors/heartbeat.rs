@@ -16,14 +16,14 @@ use crate::adaptors::network::ExternalNetworkInteractions;
 /// OCP and SRP compliant.
 pub struct HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     network: Arc<Network<ExternalNetworkInteractions, T>>,
 }
 
 impl<T> HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(network: Arc<Network<ExternalNetworkInteractions, T>>) -> Self {
         Self { network }
@@ -33,7 +33,7 @@ where
 #[async_trait]
 impl<T> HeartbeatExternalApi for HeartbeatExternalInteractions<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     /// Get all peers considered by the `Network` to be pingable.
     ///

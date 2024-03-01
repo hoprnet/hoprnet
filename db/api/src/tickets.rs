@@ -85,7 +85,6 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-
     async fn add_ticket(&self, _ticket: &AcknowledgedTicket) -> Result<()> {
         // ticket::Entity::insert(todo!()).exec(&self.db).await?;
 
@@ -104,15 +103,16 @@ impl HoprDbTicketOperations for HoprDb {
         let (unredeemed_tickets, unredeemed_value) = Ticket::find()
             .stream(&self.db)
             .await?
-            .try_fold(
-                (0_u64, BalanceType::HOPR.zero()),
-                |(count, amount), x| async move {
-                    Ok((
-                        count + 1,
-                        amount.add(BalanceType::HOPR.balance_bytes(x.amount).map_err(|_| sea_orm::DbErr::Custom("invalid balance".into()))?),
-                    ))
-                },
-            )
+            .try_fold((0_u64, BalanceType::HOPR.zero()), |(count, amount), x| async move {
+                Ok((
+                    count + 1,
+                    amount.add(
+                        BalanceType::HOPR
+                            .balance_bytes(x.amount)
+                            .map_err(|_| sea_orm::DbErr::Custom("invalid balance".into()))?,
+                    ),
+                ))
+            })
             .await?;
 
         Ok(AllTicketStatistics {
@@ -121,7 +121,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .into(),
             losing_tickets: stats.losing_tickets as u64,
             neglected_tickets: stats.neglected_tickets as u64,
-            neglected_value:  BalanceType::HOPR.balance_bytes(stats.neglected_value)?,
+            neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value)?,
             redeemed_tickets: stats.redeemed_tickets as u64,
             redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value)?,
             unredeemed_tickets,

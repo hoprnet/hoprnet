@@ -158,29 +158,31 @@ pub struct PromiscuousStrategyConfig {
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy<Db, Net, A>
+pub struct PromiscuousStrategy<Db, Net, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
     A: ChannelActions,
+    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
-    network: Arc<Network<Net>>,
+    network: Arc<Network<Net, T>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
 }
 
-impl<Db, Net, A> PromiscuousStrategy<Db, Net, A>
+impl<Db, Net, A, T> PromiscuousStrategy<Db, Net, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions,
+    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<Network<Net>>,
+        network: Arc<Network<Net, T>>,
         chain_actions: A,
     ) -> Self {
         Self {
@@ -394,22 +396,24 @@ where
     }
 }
 
-impl<Db, Net, A> Debug for PromiscuousStrategy<Db, Net, A>
+impl<Db, Net, A, T> Debug for PromiscuousStrategy<Db, Net, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
     A: ChannelActions,
+    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Promiscuous(self.cfg.clone()))
     }
 }
 
-impl<Db, Net, A> Display for PromiscuousStrategy<Db, Net, A>
+impl<Db, Net, A, T> Display for PromiscuousStrategy<Db, Net, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
     A: ChannelActions,
+    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Promiscuous(self.cfg.clone()))
@@ -417,11 +421,12 @@ where
 }
 
 #[async_trait]
-impl<Db, Net, A> SingularStrategy for PromiscuousStrategy<Db, Net, A>
+impl<Db, Net, A, T> SingularStrategy for PromiscuousStrategy<Db, Net, A, T>
 where
     Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
     Net: NetworkExternalActions + Send + Sync,
     A: ChannelActions + Send + Sync,
+    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
@@ -586,7 +591,10 @@ mod tests {
         channel
     }
 
-    async fn prepare_network(network: Arc<Network<MockNetworkExternalActions>>, qualities: Vec<f64>) {
+    async fn prepare_network<T>(network: Arc<Network<MockNetworkExternalActions, T>>, qualities: Vec<f64>)
+    where
+        T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
         let net = network;
@@ -669,6 +677,7 @@ mod tests {
             PEERS[0].1,
             vec![],
             NetworkConfig::default(),
+            hopr_db_api::db::HoprDb::new_in_memory().await,
             MockNetworkExternalActions {},
         ));
 

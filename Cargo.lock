@@ -1695,6 +1695,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3508,6 +3509,7 @@ name = "hopr-db-migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "hopr-primitive-types",
  "sea-orm-migration",
 ]
 
@@ -3556,6 +3558,7 @@ dependencies = [
  "ethers",
  "futures",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",

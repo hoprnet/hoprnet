@@ -144,7 +144,7 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
 pub struct Network<T, U>
 where
     T: NetworkExternalActions,
-    U: hopr_db_api::peers::HoprDbPeersOperations,
+    U: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     me: PeerId,
     me_addresses: Vec<Multiaddr>,
@@ -159,7 +159,7 @@ where
 impl<T, U> Network<T, U>
 where
     T: NetworkExternalActions,
-    U: hopr_db_api::peers::HoprDbPeersOperations,
+    U: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
         my_peer_id: PeerId,

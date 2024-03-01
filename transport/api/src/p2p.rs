@@ -181,7 +181,7 @@ pub async fn p2p_loop<T>(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) where
-    T: hopr_db_api::peers::HoprDbPeersOperations,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
