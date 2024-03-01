@@ -162,7 +162,7 @@ impl HoprLoopComponents {
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn to_chain_events_refresh_process<Db, S>(
+pub fn to_chain_events_refresh_process<Db, S, T>(
     me: PeerId,
     me_onchain: Address,
     db: Arc<RwLock<Db>>,
@@ -171,11 +171,12 @@ pub fn to_chain_events_refresh_process<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<Network<ExternalNetworkInteractions>>,
+    network: Arc<Network<ExternalNetworkInteractions, T>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
     S: Stream<Item = SignificantChainEvent> + Send + 'static,
+    T: crate::Db + Sync + Send + std::fmt::Debug + 'static,
 {
     Box::pin(async move {
         pin_mut!(event_stream);
@@ -301,17 +302,18 @@ where
 /// Main builder of the hopr lib components
 #[allow(clippy::type_complexity)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn build_components<FSaveTbf>(
+pub fn build_components<FSaveTbf, T>(
     cfg: HoprLibConfig,
     chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+    new_db: T,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (
-    HoprTransport,
+    HoprTransport<T>,
     HoprChain,
     HashMap<HoprLoopComponents, Pin<Box<dyn futures::Future<Output = ()> + Send + Sync>>>,
     UnboundedReceiver<TransportOutput>,
@@ -319,6 +321,7 @@ pub fn build_components<FSaveTbf>(
 )
 where
     FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
+    T: Db + Sync + Send + std::fmt::Debug + 'static,
 {
     let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
@@ -330,6 +333,7 @@ where
         identity.public().to_peer_id(),
         my_multiaddresses.clone(),
         cfg.network_options,
+        new_db,
     );
 
     let addr_resolver = DbPeerAddressResolver(db.clone());
@@ -537,6 +541,16 @@ where
     )
 }
 
+pub trait Db:
+    hopr_db_api::accounts::HoprDbAccountOperations
+    + hopr_db_api::peers::HoprDbPeersOperations
+    + hopr_db_api::registry::HoprDbRegistryOperations
+    + hopr_db_api::tickets::HoprDbTicketOperations
+{
+}
+
+impl Db for hopr_db_api::db::HoprDb {}
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -554,7 +568,7 @@ pub struct Hopr {
     ingress_rx: Option<UnboundedReceiver<TransportOutput>>,
     state: Arc<AtomicHoprState>,
     network: String,
-    transport_api: HoprTransport,
+    transport_api: HoprTransport<hopr_db_api::db::HoprDb>,
     chain_api: HoprChain,
     chain_cfg: ChainNetworkConfig,
     safe_module_cfg: SafeModule,
@@ -641,6 +655,14 @@ impl Hopr {
             me.clone(),
             me_onchain.clone(),
             db,
+            async_std::task::block_on(hopr_db_api::db::HoprDb::new(
+                cfg.db.data.clone(),
+                hopr_db_api::db::HoprDbConfig {
+                    create_if_missing: cfg.db.initialize,
+                    force_create: cfg.db.force_initialize,
+                    log_slow_queries: std::time::Duration::from_millis(150),
+                },
+            )),
             tbf,
             save_tbf,
             vec![multiaddress],

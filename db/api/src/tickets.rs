@@ -118,7 +118,6 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-
     async fn add_ticket(&self, _ticket: &AcknowledgedTicket) -> Result<()> {
         // ticket::Entity::insert(todo!()).exec(&self.db).await?;
 

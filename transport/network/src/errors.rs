@@ -16,7 +16,7 @@ pub enum NetworkingError {
     DisallowedOperationOnOwnPeerIdError,
 
     #[error("backend error: {0}")]
-    BackendError(#[from] sqlx::Error),
+    BackendError(#[from] hopr_db_api::errors::DbError),
 
     #[error("peer does not exist")]
     NonExistingPeer,

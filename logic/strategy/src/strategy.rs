@@ -124,16 +124,17 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, Net>(
+    pub fn new<Db, Net, T>(
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<Network<Net>>,
+        network: Arc<Network<Net, T>>,
         chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
         Net: NetworkExternalActions + Send + Sync + 'static,
+        T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 

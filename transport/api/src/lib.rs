@@ -86,14 +86,18 @@ use {async_std::task::sleep, hopr_platform::time::native::current_time};
 /// Build the [Network] object responsible for tracking and holding the
 /// observable state of the physical transport network, peers inside the network
 /// and telemetry about network connections.
-pub fn build_network(
+pub fn build_network<T>(
     peer_id: PeerId,
     addresses: Vec<Multiaddr>,
     cfg: NetworkConfig,
+    db: T,
 ) -> (
-    Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+    Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
     Receiver<NetworkEvent>,
-) {
+)
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+{
     let (network_events_tx, network_events_rx) =
         futures::channel::mpsc::channel::<NetworkEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
@@ -101,6 +105,7 @@ pub fn build_network(
         peer_id,
         addresses,
         cfg,
+        db,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx),
     ));
 
@@ -118,19 +123,22 @@ where
     TicketAggregationInteraction::new(db, chain_keypair)
 }
 
-type HoprPingComponents = (
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
+type HoprPingComponents<T> = (
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
 
 /// Build the ping infrastructure to run manual pings from the interface.
-pub fn build_manual_ping(
+pub fn build_manual_ping<T>(
     cfg: core_protocol::config::ProtocolConfig,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> HoprPingComponents {
+) -> HoprPingComponents<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Sync + Send,
+{
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
@@ -141,7 +149,7 @@ pub fn build_manual_ping(
     };
 
     // manual ping explicitly called by the API
-    let ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>> = Ping::new(
+    let ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>> = Ping::new(
         ping_cfg,
         ping_tx,
         pong_rx,
@@ -152,12 +160,13 @@ pub fn build_manual_ping(
 }
 
 /// Build the index updater mechanism for indexer generated behavior inclusion.
-pub fn build_index_updater<Db>(
+pub fn build_index_updater<Db, T>(
     db: Arc<RwLock<Db>>,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
     Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Send + Sync + 'static + std::fmt::Debug,
 {
     let (indexer_update_tx, indexer_update_rx) =
         futures::channel::mpsc::channel::<IndexerProcessed>(constants::INDEXER_UPDATE_QUEUE_SIZE);
@@ -182,25 +191,28 @@ where
     )
 }
 
-type HoprHearbeat = Heartbeat<
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-    adaptors::heartbeat::HeartbeatExternalInteractions,
+type HoprHearbeat<T> = Heartbeat<
+    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
+    adaptors::heartbeat::HeartbeatExternalInteractions<T>,
 >;
 
-type HoprHeartbeatComponents = (
-    HoprHearbeat,
+type HoprHeartbeatComponents<T> = (
+    HoprHearbeat<T>,
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
 
 /// Build the heartbeat mechanism for network probing.
-pub fn build_heartbeat(
+pub fn build_heartbeat<T>(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
     addr_resolver: DbPeerAddressResolver,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> HoprHeartbeatComponents {
+) -> HoprHeartbeatComponents<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
+{
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(
         libp2p::identity::PeerId,
@@ -276,13 +288,16 @@ use hopr_primitive_types::prelude::*;
 /// Interface into the physical transport mechanism allowing all HOPR related tasks on
 /// the transport mechanism, as well as off-chain ticket manipulation.
 #[derive(Debug, Clone)]
-pub struct HoprTransport {
+pub struct HoprTransport<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
+{
     me: PeerId,
     me_onchain: Address,
     cfg: config::TransportConfig,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>>>,
-    network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>>>,
+    network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
@@ -290,15 +305,18 @@ pub struct HoprTransport {
     my_multiaddresses: Vec<Multiaddr>,
 }
 
-impl HoprTransport {
+impl<T> HoprTransport<T>
+where
+    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
+{
     #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
         identity: libp2p::identity::Keypair,
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-        ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
-        network: Arc<Network<adaptors::network::ExternalNetworkInteractions>>,
+        ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
+        network: Arc<Network<adaptors::network::ExternalNetworkInteractions, T>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>,
