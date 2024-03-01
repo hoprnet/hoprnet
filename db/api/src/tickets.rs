@@ -20,8 +20,6 @@ pub trait HoprDbTicketOperations {
 
     async fn add_ticket(&self, ticket: &AcknowledgedTicket) -> Result<()>;
 
-    async fn remove_ticket(&self, channel_id: &Hash, epoch: u32, ticket_index: u64) -> Result<()>;
-
     async fn get_ticket(
         &self,
         channel_id: &Hash,
@@ -71,8 +69,8 @@ impl HoprDbTicketOperations for HoprDb {
         // let ticket
         match ticket::Entity::find()
             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-            .filter(ticket::Column::ChannelEpoch.eq(u32_to_i32(epoch)))
-            .filter(ticket::Column::Index.eq(u64_to_i64(ticket_index)))
+            .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+            .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().as_ref()))
             .one(&self.db)
             .await?
         {
@@ -87,18 +85,8 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn remove_ticket(&self, channel_id: &Hash, epoch: u32, ticket_index: u64) -> Result<()> {
-        ticket::Entity::delete_many()
-            .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-            .filter(ticket::Column::ChannelEpoch.eq(u32_to_i32(epoch)))
-            .filter(ticket::Column::Index.eq(u64_to_i64(ticket_index)))
-            .exec(&self.db)
-            .await?;
 
-        Ok(())
-    }
-
-    async fn add_ticket(&self, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn add_ticket(&self, _ticket: &AcknowledgedTicket) -> Result<()> {
         // ticket::Entity::insert(todo!()).exec(&self.db).await?;
 
         // Ok(())
@@ -117,11 +105,11 @@ impl HoprDbTicketOperations for HoprDb {
             .stream(&self.db)
             .await?
             .try_fold(
-                (0_u64, Balance::zero(BalanceType::HOPR)),
+                (0_u64, BalanceType::HOPR.zero()),
                 |(count, amount), x| async move {
                     Ok((
                         count + 1,
-                        amount.add(Balance::new(U256::from_big_endian(&x.amount), BalanceType::HOPR)),
+                        amount.add(BalanceType::HOPR.balance_bytes(x.amount).map_err(|_| sea_orm::DbErr::Custom("invalid balance".into()))?),
                     ))
                 },
             )
@@ -133,13 +121,13 @@ impl HoprDbTicketOperations for HoprDb {
                 .into(),
             losing_tickets: stats.losing_tickets as u64,
             neglected_tickets: stats.neglected_tickets as u64,
-            neglected_value: Balance::new(U256::from_big_endian(&stats.neglected_value), BalanceType::HOPR),
+            neglected_value:  BalanceType::HOPR.balance_bytes(stats.neglected_value)?,
             redeemed_tickets: stats.redeemed_tickets as u64,
-            redeemed_value: Balance::new(U256::from_big_endian(&stats.redeemed_value), BalanceType::HOPR),
+            redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value)?,
             unredeemed_tickets,
             unredeemed_value,
             rejected_tickets: stats.rejected_tickets as u64,
-            rejected_value: Balance::new(U256::from_big_endian(&stats.rejected_value), BalanceType::HOPR),
+            rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value)?,
         })
     }
 }

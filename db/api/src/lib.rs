@@ -22,6 +22,8 @@ use sea_orm::TransactionTrait;
 use crate::db::HoprDb;
 use crate::errors::Result;
 
+pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
+
 #[async_trait]
 pub trait HoprDbGeneralModelOperations {
     fn conn(&self) -> &DatabaseConnection;

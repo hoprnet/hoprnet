@@ -1,4 +1,5 @@
 use sea_orm_migration::prelude::*;
+use hopr_primitive_types::prelude::{BinarySerializable, U256};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -30,17 +31,15 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Channel::Status).tiny_unsigned().not_null())
                     .col(
                         ColumnDef::new(Channel::Epoch)
-                            .integer()
-                            .unsigned()
+                            .binary_len(8)
                             .not_null()
-                            .default(1), // Default set in the SC
+                            .default(U256::one().to_bytes().to_vec()), // Default set in the SC
                     )
                     .col(
                         ColumnDef::new(Channel::TicketIndex)
-                            .integer()
-                            .unsigned()
+                            .binary_len(8)
                             .not_null()
-                            .default(0), // Default set in the SC
+                            .default(U256::zero().to_bytes().to_vec()), // Default set in the SC
                     )
                     .col(ColumnDef::new(Channel::ClosureTime).timestamp().null())
                     .to_owned(),

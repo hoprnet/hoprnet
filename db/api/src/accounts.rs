@@ -7,50 +7,12 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_db_entity::{account, announcement};
 use hopr_internal_types::account::AccountType;
-use hopr_primitive_types::prelude::{Address, GeneralError, ToHex};
+use hopr_internal_types::ChainOrPacketKey;
+use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
 use crate::errors::DbError::{CorruptedData, NotFound};
 use crate::errors::Result;
-
-pub enum ChainOrPacketKey {
-    ChainKey(Address),
-    PacketKey(OffchainPublicKey),
-}
-
-impl From<Address> for ChainOrPacketKey {
-    fn from(value: Address) -> Self {
-        Self::ChainKey(value)
-    }
-}
-
-impl From<OffchainPublicKey> for ChainOrPacketKey {
-    fn from(value: OffchainPublicKey) -> Self {
-        Self::PacketKey(value)
-    }
-}
-
-impl TryFrom<ChainOrPacketKey> for OffchainPublicKey {
-    type Error = GeneralError;
-
-    fn try_from(value: ChainOrPacketKey) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ChainOrPacketKey::ChainKey(_) => Err(GeneralError::InvalidInput),
-            ChainOrPacketKey::PacketKey(k) => Ok(k),
-        }
-    }
-}
-
-impl TryFrom<ChainOrPacketKey> for Address {
-    type Error = GeneralError;
-
-    fn try_from(value: ChainOrPacketKey) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ChainOrPacketKey::ChainKey(k) => Ok(k),
-            ChainOrPacketKey::PacketKey(_) => Err(GeneralError::InvalidInput),
-        }
-    }
-}
 
 #[async_trait]
 pub trait HoprDbAccountOperations {
@@ -66,7 +28,7 @@ fn model_to_account_entry(account: account::Model, announcements: Vec<announceme
 
     Ok(AccountEntry::new(
         OffchainPublicKey::from_hex(&account.packet_key)?,
-        Address::from_hex(&account.chain_key)?,
+        account.chain_key.parse()?,
         match announcement {
             None => AccountType::NotAnnounced,
             Some(a) => AccountType::Announced {

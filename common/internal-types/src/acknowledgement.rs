@@ -7,7 +7,6 @@ use tracing::debug;
 
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
-    arithmetic::{i32_to_u32, i64_to_u64},
     channels::{generate_channel_id, Ticket},
     errors::{
         CoreTypesError::{self, InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
@@ -232,10 +231,10 @@ impl AcknowledgedTicket {
         let mut ticket = Ticket::default();
 
         ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
-        ticket.amount = Balance::new(U256::default(), BalanceType::HOPR);
-        ticket.index = i64_to_u64(db_ticket.index);
-        ticket.index_offset = i32_to_u32(db_ticket.index_offset);
-        ticket.channel_epoch = i32_to_u32(db_ticket.channel_epoch);
+        ticket.amount = BalanceType::HOPR.zero();
+        ticket.index = U256::from_big_endian(&db_ticket.index).as_u64();
+        ticket.index_offset = db_ticket.index_offset as u32;
+        ticket.channel_epoch = U256::from_big_endian(&db_ticket.channel_epoch).as_u32();
         ticket.encoded_win_prob = encoded_win_prob;
         ticket.challenge = response.to_challenge().to_ethereum_challenge();
         ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);

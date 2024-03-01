@@ -129,6 +129,11 @@ impl BalanceType {
     pub fn balance<T: Into<U256>>(self, amount: T) -> Balance {
         Balance::new(amount, self)
     }
+
+    /// Deserializes the given amount and creates a new [Balance] instance.
+    pub fn balance_bytes<T: AsRef<[u8]>>(self, bytes: T) -> Result<Balance> {
+        Ok(Balance::new(U256::from_bytes(bytes.as_ref())?, self))
+    }
 }
 
 /// Represents balance of some coin or token.
