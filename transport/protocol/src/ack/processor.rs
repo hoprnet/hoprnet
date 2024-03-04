@@ -103,9 +103,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
             .get_pending_acknowledgement(&ack.ack_challenge())
             .await?
             .ok_or_else(|| {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
                 AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
                     ack.ack_challenge().to_hex(),
@@ -118,18 +115,12 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 // No pending ticket, nothing to do.
                 debug!("received acknowledgement as sender: first relayer has processed the packet.");
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
                 Ok(Reply::Sender(ack.ack_challenge()))
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                 // Try to unlock our incentive
                 unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RECEIVED_ACKS.increment(&["false"]);
-
                     AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
                     ))
@@ -141,9 +132,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 if from_channel.is_none()
                     || from_channel.is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
                 {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_RECEIVED_ACKS.increment(&["false"]);
-
                     return Err(AcknowledgementValidation(
                         "acknowledgement received for channel that does not exist or has a newer epoch".into(),
                     ));
@@ -168,23 +156,13 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_RECEIVED_ACKS.increment(&["true"]);
-
                 // Check if ticket is a win
                 if ack_ticket.is_winning_ticket(&domain_separator) {
-                    debug!("{ack_ticket} is a win");
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_WINNING_TICKETS_COUNT.increment();
-
+                    debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket",);
                     Ok(Reply::RelayerWinning(ack_ticket))
                 } else {
-                    warn!("encountered losing {ack_ticket}");
+                    trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
                     self.db.write().await.mark_losing_acked_ticket(&ack_ticket).await?;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_LOSING_TICKETS_COUNT.increment();
 
                     Ok(Reply::RelayerLosing)
                 }
@@ -261,12 +239,39 @@ impl AcknowledgementInteraction {
                             trace!("validating incoming acknowledgement from {}", peer);
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {
-                                    Ok(reply) => Some(AckProcessed::Receive(peer, Ok(reply))),
+                                    Ok(reply) => {
+                                        match &reply {
+                                            Reply::Sender(_) => {
+                                                #[cfg(all(feature = "prometheus", not(test)))]
+                                                METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                            }
+                                            Reply::RelayerWinning(_) => {
+                                                #[cfg(all(feature = "prometheus", not(test)))]
+                                                {
+                                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                                    METRIC_WINNING_TICKETS_COUNT.increment();
+                                                }
+                                            }
+                                            Reply::RelayerLosing => {
+                                                #[cfg(all(feature = "prometheus", not(test)))]
+                                                {
+                                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                                    METRIC_LOSING_TICKETS_COUNT.increment();
+                                                }
+                                            }
+                                        }
+
+                                        Some(AckProcessed::Receive(peer, Ok(reply)))
+                                    }
                                     Err(e) => {
                                         error!(
                                             "Encountered error while handling acknowledgement from peer '{}': {}",
                                             &peer, e
                                         );
+
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        METRIC_RECEIVED_ACKS.increment(&["false"]);
+
                                         None
                                     }
                                 }

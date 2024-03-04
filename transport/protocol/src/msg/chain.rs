@@ -292,13 +292,19 @@ mod tests {
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
         #[async_trait]
-        impl PeerAddressResolver for TestResolver {
-            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-                self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+        impl hopr_db_api::resolver::HoprDbResolverOperations for TestResolver {
+            async fn resolve_packet_key(
+                &self,
+                onchain_key: &Address,
+            ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+                Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
             }
 
-            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            async fn resolve_chain_key(
+                &self,
+                offchain_key: &OffchainPublicKey,
+            ) -> hopr_db_api::errors::Result<Option<Address>> {
+                Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
             }
         }
 

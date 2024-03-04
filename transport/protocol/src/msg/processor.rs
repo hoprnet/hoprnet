@@ -91,7 +91,7 @@ pub enum MsgProcessed {
 #[derive(Debug)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -99,7 +99,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -112,11 +112,12 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     type Input = ApplicationData;
+    type Packet = TransportPacket;
 
-    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket> {
+    async fn to_send(&self, data: Self::Input, path: &TransportPath) -> Result<Self::Packet> {
         let next_peer = self
             .db
             .read()
@@ -184,12 +185,7 @@ where
         }
     }
 
-    async fn from_incoming(
-        &self,
-        data: Box<[u8]>,
-        pkt_keypair: &OffchainKeypair,
-        sender: &PeerId,
-    ) -> Result<TransportPacket> {
+    async fn from_recv(&self, data: Box<[u8]>, pkt_keypair: &OffchainKeypair, sender: &PeerId) -> Result<Self::Packet> {
         let components = ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)?;
 
         match components {
@@ -371,29 +367,28 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
     }
 
-    #[tracing::instrument(level = "debug", skip(self, pkt_keypair))]
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn to_transport_packet_with_metadata(
         &self,
         event: MsgToProcess,
-        pkt_keypair: &OffchainKeypair,
     ) -> (Result<TransportPacket>, PacketMetadata) {
         let mut metadata = PacketMetadata::default();
 
         let packet = match event {
             MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                self.from_incoming(data, pkt_keypair, &peer).await
+                self.from_recv(data, &self.cfg.packet_keypair, &peer).await
             }
             MsgToProcess::ToSend(data, path, finalizer) => {
                 metadata.send_finalizer.replace(finalizer);
 
-                self.into_outgoing(data, &path).await
+                self.to_send(data, &path).await
             }
         };
 
@@ -599,8 +594,8 @@ impl PacketInteractionConfig {
 pub struct PacketMetadata {
     #[default(None)]
     pub send_finalizer: Option<PacketSendFinalizer>,
-    #[default(std::time::UNIX_EPOCH)]
     #[cfg(all(feature = "prometheus", not(test)))]
+    #[default(std::time::UNIX_EPOCH)]
     pub start_time: std::time::SystemTime,
 }
 
@@ -630,16 +625,14 @@ impl PacketInteraction {
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
         let mixer_cfg = cfg.mixer;
-        let pkt_keypair = cfg.packet_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
 
         let mut processing_stream = to_process_rx
             .then_concurrent(move |event| {
                 let processor = processor.clone();
-                let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event, &pkt_keypair).await;
+                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
@@ -845,7 +838,6 @@ mod tests {
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::resolver::HoprDbResolverOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -1248,13 +1240,19 @@ mod tests {
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
         #[async_trait]
-        impl HoprDbResolverOperations for TestResolver {
-            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-                self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+        impl hopr_db_api::resolver::HoprDbResolverOperations for TestResolver {
+            async fn resolve_packet_key(
+                &self,
+                onchain_key: &Address,
+            ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+                Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
             }
 
-            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            async fn resolve_chain_key(
+                &self,
+                offchain_key: &OffchainPublicKey,
+            ) -> hopr_db_api::errors::Result<Option<Address>> {
+                Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
             }
         }
 

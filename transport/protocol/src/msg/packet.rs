@@ -30,18 +30,14 @@ pub enum TransportPacket {
 }
 
 #[async_trait::async_trait]
-#[allow(clippy::wrong_self_convention)] // TODO: The `from_*` and `into_*` should take self, not a reference
 pub trait PacketConstructing {
     type Input;
+    type Packet;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket>;
+    async fn to_send(&self, data: Self::Input, path: &TransportPath) -> Result<Self::Packet>;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn from_incoming(
-        &self,
-        data: Box<[u8]>,
-        node_keypair: &OffchainKeypair,
-        sender: &PeerId,
-    ) -> Result<TransportPacket>;
+    async fn from_recv(&self, data: Box<[u8]>, node_keypair: &OffchainKeypair, sender: &PeerId)
+        -> Result<Self::Packet>;
 }
