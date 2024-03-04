@@ -20,11 +20,12 @@ libp2p-identity = { workspace = true }
 petgraph = {version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 chain-db = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-tracing = { workspace = true }
+hopr-db-api = { workspace = true, features = ["resolver"] }
 utils-db = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

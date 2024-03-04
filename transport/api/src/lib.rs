@@ -29,7 +29,7 @@ pub enum TransportOutput {
     Sent(HalfKeyChallenge),
 }
 
-use std::ops::Add;
+use std::{ops::Add, sync::Arc};
 pub use {
     crate::{
         multiaddrs::decapsulate_p2p_protocol,
@@ -49,10 +49,13 @@ pub use {
 };
 
 use async_lock::RwLock;
+use libp2p::request_response::{OutboundRequestId, ResponseChannel};
+use tracing::{debug, error, info, warn};
+
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_network::{heartbeat::Heartbeat, messaging::ControlMessage, network::NetworkConfig, ping::Ping};
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
-use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
+use core_path::channel_graph::ChannelGraph;
 use core_protocol::{
     ack::processor::AcknowledgementInteraction,
     msg::processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
@@ -64,9 +67,6 @@ use futures::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use libp2p::request_response::{OutboundRequestId, ResponseChannel};
-use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {core_path::path::Path, hopr_metrics::metrics::SimpleHistogram};
@@ -104,7 +104,7 @@ where
 }
 
 type HoprPingComponents<T> = (
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
+    Ping<adaptors::ping::PingExternalInteractions<T>>,
     UnboundedReceiver<(PeerId, ControlMessage)>,
     UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>,
 );
@@ -113,7 +113,7 @@ pub fn build_transport_components<T>(
     proto_cfg: core_protocol::config::ProtocolConfig,
     hb_cfg: HeartbeatConfig,
     network: Arc<Network<T>>,
-    addr_resolver: DbPeerAddressResolver,
+    addr_resolver: T,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> (
     HoprPingComponents<T>,
@@ -121,7 +121,12 @@ pub fn build_transport_components<T>(
     Receiver<NetworkTriggeredEvent>,
 )
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Sync + Send,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + std::fmt::Debug
+        + Clone
+        + Sync
+        + Send,
 {
     let (network_events_tx, network_events_rx) =
         futures::channel::mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
@@ -136,7 +141,7 @@ where
         ..PingConfig::default()
     };
 
-    let ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>> = Ping::new(
+    let ping: Ping<adaptors::ping::PingExternalInteractions<T>> = Ping::new(
         ping_cfg,
         ping_tx,
         pong_rx,
@@ -212,7 +217,7 @@ where
 }
 
 type HoprHearbeat<T> = Heartbeat<
-    Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
+    Ping<adaptors::ping::PingExternalInteractions<T>>,
     core_network::heartbeat::HeartbeatExternalInteractions<T>,
 >;
 
@@ -273,13 +278,19 @@ use hopr_primitive_types::prelude::*;
 #[derive(Debug, Clone)]
 pub struct HoprTransport<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
     me: PeerId,
     me_onchain: Address,
     cfg: config::TransportConfig,
     db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>>>,
+    new_db: T,
+    ping: Arc<RwLock<Ping<adaptors::ping::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     indexer: processes::indexer::IndexerActions,
     pkt_sender: PacketActions,
@@ -290,7 +301,12 @@ where
 
 impl<T> HoprTransport<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + std::fmt::Debug + Send + Sync,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
     #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(
@@ -298,7 +314,8 @@ where
         me_onchain: ChainKeypair,
         cfg: config::TransportConfig,
         db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
-        ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver, T>>,
+        new_db: T,
+        ping: Ping<adaptors::ping::PingExternalInteractions<T>>,
         network: Arc<Network<T>>,
         indexer: processes::indexer::IndexerActions,
         pkt_sender: PacketActions,
@@ -311,6 +328,7 @@ where
             me_onchain: me_onchain.public().to_address(),
             cfg,
             db,
+            new_db,
             ping: Arc::new(RwLock::new(ping)),
             network,
             indexer,
@@ -417,7 +435,7 @@ where
 
             let cg = self.channel_graph.read().await;
 
-            TransportPath::resolve(full_path, &DbPeerAddressResolver(self.db.clone()), &cg)
+            TransportPath::resolve(full_path, &self.new_db, &cg)
                 .await
                 .map(|(p, _)| p)?
         } else if let Some(hops) = hops {
@@ -432,7 +450,7 @@ where
                     selector.select_path(&cg, cg.my_address(), chain_key, hops as usize, hops as usize)?
                 };
 
-                cp.into_path(&DbPeerAddressResolver(self.db.clone()), chain_key).await?
+                cp.into_path(&self.new_db, chain_key).await?
             } else {
                 return Err(crate::errors::HoprTransportError::Api(
                     "send msg: unknown destination peer id encountered".to_owned(),

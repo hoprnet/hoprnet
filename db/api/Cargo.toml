@@ -36,10 +36,11 @@ hopr-internal-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 
 [features]
-default = ["accounts", "ticket", "registry", "peers"]
+default = ["accounts", "ticket", "peers", "registry", "resolver"]
 accounts = []
 ticket = []
 registry = []
+resolver = []
 peers = [
     "dep:libp2p-identity", "dep:multiaddr", "dep:num_enum", "dep:strum",
     "dep:hopr-crypto-types", "dep:hopr-primitive-types"

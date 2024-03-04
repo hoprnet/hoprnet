@@ -42,7 +42,7 @@ core-p2p = { workspace = true }
 core-packet = { workspace = true }
 core-protocol = { workspace = true }
 utils-db = { workspace = true }
-hopr-db-api = { workspace = true, features = ["peers"]}
+hopr-db-api = { workspace = true, features = ["peers", "resolver"]}
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

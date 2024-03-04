@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
@@ -24,15 +23,6 @@ pub type Tag = u16;
 
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
-
-/// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
-#[async_trait] // TODO: the resolver should not be async once detached from the DB ?
-pub trait PeerAddressResolver {
-    /// Tries to resolve off-chain public key given the on-chain address
-    async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
-    /// Tries to resolve on-chain public key given the off-chain public key
-    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
-}
 
 /// Bloom filter for packet tags to detect packet replays.
 ///

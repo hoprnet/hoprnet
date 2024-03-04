@@ -14,6 +14,9 @@ pub mod accounts;
 #[cfg(feature = "registry")]
 pub mod registry;
 
+#[cfg(feature = "resolver")]
+pub mod resolver;
+
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 

@@ -13,7 +13,6 @@ use core_network::{
 };
 use core_path::channel_graph::ChannelGraph;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::PeerAddressResolver;
 
 /// Implementor of the ping external API.
 ///
@@ -23,27 +22,35 @@ use hopr_internal_types::protocol::PeerAddressResolver;
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct PingExternalInteractions<R, T>
+pub struct PingExternalInteractions<T>
 where
-    R: PeerAddressResolver + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + Sync
+        + Send
+        + Clone
+        + std::fmt::Debug,
 {
     network: Arc<Network<T>>,
-    resolver: R,
+    resolver: T,
     channel_graph: Arc<RwLock<ChannelGraph>>,
     /// Implementation of the network interface allowing emitting events
     /// based on the [core_network::network::Network] events into the p2p swarm.
     emitter: Sender<NetworkTriggeredEvent>,
 }
 
-impl<R, T> PingExternalInteractions<R, T>
+impl<T> PingExternalInteractions<T>
 where
-    R: PeerAddressResolver + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + Sync
+        + Send
+        + Clone
+        + std::fmt::Debug,
 {
     pub fn new(
         network: Arc<Network<T>>,
-        resolver: R,
+        resolver: T,
         channel_graph: Arc<RwLock<ChannelGraph>>,
         emitter: Sender<NetworkTriggeredEvent>,
     ) -> Self {
@@ -57,10 +64,14 @@ where
 }
 
 #[async_trait]
-impl<R, T> PingExternalAPI for PingExternalInteractions<R, T>
+impl<T> PingExternalAPI for PingExternalInteractions<T>
 where
-    R: PeerAddressResolver + std::marker::Sync + std::fmt::Debug,
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations
+        + hopr_db_api::resolver::HoprDbResolverOperations
+        + Sync
+        + Send
+        + Clone
+        + std::fmt::Debug,
 {
     #[tracing::instrument(level = "info", skip(self))]
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String) {
@@ -83,7 +94,7 @@ where
                     debug!("'{peer}' changed quality to '{quality}'");
                     if let Ok(pk) = OffchainPublicKey::try_from(peer) {
                         let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
-                        if let Some(chain_key) = maybe_chain_key {
+                        if let Ok(Some(chain_key)) = maybe_chain_key {
                             let mut g = self.channel_graph.write().await;
                             let self_addr = g.my_address();
                             g.update_channel_quality(self_addr, chain_key, quality);

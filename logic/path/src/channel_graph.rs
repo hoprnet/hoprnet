@@ -206,9 +206,13 @@ impl ChannelGraph {
     /// Synchronizes the channel entries in this graph with the database.
     /// The synchronization is one-way from DB to the graph, not vice versa.
     pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
-        db.get_channels().await?.into_iter().for_each(|c| {
-            self.update_channel(c);
-        });
+        db.get_channels()
+            .await
+            .map_err(|_| hopr_db_api::errors::DbError::DecodingError)?
+            .into_iter()
+            .for_each(|c| {
+                self.update_channel(c);
+            });
         info!("synced {} channels to the graph", self.graph.edge_count());
         Ok(())
     }

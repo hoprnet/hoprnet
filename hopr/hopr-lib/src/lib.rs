@@ -64,7 +64,7 @@ use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
 use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
-use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
+use core_path::channel_graph::ChannelGraph;
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{
@@ -321,7 +321,7 @@ pub fn build_components<FSaveTbf, T>(
 )
 where
     FSaveTbf: Fn(Box<[u8]>) + Clone + Send + Sync + 'static,
-    T: Db + Sync + Send + std::fmt::Debug + 'static,
+    T: Db + Sync + Send + std::fmt::Debug + Clone + 'static,
 {
     let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
@@ -334,10 +334,8 @@ where
         identity.public().to_peer_id(),
         my_multiaddresses.clone(),
         cfg.network_options,
-        new_db,
+        new_db.clone(),
     );
-
-    let addr_resolver = DbPeerAddressResolver(db.clone());
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
@@ -422,7 +420,7 @@ where
             cfg.protocol,
             cfg.heartbeat,
             network.clone(),
-            addr_resolver.clone(),
+            new_db.clone(),
             channel_graph.clone(),
         );
 
@@ -431,6 +429,7 @@ where
         me_onchain.clone(),
         cfg.transport,
         db.clone(),
+        new_db.clone(),
         ping,
         network.clone(),
         indexer_updater,
@@ -540,6 +539,7 @@ pub trait Db:
     hopr_db_api::accounts::HoprDbAccountOperations
     + hopr_db_api::peers::HoprDbPeersOperations
     + hopr_db_api::registry::HoprDbRegistryOperations
+    + hopr_db_api::resolver::HoprDbResolverOperations
     + hopr_db_api::tickets::HoprDbTicketOperations
 {
 }
