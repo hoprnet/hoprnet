@@ -1621,6 +1621,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1651,6 +1652,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3492,10 +3494,13 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "clap",
+ "hopr-crypto-types",
  "hopr-db-migration",
+ "hopr-primitive-types",
  "sea-orm",
  "sea-orm-cli",
  "sea-orm-migration",
+ "thiserror",
 ]
 
 [[package]]

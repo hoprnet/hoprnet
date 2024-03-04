@@ -1,16 +1,16 @@
+use std::collections::{hash_map::RandomState, HashSet};
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
+
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::protocol::PeerAddressResolver;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::hash::Hash;
+
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_api::resolver::PeerAddressResolver;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::{primitives::Address, traits::ToHex};
 
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;

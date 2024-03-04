@@ -13,7 +13,7 @@ use core_network::{
 };
 use core_path::channel_graph::ChannelGraph;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::PeerAddressResolver;
+use hopr_db_api::resolver::PeerAddressResolver;
 
 /// Implementor of the ping external API.
 ///

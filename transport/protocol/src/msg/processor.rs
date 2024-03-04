@@ -845,6 +845,7 @@ mod tests {
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::resolver::PeerAddressResolver;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;

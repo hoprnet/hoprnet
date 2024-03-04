@@ -15,5 +15,10 @@ sea-orm = { workspace = true }
 sea-orm-cli = { workspace = true }
 sea-orm-migration = { workspace = true }
 
+
 [dependencies]
 sea-orm = { workspace = true }
+thiserror = { workspace = true }
+
+hopr-crypto-types = { workspace = true }
+hopr-primitive-types = { workspace = true }

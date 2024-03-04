@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::PeerAddressResolver;
+use hopr_db_api::resolver::PeerAddressResolver;
 use hopr_primitive_types::primitives::Address;
 use std::sync::Arc;
 use tracing::error;
