@@ -4,9 +4,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("row(s) were not found in the db")]
-    NotFound,
-
     #[error("db contains data which cannot be converted to business object")]
     CorruptedData,
 

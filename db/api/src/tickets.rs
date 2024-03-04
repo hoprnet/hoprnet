@@ -158,7 +158,7 @@ impl HoprDbTicketOperations for HoprDb {
         let stats = TicketStatistics::find_by_id(1)
             .one(txc)
             .await?
-            .ok_or(DbError::NotFound)?;
+            .ok_or(DbError::CorruptedData)?;
 
         let (unredeemed_tickets, unredeemed_value) = Ticket::find()
             .stream(txc)
