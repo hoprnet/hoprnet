@@ -17,6 +17,11 @@ pub mod registry;
 #[cfg(feature = "resolver")]
 pub mod resolver;
 
+#[cfg(feature = "info")]
+pub mod info;
+
+pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
+
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 
@@ -25,21 +30,88 @@ use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
 
 use crate::db::HoprDb;
-use crate::errors::Result;
+use crate::errors::{DbError, Result};
 
 pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 
+/// Represents an already opened transaction.
+/// This is a thin wrapper over [DatabaseTransaction].
+/// The wrapping behavior is needed to allow transaction agnostic functionalities
+/// of the DB traits.
+pub struct OpenTransaction(DatabaseTransaction);
+
+impl OpenTransaction {
+    /// Executes the given `callback` inside the transaction
+    /// and commits the transaction if it succeeds or rollbacks otherwise.
+    pub async fn perform<F, T, E>(self, callback: F) -> Result<T>
+    where
+        F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
+        T: Send,
+        E: std::error::Error + Send,
+    {
+        let res = callback(&self)
+            .await
+            .map_err(|e| DbError::TransactionError(e.to_string()));
+
+        if res.is_ok() {
+            self.commit().await?;
+        } else {
+            self.rollback().await?;
+        }
+        res
+    }
+
+    /// Commits the transaction.
+    pub async fn commit(self) -> Result<()> {
+        Ok(self.0.commit().await?)
+    }
+
+    /// Rollbacks the transaction.
+    pub async fn rollback(self) -> Result<()> {
+        Ok(self.0.rollback().await?)
+    }
+}
+
+impl AsRef<DatabaseTransaction> for OpenTransaction {
+    fn as_ref(&self) -> &DatabaseTransaction {
+        &self.0
+    }
+}
+
+impl From<OpenTransaction> for DatabaseTransaction {
+    fn from(value: OpenTransaction) -> Self {
+        value.0
+    }
+}
+
+/// Shorthand for optional transaction.
+/// Useful for transaction nesting (see [`HoprDbGeneralModelOperations::nest_transaction`]).
+pub type OptTx<'a> = Option<&'a OpenTransaction>;
+
 #[async_trait]
 pub trait HoprDbGeneralModelOperations {
+    /// Returns reference to the database connection.
+    /// Can be used in case transaction is not needed, but
+    /// users should aim to use [`HoprDbGeneralModelOperations::begin_transaction`]
+    /// and [`HoprDbGeneralModelOperations::nest_transaction`] as much as possible.
     fn conn(&self) -> &DatabaseConnection;
 
-    async fn begin_transaction(&self) -> Result<DatabaseTransaction>;
+    /// Creates a new transaction.
+    async fn begin_transaction(&self) -> Result<OpenTransaction>;
 
-    async fn transaction<F, T, E>(&self, callback: F) -> Result<T>
-    where
-        F: for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, std::result::Result<T, E>> + Send,
-        T: Send,
-        E: std::error::Error + Send;
+    /// Creates a nested transaction inside the given transaction.
+    ///
+    /// If `None` is given, behaves exactly as [`HoprDbGeneralModelOperations::begin_transaction`].
+    ///
+    /// This method is useful for creating APIs that should be agnostic whether they are being
+    /// run from an existing transaction or without it (via [OptTx]).
+    async fn nest_transaction(&self, tx: OptTx<'_>) -> Result<OpenTransaction> {
+        if let Some(t) = tx {
+            Ok(OpenTransaction(t.as_ref().begin().await?))
+        } else {
+            self.begin_transaction().await
+        }
+    }
 }
 
 #[async_trait]
@@ -48,16 +120,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
         &self.db
     }
 
-    async fn begin_transaction(&self) -> Result<DatabaseTransaction> {
-        Ok(self.db.begin_with_config(None, None).await?)
-    }
-
-    async fn transaction<F, T, E>(&self, callback: F) -> Result<T>
-    where
-        F: for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, std::result::Result<T, E>> + Send,
-        T: Send,
-        E: std::error::Error + Send,
-    {
-        Ok(self.db.transaction_with_config(callback, None, None).await?)
+    async fn begin_transaction(&self) -> Result<OpenTransaction> {
+        Ok(OpenTransaction(self.db.begin_with_config(None, None).await?))
     }
 }
