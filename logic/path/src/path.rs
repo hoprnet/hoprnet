@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use libp2p_identity::PeerId;
 
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::resolver::PeerAddressResolver;
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::{primitives::Address, traits::ToHex};
 
@@ -108,7 +108,11 @@ impl ChannelPath {
     /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
     /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
-    pub async fn into_path<R: PeerAddressResolver>(self, resolver: &R, destination: Address) -> Result<TransportPath> {
+    pub async fn into_path<R: HoprDbResolverOperations>(
+        self,
+        resolver: &R,
+        destination: Address,
+    ) -> Result<TransportPath> {
         let mut hops = self
             .hops
             .iter()
@@ -169,7 +173,7 @@ impl TransportPath {
     /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
     /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
-    pub async fn resolve<R: PeerAddressResolver>(
+    pub async fn resolve<R: HoprDbResolverOperations>(
         peers: Vec<PeerId>,
         resolver: &R,
         graph: &ChannelGraph,
@@ -406,7 +410,7 @@ mod tests {
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
     #[async_trait]
-    impl PeerAddressResolver for TestResolver {
+    impl HoprDbResolverOperations for TestResolver {
         async fn resolve_packet_key(
             &self,
             onchain_key: &Address,

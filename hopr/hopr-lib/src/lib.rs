@@ -539,7 +539,7 @@ pub trait Db:
     hopr_db_api::accounts::HoprDbAccountOperations
     + hopr_db_api::peers::HoprDbPeersOperations
     + hopr_db_api::registry::HoprDbRegistryOperations
-    + hopr_db_api::resolver::PeerAddressResolver
+    + hopr_db_api::resolver::HoprDbResolverOperations
     + hopr_db_api::tickets::HoprDbTicketOperations
 {
 }

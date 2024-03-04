@@ -7,7 +7,7 @@ use crate::{db::HoprDb, errors::Result};
 
 /// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
 #[async_trait]
-pub trait PeerAddressResolver {
+pub trait HoprDbResolverOperations {
     /// Tries to resolve off-chain public key given the on-chain address
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 
@@ -16,7 +16,7 @@ pub trait PeerAddressResolver {
 }
 
 #[async_trait]
-impl PeerAddressResolver for HoprDb {
+impl HoprDbResolverOperations for HoprDb {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
         let packet_key = hopr_db_entity::account::Entity::find()
             .filter(hopr_db_entity::account::Column::ChainKey.eq(onchain_key.to_hex()))

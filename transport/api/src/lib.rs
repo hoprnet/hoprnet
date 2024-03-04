@@ -122,7 +122,7 @@ pub fn build_transport_components<T>(
 )
 where
     T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::PeerAddressResolver
+        + hopr_db_api::resolver::HoprDbResolverOperations
         + std::fmt::Debug
         + Clone
         + Sync
@@ -279,7 +279,7 @@ use hopr_primitive_types::prelude::*;
 pub struct HoprTransport<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::PeerAddressResolver
+        + hopr_db_api::resolver::HoprDbResolverOperations
         + std::fmt::Debug
         + Clone
         + Send
@@ -302,7 +302,7 @@ where
 impl<T> HoprTransport<T>
 where
     T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::PeerAddressResolver
+        + hopr_db_api::resolver::HoprDbResolverOperations
         + std::fmt::Debug
         + Clone
         + Send
