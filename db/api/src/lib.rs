@@ -26,6 +26,10 @@ use crate::errors::Result;
 
 pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 
+pub struct TXC {
+
+}
+
 #[async_trait]
 pub trait HoprDbGeneralModelOperations {
     fn conn(&self) -> &DatabaseConnection;

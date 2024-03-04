@@ -15,7 +15,6 @@ use std::time::SystemTime;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
-use crate::HoprDbGeneralModelOperations;
 
 pub fn model_to_acknowledged_ticket(_ticket: &ticket::Model) -> Result<AcknowledgedTicket> {
     todo!()
@@ -23,9 +22,9 @@ pub fn model_to_acknowledged_ticket(_ticket: &ticket::Model) -> Result<Acknowled
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
-    async fn get_ticket<'a, C: ConnectionTrait>(
-        &'a self,
-        txc: Option<&'a C>,
+    async fn get_ticket<C: ConnectionTrait>(
+        &self,
+        txc: &C,
         channel_id: &Hash,
         epoch: u32,
         ticket_index: u64,
@@ -41,16 +40,16 @@ pub trait HoprDbTicketOperations {
 
     // async fn get_ticket_stats(channel_id: &Hash, epoch: u32);
 
-    async fn mark_ticket_redeemed<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>, ticket: &ticket::Model) -> Result<()>;
+    async fn mark_ticket_redeemed<C: ConnectionTrait>(&self, txc: &C, ticket: &ticket::Model) -> Result<()>;
 
-    async fn mark_tickets_neglected_in_epoch<'a, C: ConnectionTrait + StreamTrait>(
-        &'a self,
-        txc: Option<&'a C>,
+    async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(
+        &self,
+        txc: &C,
         channel_id: &Hash,
         epoch: u32,
     ) -> Result<()>;
 
-    async fn get_ticket_statistics<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>) -> Result<AllTicketStatistics>;
+    async fn get_ticket_statistics<C: ConnectionTrait + StreamTrait>(&self, txc: &C) -> Result<AllTicketStatistics>;
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -69,9 +68,9 @@ pub struct AllTicketStatistics {
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
-    async fn get_ticket<'a, C: ConnectionTrait>(
-        &'a self,
-        txc: Option<&'a C>,
+    async fn get_ticket<C: ConnectionTrait>(
+        &self,
+        txc: &C,
         channel_id: &Hash,
         epoch: u32,
         ticket_index: u64,
@@ -80,13 +79,11 @@ impl HoprDbTicketOperations for HoprDb {
         // To be removed with https://github.com/hoprnet/hoprnet/pull/6018
         chain_keypair: &ChainKeypair,
     ) -> Result<Option<AcknowledgedTicket>> {
-        let conn_or_tx = txc.unwrap_or_else(|| self.conn());
-
         match ticket::Entity::find()
             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
             .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
             .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().as_ref()))
-            .one(conn_or_tx)
+            .one(txc)
             .await?
         {
             Some(db_ticket) => Ok(Some(
@@ -100,11 +97,9 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn mark_ticket_redeemed<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>, ticket: &ticket::Model) -> Result<()> {
-        let conn_or_tx = txc.unwrap_or_else(|| self.conn());
-
+    async fn mark_ticket_redeemed<C: ConnectionTrait>(&self, txc: &C, ticket: &ticket::Model) -> Result<()> {
         let stats = ticket_statistics::Entity::find_by_id(1)
-            .one(conn_or_tx)
+            .one(txc)
             .await?
             .ok_or(DbError::CorruptedData)?;
 
@@ -115,25 +110,23 @@ impl HoprDbTicketOperations for HoprDb {
         let mut active_stats = stats.into_active_model();
         active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
         active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
-        active_stats.save(conn_or_tx).await?;
+        active_stats.save(txc).await?;
 
-        ticket::Entity::delete_by_id(ticket.id).exec(conn_or_tx).await?;
+        ticket::Entity::delete_by_id(ticket.id).exec(txc).await?;
 
         Ok(())
     }
 
-    async fn mark_tickets_neglected_in_epoch<'a, C: ConnectionTrait + StreamTrait>(
-        &'a self,
-        txc: Option<&'a C>,
+    async fn mark_tickets_neglected_in_epoch<C: ConnectionTrait + StreamTrait>(
+        &self,
+        txc: &C,
         channel_id: &Hash,
         epoch: u32,
     ) -> Result<()> {
-        let conn_or_tx= txc.unwrap_or_else(|| self.conn());
-
         let (neglectable_count, neglectable_value) = ticket::Entity::find()
             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
             .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
-            .stream(conn_or_tx)
+            .stream(txc)
             .await?
             .try_fold((0, U256::zero()), |(count, value), t| async move {
                 Ok((count + 1, value + U256::from_be_bytes(t.amount)))
@@ -141,7 +134,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await?;
 
         let stats = ticket_statistics::Entity::find_by_id(1)
-            .one(conn_or_tx)
+            .one(txc)
             .await?
             .ok_or(DbError::CorruptedData)?;
 
@@ -151,25 +144,25 @@ impl HoprDbTicketOperations for HoprDb {
         let mut active_stats = stats.into_active_model();
         active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
         active_stats.neglected_value = Set((current_neglected_value + neglectable_value).to_be_bytes().into());
-        active_stats.save(conn_or_tx).await?;
+        active_stats.save(txc).await?;
 
         ticket::Entity::delete_many()
             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
             .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
-            .exec(conn_or_tx)
+            .exec(txc)
             .await?;
 
         Ok(())
     }
 
-    async fn get_ticket_statistics<'a, C: ConnectionTrait>(&'a self, txc: Option<&'a C>) -> Result<AllTicketStatistics> {
+    async fn get_ticket_statistics<C: ConnectionTrait + StreamTrait>(&self, txc: &C) -> Result<AllTicketStatistics> {
         let stats = TicketStatistics::find_by_id(1)
-            .one(&self.db)
+            .one(txc)
             .await?
             .ok_or(DbError::NotFound)?;
 
         let (unredeemed_tickets, unredeemed_value) = Ticket::find()
-            .stream(&self.db)
+            .stream(txc)
             .await?
             .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
                 Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
