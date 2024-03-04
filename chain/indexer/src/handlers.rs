@@ -13,10 +13,10 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::Hash;
 use hopr_crypto_types::types::{OffchainPublicKey, OffchainSignature};
-use hopr_db_api::channels::{channel_status_to_model, HoprDbChannelOperations, model_to_channel_entry};
+use hopr_db_api::channels::{channel_status_to_model, model_to_channel_entry, HoprDbChannelOperations};
 use hopr_db_api::errors::DbError;
 use hopr_db_api::errors::DbError::CorruptedData;
-use hopr_db_api::tickets::{HoprDbTicketOperations, model_to_acknowledged_ticket};
+use hopr_db_api::tickets::{model_to_acknowledged_ticket, HoprDbTicketOperations};
 use hopr_db_api::HoprDbGeneralModelOperations;
 use hopr_db_entity::{
     account, announcement, chain_info, channel, network_eligibility, network_registry, node_info, ticket,
@@ -70,7 +70,9 @@ async fn channel_model_from_id<C: ConnectionTrait>(tx: &C, channel_id: Hash) -> 
 }
 
 impl<Db> ContractEventHandlers<Db>
-where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone {
+where
+    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone,
+{
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: Address, db: Db) -> Self {
         Self {
             addresses,
@@ -225,12 +227,13 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_entry.destination.eq(&self.chain_key) {
-                        self.db.mark_tickets_neglected_in_epoch(
-                            tx,
-                            &channel_entry.get_id(),
-                            channel_entry.channel_epoch.as_u32(),
-                        )
-                        .await?;
+                        self.db
+                            .mark_tickets_neglected_in_epoch(
+                                tx,
+                                &channel_entry.get_id(),
+                                channel_entry.channel_epoch.as_u32(),
+                            )
+                            .await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -326,7 +329,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                         if matching_tickets.len() == 1 {
                             let redeemed_ticket = matching_tickets.pop().unwrap();
                             let ack_ticket = model_to_acknowledged_ticket(&redeemed_ticket)?;
-                            self.db.mark_ticket_redeemed(tx, &redeemed_ticket).await?;
+                            self.db.mark_ticket_redeemed(tx, redeemed_ticket).await?;
 
                             info!("{ack_ticket} has been marked as redeemed");
                             Some(ack_ticket)
@@ -644,7 +647,8 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
 
 #[async_trait]
 impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
-where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone + Send + Sync
+where
+    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone + Send + Sync,
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -702,13 +706,11 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::traits::ChainLogHandler;
 
     use super::ContractEventHandlers;
-    use async_lock::RwLock;
     use async_std;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
@@ -724,7 +726,6 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::ContractAddresses;
     use ethers::contract::EthEvent;
     use ethers::{
@@ -733,13 +734,14 @@ pub mod tests {
     };
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::accounts::HoprDbAccountOperations;
     use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::HoprDbInfoOperations;
     use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -804,7 +806,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.read().await.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account((*SELF_CHAIN_ADDRESS).into()).await.unwrap().unwrap(),
             account_entry
         );
     }
@@ -817,12 +819,7 @@ pub mod tests {
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
-
-        db.write()
-            .await
-            .update_account_and_snapshot(&account_entry, &Snapshot::default())
-            .await
-            .unwrap();
+        db.insert_account(db.conn(), account_entry).await?;
 
         let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
 
@@ -840,7 +837,7 @@ pub mod tests {
             .unwrap_err();
 
         assert_eq!(
-            db.read().await.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account(SELF_CHAIN_ADDRESS.into()).await.unwrap().unwrap(),
             account_entry
         );
 
@@ -869,7 +866,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.read().await.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account(SELF_CHAIN_ADDRESS.into()).await.unwrap().unwrap(),
             announced_account_entry
         );
 
@@ -898,7 +895,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.read().await.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account(SELF_CHAIN_ADDRESS.into()).await.unwrap().unwrap(),
             announced_dns_account_entry
         );
     }
@@ -919,12 +916,7 @@ pub mod tests {
                 updated_block: 0,
             },
         );
-
-        db.write()
-            .await
-            .update_account_and_snapshot(&announced_account_entry, &Snapshot::default())
-            .await
-            .unwrap();
+        db.insert_account(db.conn(), announced_account_entry).await.unwrap();
 
         let revoke_announcement_log = RawLog {
             topics: vec![RevokeAnnouncementFilter::signature()],
@@ -941,7 +933,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.read().await.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account(SELF_CHAIN_ADDRESS.into()).await.unwrap().unwrap(),
             account_entry
         );
     }
@@ -968,10 +960,8 @@ pub mod tests {
             .await
             .unwrap();
 
-        let db = db.read().await;
-
         assert_eq!(
-            db.get_hopr_balance().await.unwrap(),
+            db.get_safe_balance().await.unwrap(),
             Balance::new(value, BalanceType::HOPR)
         )
     }

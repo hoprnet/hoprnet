@@ -285,7 +285,6 @@ pub mod tests {
 
     use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_db::db::CoreEthereumDb;
     use chain_rpc::BlockWithLogs;
     use chain_types::chain_events::ChainEventType;
     use ethers::{
@@ -295,11 +294,10 @@ pub mod tests {
     use futures::{join, Stream};
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_db_api::db::HoprDb;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
-    use hopr_db_api::db::HoprDb;
-    use utils_db::{db::DB, CurrentDbShim};
 
     use crate::traits::MockChainLogHandler;
 
