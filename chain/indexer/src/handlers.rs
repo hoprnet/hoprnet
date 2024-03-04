@@ -62,6 +62,13 @@ impl<Db: Clone> std::fmt::Debug for ContractEventHandlers<Db> {
     }
 }
 
+async fn channel_model_from_id<C: ConnectionTrait>(tx: &C, channel_id: Hash) -> Result<Option<channel::Model>> {
+    Ok(channel::Entity::find()
+        .filter(channel::Column::ChannelId.eq(channel_id.to_hex()))
+        .one(tx)
+        .await?)
+}
+
 impl<Db> ContractEventHandlers<Db>
 where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone {
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: Address, db: Db) -> Self {
@@ -171,7 +178,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
     ) -> Result<Option<ChainEventType>> {
         match event {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &balance_decreased.channel_id.into()).await?;
+                let maybe_channel = channel_model_from_id(tx, balance_decreased.channel_id.into()).await?;
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry = hopr_db_api::channels::model_to_channel_entry(&channel)?;
@@ -188,7 +195,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &balance_increased.channel_id.into()).await?;
+                let maybe_channel = channel_model_from_id(tx, balance_increased.channel_id.into()).await?;
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry = hopr_db_api::channels::model_to_channel_entry(&channel)?;
@@ -205,7 +212,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                 }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &channel_closed.channel_id.into()).await?;
+                let maybe_channel = channel_model_from_id(tx, channel_closed.channel_id.into()).await?;
 
                 trace!(
                     "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
@@ -219,7 +226,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_entry.destination.eq(&self.chain_key) {
                         self.db.mark_tickets_neglected_in_epoch(
-                            Some(tx),
+                            tx,
                             &channel_entry.get_id(),
                             channel_entry.channel_epoch.as_u32(),
                         )
@@ -243,7 +250,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &channel_id).await?;
+                let maybe_channel = channel_model_from_id(tx, channel_id).await?;
                 let new_model = if let Some(channel) = maybe_channel {
                     trace!(
                         "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
@@ -254,7 +261,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                     // cleanup tickets from previous epochs on channel re-opening
                     if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                         self.db
-                            .mark_tickets_neglected_in_epoch(Some(tx), &channel.channel_id.parse()?, current_epoch.as_u32())
+                            .mark_tickets_neglected_in_epoch(tx, &channel.channel_id.parse()?, current_epoch.as_u32())
                             .await?;
                     }
 
@@ -291,7 +298,8 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                 Ok(Some(ChainEventType::ChannelOpened(model_to_channel_entry(&new_model)?)))
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &ticket_redeemed.channel_id.into()).await?;
+                let maybe_channel = channel_model_from_id(tx, ticket_redeemed.channel_id.into()).await?;
+
                 if let Some(channel) = maybe_channel {
                     let channel_entry = model_to_channel_entry(&channel)?;
 
@@ -318,7 +326,7 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                         if matching_tickets.len() == 1 {
                             let redeemed_ticket = matching_tickets.pop().unwrap();
                             let ack_ticket = model_to_acknowledged_ticket(&redeemed_ticket)?;
-                            self.db.mark_ticket_redeemed(Some(tx), &redeemed_ticket).await?;
+                            self.db.mark_ticket_redeemed(tx, &redeemed_ticket).await?;
 
                             info!("{ack_ticket} has been marked as redeemed");
                             Some(ack_ticket)
@@ -351,7 +359,8 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-                let maybe_channel = self.db.get_channel_by_id(Some(tx), &closure_initiated.channel_id.into()).await?;
+                let maybe_channel = channel_model_from_id(tx, closure_initiated.channel_id.into()).await?;
+
                 if let Some(channel) = maybe_channel {
                     let mut channel_entry = model_to_channel_entry(&channel)?;
                     channel_entry.status = ChannelStatus::PendingToClose(
@@ -634,8 +643,8 @@ where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelO
 }
 
 #[async_trait]
-impl<Db: HoprDbGeneralModelOperations + Clone + Send + Sync> crate::traits::ChainLogHandler
-    for ContractEventHandlers<Db>
+impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
+where Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbChannelOperations + Clone + Send + Sync
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
