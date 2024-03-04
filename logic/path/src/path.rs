@@ -115,7 +115,7 @@ impl ChannelPath {
             .map(|addr| {
                 resolver
                     .resolve_packet_key(addr)
-                    .map(move |opt| opt.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
+                    .map(move |opt| opt?.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
             })
             .collect::<FuturesOrdered<_>>()
             .try_collect::<Vec<PeerId>>()
@@ -123,7 +123,7 @@ impl ChannelPath {
 
         let last_hop = resolver
             .resolve_packet_key(&destination)
-            .await
+            .await?
             .ok_or(InvalidPeer(destination.to_string()))?;
 
         hops.push(last_hop.into());
@@ -185,7 +185,7 @@ impl TransportPath {
                     let key = OffchainPublicKey::try_from(peer)?;
                     resolver
                         .resolve_chain_key(&key)
-                        .await
+                        .await?
                         .map(|addr| (addr, peer))
                         .ok_or(InvalidPeer(peer.to_string()))
                 })
@@ -407,12 +407,18 @@ mod tests {
 
     #[async_trait]
     impl PeerAddressResolver for TestResolver {
-        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-            self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+        async fn resolve_packet_key(
+            &self,
+            onchain_key: &Address,
+        ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+            Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
         }
 
-        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-            self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+        async fn resolve_chain_key(
+            &self,
+            offchain_key: &OffchainPublicKey,
+        ) -> hopr_db_api::errors::Result<Option<Address>> {
+            Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
         }
     }
 
