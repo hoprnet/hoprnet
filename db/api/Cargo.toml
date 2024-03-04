@@ -36,6 +36,7 @@ hopr-internal-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 lazy_static = { workspace = true }
 hex-literal = { workspace = true }
+tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
 
 [features]
 default = ["accounts", "ticket", "peers", "registry", "resolver", "info"]

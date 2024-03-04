@@ -18,7 +18,7 @@ use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 /// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
 pub fn model_to_acknowledged_ticket(
     db_ticket: ticket::Model,
-    domain_separator: &Hash,
+    domain_separator: Hash,
     chain_keypair: &ChainKeypair,
 ) -> Result<AcknowledgedTicket> {
     let response = Response::from_bytes(&db_ticket.response)?;
@@ -27,7 +27,7 @@ pub fn model_to_acknowledged_ticket(
     let mut ticket = hopr_internal_types::channels::Ticket::default();
 
     ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
-    ticket.amount = BalanceType::HOPR.zero();
+    ticket.amount = BalanceType::HOPR.balance_bytes(db_ticket.amount);
     ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
     ticket.index_offset = db_ticket.index_offset as u32;
     ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
@@ -35,13 +35,13 @@ pub fn model_to_acknowledged_ticket(
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
     ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
 
-    let signer = ticket.recover_signer(domain_separator)?.to_address();
+    let signer = ticket.recover_signer(&domain_separator)?.to_address();
     Ok(AcknowledgedTicket::new(
         ticket,
         response,
         signer,
         chain_keypair,
-        domain_separator,
+        &domain_separator,
     )?)
 }
 
@@ -52,7 +52,9 @@ fn acknowledged_ticket_to_model(acknowledged_ticket: AcknowledgedTicket) -> tick
         index: Set(acknowledged_ticket.ticket.index.to_be_bytes().to_vec()),
         index_offset: Set(acknowledged_ticket.ticket.index_offset as i32),
         winning_probability: Set(acknowledged_ticket.ticket.encoded_win_prob.to_vec()),
-        channel_epoch: Set(acknowledged_ticket.ticket.channel_epoch.to_be_bytes().to_vec()),
+        channel_epoch: Set(U256::from(acknowledged_ticket.ticket.channel_epoch)
+            .to_be_bytes()
+            .to_vec()),
         signature: Set(acknowledged_ticket.ticket.signature.unwrap().to_bytes().to_vec()),
         response: Set(acknowledged_ticket.response.to_bytes().to_vec()),
         ..Default::default()
@@ -120,7 +122,7 @@ impl HoprDbTicketOperations for HoprDb {
                 Box::pin(async move {
                     ticket::Entity::find()
                         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-                        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+                        .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().as_ref()))
                         .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().as_ref()))
                         .one(tx.as_ref())
                         .await
@@ -132,7 +134,7 @@ impl HoprDbTicketOperations for HoprDb {
             None => Ok(None),
             Some(ticket_model) => Ok(Some(model_to_acknowledged_ticket(
                 ticket_model,
-                &domain_separator,
+                domain_separator,
                 chain_keypair,
             )?)),
         }
@@ -275,7 +277,6 @@ mod tests {
     }
 
     fn generate_random_ack_ticket() -> AcknowledgedTicket {
-        let counterparty = &BOB;
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -286,21 +287,21 @@ mod tests {
         let ticket = Ticket::new(
             &ALICE.public().to_address(),
             &Balance::new(100_u32, BalanceType::HOPR),
-            0_u32.into(),
+            1_u32.into(),
             1_u32.into(),
             1.0f64,
             4u64.into(),
             Challenge::from(cp_sum).to_ethereum_challenge(),
-            counterparty,
+            &BOB,
             &Hash::default(),
         )
         .unwrap();
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
     }
 
-    /*#[async_std::test]
+    #[async_std::test]
     async fn test_insert_get_ticket() {
         let db = HoprDb::new_in_memory().await;
 
@@ -310,27 +311,38 @@ mod tests {
             BalanceType::HOPR.balance(100_u32),
             1_u32.into(),
             ChannelStatus::Open,
-            4_u32.into()
+            4_u32.into(),
         );
 
         let ack_ticket = generate_random_ack_ticket();
 
         assert_eq!(channel.get_id(), ack_ticket.ticket.channel_id, "channel ids must match");
-        assert_eq!(channel.channel_epoch.as_u32(), ack_ticket.ticket.channel_epoch, "epochs must match");
+        assert_eq!(
+            channel.channel_epoch.as_u32(),
+            ack_ticket.ticket.channel_epoch,
+            "epochs must match"
+        );
 
         let db_clone = db.clone();
         let ack_clone = ack_ticket.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.insert_channel(Some(tx), channel).await?;
-            db_clone.insert_ticket(Some(tx), ack_clone).await
-        }))
-        .await.expect("tx should succeed");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone.insert_channel(Some(tx), channel).await?;
+                    db_clone.insert_ticket(Some(tx), ack_clone).await
+                })
+            })
+            .await
+            .expect("tx should succeed");
 
-        let db_ticket = db.get_ticket(None, channel.get_id(), 4, 0, Hash::default(), &ALICE)
+        let db_ticket = db
+            .get_ticket(None, channel.get_id(), 4, 1, Hash::default(), &ALICE)
             .await
             .expect("should get ticket")
             .expect("ticket should exist");
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
-    }*/
+    }
 }
