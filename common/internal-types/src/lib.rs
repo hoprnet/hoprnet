@@ -30,6 +30,7 @@ pub mod prelude {
 }
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ChainOrPacketKey {
     /// Represents [chain public key](Address).
     ChainKey(Address),

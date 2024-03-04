@@ -11,14 +11,16 @@ use hopr_internal_types::ChainOrPacketKey;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
-use crate::errors::DbError::{CorruptedData, NotFound};
+use crate::errors::DbError::CorruptedData;
 use crate::errors::Result;
 
 #[async_trait]
 pub trait HoprDbAccountOperations {
+    async fn get_account<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<Option<AccountEntry>>;
+
     async fn get_accounts(&self, public_only: bool) -> Result<Vec<AccountEntry>>;
 
-    async fn translate_key<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<ChainOrPacketKey>;
+    async fn translate_key<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<Option<ChainOrPacketKey>>;
 }
 
 // NOTE: this currently function assumes `announcements` are sorted from latest to earliest
@@ -41,6 +43,24 @@ fn model_to_account_entry(account: account::Model, announcements: Vec<announceme
 
 #[async_trait]
 impl HoprDbAccountOperations for HoprDb {
+    async fn get_account<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<Option<AccountEntry>> {
+        let maybe_model = Account::find()
+            .find_with_related(Announcement)
+            .filter(match key.into() {
+                ChainOrPacketKey::ChainKey(chain_key) => account::Column::ChainKey.eq(chain_key.to_string()),
+                ChainOrPacketKey::PacketKey(packet_key) => account::Column::PacketKey.eq(packet_key.to_string()),
+            })
+            .all(&self.db)
+            .await?
+            .pop();
+
+        if let Some((account, announcements)) = maybe_model {
+            Ok(Some(model_to_account_entry(account, announcements)?))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn get_accounts(&self, public_only: bool) -> Result<Vec<AccountEntry>> {
         Account::find()
             .find_with_related(Announcement)
@@ -57,23 +77,29 @@ impl HoprDbAccountOperations for HoprDb {
             .collect()
     }
 
-    async fn translate_key<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<ChainOrPacketKey> {
+    async fn translate_key<T: Into<ChainOrPacketKey> + Send + Sync>(&self, key: T) -> Result<Option<ChainOrPacketKey>> {
         match key.into() {
             ChainOrPacketKey::ChainKey(chain_key) => {
-                let r = Account::find()
+                let maybe_model = Account::find()
                     .filter(account::Column::ChainKey.eq(chain_key.to_string()))
                     .one(&self.db)
-                    .await?
-                    .ok_or(NotFound)?;
-                Ok(OffchainPublicKey::from_hex(&r.packet_key)?.into())
+                    .await?;
+                if let Some(m) = maybe_model {
+                    Ok(Some(OffchainPublicKey::from_hex(&m.packet_key)?.into()))
+                } else {
+                    Ok(None)
+                }
             }
             ChainOrPacketKey::PacketKey(packet_key) => {
-                let r = Account::find()
+                let maybe_model = Account::find()
                     .filter(account::Column::PacketKey.eq(packet_key.to_string()))
                     .one(&self.db)
-                    .await?
-                    .ok_or(NotFound)?;
-                Ok(Address::from_hex(&r.chain_key)?.into())
+                    .await?;
+                if let Some(m) = maybe_model {
+                    Ok(Some(Address::from_hex(&m.chain_key)?.into()))
+                } else {
+                    Ok(None)
+                }
             }
         }
     }
