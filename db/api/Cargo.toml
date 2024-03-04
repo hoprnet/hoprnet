@@ -34,13 +34,16 @@ hopr-internal-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
+lazy_static = { workspace = true }
+hex-literal = { workspace = true }
 
 [features]
-default = ["accounts", "ticket", "peers", "registry", "resolver"]
+default = ["accounts", "ticket", "peers", "registry", "resolver", "info"]
 accounts = []
 ticket = []
 registry = []
 resolver = []
+info = []
 peers = [
     "dep:libp2p-identity", "dep:multiaddr", "dep:num_enum", "dep:strum",
     "dep:hopr-crypto-types", "dep:hopr-primitive-types"

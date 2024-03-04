@@ -1,3 +1,4 @@
+use hopr_crypto_types::prelude::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
 use thiserror::Error;
@@ -21,6 +22,9 @@ pub enum DbError {
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),
+
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),

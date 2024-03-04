@@ -37,7 +37,7 @@ impl Display for AccountType {
 pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
-    entry_type: AccountType,
+    pub entry_type: AccountType,
 }
 
 impl AccountEntry {
