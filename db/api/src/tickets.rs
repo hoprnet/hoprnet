@@ -38,7 +38,7 @@ pub trait HoprDbTicketOperations {
 
     // async fn get_ticket_stats(channel_id: &Hash, epoch: u32);
 
-    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: AcknowledgedTicket) -> Result<()>;
+    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: &AcknowledgedTicket) -> Result<()>;
 
     async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()>;
 
@@ -109,19 +109,21 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(())
     }
 
-    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: AcknowledgedTicket) -> Result<()> {
+    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: &AcknowledgedTicket) -> Result<()> {
+        let channel_id = ticket.ticket.channel_id;
+        let epoch: U256 = ticket.ticket.channel_epoch.into();
+        let index = ticket.ticket.index;
+        let ticket_value = ticket.ticket.amount.amount();
+
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     // Delete the ticket first
                     let deleted = ticket::Entity::delete_many()
-                        .filter(ticket::Column::ChannelId.eq(ticket.ticket.channel_id.to_hex()))
-                        .filter(
-                            ticket::Column::ChannelEpoch
-                                .eq(U256::from(ticket.ticket.channel_epoch).to_be_bytes().to_vec()),
-                        )
-                        .filter(ticket::Column::Index.eq(ticket.ticket.index.to_be_bytes().to_vec()))
+                        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+                        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().to_vec()))
+                        .filter(ticket::Column::Index.eq(index.to_be_bytes().to_vec()))
                         .exec(tx.as_ref())
                         .await?;
 
@@ -134,7 +136,6 @@ impl HoprDbTicketOperations for HoprDb {
 
                         let current_redeemed_count = stats.redeemed_tickets;
                         let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
-                        let ticket_value = ticket.ticket.amount.amount();
 
                         let mut active_stats = stats.into_active_model();
                         active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
@@ -143,7 +144,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                         Ok::<(), DbError>(())
                     } else {
-                        Err(DbError::LogicalError(format!("{ticket} could not be deleted")))
+                        Err(DbError::LogicalError(format!("ticket #{index} in {channel_id}:{epoch} could not be deleted")))
                     }
                 })
             })
@@ -385,7 +386,7 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     for i in 0..TO_REDEEM as usize {
-                        db_clone.mark_ticket_redeemed(Some(tx), tickets[i].clone()).await?;
+                        db_clone.mark_ticket_redeemed(Some(tx), &tickets[i]).await?;
                     }
                     Ok::<(), DbError>(())
                 })
@@ -421,10 +422,10 @@ mod tests {
 
         let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
-        db.mark_ticket_redeemed(None, ticket.clone())
+        db.mark_ticket_redeemed(None, &ticket)
             .await
             .expect("must not fail");
-        db.mark_ticket_redeemed(None, ticket)
+        db.mark_ticket_redeemed(None, &ticket)
             .await
             .expect_err("marking as redeemed again must fail");
     }
