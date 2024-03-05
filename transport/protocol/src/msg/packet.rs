@@ -1,7 +1,6 @@
-use core_path::path::TransportPath;
 use libp2p_identity::PeerId;
 
-use core_packet::errors::Result;
+use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::acknowledgement::Acknowledgement;
 
@@ -35,9 +34,13 @@ pub trait PacketConstructing {
     type Packet;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn to_send(&self, data: Self::Input, path: &TransportPath) -> Result<Self::Packet>;
+    async fn to_send(&self, data: Self::Input, path: &Vec<OffchainPublicKey>) -> Result<Self::Packet>;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(&self, data: Box<[u8]>, node_keypair: &OffchainKeypair, sender: &PeerId)
-        -> Result<Self::Packet>;
+    async fn from_recv(
+        &self,
+        data: Box<[u8]>,
+        node_keypair: &OffchainKeypair,
+        sender: OffchainPublicKey,
+    ) -> Result<Self::Packet>;
 }

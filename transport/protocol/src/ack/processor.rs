@@ -2,11 +2,13 @@ use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_packet::errors::PacketError::{AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError};
-use core_packet::errors::Result;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
+use hopr_crypto_packet::errors::PacketError::{
+    AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError,
+};
+use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::ToHex;

@@ -6,6 +6,7 @@ use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use libp2p_identity::PeerId;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use std::str::FromStr;
 use std::time::SystemTime;
@@ -45,6 +46,8 @@ pub trait HoprDbTicketOperations {
     async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()>;
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
+
+    async fn to_send<'a>(&'a self, tx: OptTx<'a>, data: Box<[u8]>, path: &Vec<OffchainPublicKey>) -> Result<()>;
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -207,6 +210,76 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
+    async fn to_send<'a>(&'a self, tx: OptTx<'a>, data: Box<[u8]>, path: &Vec<OffchainPublicKey>) -> Result<()> {
+        // ) -> Result<ChainPacketComponents> {
+        // let next_peer = self
+        //     .db
+        //     .read()
+        //     .await
+        //     .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
+        //     .await?
+        //     .ok_or_else(|| {
+        //         debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
+        //         PacketConstructionError
+        //     })?;
+
+        // let domain_separator = self
+        //     .db
+        //     .read()
+        //     .await
+        //     .get_channels_domain_separator()
+        //     .await?
+        //     .ok_or_else(|| {
+        //         warn!("Missing domain separator.");
+        //         MissingDomainSeparator
+        //     })?;
+
+        // // Decide whether to create 0-hop or multihop ticket
+        // let next_ticket = if path.length() == 1 {
+        //     Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
+        // } else {
+        //     self.create_multihop_ticket(next_peer, path.length() as u8).await?
+        // };
+
+        // match ChainPacketComponents::into_outgoing(
+        //     &data.to_bytes(),
+        //     path,
+        //     &self.cfg.chain_keypair,
+        //     next_ticket,
+        //     &domain_separator,
+        // ) {
+        //     Ok(p) => match p {
+        //         ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
+        //             Err(PacketError::LogicError("Must contain an outgoing packet type".into()))
+        //         }
+        //         ChainPacketComponents::Outgoing {
+        //             packet,
+        //             ticket,
+        //             next_hop,
+        //             ack_challenge,
+        //         } => {
+        //             self.db
+        //                 .write()
+        //                 .await
+        //                 .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
+        //                 .await?;
+
+        //             let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+        //             payload.extend_from_slice(packet.as_ref());
+        //             payload.extend_from_slice(&ticket.to_bytes());
+
+        //             Ok(TransportPacket::Outgoing {
+        //                 next_hop: next_hop.into(),
+        //                 ack_challenge,
+        //                 data: payload.into_boxed_slice(),
+        //             })
+        //         }
+        //     },
+        //     Err(e) => Err(e),
+        // }
+        Err(crate::errors::DbError::DecodingError)
+    }
+
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
         self.nest_transaction(tx)
             .await?
@@ -244,9 +317,6 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 }
-
-/// Fixed price per packet to 0.01 HOPR
-// const DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 
 impl HoprDb {
     async fn create_multihop_ticket<'a>(

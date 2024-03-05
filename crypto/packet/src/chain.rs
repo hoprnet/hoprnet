@@ -1,15 +1,15 @@
-use core_packet::{
-    errors::{PacketError::PacketDecodingError, Result},
-    packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
-    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
-};
-use core_path::path::{Path, TransportPath};
+use std::fmt::{Display, Formatter};
+
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::BinarySerializable;
-use libp2p_identity::PeerId;
-use std::fmt::{Display, Formatter};
+
+use crate::{
+    errors::{PacketError::PacketDecodingError, Result},
+    packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
+    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
+};
 
 /// Indicates the packet type.
 #[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
@@ -62,18 +62,17 @@ impl ChainPacketComponents {
     /// Constructs new outgoing packet with the given path.
     /// # Arguments
     /// * `msg` packet payload
-    /// * `path` complete path for the packet to take
+    /// * `public_keys_path` public keys of a complete path for the packet to take
     /// * `private_key` private key of the local node
-    /// * `first_ticket` ticket for the first hop on the path
+    /// * `ticket` ticket for the first hop on the path
+    /// * `domain_separator`
     pub fn into_outgoing(
         msg: &[u8],
-        path: &TransportPath,
+        public_keys_path: &Vec<OffchainPublicKey>,
         chain_keypair: &ChainKeypair,
         mut ticket: Ticket,
         domain_separator: &Hash,
     ) -> Result<Self> {
-        let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
-
         let shared_keys = CurrentSphinxSuite::new_shared_keys(&public_keys_path)?;
         let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1));
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
@@ -94,17 +93,16 @@ impl ChainPacketComponents {
             )
             .to_bytes(),
             ticket,
-            next_hop: OffchainPublicKey::try_from(path.hops()[0])?,
+            next_hop: public_keys_path[0],
             ack_challenge: por_values.ack_challenge,
         })
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
-    pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, sender: &PeerId) -> Result<Self> {
+    pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, previous_hop: OffchainPublicKey) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
-            let previous_hop = OffchainPublicKey::try_from(sender)?;
 
             let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
                 MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
@@ -336,6 +334,11 @@ mod tests {
             keypairs_onchain.iter().map(|kp| kp.public().to_address()).collect(),
         ));
 
+        let path = core_path::path::Path::hops(&path)
+            .iter()
+            .map(|v| OffchainPublicKey::try_from(v).unwrap())
+            .collect::<Vec<_>>();
+
         let mut packet =
             ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
                 .expect("failed to construct packet");
@@ -347,10 +350,12 @@ mod tests {
 
         for (i, path_element) in keypairs_offchain.iter().enumerate() {
             let sender = (i == 0)
-                .then_some(own_packet_kp.public().into())
-                .unwrap_or_else(|| keypairs_offchain.get(i - 1).map(|kp| kp.public().into()).unwrap());
+                .then_some(own_packet_kp)
+                .unwrap_or_else(|| keypairs_offchain.get(i - 1).unwrap())
+                .public()
+                .clone();
 
-            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, &sender)
+            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, sender)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
 
             match &packet {

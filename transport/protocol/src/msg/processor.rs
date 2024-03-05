@@ -1,31 +1,33 @@
+use std::{pin::Pin, sync::Arc};
+
+use async_lock::RwLock;
+use async_std::task::{sleep, spawn};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
-use std::pin::Pin;
-use std::sync::Arc;
-
-use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use tracing::{debug, error, trace, warn};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_packet::errors::PacketError::{
-    self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
-    PathPositionMismatch, Retry, TagReplay, TransportError,
-};
-use core_packet::errors::Result;
-use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
+use hopr_crypto_packet::{
+    chain::ChainPacketComponents,
+    errors::{
+        PacketError::{
+            self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
+            PathPositionMismatch, Retry, TagReplay, TransportError,
+        },
+        Result,
+    },
+    validation::validate_unacknowledged_ticket,
+};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use tracing::{debug, error, trace, warn};
-
 use super::packet::{PacketConstructing, TransportPacket};
-use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
-
-use async_std::task::{sleep, spawn};
+use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
@@ -117,17 +119,11 @@ where
     type Input = ApplicationData;
     type Packet = TransportPacket;
 
-    async fn to_send(&self, data: Self::Input, path: &TransportPath) -> Result<Self::Packet> {
-        let next_peer = self
-            .db
-            .read()
-            .await
-            .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
-            .await?
-            .ok_or_else(|| {
-                debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
-                PacketConstructionError
-            })?;
+    async fn to_send(&self, data: Self::Input, path: &Vec<OffchainPublicKey>) -> Result<Self::Packet> {
+        let next_peer = self.db.read().await.get_chain_key(&path[0]).await?.ok_or_else(|| {
+            debug!("Could not retrieve on-chain key for {}", path[0].to_peerid_str());
+            PacketConstructionError
+        })?;
 
         let domain_separator = self
             .db
@@ -141,10 +137,10 @@ where
             })?;
 
         // Decide whether to create 0-hop or multihop ticket
-        let next_ticket = if path.length() == 1 {
+        let next_ticket = if path.len() == 1 {
             Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8).await?
+            self.create_multihop_ticket(next_peer, path.len() as u8).await?
         };
 
         match ChainPacketComponents::into_outgoing(
@@ -185,7 +181,12 @@ where
         }
     }
 
-    async fn from_recv(&self, data: Box<[u8]>, pkt_keypair: &OffchainKeypair, sender: &PeerId) -> Result<Self::Packet> {
+    async fn from_recv(
+        &self,
+        data: Box<[u8]>,
+        pkt_keypair: &OffchainKeypair,
+        sender: OffchainPublicKey,
+    ) -> Result<Self::Packet> {
         let components = ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)?;
 
         match components {
@@ -383,12 +384,26 @@ where
 
         let packet = match event {
             MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                self.from_recv(data, &self.cfg.packet_keypair, &peer).await
+                let previous_hop = OffchainPublicKey::try_from(&peer).map_err(|e| {
+                    hopr_crypto_packet::errors::PacketError::LogicError(format!(
+                        "failed to convert '{peer}' into the public key {e}"
+                    ))
+                });
+
+                match previous_hop {
+                    Ok(previous_hop) => self.from_recv(data, &self.cfg.packet_keypair, previous_hop).await,
+                    Err(e) => Err(e),
+                }
             }
             MsgToProcess::ToSend(data, path, finalizer) => {
                 metadata.send_finalizer.replace(finalizer);
 
-                self.to_send(data, &path).await
+                let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
+                    path.hops().iter().map(|v| OffchainPublicKey::try_from(v)).collect();
+                match path {
+                    Ok(path) => self.to_send(data, &path).await,
+                    Err(_) => Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError),
+                }
             }
         };
 
@@ -826,7 +841,6 @@ mod tests {
     use async_lock::RwLock;
     use async_trait::async_trait;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
     use futures::{
@@ -834,6 +848,7 @@ mod tests {
         pin_mut, StreamExt,
     };
     use hex_literal::hex;
+    use hopr_crypto_packet::por::ProofOfRelayValues;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
     use hopr_crypto_types::prelude::*;
