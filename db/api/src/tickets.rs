@@ -122,8 +122,8 @@ impl HoprDbTicketOperations for HoprDb {
                 Box::pin(async move {
                     ticket::Entity::find()
                         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-                        .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().as_ref()))
-                        .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().as_ref()))
+                        .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
+                        .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().to_vec()))
                         .one(tx.as_ref())
                         .await
                 })
@@ -159,20 +159,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::CorruptedData)?;
-
-                    let current_redeemed_count = stats.redeemed_tickets;
-                    let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
-                    let ticket_value = ticket.ticket.amount.amount();
-
-                    let mut active_stats = stats.into_active_model();
-                    active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
-                    active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
-                    active_stats.save(tx.as_ref()).await?;
-
+                    // Delete the ticket first
                     let deleted = ticket::Entity::delete_many()
                         .filter(ticket::Column::ChannelId.eq(ticket.ticket.channel_id.to_hex()))
                         .filter(
@@ -183,10 +170,25 @@ impl HoprDbTicketOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await?;
 
+                    // If the ticket has been deleted, update the stats
                     if deleted.rows_affected == 1 {
+                        let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                            .one(tx.as_ref())
+                            .await?
+                            .ok_or(DbError::CorruptedData)?;
+
+                        let current_redeemed_count = stats.redeemed_tickets;
+                        let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
+                        let ticket_value = ticket.ticket.amount.amount();
+
+                        let mut active_stats = stats.into_active_model();
+                        active_stats.redeemed_tickets = Set(current_redeemed_count + 1);
+                        active_stats.redeemed_value = Set((current_redeemed_value + ticket_value).to_be_bytes().into());
+                        active_stats.save(tx.as_ref()).await?;
+
                         Ok::<(), DbError>(())
                     } else {
-                        Err(DbError::LogicalError(format!("{ticket} cannot be deleted.")))
+                        Err(DbError::LogicalError(format!("{ticket} could not be deleted")))
                     }
                 })
             })
@@ -198,9 +200,10 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    // Obtain the amount of neglected tickets and their value
                     let (neglectable_count, neglectable_value) = ticket::Entity::find()
                         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-                        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
+                        .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
                         .stream(tx.as_ref())
                         .await?
                         .try_fold((0, U256::zero()), |(count, value), t| async move {
@@ -208,32 +211,38 @@ impl HoprDbTicketOperations for HoprDb {
                         })
                         .await?;
 
-                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::CorruptedData)?;
+                    if neglectable_count > 0 {
+                        // Delete the neglectable tickets first
+                        let deleted = ticket::Entity::delete_many()
+                            .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+                            .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
+                            .exec(tx.as_ref())
+                            .await?;
 
-                    let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
-                    let current_neglected_count = stats.neglected_tickets;
+                        // Update the stats if successful
+                        if deleted.rows_affected == neglectable_count as u64 {
+                            let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                                .one(tx.as_ref())
+                                .await?
+                                .ok_or(DbError::CorruptedData)?;
 
-                    let mut active_stats = stats.into_active_model();
-                    active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
-                    active_stats.neglected_value =
-                        Set((current_neglected_value + neglectable_value).to_be_bytes().into());
-                    active_stats.save(tx.as_ref()).await?;
+                            let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
+                            let current_neglected_count = stats.neglected_tickets;
 
-                    let deleted = ticket::Entity::delete_many()
-                        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-                        .filter(ticket::Column::ChannelEpoch.eq(epoch.to_be_bytes().as_ref()))
-                        .exec(tx.as_ref())
-                        .await?;
-
-                    if deleted.rows_affected == neglectable_count as u64 {
-                        Ok(())
+                            let mut active_stats = stats.into_active_model();
+                            active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count);
+                            active_stats.neglected_value =
+                                Set((current_neglected_value + neglectable_value).to_be_bytes().into());
+                            active_stats.save(tx.as_ref()).await?;
+                            Ok(())
+                        } else {
+                            Err(DbError::LogicalError(format!(
+                                "could not mark {neglectable_count} ticket as neglected"
+                            )))
+                        }
                     } else {
-                        Err(DbError::LogicalError(format!(
-                            "could not mark {neglectable_count} ticket as neglected"
-                        )))
+                        // No neglectable tickets found
+                        Ok(())
                     }
                 })
             })
@@ -323,67 +332,17 @@ mod tests {
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
     }
 
-    #[async_std::test]
-    async fn test_insert_get_ticket() {
-        let db = HoprDb::new_in_memory().await;
-
+    async fn init_db_with_tickets(db: &HoprDb, count_tickets: u64) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
             BalanceType::HOPR.balance(100_u32),
-            1_u32.into(),
+            (count_tickets + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
         );
 
-        let ack_ticket = generate_random_ack_ticket(1);
-
-        assert_eq!(channel.get_id(), ack_ticket.ticket.channel_id, "channel ids must match");
-        assert_eq!(
-            channel.channel_epoch.as_u32(),
-            ack_ticket.ticket.channel_epoch,
-            "epochs must match"
-        );
-
-        let db_clone = db.clone();
-        let ack_clone = ack_ticket.clone();
-        db.begin_transaction()
-            .await
-            .unwrap()
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.insert_channel(Some(tx), channel).await?;
-                    db_clone.insert_ticket(Some(tx), ack_clone).await
-                })
-            })
-            .await
-            .expect("tx should succeed");
-
-        let db_ticket = db
-            .get_ticket(None, channel.get_id(), 4, 1, Hash::default(), &ALICE)
-            .await
-            .expect("should get ticket")
-            .expect("ticket should exist");
-
-        assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
-    }
-
-    #[async_std::test]
-    async fn test_mark_redeemed() {
-        let db = HoprDb::new_in_memory().await;
-
-        const COUNT_TICKETS: u64 = 10;
-
-        let channel = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100_u32),
-            (COUNT_TICKETS + 1).into(),
-            ChannelStatus::Open,
-            4_u32.into(),
-        );
-
-        let tickets = (0..COUNT_TICKETS)
+        let tickets = (0..count_tickets)
             .into_iter()
             .map(|i| generate_random_ack_ticket(i as u32))
             .collect::<Vec<_>>();
@@ -404,6 +363,46 @@ mod tests {
             })
             .await
             .expect("tx should succeed");
+
+        (channel, tickets)
+    }
+
+    #[async_std::test]
+    async fn test_insert_get_ticket() {
+        let db = HoprDb::new_in_memory().await;
+
+        let (channel, mut tickets) = init_db_with_tickets(&db, 1).await;
+        let ack_ticket = tickets.pop().unwrap();
+
+        assert_eq!(channel.get_id(), ack_ticket.ticket.channel_id, "channel ids must match");
+        assert_eq!(
+            channel.channel_epoch.as_u32(),
+            ack_ticket.ticket.channel_epoch,
+            "epochs must match"
+        );
+
+        let db_ticket = db
+            .get_ticket(
+                None,
+                channel.get_id(),
+                ack_ticket.ticket.channel_epoch,
+                ack_ticket.ticket.index,
+                Hash::default(),
+                &ALICE,
+            )
+            .await
+            .expect("should get ticket")
+            .expect("ticket should exist");
+
+        assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
+    }
+
+    #[async_std::test]
+    async fn test_mark_redeemed() {
+        let db = HoprDb::new_in_memory().await;
+        const COUNT_TICKETS: u64 = 10;
+
+        let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await;
 
         let stats = db.get_ticket_statistics(None).await.unwrap();
         assert_eq!(
@@ -464,30 +463,7 @@ mod tests {
     async fn test_mark_redeem_should_not_mark_redeem_twice() {
         let db = HoprDb::new_in_memory().await;
 
-        let channel = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100_u32),
-            1_u32.into(),
-            ChannelStatus::Open,
-            4_u32.into(),
-        );
-
-        let ticket = generate_random_ack_ticket(1);
-
-        let db_clone = db.clone();
-        let ticket_clone = ticket.clone();
-        db.begin_transaction()
-            .await
-            .unwrap()
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.insert_channel(Some(tx), channel).await?;
-                    db_clone.insert_ticket(Some(tx), ticket_clone).await
-                })
-            })
-            .await
-            .expect("tx must not fail");
+        let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
         db.mark_ticket_redeemed(None, ticket.clone())
             .await
@@ -495,5 +471,51 @@ mod tests {
         db.mark_ticket_redeemed(None, ticket)
             .await
             .expect_err("marking as redeemed again must fail");
+    }
+
+    #[async_std::test]
+    async fn test_mark_tickets_neglected() {
+        let db = HoprDb::new_in_memory().await;
+        const COUNT_TICKETS: u64 = 10;
+
+        let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await;
+
+        let stats = db.get_ticket_statistics(None).await.unwrap();
+        assert_eq!(
+            COUNT_TICKETS, stats.unredeemed_tickets,
+            "must have {COUNT_TICKETS} unredeemed"
+        );
+        assert_eq!(
+            BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
+            stats.unredeemed_value,
+            "unredeemed balance must match"
+        );
+        assert_eq!(0, stats.neglected_tickets, "there must be no redeemed tickets");
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.neglected_value,
+            "there must be 0 redeemed value"
+        );
+
+        db.mark_tickets_neglected_in_epoch(None, channel.get_id(), channel.channel_epoch.as_u32())
+            .await
+            .expect("should mark as neglected");
+
+        let stats = db.get_ticket_statistics(None).await.unwrap();
+        assert_eq!(0, stats.unredeemed_tickets, "must have 0 unredeemed");
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            stats.unredeemed_value,
+            "unredeemed balance must be zero"
+        );
+        assert_eq!(
+            COUNT_TICKETS, stats.neglected_tickets,
+            "there must be no redeemed tickets"
+        );
+        assert_eq!(
+            BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
+            stats.neglected_value,
+            "there must be a neglected value"
+        );
     }
 }
