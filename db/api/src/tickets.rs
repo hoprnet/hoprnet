@@ -15,6 +15,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
+use crate::errors::DbError::LogicalError;
 
 
 #[async_trait]
@@ -344,7 +345,7 @@ impl HoprDb {
                             let model = active_model.update(tx.as_ref()).await?;
                             let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
 
-                            Some((model.try_into()?, ticket_price.amount()))
+                            Some((model.try_into()?, ticket_price.ok_or(LogicalError("missing ticket price".into()))?.amount()))
                         } else {
                             None
                         },
