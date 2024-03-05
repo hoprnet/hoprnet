@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
-use hopr_db_entity::network_registry;
+use hopr_db_entity::{network_eligibility, network_registry};
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
@@ -15,6 +15,10 @@ pub trait HoprDbRegistryOperations {
     async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 
     async fn deny_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<()>;
+
+    async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
+
+    async fn is_safe_eligible<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 }
 
 #[async_trait]
@@ -64,6 +68,51 @@ impl HoprDbRegistryOperations for HoprDb {
             }))
             .await
     }
+
+    async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| Box::pin(async move {
+                if eligible {
+                    let new_entry = network_eligibility::ActiveModel {
+                        safe_address: Set(address.to_hex()),
+                        ..Default::default()
+                    };
+
+                    match network_eligibility::Entity::insert(new_entry)
+                        .on_conflict(
+                            OnConflict::column(network_eligibility::Column::SafeAddress)
+                                .do_nothing()
+                                .to_owned(),
+                        )
+                        .exec(tx.as_ref())
+                        .await {
+                        Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                        Err(e) => Err(e.into())
+                    }
+                } else {
+                    network_eligibility::Entity::delete_many()
+                        .filter(network_eligibility::Column::SafeAddress.eq(address.to_hex()))
+                        .exec(tx.as_ref())
+                        .await?;
+                    Ok::<_, DbError>(())
+                }
+            }))
+            .await
+    }
+
+    async fn is_safe_eligible<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| Box::pin(async move {
+                Ok::<_, DbError>(network_eligibility::Entity::find()
+                    .filter(network_eligibility::Column::SafeAddress.eq(address.to_hex()))
+                    .one(tx.as_ref())
+                    .await?
+                    .is_some())
+            }))
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -104,6 +153,34 @@ mod tests {
 
         assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await.expect("should not fail"));
         assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await.expect("should not fail"));
+    }
+
+    #[async_std::test]
+    async fn test_network_eligiblity_db() {
+        let db = HoprDb::new_in_memory().await;
+
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+
+        db.set_safe_eligibility(None, *ADDR_1, true).await.expect("should not fail to allow in nr");
+
+        assert!(db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+
+        db.set_safe_eligibility(None, *ADDR_1, true).await.expect("should not fail to allow in nr when allowed");
+
+        assert!(db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+
+        db.set_safe_eligibility(None, *ADDR_1, false).await.expect("should fail to deny in nr");
+
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
+
+        db.set_safe_eligibility(None, *ADDR_1, false).await.expect("should fail to deny in nr when denied");
+
+        assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
+        assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));
     }
 
 }
