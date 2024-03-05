@@ -4,6 +4,7 @@ use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use hopr_primitive_types::prelude::Address;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
@@ -53,7 +54,7 @@ impl HoprDbChannelOperations for HoprDb {
                             .one(tx.as_ref())
                             .await?
                         {
-                            Some(model_to_channel_entry(&model)?)
+                            Some(model.try_into()?)
                         } else {
                             None
                         },

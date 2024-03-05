@@ -6,13 +6,11 @@ use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use libp2p_identity::PeerId;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use std::str::FromStr;
 use std::time::SystemTime;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
-use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
@@ -328,7 +326,7 @@ impl HoprDb {
         path_pos: u8,
     ) -> Result<Ticket> {
         let myself = self.clone();
-        let (channel, ticket_price) = self
+        let (channel, ticket_price): (ChannelEntry, U256) = self
             .nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -346,7 +344,7 @@ impl HoprDb {
                             let model = active_model.update(tx.as_ref()).await?;
                             let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
 
-                            Some((crate::channels::model_to_channel_entry(&model)?, ticket_price.amount()))
+                            Some((model.try_into()?, ticket_price.amount()))
                         } else {
                             None
                         },
