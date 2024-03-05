@@ -1586,31 +1586,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-packet"
-version = "0.7.0"
-dependencies = [
- "async-lock 3.3.0",
- "async-std",
- "async-trait",
- "chain-db",
- "core-path",
- "hex",
- "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-sphinx",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "parameterized",
- "thiserror",
- "tracing",
- "typenum",
- "utils-db",
-]
-
-[[package]]
 name = "core-path"
 version = "0.3.0"
 dependencies = [
@@ -1644,12 +1619,12 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-db",
- "core-packet",
  "core-path",
  "env_logger",
  "futures",
  "futures-lite 1.13.0",
  "hex-literal",
+ "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
@@ -1722,11 +1697,11 @@ dependencies = [
  "chain-types",
  "core-network",
  "core-p2p",
- "core-packet",
  "core-path",
  "core-protocol",
  "futures",
  "futures-concurrency",
+ "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-internal-types",
@@ -3398,6 +3373,33 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "hopr-crypto-packet"
+version = "0.7.0"
+dependencies = [
+ "async-lock 3.3.0",
+ "async-std",
+ "async-trait",
+ "chain-db",
+ "core-path",
+ "hex",
+ "hex-literal",
+ "hopr-crypto-random",
+ "hopr-crypto-sphinx",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "mockall",
+ "parameterized",
+ "thiserror",
+ "tracing",
+ "typenum",
+ "utils-db",
 ]
 
 [[package]]

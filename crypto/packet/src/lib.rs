@@ -15,6 +15,8 @@
 //! In particular, as soon as there's way to represent `Ed448` PeerIDs, it would be easy to create e.g. `X448Suite`.
 //!
 
+/// Implements the overlay packet intermediary object.
+pub mod chain;
 /// Enumerates all errors in this crate.
 pub mod errors;
 /// Implements SPHINX packet format.

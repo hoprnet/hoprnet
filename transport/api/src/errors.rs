@@ -20,7 +20,7 @@ pub enum HoprTransportError {
     Protocol(#[from] core_protocol::errors::ProtocolError),
 
     #[error("Packet error: {0}")]
-    Packet(#[from] core_packet::errors::PacketError),
+    Packet(#[from] hopr_crypto_packet::errors::PacketError),
 
     #[error("Type error: {0}")]
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
