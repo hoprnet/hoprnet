@@ -11,8 +11,10 @@ use std::str::FromStr;
 use std::time::SystemTime;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
+use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
+use crate::info::HoprDbInfoOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
 
@@ -240,6 +242,84 @@ impl HoprDbTicketOperations for HoprDb {
                 })
             })
             .await
+    }
+}
+
+/// Fixed price per packet to 0.01 HOPR
+// const DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
+
+impl HoprDb {
+    async fn create_multihop_ticket<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        me_onchain: Address,
+        destination: Address,
+        path_pos: u8,
+    ) -> Result<Ticket> {
+        let myself = self.clone();
+        let (channel, ticket_price) = self
+            .nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbError>(
+                        if let Some(model) = hopr_db_entity::channel::Entity::find()
+                            .filter(hopr_db_entity::channel::Column::Destination.eq(destination.to_string()))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            let ticket_index = U256::from_be_bytes(&model.ticket_index) + 1u128;
+                            let mut active_model = model.into_active_model();
+                            active_model.ticket_index = sea_orm::Set(ticket_index.to_be_bytes().into());
+
+                            let model = active_model.update(tx.as_ref()).await?;
+                            let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
+
+                            Some((crate::channels::model_to_channel_entry(&model)?, ticket_price.amount()))
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await?
+            .ok_or(crate::errors::DbError::LogicalError(format!(
+                "channel not found {}",
+                destination.to_string()
+            )))?;
+
+        let amount = Balance::new(
+            ticket_price.div_f64(TICKET_WIN_PROB).map_err(|e| {
+                crate::errors::DbError::LogicalError(format!(
+                    "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
+                ))
+            })? * U256::from(path_pos - 1),
+            BalanceType::HOPR,
+        );
+
+        if channel.balance.lt(&amount) {
+            return Err(crate::errors::DbError::LogicalError(format!(
+                "out of funds: {} with counterparty {destination}",
+                channel.get_id()
+            )));
+        }
+
+        hopr_internal_types::channels::Ticket::new_partial(
+            &me_onchain,
+            &destination,
+            &amount,
+            channel.ticket_index,
+            U256::one(), // unaggregated always have index_offset == 1
+            TICKET_WIN_PROB,
+            channel.channel_epoch,
+        )
+        .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
+
+        //         #[cfg(all(feature = "prometheus", not(test)))]
+        //         METRIC_TICKETS_COUNT.increment();
+
+        // Ok(ticket)
+        Err(crate::errors::DbError::DecodingError)
     }
 }
 

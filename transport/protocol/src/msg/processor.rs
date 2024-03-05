@@ -616,11 +616,10 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
-        db: Arc<RwLock<Db>>,
-        tbf: Arc<RwLock<TagBloomFilter>>,
-        cfg: PacketInteractionConfig,
-    ) -> Self {
+    pub fn new<Db>(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
+    where
+        Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
+    {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
