@@ -2,6 +2,7 @@ use hopr_crypto_types::prelude::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
 use thiserror::Error;
+use hopr_db_entity::errors::DbEntityError;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -25,6 +26,9 @@ pub enum DbError {
 
     #[error(transparent)]
     CryptoError(#[from] CryptoError),
+
+    #[error(transparent)]
+    EntityError(#[from] DbEntityError),
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),

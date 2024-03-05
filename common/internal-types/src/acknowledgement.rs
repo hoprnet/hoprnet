@@ -89,7 +89,7 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -98,6 +98,17 @@ pub struct AcknowledgedTicket {
     pub vrf_params: VrfParameters,
     pub signer: Address,
 }
+
+impl PartialEq for AcknowledgedTicket {
+    fn eq(&self, other: &Self) -> bool {
+        self.status == other.status
+            && self.ticket == other.ticket
+            && self.response == other.response
+            && self.signer == other.signer
+    }
+}
+
+impl Eq for AcknowledgedTicket {}
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

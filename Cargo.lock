@@ -3489,6 +3489,7 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -3496,9 +3497,11 @@ name = "hopr-db-entity"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "chrono",
  "clap",
  "hopr-crypto-types",
  "hopr-db-migration",
+ "hopr-internal-types",
  "hopr-primitive-types",
  "sea-orm",
  "sea-orm-cli",
@@ -3527,7 +3530,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-entity",
  "hopr-primitive-types",
  "lazy_static",
  "multiaddr",
@@ -8108,6 +8110,29 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tracing-test"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a2c0ff408fe918a94c428a3f2ad04e4afd5c95bbc08fcf868eff750c15728a4"
+dependencies = [
+ "lazy_static",
+ "tracing-core",
+ "tracing-subscriber",
+ "tracing-test-macro",
+]
+
+[[package]]
+name = "tracing-test-macro"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "258bc1c4f8e2e73a977812ab339d503e6feeb92700f6d07a6de4d321522d5c08"
+dependencies = [
+ "lazy_static",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

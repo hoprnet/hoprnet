@@ -54,6 +54,7 @@ impl MigrationTrait for Migration {
                     .table(Channel::Table)
                     .col(Channel::ChannelId)
                     .col(Channel::Epoch)
+                    .unique()
                     .to_owned(),
             )
             .await?;

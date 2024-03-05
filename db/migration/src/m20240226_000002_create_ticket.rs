@@ -52,10 +52,28 @@ impl MigrationTrait for Migration {
                     .col(Ticket::ChannelEpoch)
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ticket_channel_id_epoch_index")
+                    .if_not_exists()
+                    .table(Ticket::Table)
+                    .col(Ticket::ChannelId)
+                    .col(Ticket::ChannelEpoch)
+                    .col(Ticket::Index)
+                    .unique()
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(Index::drop().name("idx_ticket_channel_id_epoch_index").to_owned())
+            .await?;
+
         manager
             .drop_index(Index::drop().name("idx_fk_ticket_channel").to_owned())
             .await?;
