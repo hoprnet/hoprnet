@@ -1,5 +1,5 @@
 [package]
-name = "core-packet"
+name = "hopr-crypto-packet"
 version = "0.7.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -33,6 +33,8 @@ async-trait = "0.1.73"
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true, features = ["ed25519", "secp256k1", "x25519"] }
+hopr-db-api = { workspace = true, features = ["resolver"] }
+libp2p-identity = { workspace = true }
 mockall = "0.11.4"
 parameterized = "1.0"
 

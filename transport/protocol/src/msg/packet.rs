@@ -1,7 +1,6 @@
-use core_path::path::TransportPath;
 use libp2p_identity::PeerId;
 
-use core_packet::errors::Result;
+use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::acknowledgement::Acknowledgement;
 
@@ -30,18 +29,18 @@ pub enum TransportPacket {
 }
 
 #[async_trait::async_trait]
-#[allow(clippy::wrong_self_convention)] // TODO: The `from_*` and `into_*` should take self, not a reference
 pub trait PacketConstructing {
     type Input;
+    type Packet;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket>;
+    async fn to_send(&self, data: Self::Input, path: &Vec<OffchainPublicKey>) -> Result<Self::Packet>;
 
     #[allow(clippy::wrong_self_convention)]
-    async fn from_incoming(
+    async fn from_recv(
         &self,
         data: Box<[u8]>,
         node_keypair: &OffchainKeypair,
-        sender: &PeerId,
-    ) -> Result<TransportPacket>;
+        sender: OffchainPublicKey,
+    ) -> Result<Self::Packet>;
 }

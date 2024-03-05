@@ -1,31 +1,33 @@
+use std::{pin::Pin, sync::Arc};
+
+use async_lock::RwLock;
+use async_std::task::{sleep, spawn};
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
-use std::pin::Pin;
-use std::sync::Arc;
-
-use async_lock::RwLock;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use tracing::{debug, error, trace, warn};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
-use core_packet::errors::PacketError::{
-    self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
-    PathPositionMismatch, Retry, TagReplay, TransportError,
-};
-use core_packet::errors::Result;
-use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
+use hopr_crypto_packet::{
+    chain::ChainPacketComponents,
+    errors::{
+        PacketError::{
+            self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
+            PathPositionMismatch, Retry, TagReplay, TransportError,
+        },
+        Result,
+    },
+    validation::validate_unacknowledged_ticket,
+};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use tracing::{debug, error, trace, warn};
-
 use super::packet::{PacketConstructing, TransportPacket};
-use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
-
-use async_std::task::{sleep, spawn};
+use crate::msg::mixer::MixerConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge, SimpleHistogram};
@@ -91,7 +93,7 @@ pub enum MsgProcessed {
 #[derive(Debug)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -99,7 +101,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -112,21 +114,16 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     type Input = ApplicationData;
+    type Packet = TransportPacket;
 
-    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket> {
-        let next_peer = self
-            .db
-            .read()
-            .await
-            .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
-            .await?
-            .ok_or_else(|| {
-                debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
-                PacketConstructionError
-            })?;
+    async fn to_send(&self, data: Self::Input, path: &Vec<OffchainPublicKey>) -> Result<Self::Packet> {
+        let next_peer = self.db.read().await.get_chain_key(&path[0]).await?.ok_or_else(|| {
+            debug!("Could not retrieve on-chain key for {}", path[0].to_peerid_str());
+            PacketConstructionError
+        })?;
 
         let domain_separator = self
             .db
@@ -140,10 +137,10 @@ where
             })?;
 
         // Decide whether to create 0-hop or multihop ticket
-        let next_ticket = if path.length() == 1 {
+        let next_ticket = if path.len() == 1 {
             Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8).await?
+            self.create_multihop_ticket(next_peer, path.len() as u8).await?
         };
 
         match ChainPacketComponents::into_outgoing(
@@ -184,12 +181,12 @@ where
         }
     }
 
-    async fn from_incoming(
+    async fn from_recv(
         &self,
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
-        sender: &PeerId,
-    ) -> Result<TransportPacket> {
+        sender: OffchainPublicKey,
+    ) -> Result<Self::Packet> {
         let components = ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)?;
 
         match components {
@@ -371,29 +368,42 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
+    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
     }
 
-    #[tracing::instrument(level = "debug", skip(self, pkt_keypair))]
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn to_transport_packet_with_metadata(
         &self,
         event: MsgToProcess,
-        pkt_keypair: &OffchainKeypair,
     ) -> (Result<TransportPacket>, PacketMetadata) {
         let mut metadata = PacketMetadata::default();
 
         let packet = match event {
             MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                self.from_incoming(data, pkt_keypair, &peer).await
+                let previous_hop = OffchainPublicKey::try_from(&peer).map_err(|e| {
+                    hopr_crypto_packet::errors::PacketError::LogicError(format!(
+                        "failed to convert '{peer}' into the public key {e}"
+                    ))
+                });
+
+                match previous_hop {
+                    Ok(previous_hop) => self.from_recv(data, &self.cfg.packet_keypair, previous_hop).await,
+                    Err(e) => Err(e),
+                }
             }
             MsgToProcess::ToSend(data, path, finalizer) => {
                 metadata.send_finalizer.replace(finalizer);
 
-                self.into_outgoing(data, &path).await
+                let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
+                    path.hops().iter().map(|v| OffchainPublicKey::try_from(v)).collect();
+                match path {
+                    Ok(path) => self.to_send(data, &path).await,
+                    Err(_) => Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError),
+                }
             }
         };
 
@@ -599,8 +609,8 @@ impl PacketInteractionConfig {
 pub struct PacketMetadata {
     #[default(None)]
     pub send_finalizer: Option<PacketSendFinalizer>,
-    #[default(std::time::UNIX_EPOCH)]
     #[cfg(all(feature = "prometheus", not(test)))]
+    #[default(std::time::UNIX_EPOCH)]
     pub start_time: std::time::SystemTime,
 }
 
@@ -621,25 +631,22 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
-        db: Arc<RwLock<Db>>,
-        tbf: Arc<RwLock<TagBloomFilter>>,
-        cfg: PacketInteractionConfig,
-    ) -> Self {
+    pub fn new<Db>(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
+    where
+        Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
+    {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
         let mixer_cfg = cfg.mixer;
-        let pkt_keypair = cfg.packet_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
 
         let mut processing_stream = to_process_rx
             .then_concurrent(move |event| {
                 let processor = processor.clone();
-                let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event, &pkt_keypair).await;
+                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
@@ -834,7 +841,6 @@ mod tests {
     use async_lock::RwLock;
     use async_trait::async_trait;
     use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_packet::por::ProofOfRelayValues;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::{Path, TransportPath};
     use futures::{
@@ -842,10 +848,10 @@ mod tests {
         pin_mut, StreamExt,
     };
     use hex_literal::hex;
+    use hopr_crypto_packet::por::ProofOfRelayValues;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SharedSecret};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::resolver::HoprDbResolverOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -1248,13 +1254,19 @@ mod tests {
         struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
         #[async_trait]
-        impl HoprDbResolverOperations for TestResolver {
-            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-                self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+        impl hopr_db_api::resolver::HoprDbResolverOperations for TestResolver {
+            async fn resolve_packet_key(
+                &self,
+                onchain_key: &Address,
+            ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+                Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
             }
 
-            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            async fn resolve_chain_key(
+                &self,
+                offchain_key: &OffchainPublicKey,
+            ) -> hopr_db_api::errors::Result<Option<Address>> {
+                Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
             }
         }
 
