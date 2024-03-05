@@ -14,6 +14,9 @@ pub enum CoreEthereumIndexerError {
     DbBackendError(#[from] sea_orm::DbErr),
 
     #[error(transparent)]
+    DbEntityError(#[from] hopr_db_entity::errors::DbEntityError),
+
+    #[error(transparent)]
     AbiError(#[from] AbiError),
 
     #[error(transparent)]

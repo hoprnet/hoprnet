@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_std::task::spawn;
-use futures::{stream, StreamExt};
+use futures::{stream, StreamExt, TryFutureExt};
 use sea_orm::prelude::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{debug, error, info, trace};
@@ -197,7 +197,8 @@ where
                 })
                 .then(|block_with_logs| async {
                     if let Err(error) = db
-                        .transaction(|tx| {
+                        .begin_transaction()
+                        .and_then(|tx| tx.perform(|tx| {
                             Box::pin(async move {
                                 let res = chain_info::Entity::update_many()
                                     .col_expr(
@@ -205,7 +206,7 @@ where
                                         Expr::value(block_with_logs.block_id as i32),
                                     )
                                     .filter(chain_info::Column::Id.eq(1))
-                                    .exec(tx)
+                                    .exec(tx.as_ref())
                                     .await?;
                                 if res.rows_affected == 1 {
                                     Ok(())
@@ -213,7 +214,7 @@ where
                                     Err(sea_orm::DbErr::RecordNotUpdated)
                                 }
                             })
-                        })
+                        }))
                         .await
                     {
                         error!("failed to write the latest block number into the database: {error}");
