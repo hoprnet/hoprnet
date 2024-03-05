@@ -12,10 +12,10 @@ use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OnChainData {
-    pub ledger_dst: Hash,
-    pub safe_registry_dst: Hash,
-    pub channels_dst: Hash,
-    pub ticket_price: Balance,
+    pub ledger_dst: Option<Hash>,
+    pub safe_registry_dst: Option<Hash>,
+    pub channels_dst: Option<Hash>,
+    pub ticket_price: Option<Balance>,
     pub nr_enabled: bool,
     pub last_indexed_block: u32,
 }
@@ -96,11 +96,29 @@ impl HoprDbInfoOperations for HoprDb {
                         .await?
                         .ok_or(CorruptedData)?;
 
+                    let ledger_dst = if let Some(b) = model.ledger_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
+
+                    let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
+
+                    let channels_dst = if let Some(b) = model.channels_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
+
                     Ok::<OnChainData, DbError>(OnChainData {
-                        ledger_dst: Hash::from_bytes(&model.ledger_dst)?,
-                        safe_registry_dst: Hash::from_bytes(&model.safe_registry_dst)?,
-                        channels_dst: Hash::from_bytes(&model.channels_dst)?,
-                        ticket_price: BalanceType::HOPR.balance_bytes(model.ticket_price),
+                        ledger_dst,
+                        safe_registry_dst,
+                        channels_dst,
+                        ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
                         nr_enabled: model.network_registry_enabled,
                         last_indexed_block: model.last_indexed_block as u32,
                     })
