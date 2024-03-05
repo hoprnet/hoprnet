@@ -3496,9 +3496,11 @@ name = "hopr-db-entity"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "chrono",
  "clap",
  "hopr-crypto-types",
  "hopr-db-migration",
+ "hopr-internal-types",
  "hopr-primitive-types",
  "sea-orm",
  "sea-orm-cli",
@@ -3527,7 +3529,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-entity",
  "hopr-primitive-types",
  "lazy_static",
  "multiaddr",

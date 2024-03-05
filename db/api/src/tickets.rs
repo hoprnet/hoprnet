@@ -9,57 +9,12 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use std::str::FromStr;
 use std::time::SystemTime;
+use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
 use crate::db::HoprDb;
-use crate::errors::DbError::DecodingError;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
-/// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
-pub fn model_to_acknowledged_ticket(
-    db_ticket: ticket::Model,
-    domain_separator: Hash,
-    chain_keypair: &ChainKeypair,
-) -> Result<AcknowledgedTicket> {
-    let response = Response::from_bytes(&db_ticket.response)?;
-
-    // To be refactored with https://github.com/hoprnet/hoprnet/pull/6018
-    let mut ticket = hopr_internal_types::channels::Ticket::default();
-
-    ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
-    ticket.amount = BalanceType::HOPR.balance_bytes(db_ticket.amount);
-    ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
-    ticket.index_offset = db_ticket.index_offset as u32;
-    ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
-    ticket.encoded_win_prob = db_ticket.winning_probability.try_into().map_err(|_| DecodingError)?;
-    ticket.challenge = response.to_challenge().to_ethereum_challenge();
-    ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
-
-    let signer = ticket.recover_signer(&domain_separator)?.to_address();
-    Ok(AcknowledgedTicket::new(
-        ticket,
-        response,
-        signer,
-        chain_keypair,
-        &domain_separator,
-    )?)
-}
-
-fn acknowledged_ticket_to_model(acknowledged_ticket: AcknowledgedTicket) -> ticket::ActiveModel {
-    ticket::ActiveModel {
-        channel_id: Set(acknowledged_ticket.ticket.channel_id.to_hex()),
-        amount: Set(acknowledged_ticket.ticket.amount.amount().to_be_bytes().to_vec()),
-        index: Set(acknowledged_ticket.ticket.index.to_be_bytes().to_vec()),
-        index_offset: Set(acknowledged_ticket.ticket.index_offset as i32),
-        winning_probability: Set(acknowledged_ticket.ticket.encoded_win_prob.to_vec()),
-        channel_epoch: Set(U256::from(acknowledged_ticket.ticket.channel_epoch)
-            .to_be_bytes()
-            .to_vec()),
-        signature: Set(acknowledged_ticket.ticket.signature.unwrap().to_bytes().to_vec()),
-        response: Set(acknowledged_ticket.response.to_bytes().to_vec()),
-        ..Default::default()
-    }
-}
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
@@ -145,7 +100,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    acknowledged_ticket_to_model(acknowledged_ticket)
+                    ticket::ActiveModel::from(acknowledged_ticket)
                         .insert(tx.as_ref())
                         .await
                 })
@@ -234,6 +189,7 @@ impl HoprDbTicketOperations for HoprDb {
                             active_stats.neglected_value =
                                 Set((current_neglected_value + neglectable_value).to_be_bytes().into());
                             active_stats.save(tx.as_ref()).await?;
+
                             Ok(())
                         } else {
                             Err(DbError::LogicalError(format!(
