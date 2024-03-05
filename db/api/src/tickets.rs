@@ -88,7 +88,7 @@ impl HoprDbTicketOperations for HoprDb {
         match ticket {
             None => Ok(None),
             Some(ticket_model) => Ok(Some(model_to_acknowledged_ticket(
-                ticket_model,
+                &ticket_model,
                 domain_separator,
                 chain_keypair,
             )?)),

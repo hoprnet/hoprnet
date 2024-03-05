@@ -7,7 +7,7 @@ use crate::ticket;
 
 /// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
 pub fn model_to_acknowledged_ticket(
-    db_ticket: ticket::Model,
+    db_ticket: &ticket::Model,
     domain_separator: Hash,
     chain_keypair: &ChainKeypair,
 ) -> crate::errors::Result<AcknowledgedTicket> {
@@ -17,11 +17,11 @@ pub fn model_to_acknowledged_ticket(
     let mut ticket = hopr_internal_types::channels::Ticket::default();
 
     ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
-    ticket.amount = BalanceType::HOPR.balance_bytes(db_ticket.amount);
+    ticket.amount = BalanceType::HOPR.balance_bytes(&db_ticket.amount);
     ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
     ticket.index_offset = db_ticket.index_offset as u32;
     ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
-    ticket.encoded_win_prob = db_ticket.winning_probability.try_into().map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
+    ticket.encoded_win_prob = db_ticket.winning_probability.clone().try_into().map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
     ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
 

@@ -42,11 +42,11 @@ impl TryFrom<&channel::Model> for ChannelStatus {
     }
 }
 
-impl TryFrom<channel::Model> for ChannelEntry {
-    type Error = crate::errors::DbEntityError;
+impl TryFrom<&channel::Model> for ChannelEntry {
+    type Error = DbEntityError;
 
-    fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        let status = (&value).try_into()?;
+    fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
+        let status = value.try_into()?;
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
@@ -55,6 +55,14 @@ impl TryFrom<channel::Model> for ChannelEntry {
             status,
             U256::from_be_bytes(&value.epoch),
         ))
+    }
+}
+
+impl TryFrom<channel::Model> for ChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
+        (&value).try_into()
     }
 }
 
