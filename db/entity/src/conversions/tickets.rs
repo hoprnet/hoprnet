@@ -14,8 +14,7 @@ pub fn model_to_acknowledged_ticket(
     let response = Response::from_bytes(&db_ticket.response)?;
 
     // To be refactored with https://github.com/hoprnet/hoprnet/pull/6018
-    let mut ticket = hopr_internal_types::channels::Ticket::default();
-
+    let mut ticket = Ticket::default();
     ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
     ticket.amount = BalanceType::HOPR.balance_bytes(&db_ticket.amount);
     ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
@@ -26,6 +25,7 @@ pub fn model_to_acknowledged_ticket(
     ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
 
     let signer = ticket.recover_signer(&domain_separator)?.to_address();
+
     Ok(AcknowledgedTicket::new(
         ticket,
         response,
