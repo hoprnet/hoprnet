@@ -38,8 +38,7 @@ jobs:
       - name: Set up environment
         id: setup
         run: |
-          set -x
-          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/.pr-'${{ github.event.pull_request.number }}'/')
+          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
@@ -87,8 +86,7 @@ jobs:
 
       - name: Set up environment
         run: |
-          set -x
-          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/.pr-'${{ github.event.pull_request.number }}'/')
+          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt
           python3 ./scripts/sync-deployment.py -a undeploy -v ${docker_tag}
