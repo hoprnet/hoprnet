@@ -64,7 +64,9 @@ pub fn update_identity_password(
     path: &PathBuf,
     password: &str,
 ) -> Result<Option<(String, HoprKeys)>, HelperErrors> {
-    let file_path = path.to_str().ok_or(HelperErrors::IncorrectFilename(path.to_string_lossy().to_string()))?;
+    let file_path = path
+        .to_str()
+        .ok_or(HelperErrors::IncorrectFilename(path.to_string_lossy().to_string()))?;
 
     if file_path.ends_with(".id") {
         // insert remove actual file with name `file_path`
