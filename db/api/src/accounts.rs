@@ -37,6 +37,9 @@ pub trait HoprDbAccountOperations {
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
+    where T: Into<ChainOrPacketKey> + Send + Sync;
+
     async fn translate_key<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<Option<ChainOrPacketKey>>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
@@ -82,6 +85,7 @@ impl HoprDbAccountOperations for HoprDb {
                                 account::Column::PacketKey.eq(packet_key.to_string())
                             }
                         })
+                        .order_by_desc(announcement::Column::AtBlock)
                         .all(tx.as_ref())
                         .await?
                         .pop();
@@ -217,6 +221,27 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
+    async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()> where T: Into<ChainOrPacketKey> + Send + Sync {
+        let cpk = key.into();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| Box::pin(async move {
+                let r = account::Entity::delete_many()
+                    .filter(match cpk {
+                        ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
+                        ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex())
+                    })
+                    .exec(tx.as_ref())
+                    .await?;
+                if r.rows_affected != 0 {
+                    Ok::<_, DbError>(())
+                } else {
+                    Err(MissingAccount)
+                }
+            }))
+            .await
+    }
+
     async fn translate_key<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
         &'a self,
         tx: OptTx<'a>,
@@ -315,6 +340,22 @@ mod tests {
         assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
         assert_eq!(acc, db_acc);
+
+        let maddr: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
+        let block = 300;
+        let db_acc = db
+            .insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect("should insert updated announcement");
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc);
     }
 
     #[async_std::test]
@@ -380,6 +421,37 @@ mod tests {
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
         assert_eq!(acc, db_acc_2);
+    }
+
+    #[async_std::test]
+    async fn test_delete_account() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        db.insert_account(None, AccountEntry::new(OffchainKeypair::random().public().clone(), chain_1,
+                                                  AccountType::Announced {
+                                                      multiaddr: "/ip4/1.2.3.4/tcp/1234".parse().unwrap(),
+                                                      updated_block: 10,
+                                                  })).await.unwrap();
+
+        assert!(db.get_account(None, chain_1).await.unwrap().is_some());
+
+        db.delete_account(None, chain_1).await.expect("should not fail to delete");
+
+        assert!(db.get_account(None, chain_1).await.unwrap().is_none());
+    }
+
+    #[async_std::test]
+    async fn test_should_fail_to_delete_nonexistent_account() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+
+        let r = db.delete_account(None, chain_1).await;
+        assert!(
+            matches!(r, Err(MissingAccount)),
+            "should not delete non-existing account"
+        )
     }
 
     #[async_std::test]

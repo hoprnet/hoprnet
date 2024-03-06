@@ -22,7 +22,6 @@ use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
-use crate::errors::DbError::LogicalError;
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
