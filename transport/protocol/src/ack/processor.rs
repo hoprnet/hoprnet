@@ -1,23 +1,23 @@
-use async_lock::RwLock;
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use std::{pin::Pin, sync::Arc};
 
-use chain_db::traits::HoprCoreEthereumDbActions;
+use async_lock::RwLock;
+use async_std::task::spawn;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
+use libp2p_identity::PeerId;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use tracing::{debug, error, trace, warn};
+
+use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_packet::errors::PacketError::{
     AcknowledgementValidation, MissingDomainSeparator, Retry, TransportError,
 };
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
+pub use hopr_db_api::tickets::AckResult;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::ToHex;
-use libp2p_identity::PeerId;
-use std::pin::Pin;
-use std::sync::Arc;
-use tracing::{debug, error, trace, warn};
-
-use async_std::task::spawn;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -42,14 +42,6 @@ lazy_static::lazy_static! {
 pub const ACK_TX_QUEUE_SIZE: usize = 2048;
 pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 
-#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
-#[derive(Debug)]
-pub enum Reply {
-    Sender(HalfKeyChallenge),
-    RelayerWinning(AcknowledgedTicket),
-    RelayerLosing,
-}
-
 #[derive(Debug)]
 pub enum AckToProcess {
     ToReceive(PeerId, Acknowledgement),
@@ -59,7 +51,7 @@ pub enum AckToProcess {
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
 pub enum AckProcessed {
-    Receive(PeerId, Result<Reply>),
+    Receive(PeerId, Result<AckResult>),
     Send(PeerId, Acknowledgement),
 }
 
@@ -87,7 +79,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<Reply> {
+    pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<AckResult> {
         /*
             There are three cases:
             1. There is an unacknowledged ticket and we are
@@ -117,7 +109,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 // No pending ticket, nothing to do.
                 debug!("received acknowledgement as sender: first relayer has processed the packet.");
 
-                Ok(Reply::Sender(ack.ack_challenge()))
+                Ok(AckResult::Sender(ack.ack_challenge()))
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
@@ -161,12 +153,12 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 // Check if ticket is a win
                 if ack_ticket.is_winning_ticket(&domain_separator) {
                     debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket",);
-                    Ok(Reply::RelayerWinning(ack_ticket))
+                    Ok(AckResult::RelayerWinning(ack_ticket))
                 } else {
                     trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
                     self.db.write().await.mark_losing_acked_ticket(&ack_ticket).await?;
 
-                    Ok(Reply::RelayerLosing)
+                    Ok(AckResult::RelayerLosing)
                 }
             }
         }
@@ -243,18 +235,18 @@ impl AcknowledgementInteraction {
                                 match processor.handle_acknowledgement(ack).await {
                                     Ok(reply) => {
                                         match &reply {
-                                            Reply::Sender(_) => {
+                                            AckResult::Sender(_) => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
                                                 METRIC_RECEIVED_ACKS.increment(&["false"]);
                                             }
-                                            Reply::RelayerWinning(_) => {
+                                            AckResult::RelayerWinning(_) => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
                                                 {
                                                     METRIC_RECEIVED_ACKS.increment(&["true"]);
                                                     METRIC_WINNING_TICKETS_COUNT.increment();
                                                 }
                                             }
-                                            Reply::RelayerLosing => {
+                                            AckResult::RelayerLosing => {
                                                 #[cfg(all(feature = "prometheus", not(test)))]
                                                 {
                                                     METRIC_RECEIVED_ACKS.increment(&["true"]);
