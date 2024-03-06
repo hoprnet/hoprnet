@@ -23,7 +23,7 @@ impl MigrationTrait for Migration {
                             .integer()
                             .unsigned()
                             .not_null()
-                            .default(1),
+                            .default(0),
                     )
                     .col(ColumnDef::new(ChainInfo::TicketPrice).binary_len(12).null())
                     .col(ColumnDef::new(ChainInfo::ChannelsDST).binary_len(32).null())
