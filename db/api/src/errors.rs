@@ -6,6 +6,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
+    #[error("account entry for announcement not found")]
+    MissingAccount,
+
     #[error("missing fixed entry in table {0}")]
     MissingFixedTableEntry(String),
 

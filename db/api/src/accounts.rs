@@ -15,6 +15,7 @@ use hopr_primitive_types::prelude::{Address, ToHex};
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::errors::DbError::MissingAccount;
 
 #[async_trait]
 pub trait HoprDbAccountOperations {
@@ -32,7 +33,7 @@ pub trait HoprDbAccountOperations {
         key: T,
         multiaddr: Multiaddr,
         at_block: u32,
-    ) -> Result<()>
+    ) -> Result<AccountEntry>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
@@ -158,7 +159,7 @@ impl HoprDbAccountOperations for HoprDb {
         key: T,
         multiaddr: Multiaddr,
         at_block: u32,
-    ) -> Result<()>
+    ) -> Result<AccountEntry>
     where
         T: Into<ChainOrPacketKey> + Send + Sync,
     {
@@ -167,20 +168,21 @@ impl HoprDbAccountOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let account_id = account::Entity::find()
+                    let (existing_account, mut existing_announcements) = account::Entity::find()
+                        .find_with_related(announcement::Entity)
                         .filter(match cpk {
                             ChainOrPacketKey::ChainKey(chain_key) => account::Column::ChainKey.eq(chain_key.to_hex()),
                             ChainOrPacketKey::PacketKey(packet_key) => {
                                 account::Column::PacketKey.eq(packet_key.to_hex())
                             }
                         })
-                        .one(tx.as_ref())
+                        .all(tx.as_ref())
                         .await?
-                        .ok_or(DbError::LogicalError("missing account".into()))?
-                        .id;
+                        .pop()
+                        .ok_or(MissingAccount)?;
 
                     let new_announcement = announcement::ActiveModel {
-                        account_id: Set(account_id),
+                        account_id: Set(existing_account.id),
                         multiaddress: Set(multiaddr.to_string()),
                         at_block: Set(at_block as i32),
                         ..Default::default()
@@ -195,7 +197,17 @@ impl HoprDbAccountOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await
                     {
-                        Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                        Ok(m) => {
+                            let new_announcement = announcement::Entity::find_by_id(m.last_insert_id)
+                                .one(tx.as_ref())
+                                .await?
+                                .ok_or(DbError::LogicalError("failed to fetch inserted announcement".into()))?;
+
+                            // Insert at the first position, since this is the latest announcement
+                            existing_announcements.insert(0, new_announcement);
+                            Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
+                        }
+                        Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?),
                         Err(e) => Err(e.into()),
                     }
                 })
@@ -273,7 +285,7 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
         let block = 100;
 
-        db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert announcement");
 
@@ -284,9 +296,10 @@ mod tests {
             .expect("should contain account");
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc);
 
         let block = 200;
-        db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert duplicate announcement");
 
@@ -297,6 +310,7 @@ mod tests {
             .expect("should contain account");
         assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc);
     }
 
     #[async_std::test]
@@ -308,9 +322,13 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
         let block = 100;
 
-        db.insert_announcement(None, chain_1, maddr.clone(), block)
-            .await
-            .expect_err("should not insert announcement to non-existing account");
+        let r = db.insert_announcement(None, chain_1, maddr.clone(), block).await;
+        assert!(matches!(
+            r,
+            Err(MissingAccount)),
+            "should not insert announcement to non-existing account"
+        )
+
     }
 
     #[async_std::test]
@@ -334,10 +352,10 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
         let block = 100;
 
-        db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc_1 = db.insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert announcement");
-        db.insert_announcement(None, chain_2, maddr.clone(), block)
+        let db_acc_2 = db.insert_announcement(None, chain_2, maddr.clone(), block)
             .await
             .expect("should insert announcement");
 
@@ -348,6 +366,7 @@ mod tests {
             .expect("should contain account");
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc_1);
 
         let acc = db
             .get_account(None, chain_2)
@@ -356,6 +375,7 @@ mod tests {
             .expect("should contain account");
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc_2);
     }
 
     #[async_std::test]

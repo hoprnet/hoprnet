@@ -18,7 +18,6 @@ use hopr_primitive_types::prelude::*;
 
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
-use crate::errors::DbError::LogicalError;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;

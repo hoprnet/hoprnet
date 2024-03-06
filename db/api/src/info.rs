@@ -190,24 +190,6 @@ impl HoprDbInfoOperations for HoprDb {
                         None
                     };
 
-                    let ledger_dst = if let Some(b) = model.ledger_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
-
-                    let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
-
-                    let channels_dst = if let Some(b) = model.channels_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
-
                     Ok::<OnChainData, DbError>(OnChainData {
                         ledger_dst,
                         safe_registry_dst,

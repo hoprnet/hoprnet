@@ -157,7 +157,7 @@ mod tests {
             .await
             .expect("should not fail"));
 
-        db.allow_in_network_registry(None, *ADDR_1)
+        db.set_access_in_network_registry(None, *ADDR_1, true)
             .await
             .expect("should not fail to allow in nr");
 
@@ -170,7 +170,7 @@ mod tests {
             .await
             .expect("should not fail"));
 
-        db.allow_in_network_registry(None, *ADDR_1)
+        db.set_access_in_network_registry(None, *ADDR_1, true)
             .await
             .expect("should not fail to allow in nr when allowed");
 
@@ -183,7 +183,7 @@ mod tests {
             .await
             .expect("should not fail"));
 
-        db.deny_in_network_registry(None, *ADDR_1)
+        db.set_access_in_network_registry(None, *ADDR_1, false)
             .await
             .expect("should fail to deny in nr");
 
@@ -196,7 +196,7 @@ mod tests {
             .await
             .expect("should not fail"));
 
-        db.deny_in_network_registry(None, *ADDR_1)
+        db.set_access_in_network_registry(None, *ADDR_1, false)
             .await
             .expect("should fail to deny in nr when denied");
 
