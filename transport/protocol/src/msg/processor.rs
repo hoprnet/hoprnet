@@ -288,14 +288,24 @@ where
 
                 debug!("price per packet is {price_per_packet}");
 
-                let validation_res = validate_unacknowledged_ticket::<Db>(
-                    self.db.clone(),
+                let validation_res = validate_unacknowledged_ticket(
                     &ticket,
                     &channel,
                     &previous_hop_addr,
                     Balance::new(price_per_packet, BalanceType::HOPR),
                     TICKET_WIN_PROB,
-                    self.cfg.check_unrealized_balance,
+                    if self.cfg.check_unrealized_balance {
+                        Some(
+                            self.db
+                                .clone()
+                                .read()
+                                .await
+                                .get_unrealized_balance(&channel.get_id())
+                                .await?,
+                        )
+                    } else {
+                        None
+                    },
                     &domain_separator,
                 )
                 .await;

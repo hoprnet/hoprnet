@@ -18,6 +18,9 @@ pub enum DbError {
     #[error("logical error: {0}")]
     LogicalError(String),
 
+    #[error("ticket validation error: {0}")]
+    TicketValidationError(String),
+
     #[error(transparent)]
     PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 
