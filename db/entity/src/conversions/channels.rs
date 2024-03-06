@@ -1,10 +1,10 @@
-use std::str::FromStr;
-use sea_orm::{Set};
+use crate::channel;
+use crate::errors::DbEntityError;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_internal_types::prelude::ChannelEntry;
 use hopr_primitive_types::prelude::{BalanceType, IntoEndian, ToHex, U256};
-use crate::channel;
-use crate::errors::DbEntityError;
+use sea_orm::Set;
+use std::str::FromStr;
 
 /// Extension trait for updating [ChannelStatus] inside [channel::ActiveModel].
 /// This is needed as `status` maps to two model members.
@@ -31,10 +31,13 @@ impl TryFrom<&channel::Model> for ChannelStatus {
             1 => Ok(ChannelStatus::Open),
             2 => {
                 if let Some(ct) = &value.closure_time {
-                    let time = chrono::DateTime::<chrono::Utc>::from_str(ct).map_err(|_| DbEntityError::ConversionError("channel closure time".into()))?;
+                    let time = chrono::DateTime::<chrono::Utc>::from_str(ct)
+                        .map_err(|_| DbEntityError::ConversionError("channel closure time".into()))?;
                     Ok(ChannelStatus::PendingToClose(time.into()))
                 } else {
-                    Err(DbEntityError::ConversionError("channel is pending to close but without closure time".into()))
+                    Err(DbEntityError::ConversionError(
+                        "channel is pending to close but without closure time".into(),
+                    ))
                 }
             }
             _ => Err(DbEntityError::ConversionError("invalid channel status value".into())),

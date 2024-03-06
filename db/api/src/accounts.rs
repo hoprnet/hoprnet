@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
+use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_query::OnConflict;
 
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_db_entity::{account, announcement};
@@ -27,11 +29,19 @@ pub trait HoprDbAccountOperations {
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()>;
 
-    async fn translate_key<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
+    async fn insert_announcement<'a, T>(
         &'a self,
         tx: OptTx<'a>,
         key: T,
-    ) -> Result<Option<ChainOrPacketKey>>;
+        multiaddr: Multiaddr,
+        at_block: u32,
+    ) -> Result<()>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync;
+
+    async fn translate_key<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<Option<ChainOrPacketKey>>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync;
 }
 
 // NOTE: this currently function assumes `announcements` are sorted from latest to earliest
@@ -88,6 +98,29 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
+    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Account::find()
+                        .find_with_related(Announcement)
+                        .filter(if public_only {
+                            announcement::Column::Multiaddress.ne("")
+                        } else {
+                            Expr::value(1)
+                        })
+                        .order_by_desc(announcement::Column::AtBlock)
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|(a, b)| model_to_account_entry(a, b))
+                        .collect()
+                })
+            })
+            .await
+    }
+
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
         self.nest_transaction(tx)
             .await?
@@ -122,24 +155,52 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
-    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>> {
+    async fn insert_announcement<'a, T>(
+        &'a self,
+        tx: OptTx<'a>,
+        key: T,
+        multiaddr: Multiaddr,
+        at_block: u32,
+    ) -> Result<()>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync,
+    {
+        let cpk = key.into();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Account::find()
-                        .find_with_related(Announcement)
-                        .filter(if public_only {
-                            announcement::Column::Multiaddress.ne("")
-                        } else {
-                            Expr::value(1)
+                    let account_id = account::Entity::find()
+                        .filter(match cpk {
+                            ChainOrPacketKey::ChainKey(chain_key) => account::Column::ChainKey.eq(chain_key.to_hex()),
+                            ChainOrPacketKey::PacketKey(packet_key) => {
+                                account::Column::PacketKey.eq(packet_key.to_hex())
+                            }
                         })
-                        .order_by_desc(announcement::Column::AtBlock)
-                        .all(tx.as_ref())
+                        .one(tx.as_ref())
                         .await?
-                        .into_iter()
-                        .map(|(a, b)| model_to_account_entry(a, b))
-                        .collect()
+                        .ok_or(DbError::LogicalError("missing account".into()))?
+                        .id;
+
+                    let new_announcement = announcement::ActiveModel {
+                        account_id: Set(account_id),
+                        multiaddress: Set(multiaddr.to_string()),
+                        at_block: Set(at_block as i32),
+                        ..Default::default()
+                    };
+
+                    match announcement::Entity::insert(new_announcement)
+                        .on_conflict(
+                            OnConflict::columns([announcement::Column::AccountId, announcement::Column::Multiaddress])
+                                .update_column(announcement::Column::AtBlock)
+                                .to_owned(),
+                        )
+                        .exec(tx.as_ref())
+                        .await
+                    {
+                        Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                        Err(e) => Err(e.into()),
+                    }
                 })
             })
             .await
@@ -189,10 +250,116 @@ impl HoprDbAccountOperations for HoprDb {
 mod tests {
     use super::*;
     use crate::errors::DbError;
+    use crate::errors::DbError::DecodingError;
     use crate::HoprDbGeneralModelOperations;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_db_entity::prelude::Announcement;
-    use sea_orm::Set;
+
+    #[async_std::test]
+    async fn test_insert_account_announcement() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(packet_1, acc.public_key, "pub keys must match");
+        assert_eq!(AccountType::NotAnnounced, acc.entry_type.clone());
+
+        let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
+        let block = 100;
+
+        db.insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect("should insert announcement");
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+
+        let block = 200;
+        db.insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect("should insert duplicate announcement");
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+    }
+
+    #[async_std::test]
+    async fn test_should_not_insert_account_announcement_to_nonexisting_account() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+
+        let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
+        let block = 100;
+
+        db.insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect_err("should not insert announcement to non-existing account");
+    }
+
+    #[async_std::test]
+    async fn test_should_allow_duplicate_announcement_per_different_accounts() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
+        let block = 100;
+
+        db.insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect("should insert announcement");
+        db.insert_announcement(None, chain_2, maddr.clone(), block)
+            .await
+            .expect("should insert announcement");
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+
+        let acc = db
+            .get_account(None, chain_2)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+    }
 
     #[async_std::test]
     async fn test_translate_key() {
@@ -210,43 +377,39 @@ mod tests {
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    let entry = AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced);
-                    db_clone.insert_account(Some(tx), entry).await?;
-
-                    let entry = AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced);
-                    db_clone.insert_account(Some(tx), entry).await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced),
+                        )
+                        .await?;
                     Ok::<(), DbError>(())
                 })
             })
             .await
             .expect("tx should not fail");
 
-        let (a, b) = db
-            .begin_transaction()
+        let a: Address = db
+            .translate_key(None, packet_1)
             .await
-            .unwrap()
-            .perform(|tx| {
-                Box::pin(async move {
-                    let a: Address = db
-                        .translate_key(Some(tx), packet_1)
-                        .await
-                        .expect("must translate")
-                        .expect("must contain key")
-                        .try_into()
-                        .expect("must be chain key");
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
 
-                    let b: OffchainPublicKey = db
-                        .translate_key(Some(tx), chain_2)
-                        .await
-                        .expect("must translate")
-                        .expect("must contain key")
-                        .try_into()
-                        .expect("must be chain key");
-                    Ok::<_, DbError>((a, b))
-                })
-            })
+        let b: OffchainPublicKey = db
+            .translate_key(None, chain_2)
             .await
-            .unwrap();
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
 
         assert_eq!(chain_1, a, "chain keys must match");
         assert_eq!(packet_2, b, "chain keys must match");
@@ -256,102 +419,58 @@ mod tests {
     async fn test_get_accounts() {
         let db = HoprDb::new_in_memory().await;
 
-        let tx = db.begin_transaction().await.unwrap();
-
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
-        let account_1 = account::ActiveModel {
-            chain_key: Set(chain_1.to_hex()),
-            packet_key: Set(packet_1.to_hex()),
-            ..Default::default()
-        };
-
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
-        let account_2 = account::ActiveModel {
-            chain_key: Set(chain_2.to_hex()),
-            packet_key: Set(packet_2.to_hex()),
-            ..Default::default()
-        };
-
-        let res = Account::insert_many([account_1, account_2])
-            .exec(tx.as_ref())
-            .await
-            .expect("insert must succeed");
-
-        let ma_1 = "/ip4/10.10.10.10/tcp/1234";
-        let announcement = announcement::ActiveModel {
-            account_id: Set(res.last_insert_id.into()),
-            multiaddress: Set(ma_1.into()),
-            at_block: Set(10),
-            ..Default::default()
-        };
-        Announcement::insert(announcement)
-            .exec(tx.as_ref())
-            .await
-            .expect("insert must succeed");
-
         let chain_3 = ChainKeypair::random().public().to_address();
-        let packet_3 = OffchainKeypair::random().public().clone();
-        let account_3 = account::ActiveModel {
-            chain_key: Set(chain_3.to_hex()),
-            packet_key: Set(packet_3.to_hex()),
-            ..Default::default()
-        };
 
-        let res = Account::insert(account_3)
-            .exec(tx.as_ref())
-            .await
-            .expect("insert must succeed");
-
-        let announcement_1 = announcement::ActiveModel {
-            account_id: Set(res.last_insert_id.into()),
-            multiaddress: Set("/ip4/1.2.3.4/tcp/1234".into()),
-            at_block: Set(12),
-            ..Default::default()
-        };
-
-        let ma_2 = "/ip4/8.8.1.1/tcp/1234";
-        let announcement_2 = announcement::ActiveModel {
-            account_id: Set(res.last_insert_id.into()),
-            multiaddress: Set(ma_2.into()),
-            at_block: Set(15),
-            ..Default::default()
-        };
-
-        let announcement_3 = announcement::ActiveModel {
-            account_id: Set(res.last_insert_id.into()),
-            multiaddress: Set("/ip4/1.2.3.0/tcp/234".into()),
-            at_block: Set(14),
-            ..Default::default()
-        };
-
-        Announcement::insert_many([announcement_1, announcement_2, announcement_3])
-            .exec(tx.as_ref())
-            .await
-            .expect("insert must succeed");
-
-        tx.commit().await.unwrap();
-
-        let (all_accounts, public_only) = db
-            .begin_transaction()
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    let all_accounts = db
-                        .get_accounts(Some(tx.into()), false)
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(*OffchainKeypair::random().public(), chain_1, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(
+                                *OffchainKeypair::random().public(),
+                                chain_2,
+                                AccountType::Announced {
+                                    multiaddr: "/ip4/10.10.10.10/tcp/1234".parse().map_err(|_| DecodingError)?,
+                                    updated_block: 10,
+                                },
+                            ),
+                        )
+                        .await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(*OffchainKeypair::random().public(), chain_3, AccountType::NotAnnounced),
+                        )
+                        .await?;
+
+                    db_clone
+                        .insert_announcement(Some(tx), chain_3, "/ip4/1.2.3.4/tcp/1234".parse().unwrap(), 12)
+                        .await?;
+                    db_clone
+                        .insert_announcement(Some(tx), chain_3, "/ip4/8.8.1.1/tcp/1234".parse().unwrap(), 15)
+                        .await?;
+                    db_clone
+                        .insert_announcement(Some(tx), chain_3, "/ip4/1.2.3.0/tcp/234".parse().unwrap(), 14)
                         .await
-                        .expect("should get accounts");
-                    let public_only = db
-                        .get_accounts(Some(tx.into()), true)
-                        .await
-                        .expect("should get accounts");
-                    Ok::<_, DbError>((all_accounts, public_only))
                 })
             })
             .await
-            .unwrap();
+            .expect("must insert announcements");
+
+        let all_accounts = db.get_accounts(None, false).await.expect("must get all");
+        let public_only = db.get_accounts(None, true).await.expect("must get public");
 
         assert_eq!(3, all_accounts.len());
 
@@ -360,12 +479,13 @@ mod tests {
             .iter()
             .find(|a| a.chain_addr.eq(&chain_2))
             .expect("should contain 1");
+
         let acc_2 = public_only
             .iter()
             .find(|a| a.chain_addr.eq(&chain_3))
             .expect("should contain 2");
 
-        assert_eq!(ma_1, acc_1.get_multiaddr().unwrap().to_string());
-        assert_eq!(ma_2, acc_2.get_multiaddr().unwrap().to_string());
+        assert_eq!("/ip4/10.10.10.10/tcp/1234", acc_1.get_multiaddr().unwrap().to_string());
+        assert_eq!("/ip4/8.8.1.1/tcp/1234", acc_2.get_multiaddr().unwrap().to_string());
     }
 }

@@ -9,8 +9,8 @@ mod m20240226_000006_create_peer_store;
 mod m20240226_000007_create_chain_info;
 mod m20240226_000008_create_stats;
 mod m20240301_000009_create_network_eligibility;
-mod m20240301_000011_initial_seed;
 mod m20240301_000010_create_settings;
+mod m20240301_000011_initial_seed;
 
 pub struct Migrator;
 
@@ -29,7 +29,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20240301_000009_create_network_eligibility::Migration),
             Box::new(m20240301_000010_create_settings::Migration),
             Box::new(m20240301_000011_initial_seed::Migration),
-
         ]
     }
 }
