@@ -10,13 +10,15 @@ use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use futures::TryStreamExt;
+use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
+use hopr_db_api::errors::DbError;
 use hopr_db_api::errors::DbError::LogicalError;
 use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
-use hopr_db_entity::{
-    account, chain_info, channel, ticket,
-};
+use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
+use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
+use hopr_db_entity::{account, chain_info, channel, ticket};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -24,10 +26,6 @@ use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_db_api::errors::DbError;
-use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
 /// Event handling object for on-chain operations
 ///
@@ -96,14 +94,23 @@ where
                 }
                 let node_address: Address = address_announcement.node.into();
 
-                return match self.db.insert_announcement(Some(tx), node_address, address_announcement.base_multiaddr.parse()?, block_number).await {
-                    Ok(account) =>  Ok(Some(ChainEventType::Announcement {
+                return match self
+                    .db
+                    .insert_announcement(
+                        Some(tx),
+                        node_address,
+                        address_announcement.base_multiaddr.parse()?,
+                        block_number,
+                    )
+                    .await
+                {
+                    Ok(account) => Ok(Some(ChainEventType::Announcement {
                         peer: account.public_key.into(),
                         address: account.chain_addr,
                         multiaddresses: vec![account.get_multiaddr().expect("not must contain multiaddr")],
                     })),
                     Err(DbError::MissingAccount) => Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding),
-                    Err(e) => Err(e.into())
+                    Err(e) => Err(e.into()),
                 };
             }
             HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
@@ -133,7 +140,7 @@ where
                 match self.db.delete_all_announcements(Some(tx), node_address).await {
                     Err(DbError::MissingAccount) => return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding),
                     Err(e) => return Err(e.into()),
-                    _ => {},
+                    _ => {}
                 }
             }
         };
@@ -230,9 +237,15 @@ where
                     let current_epoch = U256::from_big_endian(&channel.epoch);
 
                     // cleanup tickets from previous epochs on channel re-opening
-                    if source == self.chain_key.public().to_address() || destination == self.chain_key.public().to_address() {
+                    if source == self.chain_key.public().to_address()
+                        || destination == self.chain_key.public().to_address()
+                    {
                         self.db
-                            .mark_tickets_neglected_in_epoch(Some(tx), channel.channel_id.parse()?, current_epoch.as_u32())
+                            .mark_tickets_neglected_in_epoch(
+                                Some(tx),
+                                channel.channel_id.parse()?,
+                                current_epoch.as_u32(),
+                            )
                             .await?;
                     }
 
@@ -256,7 +269,9 @@ where
                         epoch: Set(U256::one().to_be_bytes().into()),
                         ticket_index: Set(U256::zero().to_be_bytes().into()),
                         ..Default::default()
-                    }.insert(tx.as_ref()).await?
+                    }
+                    .insert(tx.as_ref())
+                    .await?
                 };
 
                 Ok(Some(ChainEventType::ChannelOpened(new_model.try_into()?)))
@@ -290,7 +305,13 @@ where
                         if matching_tickets.len() == 1 {
                             let chain_info = self.db.get_chain_data(Some(tx)).await?;
                             let redeemed_ticket = matching_tickets.pop().unwrap();
-                            let ack_ticket = model_to_acknowledged_ticket(&redeemed_ticket, chain_info.channels_dst.ok_or(LogicalError("missing channels dst".into()))?, &self.chain_key)?;
+                            let ack_ticket = model_to_acknowledged_ticket(
+                                &redeemed_ticket,
+                                chain_info
+                                    .channels_dst
+                                    .ok_or(LogicalError("missing channels dst".into()))?,
+                                &self.chain_key,
+                            )?;
 
                             self.db.mark_ticket_redeemed(Some(tx), &ack_ticket).await?;
                             info!("{ack_ticket} has been marked as redeemed");
@@ -346,27 +367,27 @@ where
                     id: Set(SINGULAR_TABLE_FIXED_ID),
                     channels_dst: Set(Some(domain_separator_updated.domain_separator.into())),
                     ..Default::default()
-                }.update(tx.as_ref()).await?;
+                }
+                .update(tx.as_ref())
+                .await?;
 
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
                 chain_info::ActiveModel {
                     id: Set(SINGULAR_TABLE_FIXED_ID),
-                    ledger_dst:Set(Some(ledger_domain_separator_updated.ledger_domain_separator.into())),
+                    ledger_dst: Set(Some(ledger_domain_separator_updated.ledger_domain_separator.into())),
                     ..Default::default()
-                }.update(tx.as_ref()).await?;
+                }
+                .update(tx.as_ref())
+                .await?;
 
                 Ok(None)
             }
         }
     }
 
-    async fn on_token_event(
-        &self,
-        tx: &OpenTransaction,
-        event: HoprTokenEvents,
-    ) -> Result<Option<ChainEventType>> {
+    async fn on_token_event(&self, tx: &OpenTransaction, event: HoprTokenEvents) -> Result<Option<ChainEventType>> {
         match event {
             HoprTokenEvents::TransferFilter(transferred) => {
                 let from: Address = transferred.from.into();
@@ -403,7 +424,9 @@ where
 
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    self.db.set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value)).await?;
+                    self.db
+                        .set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
+                        .await?;
                 } else {
                     return Ok(None);
                 }
@@ -422,7 +445,9 @@ where
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
-                self.db.set_access_in_network_registry(Some(tx), node_address, false).await?;
+                self.db
+                    .set_access_in_network_registry(Some(tx), node_address, false)
+                    .await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -431,7 +456,9 @@ where
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
-                self.db.set_access_in_network_registry(Some(tx), node_address, false).await?;
+                self.db
+                    .set_access_in_network_registry(Some(tx), node_address, false)
+                    .await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -440,7 +467,9 @@ where
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address: Address = registered.node_address.into();
-                self.db.set_access_in_network_registry(Some(tx), node_address, true).await?;
+                self.db
+                    .set_access_in_network_registry(Some(tx), node_address, true)
+                    .await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -449,7 +478,9 @@ where
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address: Address = registered.node_address.into();
-                self.db.set_access_in_network_registry(Some(tx), node_address, true).await?;
+                self.db
+                    .set_access_in_network_registry(Some(tx), node_address, true)
+                    .await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -458,14 +489,18 @@ where
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.into();
-                self.db.set_safe_eligibility(Some(tx), account, eligibility_updated.eligibility).await?;
+                self.db
+                    .set_safe_eligibility(Some(tx), account, eligibility_updated.eligibility)
+                    .await?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
                 chain_info::ActiveModel {
                     id: Set(SINGULAR_TABLE_FIXED_ID),
                     network_registry_enabled: Set(enabled.is_enabled),
                     ..Default::default()
-                }.update(tx.as_ref()).await?;
+                }
+                .update(tx.as_ref())
+                .await?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -502,7 +537,9 @@ where
                     id: Set(SINGULAR_TABLE_FIXED_ID),
                     safe_registry_dst: Set(Some(domain_separator_updated.domain_separator.into())),
                     ..Default::default()
-                }.update(tx.as_ref()).await?;
+                }
+                .update(tx.as_ref())
+                .await?;
             }
         }
 
@@ -535,7 +572,9 @@ where
                     id: Set(SINGULAR_TABLE_FIXED_ID),
                     ticket_price: Set(Some(update.1.to_be_bytes().into())),
                     ..Default::default()
-                }.update(tx.as_ref()).await?;
+                }
+                .update(tx.as_ref())
+                .await?;
 
                 info!("ticket price has been set to {}", update.1);
             }
@@ -637,18 +676,18 @@ pub mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::HoprDbInfoOperations;
+    use hopr_db_api::registry::HoprDbRegistryOperations;
     use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations, SINGULAR_TABLE_FIXED_ID};
+    use hopr_db_entity::chain_info;
     use hopr_internal_types::prelude::*;
+    use hopr_internal_types::ChainOrPacketKey;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
     use sea_orm::{ActiveModelTrait, Set};
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::registry::HoprDbRegistryOperations;
-    use hopr_db_entity::chain_info;
-    use hopr_internal_types::ChainOrPacketKey;
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -702,7 +741,9 @@ pub mod tests {
             data: encode(&[
                 Token::FixedBytes(Vec::from(keybinding.signature.to_bytes())),
                 Token::FixedBytes(Vec::from(keybinding.packet_key.to_bytes())),
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_KEY.public().to_address().to_bytes())),
+                Token::Address(EthereumAddress::from_slice(
+                    &SELF_CHAIN_KEY.public().to_address().to_bytes(),
+                )),
             ]),
         };
 
@@ -714,7 +755,10 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS)).await.unwrap().unwrap(),
+            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
+                .await
+                .unwrap()
+                .unwrap(),
             account_entry
         );
     }
@@ -745,7 +789,10 @@ pub mod tests {
             .unwrap_err();
 
         assert_eq!(
-            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS)).await.unwrap().unwrap(),
+            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
+                .await
+                .unwrap()
+                .unwrap(),
             account_entry
         );
 
@@ -774,7 +821,10 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS)).await.unwrap().unwrap(),
+            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
+                .await
+                .unwrap()
+                .unwrap(),
             announced_account_entry
         );
 
@@ -803,7 +853,10 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS)).await.unwrap().unwrap(),
+            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
+                .await
+                .unwrap()
+                .unwrap(),
             announced_dns_account_entry
         );
     }
@@ -841,7 +894,10 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS)).await.unwrap().unwrap(),
+            db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
+                .await
+                .unwrap()
+                .unwrap(),
             account_entry
         );
     }
@@ -882,7 +938,9 @@ pub mod tests {
 
         let value = U256::max_value();
 
-        db.set_safe_balance(None, BalanceType::HOPR.balance(value)).await.unwrap();
+        db.set_safe_balance(None, BalanceType::HOPR.balance(value))
+            .await
+            .unwrap();
 
         let transferred_log = RawLog {
             topics: vec![
@@ -898,10 +956,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_safe_balance(None).await.unwrap(),
-            BalanceType::HOPR.zero()
-        )
+        assert_eq!(db.get_safe_balance(None).await.unwrap(), BalanceType::HOPR.zero())
     }
 
     #[async_std::test]
@@ -936,10 +991,7 @@ pub mod tests {
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_allowance(
-                None,
-                Balance::new(U256::from(10u64), BalanceType::HOPR),
-            )
+            .set_safe_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
             .await;
         assert_eq!(
             db.get_safe_allowance(None).await.unwrap(),
@@ -969,14 +1021,20 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
 
         handlers
             .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
     }
 
     #[async_std::test]
@@ -994,14 +1052,20 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
 
         handlers
             .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
     }
 
     #[async_std::test]
@@ -1010,7 +1074,9 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true).await.unwrap();
+        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
+            .await
+            .unwrap();
 
         let registered_log = RawLog {
             topics: vec![
@@ -1021,14 +1087,20 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
 
         handlers
             .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
     }
 
     #[async_std::test]
@@ -1037,7 +1109,9 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true).await.unwrap();
+        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
+            .await
+            .unwrap();
 
         let registered_log = RawLog {
             topics: vec![
@@ -1048,14 +1122,20 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
 
         handlers
             .on_event(handlers.addresses.network_registry, 0u32, registered_log)
             .await
             .unwrap();
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db
+            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+            .await
+            .unwrap());
     }
 
     #[async_std::test]
@@ -1090,7 +1170,10 @@ pub mod tests {
             id: Set(SINGULAR_TABLE_FIXED_ID),
             network_registry_enabled: Set(true),
             ..Default::default()
-        }.save(db.conn()).await.unwrap();
+        }
+        .save(db.conn())
+        .await
+        .unwrap();
 
         let nr_disabled = RawLog {
             topics: vec![
@@ -1188,7 +1271,15 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(solidity_balance, db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap().balance.amount());
+        assert_eq!(
+            solidity_balance,
+            db.get_channel_by_id(None, channel.get_id())
+                .await
+                .unwrap()
+                .unwrap()
+                .balance
+                .amount()
+        );
     }
 
     #[async_std::test]
@@ -1209,11 +1300,9 @@ pub mod tests {
 
         assert!(db.get_chain_data(None).await.unwrap().channels_dst.is_none());
 
-
         handlers.on_event(handlers.addresses.channels, 0u32, log).await.unwrap();
 
         assert_eq!(separator, db.get_chain_data(None).await.unwrap().channels_dst.unwrap());
-
     }
 
     #[async_std::test]
@@ -1248,7 +1337,15 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(solidity_balance, db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap().balance.amount());
+        assert_eq!(
+            solidity_balance,
+            db.get_channel_by_id(None, channel.get_id())
+                .await
+                .unwrap()
+                .unwrap()
+                .balance
+                .amount()
+        );
     }
 
     #[async_std::test]
@@ -1472,11 +1569,11 @@ pub mod tests {
 
         // Nothing to write to the DB here, since we do not track this
         /*db.write()
-            .await
-            .set_mfa_protected_and_update_snapshot(Some(*SAFE_INSTANCE_ADDR), &Snapshot::default())
-            .await
-            .unwrap();
-          */
+          .await
+          .set_mfa_protected_and_update_snapshot(Some(*SAFE_INSTANCE_ADDR), &Snapshot::default())
+          .await
+          .unwrap();
+        */
 
         let safe_registered_log = RawLog {
             topics: vec![

@@ -178,7 +178,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + 'static> HoprChain<T> {
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
         let channel_id = generate_channel_id(src, dest);
-        self.db.get_channel_by_id(None, channel_id)
+        self.db
+            .get_channel_by_id(None, channel_id)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {

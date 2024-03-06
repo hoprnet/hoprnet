@@ -25,11 +25,11 @@ pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 
+use crate::accounts::HoprDbAccountOperations;
+use crate::channels::HoprDbChannelOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
-use crate::accounts::HoprDbAccountOperations;
-use crate::channels::HoprDbChannelOperations;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
@@ -130,7 +130,14 @@ impl HoprDbGeneralModelOperations for HoprDb {
     }
 }
 
-pub trait HoprDbAllOperations: HoprDbGeneralModelOperations
-    + HoprDbAccountOperations + HoprDbChannelOperations
-    + HoprDbInfoOperations + HoprDbRegistryOperations + HoprDbTicketOperations
-    + HoprDbPeersOperations + HoprDbResolverOperations {}
+pub trait HoprDbAllOperations:
+    HoprDbGeneralModelOperations
+    + HoprDbAccountOperations
+    + HoprDbChannelOperations
+    + HoprDbInfoOperations
+    + HoprDbRegistryOperations
+    + HoprDbTicketOperations
+    + HoprDbPeersOperations
+    + HoprDbResolverOperations
+{
+}

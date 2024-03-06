@@ -84,13 +84,13 @@ use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 
+use hopr_db_api::db::HoprDb;
+use hopr_db_api::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
     hopr_platform::time::native::current_time,
 };
-use hopr_db_api::db::HoprDb;
-use hopr_db_api::HoprDbAllOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

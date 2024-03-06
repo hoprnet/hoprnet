@@ -98,9 +98,7 @@ impl HoprDbChannelOperations for HoprDb {
                         .stream(tx.as_ref())
                         .await?
                         .map_err(DbError::from)
-                        .try_filter_map(|m| async move {
-                            Ok(Some(ChannelEntry::try_from(m)?))
-                        })
+                        .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
                         .try_collect()
                         .await
                 })

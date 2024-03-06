@@ -1,3 +1,4 @@
+use crate::HoprDbAllOperations;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_primitive_types::primitives::Balance;
@@ -10,7 +11,6 @@ use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use tracing::log::LevelFilter;
-use crate::HoprDbAllOperations;
 
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {

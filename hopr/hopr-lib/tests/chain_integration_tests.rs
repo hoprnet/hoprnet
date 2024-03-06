@@ -24,12 +24,12 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::db::HoprDb;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info};
-use hopr_db_api::db::HoprDb;
 use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use utils_db::db::DB;
 use utils_db::sqlite::SqliteShim;
@@ -223,8 +223,7 @@ async fn start_node_chain_logic(
     }));
 
     // Indexer
-    let chain_log_handler =
-        ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), new_db.clone());
+    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), new_db.clone());
 
     let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, new_db.clone(), indexer_cfg, sce_tx);
     indexer.start().await.expect("indexer should sync");
