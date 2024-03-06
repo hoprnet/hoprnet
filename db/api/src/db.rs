@@ -1,4 +1,7 @@
+use hopr_crypto_types::types::HalfKeyChallenge;
+use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use migration::{Migrator, MigratorTrait};
+use moka::future::Cache;
 use sea_orm::SqlxSqliteConnector;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -19,6 +22,7 @@ pub struct HoprDbConfig {
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
+    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
 }
 
 pub const SQL_DB_FILE_NAME: &str = "hopr_db_1.db";
@@ -56,7 +60,15 @@ impl HoprDb {
 
         Migrator::up(&db, None).await.expect("cannot apply database migration");
 
-        Self { db }
+        let cache = Cache::builder()
+            .time_to_idle(std::time::Duration::from_secs(30))
+            .max_capacity(1_000_000_000)
+            .build();
+
+        Self {
+            db,
+            unacked_tickets: cache,
+        }
     }
 }
 

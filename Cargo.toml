@@ -62,6 +62,7 @@ lazy_static = "1.4.0"
 libp2p-identity = { version = "0.2.5", features = ["peerid", "ed25519", "rand"] }
 libp2p-mplex = "0.41.0"
 libp2p = { version = "0.53.2" }
+moka = { version = "0.12", features = ["future"] }
 multiaddr = "0.18.0"
 num_enum = "0.7"
 regex = "1"

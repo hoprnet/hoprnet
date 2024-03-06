@@ -1,8 +1,8 @@
 use hopr_crypto_types::prelude::CryptoError;
+use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
 use thiserror::Error;
-use hopr_db_entity::errors::DbEntityError;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -17,6 +17,9 @@ pub enum DbError {
 
     #[error("logical error: {0}")]
     LogicalError(String),
+
+    #[error(transparent)]
+    PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),

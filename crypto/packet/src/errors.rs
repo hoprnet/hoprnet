@@ -1,4 +1,3 @@
-use core_path::errors::PathError;
 use hopr_crypto_types::errors::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
@@ -54,9 +53,6 @@ pub enum PacketError {
 
     #[error(transparent)]
     PacketDbError(#[from] DbError),
-
-    #[error(transparent)]
-    PathError(#[from] PathError),
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),

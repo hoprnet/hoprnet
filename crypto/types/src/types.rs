@@ -428,6 +428,12 @@ impl BinarySerializable for HalfKeyChallenge {
     }
 }
 
+impl std::hash::Hash for HalfKeyChallenge {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.hkc.hash(state);
+    }
+}
+
 impl FromStr for HalfKeyChallenge {
     type Err = GeneralError;
 
