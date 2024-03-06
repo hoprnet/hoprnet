@@ -1,7 +1,8 @@
-use hopr_crypto_types::types::HalfKeyChallenge;
+use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
+use hopr_primitive_types::primitives::Balance;
 use migration::{Migrator, MigratorTrait};
-use moka::future::Cache;
+use moka::{future::Cache, Expiry};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -19,9 +20,18 @@ pub struct HoprDbConfig {
     pub log_slow_queries: Duration,
 }
 
+pub struct ExpiryNever;
+
+impl<K, V> Expiry<K, V> for ExpiryNever {
+    fn expire_after_create(&self, _key: &K, _value: &V, _current_time: std::time::Instant) -> Option<Duration> {
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
+    pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
 }
 
@@ -60,14 +70,20 @@ impl HoprDb {
 
         Migrator::up(&db, None).await.expect("cannot apply database migration");
 
-        let cache = Cache::builder()
+        let unacked_tickets = Cache::builder()
             .time_to_idle(std::time::Duration::from_secs(30))
             .max_capacity(1_000_000_000)
             .build();
 
+        let unrealized_value = Cache::builder()
+            .expire_after(ExpiryNever {})
+            .max_capacity(10_000)
+            .build();
+
         Self {
             db,
-            unacked_tickets: cache,
+            unacked_tickets,
+            unrealized_value,
         }
     }
 }

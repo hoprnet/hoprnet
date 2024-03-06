@@ -12,7 +12,7 @@ pub enum DbEntityError {
     CryptoError(#[from] hopr_crypto_types::errors::CryptoError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_primitive_types::errors::GeneralError)
+    GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, DbEntityError>;

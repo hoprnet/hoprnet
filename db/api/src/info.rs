@@ -103,34 +103,41 @@ impl HoprDbInfoOperations for HoprDb {
     async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                  node_info::ActiveModel {
-                      id: Set(SINGULAR_TABLE_FIXED_ID),
-                      safe_allowance: Set(new_allowance.amount().to_be_bytes().to_vec()),
-                      ..Default::default()
-                  }.save(tx.as_ref()).await?;
+            .perform(|tx| {
+                Box::pin(async move {
+                    node_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        safe_allowance: Set(new_allowance.amount().to_be_bytes().to_vec()),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
 
-                Ok::<_, DbError>(())
-            }))
+                    Ok::<_, DbError>(())
+                })
+            })
             .await
     }
 
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>> {
-        let addrs = self.nest_transaction(tx)
+        let addrs = self
+            .nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                    .one(tx.as_ref())
-                    .await?
-                    .ok_or(CorruptedData)?;
-                Ok::<_, DbError>(info.safe_address.zip(info.module_address))
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(CorruptedData)?;
+                    Ok::<_, DbError>(info.safe_address.zip(info.module_address))
+                })
+            })
             .await?;
 
         Ok(if let Some((safe_address, module_address)) = addrs {
             Some(SafeInfo {
                 safe_address: safe_address.parse()?,
-                module_address: module_address.parse()?
+                module_address: module_address.parse()?,
             })
         } else {
             None
@@ -140,15 +147,19 @@ impl HoprDbInfoOperations for HoprDb {
     async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                node_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    safe_address: Set(Some(safe_info.safe_address.to_hex())),
-                    module_address: Set(Some(safe_info.module_address.to_hex())),
-                    ..Default::default()
-                }.save(tx.as_ref()).await?;
-                Ok::<_, DbError>(())
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    node_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        safe_address: Set(Some(safe_info.safe_address.to_hex())),
+                        module_address: Set(Some(safe_info.module_address.to_hex())),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
+                    Ok::<_, DbError>(())
+                })
+            })
             .await
     }
 
@@ -196,14 +207,18 @@ impl HoprDbInfoOperations for HoprDb {
     async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    last_indexed_block: Set(block_num as i32),
-                    ..Default::default()
-                }.save(tx.as_ref()).await?;
-                Ok::<_, DbError>(())
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        last_indexed_block: Set(block_num as i32),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
+                    Ok::<_, DbError>(())
+                })
+            })
             .await
     }
 
@@ -274,24 +289,40 @@ mod tests {
     async fn test_set_get_balance() {
         let db = HoprDb::new_in_memory().await;
 
-        assert_eq!(BalanceType::HOPR.zero(), db.get_safe_balance(None).await.unwrap(), "balance must be 0");
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            db.get_safe_balance(None).await.unwrap(),
+            "balance must be 0"
+        );
 
         let balance = BalanceType::HOPR.balance(10_000);
         db.set_safe_balance(None, balance).await.unwrap();
 
-        assert_eq!(balance, db.get_safe_balance(None).await.unwrap(), "balance must be {balance}");
+        assert_eq!(
+            balance,
+            db.get_safe_balance(None).await.unwrap(),
+            "balance must be {balance}"
+        );
     }
 
     #[async_std::test]
     async fn test_set_get_allowance() {
         let db = HoprDb::new_in_memory().await;
 
-        assert_eq!(BalanceType::HOPR.zero(), db.get_safe_allowance(None).await.unwrap(), "balance must be 0");
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            db.get_safe_allowance(None).await.unwrap(),
+            "balance must be 0"
+        );
 
         let balance = BalanceType::HOPR.balance(10_000);
         db.set_safe_allowance(None, balance).await.unwrap();
 
-        assert_eq!(balance, db.get_safe_allowance(None).await.unwrap(), "balance must be {balance}");
+        assert_eq!(
+            balance,
+            db.get_safe_allowance(None).await.unwrap(),
+            "balance must be {balance}"
+        );
     }
 
     #[async_std::test]

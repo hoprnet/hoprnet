@@ -29,7 +29,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(ChainInfo::ChannelsDST).binary_len(32).null())
                     .col(ColumnDef::new(ChainInfo::LedgerDST).binary_len(32).null())
                     .col(ColumnDef::new(ChainInfo::SafeRegistryDST).binary_len(32).null())
-                    .col(ColumnDef::new(ChainInfo::NetworkRegistryEnabled).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(ChainInfo::NetworkRegistryEnabled)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .to_owned(),
             )
             .await
