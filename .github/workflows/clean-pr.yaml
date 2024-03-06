@@ -60,3 +60,5 @@ jobs:
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version} || true
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version}-cache || true
           done
+        env:
+          GITHUB_SHA: ${{ github.sha }}

@@ -74,6 +74,8 @@ jobs:
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
             echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
           fi
+        env:
+          GITHUB_SHA: ${{ github.sha }}
 
       - name: Build and push docker image - Default
         run: nix run .#${{ matrix.target }}-docker-build-and-upload
