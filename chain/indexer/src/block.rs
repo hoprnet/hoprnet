@@ -497,7 +497,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 1)
+            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
