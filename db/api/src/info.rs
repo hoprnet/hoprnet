@@ -386,7 +386,7 @@ mod tests {
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory().await;
 
-        assert_eq!(1, db.get_chain_data(None).await.unwrap().last_indexed_block);
+        assert_eq!(0, db.get_chain_data(None).await.unwrap().last_indexed_block);
 
         let block_num = 100000;
         db.set_last_indexed_block(None, block_num).await.unwrap();
