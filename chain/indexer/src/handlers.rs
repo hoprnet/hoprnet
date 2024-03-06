@@ -22,6 +22,7 @@ use hopr_db_entity::{account, chain_info, channel, ticket};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
@@ -218,6 +219,15 @@ where
                     active_channel.set_status(ChannelStatus::Closed);
                     active_channel.save(tx.as_ref()).await?;
 
+                    if channel_entry.source == self.chain_key.public().to_address()
+                        || channel_entry.destination == self.chain_key.public().to_address()
+                    {
+                        // Reset the current_ticket_index to zero
+                        self.db
+                            .invalidate_cached_ticket_index(&channel_closed.channel_id.into())
+                            .await;
+                    }
+
                     Ok(Some(ChainEventType::ChannelClosed(channel_entry)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
@@ -247,6 +257,8 @@ where
                                 current_epoch.as_u32(),
                             )
                             .await?;
+
+                        self.db.invalidate_cached_ticket_index(&channel_id).await;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -281,6 +293,7 @@ where
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry: ChannelEntry = (&channel).try_into()?;
+                    self.db.invalidate_cached_ticket_index(&channel_entry.get_id()).await;
 
                     // For channels that destination is us, it means that our ticket
                     // has been redeemed, so mark it in the DB as redeemed
@@ -302,33 +315,37 @@ where
                             .try_collect()
                             .await?;
 
-                        if matching_tickets.len() == 1 {
-                            let chain_info = self.db.get_chain_data(Some(tx)).await?;
-                            let redeemed_ticket = matching_tickets.pop().unwrap();
-                            let ack_ticket = model_to_acknowledged_ticket(
-                                &redeemed_ticket,
-                                chain_info
-                                    .channels_dst
-                                    .ok_or(LogicalError("missing channels dst".into()))?,
-                                &self.chain_key,
-                            )?;
+                        match matching_tickets.len().cmp(&1) {
+                            Ordering::Equal => {
+                                let chain_info = self.db.get_chain_data(Some(tx)).await?;
+                                let redeemed_ticket = matching_tickets.pop().unwrap();
+                                let ack_ticket = model_to_acknowledged_ticket(
+                                    &redeemed_ticket,
+                                    chain_info
+                                        .channels_dst
+                                        .ok_or(LogicalError("missing channels dst".into()))?,
+                                    &self.chain_key,
+                                )?;
 
-                            self.db.mark_ticket_redeemed(Some(tx), &ack_ticket).await?;
-                            info!("{ack_ticket} has been marked as redeemed");
-                            Some(ack_ticket)
-                        } else if matching_tickets.len() > 1 {
-                            error!(
-                                "found {} tickets matching redeemed index {} in {channel_entry}",
-                                matching_tickets.len(),
-                                ticket_redeemed.new_ticket_index - 1
-                            );
-                            None
-                        } else {
-                            error!(
-                                "could not find acknowledged ticket with idx {} in {channel_entry}",
-                                ticket_redeemed.new_ticket_index - 1
-                            );
-                            None
+                                self.db.mark_ticket_redeemed(Some(tx), &ack_ticket).await?;
+                                info!("{ack_ticket} has been marked as redeemed");
+                                Some(ack_ticket)
+                            }
+                            Ordering::Less => {
+                                error!(
+                                    "could not find acknowledged ticket with idx {} in {channel_entry}",
+                                    ticket_redeemed.new_ticket_index - 1
+                                );
+                                None
+                            }
+                            Ordering::Greater => {
+                                error!(
+                                    "found {} tickets matching redeemed index {} in {channel_entry}",
+                                    matching_tickets.len(),
+                                    ticket_redeemed.new_ticket_index - 1
+                                );
+                                None
+                            }
                         }
                     } else {
                         debug!("observed redeem event on a foreign {channel_entry}");
@@ -647,6 +664,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use std::sync::atomic::Ordering;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::traits::ChainLogHandler;
@@ -680,6 +698,7 @@ pub mod tests {
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::HoprDbInfoOperations;
     use hopr_db_api::registry::HoprDbRegistryOperations;
+    use hopr_db_api::tickets::HoprDbTicketOperations;
     use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations, SINGULAR_TABLE_FIXED_ID};
     use hopr_db_entity::chain_info;
     use hopr_internal_types::prelude::*;
@@ -1384,6 +1403,13 @@ pub mod tests {
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());
+        assert_eq!(
+            0,
+            db.get_cached_ticket_index(&closed_channel.get_id())
+                .await
+                .unwrap()
+                .load(Ordering::Relaxed)
+        );
 
         assert!(closed_channel.balance.amount().eq(&U256::zero()));
     }
@@ -1415,6 +1441,13 @@ pub mod tests {
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 1u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
+        assert_eq!(
+            0,
+            db.get_cached_ticket_index(&channel.get_id())
+                .await
+                .unwrap()
+                .load(Ordering::Relaxed)
+        );
     }
 
     #[async_std::test]
@@ -1453,6 +1486,14 @@ pub mod tests {
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 4u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
+
+        assert_eq!(
+            0,
+            db.get_cached_ticket_index(&channel.get_id())
+                .await
+                .unwrap()
+                .load(Ordering::Relaxed)
+        );
     }
 
     #[async_std::test]
@@ -1490,6 +1531,13 @@ pub mod tests {
         let channel = db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap();
 
         assert_eq!(channel.ticket_index, ticket_index);
+
+        assert!(db
+            .get_cached_ticket_index(&channel.get_id())
+            .await
+            .unwrap()
+            .load(Ordering::Relaxed)
+            .ge(&ticket_index.as_usize()));
     }
 
     #[async_std::test]
