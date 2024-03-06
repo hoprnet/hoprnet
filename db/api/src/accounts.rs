@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Related, Set};
 use sea_query::OnConflict;
 
 use hopr_db_entity::prelude::{Account, Announcement};
@@ -36,6 +36,9 @@ pub trait HoprDbAccountOperations {
     ) -> Result<AccountEntry>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
+
+    async fn delete_all_announcements<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
+    where T: Into<ChainOrPacketKey> + Send + Sync;
 
     async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
     where T: Into<ChainOrPacketKey> + Send + Sync;
@@ -221,6 +224,35 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
+    async fn delete_all_announcements<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()> where T: Into<ChainOrPacketKey> + Send + Sync {
+        let cpk = key.into();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| Box::pin(async move {
+                let to_delete = account::Entity::find_related()
+                    .filter(match cpk {
+                        ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
+                        ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex())
+                    })
+                    .all(tx.as_ref())
+                    .await?
+                    .into_iter()
+                    .map(|x| x.id)
+                    .collect::<Vec<_>>();
+
+                if !to_delete.is_empty() {
+                    announcement::Entity::delete_many()
+                        .filter(announcement::Column::Id.is_in(to_delete))
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    Ok::<_, DbError>(())
+                } else {
+                    Err(MissingAccount)
+                }
+            })).await
+    }
+
     async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()> where T: Into<ChainOrPacketKey> + Send + Sync {
         let cpk = key.into();
         self.nest_transaction(tx)
@@ -289,6 +321,7 @@ mod tests {
     use crate::errors::DbError::DecodingError;
     use crate::HoprDbGeneralModelOperations;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_internal_types::prelude::AccountType::NotAnnounced;
 
     #[async_std::test]
     async fn test_insert_account_announcement() {
@@ -453,6 +486,42 @@ mod tests {
             "should not delete non-existing account"
         )
     }
+
+    #[async_std::test]
+    async fn test_delete_announcements() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let mut entry = AccountEntry::new(OffchainKeypair::random().public().clone(), chain_1,
+                                      AccountType::Announced {
+                                          multiaddr: "/ip4/1.2.3.4/tcp/1234".parse().unwrap(),
+                                          updated_block: 10,
+                                      });
+
+        db.insert_account(None, entry.clone()).await.unwrap();
+
+        assert_eq!(Some(entry.clone()), db.get_account(None, chain_1).await.unwrap());
+
+        db.delete_all_announcements(None, chain_1).await.unwrap();
+
+        entry.entry_type = NotAnnounced;
+
+        assert_eq!(Some(entry), db.get_account(None, chain_1).await.unwrap());
+    }
+
+    #[async_std::test]
+    async fn test_should_fail_to_delete_nonexistent_account_announcements() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+
+        let r = db.delete_all_announcements(None, chain_1).await;
+        assert!(
+            matches!(r, Err(MissingAccount)),
+            "should not delete non-existing account"
+        )
+    }
+
 
     #[async_std::test]
     async fn test_translate_key() {
