@@ -1,5 +1,7 @@
 use std::ops::Sub;
 use std::str::FromStr;
+use std::sync::atomic::Ordering;
+use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::SystemTime;
 
 use async_trait::async_trait;
@@ -534,7 +536,15 @@ impl HoprDbTicketOperations for HoprDb {
                                 return Err(crate::errors::DbError::TicketValidationError(e.to_string()));
                             }
 
-                            myself.ticket_index.insert(channel.get_id(), ticket.index.into()).await;
+                            let ticket_index = myself
+                                .ticket_index
+                                .get_with(channel.get_id(), async {
+                                    let channel_ticket_index = channel.ticket_index.as_u128() as usize;
+                                    Arc::new(AtomicUsize::from(channel_ticket_index))
+                                })
+                                .await;
+                            ticket_index.fetch_add(1, Ordering::SeqCst);
+
                             myself
                                 .unacked_tickets
                                 .insert(
@@ -660,18 +670,27 @@ impl HoprDb {
                             .one(tx.as_ref())
                             .await?
                         {
-                            let ticket_index = U256::from_be_bytes(&model.ticket_index) + 1u128;
-                            let mut active_model = model.into_active_model();
-                            active_model.ticket_index = sea_orm::Set(ticket_index.to_be_bytes().into());
+                            let channel_id = Hash::from_str(&model.channel_id)?;
 
-                            // TODO: use the cache
-                            // self.ticket_index.get...
+                            let ticket_index = myself
+                                .ticket_index
+                                .get_with(channel_id, async {
+                                    let channel_ticket_index =
+                                        U256::from_be_bytes(model.ticket_index.clone()).as_u128() as usize;
+                                    Arc::new(AtomicUsize::from(channel_ticket_index))
+                                })
+                                .await;
 
-                            let model = active_model.update(tx.as_ref()).await?;
+                            let old_ticket_index = ticket_index.fetch_add(1, Ordering::SeqCst) as u128;
+
                             let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
 
                             Some((
-                                model.try_into()?,
+                                {
+                                    let mut channel: ChannelEntry = model.try_into()?;
+                                    channel.ticket_index = old_ticket_index.into();
+                                    channel
+                                },
                                 ticket_price
                                     .ok_or(DbError::LogicalError("missing ticket price".into()))?
                                     .amount(),

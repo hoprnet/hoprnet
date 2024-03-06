@@ -1,12 +1,13 @@
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
-use hopr_primitive_types::primitives::{Balance, U256};
+use hopr_primitive_types::primitives::Balance;
 use migration::{Migrator, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
+use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use tracing::log::LevelFilter;
 
@@ -32,7 +33,7 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
     pub(crate) unrealized_value: Cache<Hash, Balance>,
-    pub(crate) ticket_index: Cache<Hash, U256>,
+    pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
 }
 
