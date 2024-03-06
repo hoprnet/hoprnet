@@ -49,16 +49,3 @@ jobs:
           do
             gh actions-cache delete $cacheKey -R hoprnet/hoprnet -B refs/pull/${{ github.event.inputs.pr_number }}/merge --confirm
           done
-
-      - name: Cleanup Docker Registry
-        run: |
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          next_version=$(./scripts/get-next-version.sh Build)
-          images=('hopli' 'hoprd')
-          for image in "${images[@]}"; do
-            echo "Removing tag: $image:${next_version} and $image:${next_version}-cache"
-            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version} || true
-            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version}-cache || true
-          done
-        env:
-          GITHUB_SHA: ${{ github.sha }}
