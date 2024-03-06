@@ -21,6 +21,9 @@ pub enum DbError {
     #[error("logical error: {0}")]
     LogicalError(String),
 
+    #[error("ack validation error: {0}")]
+    AcknowledgementValidationError(String),
+
     #[error("ticket validation error: {0}")]
     TicketValidationError(String),
 

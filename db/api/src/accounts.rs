@@ -13,9 +13,9 @@ use hopr_internal_types::ChainOrPacketKey;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
+use crate::errors::DbError::MissingAccount;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
-use crate::errors::DbError::MissingAccount;
 
 #[async_trait]
 pub trait HoprDbAccountOperations {
@@ -207,7 +207,9 @@ impl HoprDbAccountOperations for HoprDb {
                             existing_announcements.insert(0, new_announcement);
                             Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
                         }
-                        Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?),
+                        Err(DbErr::RecordNotInserted) => {
+                            Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
+                        }
                         Err(e) => Err(e.into()),
                     }
                 })
@@ -285,7 +287,8 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
         let block = 100;
 
-        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc = db
+            .insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert announcement");
 
@@ -299,7 +302,8 @@ mod tests {
         assert_eq!(acc, db_acc);
 
         let block = 200;
-        let db_acc = db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc = db
+            .insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert duplicate announcement");
 
@@ -323,12 +327,10 @@ mod tests {
         let block = 100;
 
         let r = db.insert_announcement(None, chain_1, maddr.clone(), block).await;
-        assert!(matches!(
-            r,
-            Err(MissingAccount)),
+        assert!(
+            matches!(r, Err(MissingAccount)),
             "should not insert announcement to non-existing account"
         )
-
     }
 
     #[async_std::test]
@@ -352,10 +354,12 @@ mod tests {
         let maddr: Multiaddr = "/ip4/1.2.3.4/tcp/8000".parse().unwrap();
         let block = 100;
 
-        let db_acc_1 = db.insert_announcement(None, chain_1, maddr.clone(), block)
+        let db_acc_1 = db
+            .insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert announcement");
-        let db_acc_2 = db.insert_announcement(None, chain_2, maddr.clone(), block)
+        let db_acc_2 = db
+            .insert_announcement(None, chain_2, maddr.clone(), block)
             .await
             .expect("should insert announcement");
 

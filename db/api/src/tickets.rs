@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
-use tracing::instrument;
+use tracing::{debug, instrument, trace};
 
 use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
 use hopr_crypto_types::prelude::*;
@@ -23,6 +23,14 @@ use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 use crate::errors::DbError::LogicalError;
+
+#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
+#[derive(Debug)]
+pub enum AckResult {
+    Sender(HalfKeyChallenge),
+    RelayerWinning(AcknowledgedTicket),
+    RelayerLosing,
+}
 
 pub enum TransportPacketWithChainData {
     /// Packet is intended for us
@@ -76,6 +84,21 @@ pub trait HoprDbTicketOperations {
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
+    /// Processes the acknowledgements for the pending tickets
+    ///
+    /// There are three cases:
+    /// 1. There is an unacknowledged ticket and we are awaiting a half key.
+    /// 2. We were the creator of the packet, hence we do not wait for any half key
+    /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
+
+    async fn handle_acknowledgement<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        ack: Acknowledgement,
+        me: ChainKeypair,
+    ) -> Result<AckResult>;
+
+    /// Process the data into an outgoing packet
     async fn to_send<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -84,6 +107,7 @@ pub trait HoprDbTicketOperations {
         path: Vec<OffchainPublicKey>,
     ) -> Result<TransportPacketWithChainData>;
 
+    /// Process the incoming packet into data
     async fn from_recv<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -247,6 +271,78 @@ impl HoprDbTicketOperations for HoprDb {
                     } else {
                         // No neglectable tickets found
                         Ok(())
+                    }
+                })
+            })
+            .await
+    }
+
+    #[instrument(level = "trace", skip(self, tx))]
+    async fn handle_acknowledgement<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        ack: Acknowledgement,
+        me: ChainKeypair,
+    ) -> Result<AckResult> {
+        let myself = self.clone();
+
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    match myself
+                        .unacked_tickets
+                        .remove(&ack.ack_challenge())
+                        .await
+                        .ok_or_else(|| {
+                            crate::errors::DbError::AcknowledgementValidationError(format!(
+                                "received unexpected acknowledgement for half key challenge {} - half key {}",
+                                ack.ack_challenge().to_hex(),
+                                ack.ack_key_share.to_hex()
+                            ))
+                        })? {
+                        PendingAcknowledgement::WaitingAsSender => {
+                            trace!("received acknowledgement as sender: first relayer has processed the packet.");
+
+                            Ok(AckResult::Sender(ack.ack_challenge()))
+                        }
+
+                        PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
+                            // Try to unlock the incentive
+                            unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
+                                crate::errors::DbError::AcknowledgementValidationError(format!(
+                                    "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
+                                ))
+                            })?;
+
+                            if myself
+                                .get_channel_from(Some(tx), unacknowledged.signer)
+                                .await?
+                                .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
+                            {
+                                return Err(crate::errors::DbError::LogicalError(format!(
+                                    "no channel found for  address '{}'",
+                                    unacknowledged.signer
+                                )));
+                            }
+
+                            let domain_separator =
+                                myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                    crate::errors::DbError::LogicalError("domain separator missing".into())
+                                })?;
+
+                            let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &me, &domain_separator)?;
+
+                            if ack_ticket.is_winning_ticket(&domain_separator) {
+                                debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
+                                myself.insert_ticket(Some(tx), ack_ticket.clone()).await?;
+                                Ok(AckResult::RelayerWinning(ack_ticket))
+                            } else {
+                                trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
+
+                                Ok(AckResult::RelayerLosing)
+                            }
+                        }
                     }
                 })
             })
@@ -570,7 +666,7 @@ impl HoprDb {
                             Some((
                                 model.try_into()?,
                                 ticket_price
-                                    .ok_or(LogicalError("missing ticket price".into()))?
+                                    .ok_or(DbError::LogicalError("missing ticket price".into()))?
                                     .amount(),
                             ))
                         } else {

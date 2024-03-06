@@ -18,7 +18,7 @@ use core_p2p::{
     libp2p::request_response::ResponseChannel, libp2p::swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_protocol::{
-    ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
+    ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
     config::ProtocolConfig,
     msg::processor::{MsgProcessed, PacketInteraction},
     ticket_aggregation::processor::{
@@ -278,17 +278,17 @@ pub async fn p2p_loop<T>(
                         debug!("transport input - ack - received an acknowledgement from '{peer}'");
                         if let Ok(reply) = reply {
                             match reply {
-                                Reply::Sender(half_key_challenge) => {
+                                AckResult::Sender(half_key_challenge) => {
                                     if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Sent(half_key_challenge)) {
                                         error!("transport input - ack - failed to emit received acknowledgement: {e}")
                                     }
                                 },
-                                Reply::RelayerWinning(acknowledged_ticket) => {
+                                AckResult::RelayerWinning(acknowledged_ticket) => {
                                     if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
                                         error!("transport input - ack -failed to emit acknowledged ticket: {e}");
                                     }
                                 }
-                                Reply::RelayerLosing => {}
+                                AckResult::RelayerLosing => {}
                             }
                         }
                     },

@@ -845,7 +845,7 @@ impl Stream for PacketInteraction {
 mod tests {
     use super::{ApplicationData, MsgProcessed, PacketInteraction, PacketInteractionConfig, DEFAULT_PRICE_PER_PACKET};
     use crate::{
-        ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
+        ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
         msg::mixer::MixerConfig,
     };
     use async_lock::RwLock;
@@ -1058,7 +1058,7 @@ mod tests {
             for i in 1..PENDING_ACKS + 1 {
                 if let Some(a) = ack_interaction_sender.next().await {
                     match a {
-                        AckProcessed::Receive(_, Ok(Reply::Sender(ack))) => {
+                        AckProcessed::Receive(_, Ok(AckResult::Sender(ack))) => {
                             debug!("sender has received acknowledgement {i}: {ack}");
                             assert!(
                                 sent_challenges.iter().any(|(_, c)| ack.eq(c)),
@@ -1217,17 +1217,17 @@ mod tests {
                         assert!(reply.is_ok());
 
                         match reply.unwrap() {
-                            Reply::Sender(hkc) => {
+                            AckResult::Sender(hkc) => {
                                 assert_eq!(i - 1, 0, "Only the sender can receive a half key challenge");
                                 received_challenges.push(hkc);
                             }
-                            Reply::RelayerWinning(tkt) => {
+                            AckResult::RelayerWinning(tkt) => {
                                 // choose the last relayer before the receiver
                                 if i - 1 == components.len() - 2 {
                                     received_tickets.push(tkt)
                                 }
                             }
-                            Reply::RelayerLosing => {
+                            AckResult::RelayerLosing => {
                                 assert!(false);
                             }
                         }
