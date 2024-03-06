@@ -1,6 +1,6 @@
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
-use hopr_primitive_types::primitives::Balance;
+use hopr_primitive_types::primitives::{Balance, U256};
 use migration::{Migrator, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::SqlxSqliteConnector;
@@ -32,6 +32,7 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
     pub(crate) unrealized_value: Cache<Hash, Balance>,
+    pub(crate) ticket_index: Cache<Hash, U256>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
 }
 
@@ -80,10 +81,16 @@ impl HoprDb {
             .max_capacity(10_000)
             .build();
 
+        let ticket_index = Cache::builder()
+            .expire_after(ExpiryNever {})
+            .max_capacity(10_000)
+            .build();
+
         Self {
             db,
             unacked_tickets,
             unrealized_value,
+            ticket_index,
         }
     }
 }
