@@ -111,7 +111,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 /// object. This behavior will be refactored and hidden behind a trait
 /// in the future implementations.
 #[derive(Debug, Clone)]
-pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone> {
+pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug> {
     me_onchain: ChainKeypair,
     safe_address: Address,
     contract_addresses: ContractAddresses,
@@ -123,7 +123,7 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone> {
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
-impl<T: HoprDbAllOperations + Send + Sync + Clone + 'static> HoprChain<T> {
+impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprChain<T> {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,

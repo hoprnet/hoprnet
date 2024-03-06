@@ -376,7 +376,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + 'static>(
+pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static>(
     me_onchain: ChainKeypair,
     new_db: T,
     contract_addrs: ContractAddresses,

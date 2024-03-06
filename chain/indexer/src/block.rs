@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
-use sea_orm::EntityTrait;
 use tracing::{debug, error, info, trace};
 
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
@@ -10,7 +9,6 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_api::HoprDbGeneralModelOperations;
-use hopr_db_entity::chain_info;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -112,12 +110,9 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = chain_info::Entity::find_by_id(1)
-            .one(self.db.conn())
-            .await?
-            .map(|info| info.last_indexed_block as u64);
+        let db_latest_block = self.db.get_chain_data(None).await?.last_indexed_block as u64;
 
-        let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
+        let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
         info!(
             "DB latest block: {:?}, Latest block {:?}",

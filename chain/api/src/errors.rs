@@ -17,7 +17,7 @@ pub enum HoprChainError {
     Db(#[from] utils_db::errors::DbError),
 
     #[error(transparent)]
-    Database(#[from] hopr_db_api::errors::DbError),
+    DbError(#[from] hopr_db_api::errors::DbError),
 }
 
 /// The default [Result] object translating errors in the [HoprChainError] type
