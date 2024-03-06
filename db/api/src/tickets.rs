@@ -665,7 +665,7 @@ impl HoprDb {
                             Some((
                                 model.try_into()?,
                                 ticket_price
-                                    .ok_or(LogicalError("missing ticket price".into()))?
+                                    .ok_or(DbError::LogicalError("missing ticket price".into()))?
                                     .amount(),
                             ))
                         } else {
