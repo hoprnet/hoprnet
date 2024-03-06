@@ -3,19 +3,20 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use hopr_primitive_types::prelude::Address;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
-
 
 #[async_trait]
 pub trait HoprDbChannelOperations {
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
 
     async fn get_channel_to<'a>(&'a self, tx: OptTx<'a>, destination: Address) -> Result<Option<ChannelEntry>>;
+
+    async fn get_channel_from<'a>(&'a self, tx: OptTx<'a>, source: Address) -> Result<Option<ChannelEntry>>;
 
     async fn insert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 }
@@ -51,6 +52,27 @@ impl HoprDbChannelOperations for HoprDb {
                     Ok::<_, DbError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::Destination.eq(destination.to_string()))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            Some(model.try_into()?)
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await
+    }
+
+    async fn get_channel_from<'a>(&'a self, tx: OptTx<'a>, source: Address) -> Result<Option<ChannelEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbError>(
+                        if let Some(model) = Channel::find()
+                            .filter(channel::Column::Source.eq(source.to_string()))
                             .one(tx.as_ref())
                             .await?
                         {

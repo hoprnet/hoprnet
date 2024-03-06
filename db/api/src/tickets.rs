@@ -1,22 +1,53 @@
+use std::ops::Sub;
+use std::str::FromStr;
+use std::time::SystemTime;
+
 use async_trait::async_trait;
 use futures::TryStreamExt;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use tracing::instrument;
+
+use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
 use hopr_crypto_types::prelude::*;
+use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 use hopr_db_entity::prelude::{Ticket, TicketStatistics};
 use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
-use std::str::FromStr;
-use std::time::SystemTime;
-use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
+use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
+use crate::errors::DbError::LogicalError;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
+use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 use crate::errors::DbError::LogicalError;
 
+pub enum TransportPacketWithChainData {
+    /// Packet is intended for us
+    Final {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
+        plain_text: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+    /// Packet must be forwarded
+    Forwarded {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
+        next_hop: OffchainPublicKey,
+        data: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+    /// Packet that is being sent out by us
+    Outgoing {
+        next_hop: OffchainPublicKey,
+        ack_challenge: HalfKeyChallenge,
+        data: Box<[u8]>,
+    },
+}
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
@@ -46,7 +77,22 @@ pub trait HoprDbTicketOperations {
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
-    async fn to_send<'a>(&'a self, tx: OptTx<'a>, data: Box<[u8]>, path: &Vec<OffchainPublicKey>) -> Result<()>;
+    async fn to_send<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        data: Box<[u8]>,
+        me: ChainKeypair,
+        path: Vec<OffchainPublicKey>,
+    ) -> Result<TransportPacketWithChainData>;
+
+    async fn from_recv<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        data: Box<[u8]>,
+        me: ChainKeypair,
+        pkt_keypair: &OffchainKeypair,
+        sender: OffchainPublicKey,
+    ) -> Result<TransportPacketWithChainData>;
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -103,11 +149,7 @@ impl HoprDbTicketOperations for HoprDb {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
-                Box::pin(async move {
-                    ticket::ActiveModel::from(acknowledged_ticket)
-                        .insert(tx.as_ref())
-                        .await
-                })
+                Box::pin(async move { ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await })
             })
             .await?;
         Ok(())
@@ -136,7 +178,7 @@ impl HoprDbTicketOperations for HoprDb {
                         let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                             .one(tx.as_ref())
                             .await?
-                            .ok_or(DbError::CorruptedData)?;
+                            .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                         let current_redeemed_count = stats.redeemed_tickets;
                         let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
@@ -148,7 +190,9 @@ impl HoprDbTicketOperations for HoprDb {
 
                         Ok::<(), DbError>(())
                     } else {
-                        Err(DbError::LogicalError(format!("ticket #{index} in {channel_id}:{epoch} could not be deleted")))
+                        Err(DbError::LogicalError(format!(
+                            "ticket #{index} in {channel_id}:{epoch} could not be deleted"
+                        )))
                     }
                 })
             })
@@ -184,7 +228,7 @@ impl HoprDbTicketOperations for HoprDb {
                             let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                 .one(tx.as_ref())
                                 .await?
-                                .ok_or(DbError::CorruptedData)?;
+                                .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                             let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
                             let current_neglected_count = stats.neglected_tickets;
@@ -210,74 +254,253 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn to_send<'a>(&'a self, tx: OptTx<'a>, data: Box<[u8]>, path: &Vec<OffchainPublicKey>) -> Result<()> {
-        // ) -> Result<ChainPacketComponents> {
-        // let next_peer = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_chain_key(&OffchainPublicKey::try_from(path.hops()[0])?)
-        //     .await?
-        //     .ok_or_else(|| {
-        //         debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
-        //         PacketConstructionError
-        //     })?;
+    #[instrument(level = "trace", skip(self, tx))]
+    async fn to_send<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        data: Box<[u8]>,
+        me: ChainKeypair,
+        path: Vec<OffchainPublicKey>,
+    ) -> Result<TransportPacketWithChainData> {
+        let myself = self.clone();
 
-        // let domain_separator = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_channels_domain_separator()
-        //     .await?
-        //     .ok_or_else(|| {
-        //         warn!("Missing domain separator.");
-        //         MissingDomainSeparator
-        //     })?;
+        let components = self
+            .nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let next_peer = myself
+                        .resolve_chain_key(&path[0])
+                        .await?
+                        .ok_or_else(|| hopr_crypto_packet::errors::PacketError::PacketConstructionError)?;
 
-        // // Decide whether to create 0-hop or multihop ticket
-        // let next_ticket = if path.length() == 1 {
-        //     Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
-        // } else {
-        //     self.create_multihop_ticket(next_peer, path.length() as u8).await?
-        // };
+                    let domain_separator = myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                        hopr_crypto_packet::errors::PacketError::LogicError("domain separator missing".into())
+                    })?;
 
-        // match ChainPacketComponents::into_outgoing(
-        //     &data.to_bytes(),
-        //     path,
-        //     &self.cfg.chain_keypair,
-        //     next_ticket,
-        //     &domain_separator,
-        // ) {
-        //     Ok(p) => match p {
-        //         ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
-        //             Err(PacketError::LogicError("Must contain an outgoing packet type".into()))
-        //         }
-        //         ChainPacketComponents::Outgoing {
-        //             packet,
-        //             ticket,
-        //             next_hop,
-        //             ack_challenge,
-        //         } => {
-        //             self.db
-        //                 .write()
-        //                 .await
-        //                 .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
-        //                 .await?;
+                    // Decide whether to create 0-hop or multihop ticket
+                    let next_ticket = if path.len() == 1 {
+                        hopr_internal_types::channels::Ticket::new_zero_hop(&next_peer, &me, &domain_separator).map_err(
+                            |e| {
+                                crate::errors::DbError::LogicalError(format!("failed to construct a 0 hop ticket: {e}"))
+                            },
+                        )
+                    } else {
+                        myself
+                            .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
+                            .await
+                    }?;
 
-        //             let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-        //             payload.extend_from_slice(packet.as_ref());
-        //             payload.extend_from_slice(&ticket.to_bytes());
+                    ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
+                        |e| {
+                            crate::errors::DbError::LogicalError(format!(
+                                "failed to construct chain components for a packet: {e}"
+                            ))
+                        },
+                    )
+                })
+            })
+            .await?;
 
-        //             Ok(TransportPacket::Outgoing {
-        //                 next_hop: next_hop.into(),
-        //                 ack_challenge,
-        //                 data: payload.into_boxed_slice(),
-        //             })
-        //         }
-        //     },
-        //     Err(e) => Err(e),
-        // }
-        Err(crate::errors::DbError::DecodingError)
+        match components {
+            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => Err(
+                crate::errors::DbError::LogicalError("Must contain an outgoing packet type".into()),
+            ),
+            ChainPacketComponents::Outgoing {
+                packet,
+                ticket,
+                next_hop,
+                ack_challenge,
+            } => {
+                self.unacked_tickets
+                    .insert(ack_challenge, PendingAcknowledgement::WaitingAsSender)
+                    .await;
+
+                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                payload.extend_from_slice(packet.as_ref());
+                payload.extend_from_slice(&ticket.to_bytes());
+
+                Ok(TransportPacketWithChainData::Outgoing {
+                    next_hop: next_hop.into(),
+                    ack_challenge,
+                    data: payload.into_boxed_slice(),
+                })
+            }
+        }
+    }
+
+    #[instrument(level = "trace", skip(self, tx))]
+    async fn from_recv<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        data: Box<[u8]>,
+        me: ChainKeypair,
+        pkt_keypair: &OffchainKeypair,
+        sender: OffchainPublicKey,
+    ) -> Result<TransportPacketWithChainData> {
+        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)? {
+            ChainPacketComponents::Final {
+                packet_tag,
+                ack_key,
+                previous_hop,
+                plain_text,
+                ..
+            } => {
+                let ack = Acknowledgement::new(ack_key, pkt_keypair);
+
+                Ok(TransportPacketWithChainData::Final {
+                    packet_tag,
+                    previous_hop: previous_hop.into(),
+                    plain_text,
+                    ack,
+                })
+            }
+            ChainPacketComponents::Forwarded {
+                packet,
+                ticket,
+                ack_challenge,
+                packet_tag,
+                ack_key,
+                previous_hop,
+                own_key,
+                next_hop,
+                next_challenge,
+                path_pos,
+            } => {
+                let myself = self.clone();
+
+                let t = self
+                    .nest_transaction(tx)
+                    .await?
+                    .perform(|tx| {
+                        Box::pin(async move {
+                            let chain_data = myself.get_chain_data(Some(tx)).await?;
+
+                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
+                            })?;
+                            let ticket_price = chain_data.ticket_price.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("failed to fetch the ticket price".into())
+                            })?;
+
+                            let previous_hop_addr =
+                                myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
+                                    hopr_crypto_packet::errors::PacketError::PacketDecodingError(format!(
+                                        "failed to find channel key for packet key {} on previous hop",
+                                        previous_hop.to_peerid_str()
+                                    ))
+                                })?;
+
+                            let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
+                                hopr_crypto_packet::errors::PacketError::PacketDecodingError(format!(
+                                    "failed to find channel key for packet key {} on next hop",
+                                    next_hop.to_peerid_str()
+                                ))
+                            })?;
+
+                            let channel =
+                                myself
+                                    .get_channel_from(Some(tx), previous_hop_addr)
+                                    .await?
+                                    .ok_or_else(|| {
+                                        crate::errors::DbError::LogicalError(format!(
+                                            "no channel found for previous hop address '{previous_hop_addr}'"
+                                        ))
+                                    })?;
+
+                            let unrealized_balance = myself
+                                .unrealized_value
+                                .get(&channel.get_id())
+                                .await
+                                .map(|balance| balance.sub(channel.balance.clone()))
+                                .unwrap_or(channel.balance);
+
+                            if let Err(e) = validate_unacknowledged_ticket(
+                                &ticket,
+                                &channel,
+                                &previous_hop_addr,
+                                ticket_price,
+                                TICKET_WIN_PROB,
+                                Some(unrealized_balance),
+                                &domain_separator,
+                            )
+                            .await
+                            {
+                                // TODO: move this outside to the from_recv caller
+
+                                // #[cfg(all(feature = "prometheus", not(test)))]
+                                // METRIC_REJECTED_TICKETS_COUNT.increment();
+
+                                myself.unacked_tickets.remove(&ack_challenge).await;
+                                return Err(crate::errors::DbError::TicketValidationError(e.to_string()));
+                            }
+
+                            myself.ticket_index.insert(channel.get_id(), ticket.index.into()).await;
+                            myself
+                                .unacked_tickets
+                                .insert(
+                                    ack_challenge,
+                                    PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
+                                        ticket.clone(),
+                                        own_key.clone(),
+                                        previous_hop_addr,
+                                    )),
+                                )
+                                .await;
+
+                            // Check that the calculated path position from the ticket matches value from the packet header
+                            let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
+                            if !ticket_path_pos.eq(&path_pos) {
+                                return Err(crate::errors::DbError::LogicalError(format!(
+                                    "path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}"
+                                )));
+                            }
+
+                            // Create next ticket for the packet
+                            let mut ticket = if ticket_path_pos == 1 {
+                                Ok(hopr_internal_types::channels::Ticket::new_zero_hop(
+                                    &next_hop_addr,
+                                    &me,
+                                    &domain_separator,
+                                )?)
+                            } else {
+                                myself
+                                    .create_multihop_ticket(
+                                        Some(tx),
+                                        me.public().to_address(),
+                                        next_hop_addr,
+                                        ticket_path_pos,
+                                    )
+                                    .await
+                            }?;
+
+                            // forward packet
+                            ticket.challenge = next_challenge.to_ethereum_challenge();
+                            ticket.sign(&me, &domain_separator);
+
+                            Ok(ticket)
+                        })
+                    })
+                    .await?;
+
+                let ack = Acknowledgement::new(ack_key, pkt_keypair);
+
+                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                payload.extend_from_slice(packet.as_ref());
+                payload.extend_from_slice(&t.to_bytes());
+
+                Ok(TransportPacketWithChainData::Forwarded {
+                    packet_tag,
+                    previous_hop: previous_hop,
+                    next_hop: next_hop,
+                    data: payload.into_boxed_slice(),
+                    ack,
+                })
+            }
+            ChainPacketComponents::Outgoing { .. } => Err(crate::errors::DbError::LogicalError(
+                "Cannot receive an outgoing packet".into(),
+            )),
+        }
     }
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
@@ -288,7 +511,7 @@ impl HoprDbTicketOperations for HoprDb {
                     let stats = TicketStatistics::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::CorruptedData)?;
+                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                     let (unredeemed_tickets, unredeemed_value) = Ticket::find()
                         .stream(tx.as_ref())
@@ -300,7 +523,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     Ok::<AllTicketStatistics, DbError>(AllTicketStatistics {
                         last_updated: chrono::DateTime::<chrono::Utc>::from_str(&stats.last_updated)
-                            .map_err(|_| DbError::CorruptedData)?
+                            .map_err(|_| DbError::DecodingError)?
                             .into(),
                         losing_tickets: stats.losing_tickets as u64,
                         neglected_tickets: stats.neglected_tickets as u64,
@@ -325,7 +548,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         path_pos: u8,
-    ) -> Result<Ticket> {
+    ) -> Result<hopr_internal_types::channels::Ticket> {
         let myself = self.clone();
         let (channel, ticket_price): (ChannelEntry, U256) = self
             .nest_transaction(tx)
@@ -345,7 +568,12 @@ impl HoprDb {
                             let model = active_model.update(tx.as_ref()).await?;
                             let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
 
-                            Some((model.try_into()?, ticket_price.ok_or(LogicalError("missing ticket price".into()))?.amount()))
+                            Some((
+                                model.try_into()?,
+                                ticket_price
+                                    .ok_or(LogicalError("missing ticket price".into()))?
+                                    .amount(),
+                            ))
                         } else {
                             None
                         },
@@ -374,7 +602,7 @@ impl HoprDb {
             )));
         }
 
-        hopr_internal_types::channels::Ticket::new_partial(
+        let ticket = hopr_internal_types::channels::Ticket::new_partial(
             &me_onchain,
             &destination,
             &amount,
@@ -388,8 +616,7 @@ impl HoprDb {
         //         #[cfg(all(feature = "prometheus", not(test)))]
         //         METRIC_TICKETS_COUNT.increment();
 
-        // Ok(ticket)
-        Err(crate::errors::DbError::DecodingError)
+        Ok(ticket)
     }
 }
 
@@ -571,9 +798,7 @@ mod tests {
 
         let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
-        db.mark_ticket_redeemed(None, &ticket)
-            .await
-            .expect("must not fail");
+        db.mark_ticket_redeemed(None, &ticket).await.expect("must not fail");
         db.mark_ticket_redeemed(None, &ticket)
             .await
             .expect_err("marking as redeemed again must fail");

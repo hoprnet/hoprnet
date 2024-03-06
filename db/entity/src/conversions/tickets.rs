@@ -1,9 +1,9 @@
-use sea_orm::Set;
+use crate::errors::DbEntityError;
+use crate::ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use crate::errors::DbEntityError;
-use crate::ticket;
+use sea_orm::Set;
 
 /// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
 pub fn model_to_acknowledged_ticket(
@@ -20,7 +20,11 @@ pub fn model_to_acknowledged_ticket(
     ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
     ticket.index_offset = db_ticket.index_offset as u32;
     ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
-    ticket.encoded_win_prob = db_ticket.winning_probability.clone().try_into().map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
+    ticket.encoded_win_prob = db_ticket
+        .winning_probability
+        .clone()
+        .try_into()
+        .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
     ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
 
@@ -43,9 +47,7 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             index: Set(value.ticket.index.to_be_bytes().to_vec()),
             index_offset: Set(value.ticket.index_offset as i32),
             winning_probability: Set(value.ticket.encoded_win_prob.to_vec()),
-            channel_epoch: Set(U256::from(value.ticket.channel_epoch)
-                .to_be_bytes()
-                .to_vec()),
+            channel_epoch: Set(U256::from(value.ticket.channel_epoch).to_be_bytes().to_vec()),
             signature: Set(value.ticket.signature.unwrap().to_bytes().to_vec()),
             response: Set(value.response.to_bytes().to_vec()),
             ..Default::default()

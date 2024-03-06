@@ -1,22 +1,28 @@
 use hopr_crypto_types::prelude::CryptoError;
+use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
 use thiserror::Error;
-use hopr_db_entity::errors::DbEntityError;
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("db contains data which cannot be converted to business object")]
-    CorruptedData,
+    #[error("missing fixed entry in table {0}")]
+    MissingFixedTableEntry(String),
 
     #[error("transaction error: {0}")]
-    TransactionError(String),
+    TransactionError(Box<dyn std::error::Error + Send + Sync>),
 
     #[error("error while decoding db entity")]
     DecodingError,
 
     #[error("logical error: {0}")]
     LogicalError(String),
+
+    #[error("ticket validation error: {0}")]
+    TicketValidationError(String),
+
+    #[error(transparent)]
+    PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),
@@ -34,9 +40,12 @@ pub enum DbError {
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
-impl<E: std::error::Error> From<TransactionError<E>> for DbError {
+impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbError {
     fn from(value: TransactionError<E>) -> Self {
-        DbError::TransactionError(value.to_string())
+        match value {
+            TransactionError::Connection(e) => Self::BackendError(e),
+            TransactionError::Transaction(e) => Self::TransactionError(e.into()),
+        }
     }
 }
 

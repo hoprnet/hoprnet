@@ -1,11 +1,10 @@
 use async_trait::async_trait;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_entity::{chain_info, global_settings, node_info};
-use hopr_primitive_types::prelude::{Balance, BalanceType, BinarySerializable, IntoEndian};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySerializable, IntoEndian, ToHex};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 
 use crate::db::HoprDb;
-use crate::errors::DbError::CorruptedData;
 
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
@@ -20,6 +19,12 @@ pub struct OnChainData {
     pub last_indexed_block: u32,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SafeInfo {
+    pub safe_address: Address,
+    pub module_address: Address,
+}
+
 #[async_trait]
 pub trait HoprDbInfoOperations {
     async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
@@ -28,11 +33,19 @@ pub trait HoprDbInfoOperations {
 
     async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
+    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
+
+    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
+
+    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()>;
+
     async fn get_chain_data<'a>(&'a self, tx: OptTx<'a>) -> Result<OnChainData>;
+
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>>;
 
-    async fn set_global_setting<'a>(&'a self, txc: OptTx<'a>, key: &str, value: &[u8]) -> Result<()>;
+    async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()>;
 }
 
 #[async_trait]
@@ -45,7 +58,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
                 })
             })
@@ -79,8 +92,71 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
+                })
+            })
+            .await
+    }
+
+    async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    node_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        safe_allowance: Set(new_allowance.amount().to_be_bytes().to_vec()),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
+
+                    Ok::<_, DbError>(())
+                })
+            })
+            .await
+    }
+
+    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>> {
+        let addrs = self
+            .nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
+                    Ok::<_, DbError>(info.safe_address.zip(info.module_address))
+                })
+            })
+            .await?;
+
+        Ok(if let Some((safe_address, module_address)) = addrs {
+            Some(SafeInfo {
+                safe_address: safe_address.parse()?,
+                module_address: module_address.parse()?,
+            })
+        } else {
+            None
+        })
+    }
+
+    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    node_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        safe_address: Set(Some(safe_info.safe_address.to_hex())),
+                        module_address: Set(Some(safe_info.module_address.to_hex())),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
+                    Ok::<_, DbError>(())
                 })
             })
             .await
@@ -94,7 +170,25 @@ impl HoprDbInfoOperations for HoprDb {
                     let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)?;
+                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
+
+                    let ledger_dst = if let Some(b) = model.ledger_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
+
+                    let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
+
+                    let channels_dst = if let Some(b) = model.channels_dst {
+                        Some(Hash::from_bytes(&b)?)
+                    } else {
+                        None
+                    };
 
                     let ledger_dst = if let Some(b) = model.ledger_dst {
                         Some(Hash::from_bytes(&b)?)
@@ -127,6 +221,24 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
+    async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        last_indexed_block: Set(block_num as i32),
+                        ..Default::default()
+                    }
+                    .save(tx.as_ref())
+                    .await?;
+                    Ok::<_, DbError>(())
+                })
+            })
+            .await
+    }
+
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>> {
         let k = key.to_owned();
         self.nest_transaction(tx)
@@ -145,23 +257,134 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: &[u8]) -> Result<()> {
+    async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()> {
         let k = key.to_owned();
-        let v = value.to_vec();
+        let value = value.map(|v| Vec::from(v));
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    global_settings::ActiveModel {
-                        key: Set(k),
-                        value: Set(v),
-                        ..Default::default()
+                    if let Some(v) = value {
+                        let mut am = global_settings::Entity::find()
+                            .filter(global_settings::Column::Key.eq(k.clone()))
+                            .one(tx.as_ref())
+                            .await?
+                            .map(|m| m.into_active_model())
+                            .unwrap_or(global_settings::ActiveModel {
+                                key: Set(k),
+                                ..Default::default()
+                            });
+                        am.value = Set(v.into());
+                        am.save(tx.as_ref()).await?;
+                    } else {
+                        global_settings::Entity::delete_many()
+                            .filter(global_settings::Column::Key.eq(k))
+                            .exec(tx.as_ref())
+                            .await?;
                     }
-                    .insert(tx.as_ref())
-                    .await?;
                     Ok::<(), DbError>(())
                 })
             })
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hex_literal::hex;
+    use hopr_primitive_types::prelude::{Address, BalanceType};
+
+    use crate::db::HoprDb;
+    use crate::info::{HoprDbInfoOperations, SafeInfo};
+
+    lazy_static::lazy_static! {
+        static ref ADDR_1: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
+        static ref ADDR_2: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
+    }
+
+    #[async_std::test]
+    async fn test_set_get_balance() {
+        let db = HoprDb::new_in_memory().await;
+
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            db.get_safe_balance(None).await.unwrap(),
+            "balance must be 0"
+        );
+
+        let balance = BalanceType::HOPR.balance(10_000);
+        db.set_safe_balance(None, balance).await.unwrap();
+
+        assert_eq!(
+            balance,
+            db.get_safe_balance(None).await.unwrap(),
+            "balance must be {balance}"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_set_get_allowance() {
+        let db = HoprDb::new_in_memory().await;
+
+        assert_eq!(
+            BalanceType::HOPR.zero(),
+            db.get_safe_allowance(None).await.unwrap(),
+            "balance must be 0"
+        );
+
+        let balance = BalanceType::HOPR.balance(10_000);
+        db.set_safe_allowance(None, balance).await.unwrap();
+
+        assert_eq!(
+            balance,
+            db.get_safe_allowance(None).await.unwrap(),
+            "balance must be {balance}"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_set_get_safe_info() {
+        let db = HoprDb::new_in_memory().await;
+
+        assert_eq!(None, db.get_safe_info(None).await.unwrap());
+
+        let safe_info = SafeInfo {
+            safe_address: *ADDR_1,
+            module_address: *ADDR_2,
+        };
+
+        db.set_safe_info(None, safe_info).await.unwrap();
+
+        assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
+    }
+
+    #[async_std::test]
+    async fn test_set_last_indexed_block() {
+        let db = HoprDb::new_in_memory().await;
+
+        assert_eq!(1, db.get_chain_data(None).await.unwrap().last_indexed_block);
+
+        let block_num = 100000;
+        db.set_last_indexed_block(None, block_num).await.unwrap();
+
+        assert_eq!(block_num, db.get_chain_data(None).await.unwrap().last_indexed_block);
+    }
+
+    #[async_std::test]
+    async fn test_set_get_global_setting() {
+        let db = HoprDb::new_in_memory().await;
+
+        let key = "test";
+        let value = hex!("deadbeef");
+
+        assert_eq!(None, db.get_global_setting(None, key).await.unwrap());
+
+        db.set_global_setting(None, key, Some(&value)).await.unwrap();
+
+        assert_eq!(Some(value.into()), db.get_global_setting(None, key).await.unwrap());
+
+        db.set_global_setting(None, key, None).await.unwrap();
+
+        assert_eq!(None, db.get_global_setting(None, key).await.unwrap());
     }
 }

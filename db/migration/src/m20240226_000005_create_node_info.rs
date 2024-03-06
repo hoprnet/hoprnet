@@ -19,16 +19,19 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(NodeInfo::ChainAddress)
-                            .string_len(40)
-                            .unique_key()
-                            .not_null(),
+                        ColumnDef::new(NodeInfo::SafeBalance)
+                            .binary_len(12)
+                            .not_null()
+                            .default(vec![0u8; 12]),
                     )
-                    .col(ColumnDef::new(NodeInfo::PacketKey).binary_len(32))
-                    .col(ColumnDef::new(NodeInfo::SafeBalance).binary_len(12).not_null())
-                    .col(ColumnDef::new(NodeInfo::SafeAllowance).binary_len(12).not_null())
-                    .col(ColumnDef::new(NodeInfo::SafeAddress).string_len(40).not_null())
-                    .col(ColumnDef::new(NodeInfo::ModuleAddress).string_len(40).not_null())
+                    .col(
+                        ColumnDef::new(NodeInfo::SafeAllowance)
+                            .binary_len(12)
+                            .not_null()
+                            .default(vec![0u8; 12]),
+                    )
+                    .col(ColumnDef::new(NodeInfo::SafeAddress).string_len(40).null())
+                    .col(ColumnDef::new(NodeInfo::ModuleAddress).string_len(40).null())
                     .to_owned(),
             )
             .await
@@ -45,8 +48,6 @@ impl MigrationTrait for Migration {
 enum NodeInfo {
     Table,
     Id,
-    ChainAddress,
-    PacketKey,
     SafeBalance,
     SafeAllowance,
     SafeAddress,
