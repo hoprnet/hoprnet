@@ -24,6 +24,9 @@ pub enum ProtocolError {
     #[error("db error {0}")]
     DbError(#[from] DbError),
 
+    #[error("db error {0}")]
+    UnifiedDbError(String),
+
     #[error("Failed to notify an external process: {0}")]
     Notification(String),
 

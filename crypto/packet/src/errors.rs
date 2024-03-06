@@ -9,8 +9,8 @@ pub enum PacketError {
     #[error("failed to decode packet: {0}")]
     PacketDecodingError(String),
 
-    #[error("failed to construct packet")]
-    PacketConstructionError,
+    #[error("failed to construct packet: {0}")]
+    PacketConstructionError(String),
 
     #[error("packet is in invalid state")]
     InvalidPacketState,

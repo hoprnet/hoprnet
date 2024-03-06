@@ -68,12 +68,12 @@ impl ChainPacketComponents {
     /// * `domain_separator`
     pub fn into_outgoing(
         msg: &[u8],
-        public_keys_path: &Vec<OffchainPublicKey>,
+        public_keys_path: &[OffchainPublicKey],
         chain_keypair: &ChainKeypair,
         mut ticket: Ticket,
         domain_separator: &Hash,
     ) -> Result<Self> {
-        let shared_keys = CurrentSphinxSuite::new_shared_keys(&public_keys_path)?;
+        let shared_keys = CurrentSphinxSuite::new_shared_keys(public_keys_path)?;
         let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1));
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
@@ -85,7 +85,7 @@ impl ChainPacketComponents {
             packet: MetaPacket::<CurrentSphinxSuite>::new(
                 shared_keys,
                 msg,
-                &public_keys_path,
+                public_keys_path,
                 INTERMEDIATE_HOPS + 1,
                 POR_SECRET_LENGTH,
                 &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),

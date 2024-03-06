@@ -49,6 +49,7 @@ pub use {
 };
 
 use async_lock::RwLock;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use tracing::{debug, error, info, warn};
 
@@ -204,11 +205,11 @@ where
 pub fn build_packet_actions<Db>(
     me: &OffchainKeypair,
     me_onchain: &ChainKeypair,
-    db: Arc<RwLock<Db>>,
+    db: Db,
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug + 'static,
+    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
