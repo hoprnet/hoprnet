@@ -8,7 +8,6 @@ use bindings::{
 };
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
-use ethers::abi::AbiEncode;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::{Hash, Keypair};
@@ -18,7 +17,7 @@ use hopr_db_api::errors::DbError::LogicalError;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_db_api::{HoprDbGeneralModelOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::{
-    account, announcement, chain_info, channel, ticket,
+    account, chain_info, channel, ticket,
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -136,18 +135,11 @@ where
                 }
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
-                let maybe_account = account::Entity::find()
-                    .filter(account::Column::ChainKey.eq(revocation.node.encode_hex()))
-                    .one(tx.as_ref())
-                    .await?;
-
-                if let Some(account) = maybe_account {
-                    announcement::Entity::delete_many()
-                        .filter(announcement::Column::AccountId.eq(account.id))
-                        .exec(tx.as_ref())
-                        .await?;
-                } else {
-                    return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
+                let node_address: Address = revocation.node.into();
+                match self.db.delete_all_announcements(Some(tx), node_address).await {
+                    Err(DbError::MissingAccount) => return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding),
+                    Err(e) => return Err(e.into()),
+                    _ => {},
                 }
             }
         };
@@ -779,12 +771,12 @@ pub mod tests {
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr,
-                updated_block: 0,
+                updated_block: 1,
             },
         );
 
         handlers
-            .on_event(handlers.addresses.announcements, 0u32, address_announcement_log)
+            .on_event(handlers.addresses.announcements, 1u32, address_announcement_log)
             .await
             .unwrap();
 
@@ -808,12 +800,12 @@ pub mod tests {
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr_dns,
-                updated_block: 0,
+                updated_block: 2,
             },
         );
 
         handlers
-            .on_event(handlers.addresses.announcements, 0u32, address_announcement_dns_log)
+            .on_event(handlers.addresses.announcements, 2u32, address_announcement_dns_log)
             .await
             .unwrap();
 
@@ -1168,7 +1160,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
+        assert!(!db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
     }
 
     #[async_std::test]
@@ -1347,7 +1339,7 @@ pub mod tests {
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            3.into(),
         );
 
         db.insert_channel(None, channel).await.unwrap();

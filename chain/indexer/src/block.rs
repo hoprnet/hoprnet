@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use async_std::task::spawn;
-use futures::{stream, StreamExt, TryFutureExt};
-use sea_orm::prelude::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use futures::{stream, StreamExt};
+use sea_orm::EntityTrait;
 use tracing::{debug, error, info, trace};
 
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::HoprDbGeneralModelOperations;
+use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_entity::chain_info;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
@@ -98,7 +98,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -196,27 +196,7 @@ where
                     }
                 })
                 .then(|block_with_logs| async {
-                    if let Err(error) = db
-                        .begin_transaction()
-                        .and_then(|tx| tx.perform(|tx| {
-                            Box::pin(async move {
-                                let res = chain_info::Entity::update_many()
-                                    .col_expr(
-                                        chain_info::Column::LastIndexedBlock,
-                                        Expr::value(block_with_logs.block_id as i32),
-                                    )
-                                    .filter(chain_info::Column::Id.eq(1))
-                                    .exec(tx.as_ref())
-                                    .await?;
-                                if res.rows_affected == 1 {
-                                    Ok(())
-                                } else {
-                                    Err(sea_orm::DbErr::RecordNotUpdated)
-                                }
-                            })
-                        }))
-                        .await
-                    {
+                    if let Err(error) = db.set_last_indexed_block(None, block_with_logs.block_id as u32).await {
                         error!("failed to write the latest block number into the database: {error}");
                     }
 
@@ -517,7 +497,7 @@ pub mod tests {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
             .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
+            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 1)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;

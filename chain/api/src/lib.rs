@@ -152,7 +152,7 @@ impl HoprChain {
         let db_processor = ContractEventHandlers::new(
             self.contract_addresses,
             self.safe_address,
-            (&self.me_onchain).into(),
+            self.me_onchain.clone(),
             self.db.clone(),
         );
 
