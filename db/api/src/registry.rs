@@ -10,11 +10,10 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 
 #[async_trait]
 pub trait HoprDbRegistryOperations {
-    async fn allow_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<()>;
+    async fn set_access_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address, allowed: bool)
+        -> Result<()>;
 
     async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
-
-    async fn deny_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<()>;
 
     async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
 
@@ -23,27 +22,40 @@ pub trait HoprDbRegistryOperations {
 
 #[async_trait]
 impl HoprDbRegistryOperations for HoprDb {
-    async fn allow_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<()> {
+    async fn set_access_in_network_registry<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        address: Address,
+        allowed: bool,
+    ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let entry = network_registry::ActiveModel {
-                        chain_address: Set(address.to_hex()),
-                        ..Default::default()
-                    };
+                    if allowed {
+                        let entry = network_registry::ActiveModel {
+                            chain_address: Set(address.to_hex()),
+                            ..Default::default()
+                        };
 
-                    match network_registry::Entity::insert(entry)
-                        .on_conflict(
-                            OnConflict::column(network_registry::Column::ChainAddress)
-                                .do_nothing()
-                                .to_owned(),
-                        )
-                        .exec(tx.as_ref())
-                        .await
-                    {
-                        Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
-                        Err(e) => Err(e.into()),
+                        match network_registry::Entity::insert(entry)
+                            .on_conflict(
+                                OnConflict::column(network_registry::Column::ChainAddress)
+                                    .do_nothing()
+                                    .to_owned(),
+                            )
+                            .exec(tx.as_ref())
+                            .await
+                        {
+                            Ok(_) | Err(DbErr::RecordNotInserted) => Ok::<_, DbError>(()),
+                            Err(e) => Err(e.into()),
+                        }
+                    } else {
+                        network_registry::Entity::delete_many()
+                            .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
+                            .exec(tx.as_ref())
+                            .await?;
+                        Ok::<_, DbError>(())
                     }
                 })
             })
@@ -62,21 +74,6 @@ impl HoprDbRegistryOperations for HoprDb {
                             .await?
                             .is_some(),
                     )
-                })
-            })
-            .await
-    }
-
-    async fn deny_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    network_registry::Entity::delete_many()
-                        .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
-                        .exec(tx.as_ref())
-                        .await?;
-                    Ok::<_, DbError>(())
                 })
             })
             .await

@@ -177,7 +177,7 @@ impl HoprDbTicketOperations for HoprDb {
                         let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                             .one(tx.as_ref())
                             .await?
-                            .ok_or(DbError::CorruptedData)?;
+                            .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                         let current_redeemed_count = stats.redeemed_tickets;
                         let current_redeemed_value = U256::from_be_bytes(&stats.redeemed_value);
@@ -227,7 +227,7 @@ impl HoprDbTicketOperations for HoprDb {
                             let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                                 .one(tx.as_ref())
                                 .await?
-                                .ok_or(DbError::CorruptedData)?;
+                                .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                             let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
                             let current_neglected_count = stats.neglected_tickets;
@@ -510,7 +510,7 @@ impl HoprDbTicketOperations for HoprDb {
                     let stats = TicketStatistics::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(DbError::CorruptedData)?;
+                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
 
                     let (unredeemed_tickets, unredeemed_value) = Ticket::find()
                         .stream(tx.as_ref())
@@ -522,7 +522,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     Ok::<AllTicketStatistics, DbError>(AllTicketStatistics {
                         last_updated: chrono::DateTime::<chrono::Utc>::from_str(&stats.last_updated)
-                            .map_err(|_| DbError::CorruptedData)?
+                            .map_err(|_| DbError::DecodingError)?
                             .into(),
                         losing_tickets: stats.losing_tickets as u64,
                         neglected_tickets: stats.neglected_tickets as u64,

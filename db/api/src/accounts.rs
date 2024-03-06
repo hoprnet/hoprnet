@@ -13,17 +13,14 @@ use hopr_internal_types::ChainOrPacketKey;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
-use crate::errors::DbError::CorruptedData;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
 #[async_trait]
 pub trait HoprDbAccountOperations {
-    async fn get_account<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
-        &'a self,
-        tx: OptTx<'a>,
-        key: T,
-    ) -> Result<Option<AccountEntry>>;
+    async fn get_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<Option<AccountEntry>>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync;
 
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
 
@@ -55,7 +52,7 @@ fn model_to_account_entry(account: account::Model, announcements: Vec<announceme
         match announcement {
             None => AccountType::NotAnnounced,
             Some(a) => AccountType::Announced {
-                multiaddr: a.multiaddress.parse().map_err(|_| CorruptedData)?,
+                multiaddr: a.multiaddress.parse().map_err(|_| DbError::DecodingError)?,
                 updated_block: a.at_block as u32,
             },
         },

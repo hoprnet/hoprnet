@@ -47,11 +47,9 @@ impl OpenTransaction {
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
         T: Send,
-        E: std::error::Error + Send,
+        E: std::error::Error + Send + Sync + 'static,
     {
-        let res = callback(&self)
-            .await
-            .map_err(|e| DbError::TransactionError(e.to_string()));
+        let res = callback(&self).await.map_err(|e| DbError::TransactionError(e.into()));
 
         if res.is_ok() {
             self.commit().await?;

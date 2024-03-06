@@ -5,7 +5,6 @@ use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySeriali
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 
 use crate::db::HoprDb;
-use crate::errors::DbError::CorruptedData;
 
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
@@ -59,7 +58,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
                 })
             })
@@ -93,7 +92,7 @@ impl HoprDbInfoOperations for HoprDb {
                     node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
                         .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
                 })
             })
@@ -128,7 +127,7 @@ impl HoprDbInfoOperations for HoprDb {
                     let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)?;
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
                     Ok::<_, DbError>(info.safe_address.zip(info.module_address))
                 })
             })
@@ -171,7 +170,7 @@ impl HoprDbInfoOperations for HoprDb {
                     let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
                         .one(tx.as_ref())
                         .await?
-                        .ok_or(CorruptedData)?;
+                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
 
                     let ledger_dst = if let Some(b) = model.ledger_dst {
                         Some(Hash::from_bytes(&b)?)

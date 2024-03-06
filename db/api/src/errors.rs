@@ -6,11 +6,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("db contains data which cannot be converted to business object")]
-    CorruptedData,
+    #[error("missing fixed entry in table {0}")]
+    MissingFixedTableEntry(String),
 
     #[error("transaction error: {0}")]
-    TransactionError(String),
+    TransactionError(Box<dyn std::error::Error + Send + Sync>),
 
     #[error("error while decoding db entity")]
     DecodingError,
@@ -40,9 +40,12 @@ pub enum DbError {
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 
-impl<E: std::error::Error> From<TransactionError<E>> for DbError {
+impl<E: std::error::Error + Send + Sync + 'static> From<TransactionError<E>> for DbError {
     fn from(value: TransactionError<E>) -> Self {
-        DbError::TransactionError(value.to_string())
+        match value {
+            TransactionError::Connection(e) => Self::BackendError(e),
+            TransactionError::Transaction(e) => Self::TransactionError(e.into()),
+        }
     }
 }
 
