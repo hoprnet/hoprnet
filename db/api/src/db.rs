@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use tracing::log::LevelFilter;
+use crate::HoprDbAllOperations;
 
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
@@ -95,6 +96,8 @@ impl HoprDb {
         }
     }
 }
+
+impl HoprDbAllOperations for HoprDb {}
 
 #[cfg(test)]
 mod tests {

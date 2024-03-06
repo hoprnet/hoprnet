@@ -20,6 +20,7 @@ use chain_types::chain_events::SignificantChainEvent;
 use chain_types::{ContractAddresses, TypedTransaction};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
+use hopr_db_api::HoprDbAllOperations;
 use hopr_primitive_types::primitives::Address;
 use utils_db::CurrentDbShim;
 
@@ -375,9 +376,9 @@ where
 }
 
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub fn build_chain_api(
+pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + 'static>(
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+    new_db: T,
     contract_addrs: ContractAddresses,
     safe_address: Address,
     indexer_start_block: u64,
@@ -385,7 +386,7 @@ pub fn build_chain_api(
     chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-) -> chain_api::HoprChain {
+) -> chain_api::HoprChain<T> {
     let indexer_cfg = chain_indexer::IndexerConfig {
         start_block_number: indexer_start_block,
         ..Default::default()
@@ -393,7 +394,7 @@ pub fn build_chain_api(
 
     chain_api::HoprChain::new(
         me_onchain,
-        db,
+        new_db,
         contract_addrs,
         safe_address,
         indexer_cfg,

@@ -1191,6 +1191,7 @@ dependencies = [
  "core-path",
  "futures",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-primitive-types",
  "serde",

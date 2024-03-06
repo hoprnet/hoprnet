@@ -12,10 +12,8 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
-use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::errors::DbError::LogicalError;
-use hopr_db_api::tickets::HoprDbTicketOperations;
-use hopr_db_api::{HoprDbGeneralModelOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
+use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::{
     account, chain_info, channel, ticket,
 };
@@ -27,10 +25,7 @@ use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_db_api::accounts::HoprDbAccountOperations;
 use hopr_db_api::errors::DbError;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::registry::HoprDbRegistryOperations;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 
@@ -71,8 +66,7 @@ async fn channel_model_from_id(tx: &OpenTransaction, channel_id: Hash) -> Result
 
 impl<Db> ContractEventHandlers<Db>
 where
-    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbAccountOperations +
-    HoprDbChannelOperations + HoprDbInfoOperations + HoprDbRegistryOperations + Clone,
+    Db: HoprDbAllOperations + Clone,
 {
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: ChainKeypair, db: Db) -> Self {
         Self {
@@ -556,8 +550,7 @@ where
 #[async_trait]
 impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
 where
-    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbAccountOperations +
-    HoprDbChannelOperations + HoprDbInfoOperations + HoprDbRegistryOperations + Clone + Send + Sync,
+    Db: HoprDbAllOperations + Clone + Send + Sync,
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -646,7 +639,7 @@ pub mod tests {
     use hopr_db_api::accounts::HoprDbAccountOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::HoprDbInfoOperations;
-    use hopr_db_api::{HoprDbGeneralModelOperations, SINGULAR_TABLE_FIXED_ID};
+    use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations, SINGULAR_TABLE_FIXED_ID};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
@@ -677,7 +670,7 @@ pub mod tests {
         HoprDb::new_in_memory().await
     }
 
-    fn init_handlers<Db: HoprDbGeneralModelOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
+    fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
         ContractEventHandlers {
             addresses: ContractAddresses {
                 channels: *CHANNELS_ADDR,

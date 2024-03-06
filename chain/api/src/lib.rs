@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chain_actions::ChainActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::rpc::RpcOperations;
 use chain_rpc::HoprRpcOperations;
@@ -27,6 +26,8 @@ use crate::errors::{HoprChainError, Result};
 
 use async_std::task::sleep;
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use hopr_db_api::HoprDbAllOperations;
+use hopr_internal_types::prelude::generate_channel_id;
 
 /// The default HTTP request engine
 ///
@@ -110,23 +111,23 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 /// object. This behavior will be refactored and hidden behind a trait
 /// in the future implementations.
 #[derive(Debug, Clone)]
-pub struct HoprChain {
+pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone> {
     me_onchain: ChainKeypair,
     safe_address: Address,
     contract_addresses: ContractAddresses,
     indexer_cfg: IndexerConfig,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    db: Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>>,
+    db: T,
     chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
-impl HoprChain {
+impl<T: HoprDbAllOperations + Send + Sync + Clone + 'static> HoprChain<T> {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+        db: T,
         contract_addresses: ContractAddresses,
         safe_address: Address,
         indexer_cfg: IndexerConfig,
@@ -172,14 +173,12 @@ impl HoprChain {
     }
 
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-        Ok(self.db.read().await.get_accounts().await?)
+        Ok(self.db.get_accounts(None, true).await?)
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
-        self.db
-            .read()
-            .await
-            .get_channel_x(src, dest)
+        let channel_id = generate_channel_id(src, dest);
+        self.db.get_channel_by_id(None, channel_id)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {
@@ -190,24 +189,24 @@ impl HoprChain {
             })
     }
 
-    pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_from(src).await?)
+    pub async fn channel_from(&self, src: &Address) -> errors::Result<Option<ChannelEntry>> {
+        Ok(self.db.get_channel_from(None, *src).await?)
     }
 
-    pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels_to(dest).await?)
+    pub async fn channel_to(&self, dest: &Address) -> errors::Result<Option<ChannelEntry>> {
+        Ok(self.db.get_channel_to(None, *dest).await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.read().await.get_channels().await?)
+        Ok(self.db.get_all_channels(None).await?)
     }
 
     pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.read().await.get_ticket_price().await?)
+        Ok(self.db.get_chain_data(None).await?.ticket_price.map(|b| b.amount()))
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
-        Ok(self.db.read().await.get_staking_safe_allowance().await?)
+        Ok(self.db.get_safe_allowance(None).await?)
     }
 
     pub fn actions_ref(&self) -> &ChainActions<CoreEthereumDb<CurrentDbShim>> {
@@ -224,7 +223,7 @@ impl HoprChain {
     }
 
     // NOTE: needed early in the initialization to sync
-    pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::CurrentDbShim>>> {
+    pub fn db(&self) -> T {
         self.db.clone()
     }
 
