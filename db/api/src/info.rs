@@ -41,6 +41,10 @@ pub trait HoprDbInfoOperations {
 
     async fn get_chain_data<'a>(&'a self, tx: OptTx<'a>) -> Result<OnChainData>;
 
+    async fn update_channel_domain_separator<'a>(&'a self, tx: OptTx<'a>, ds: Hash) -> Result<()>;
+
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
+
     async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>>;
@@ -198,6 +202,44 @@ impl HoprDbInfoOperations for HoprDb {
                         nr_enabled: model.network_registry_enabled,
                         last_indexed_block: model.last_indexed_block as u32,
                     })
+                })
+            })
+            .await
+    }
+
+    async fn update_channel_domain_separator<'a>(&'a self, tx: OptTx<'a>, ds: Hash) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        channels_dst: Set(Some(ds.to_bytes().into())),
+                        ..Default::default()
+                    }
+                    .update(tx.as_ref())
+                    .await?;
+
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await
+    }
+
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        ticket_price: Set(Some(price.amount().to_be_bytes().into())),
+                        ..Default::default()
+                    }
+                    .update(tx.as_ref())
+                    .await?;
+
+                    Ok::<(), DbError>(())
                 })
             })
             .await

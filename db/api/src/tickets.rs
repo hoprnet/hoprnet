@@ -664,6 +664,9 @@ impl HoprDb {
                             let mut active_model = model.into_active_model();
                             active_model.ticket_index = sea_orm::Set(ticket_index.to_be_bytes().into());
 
+                            // TODO: use the cache
+                            // self.ticket_index.get...
+
                             let model = active_model.update(tx.as_ref()).await?;
                             let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
 
