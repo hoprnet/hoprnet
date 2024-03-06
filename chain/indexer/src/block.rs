@@ -299,6 +299,7 @@ pub mod tests {
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
+    use hopr_db_api::info::HoprDbInfoOperations;
 
     use crate::traits::MockChainLogHandler;
 
@@ -398,12 +399,7 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        assert!(db
-            .write()
-            .await
-            .update_latest_block_number(latest_block as u32)
-            .await
-            .is_ok());
+        db.set_last_indexed_block(None, latest_block as u32).await.unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
@@ -496,7 +492,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(finalized_block.logs.len())
-            .returning(|_, _, _, _| Ok(None));
+            .returning(|_, _, _| Ok(None));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -551,7 +547,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(blocks.len())
-            .returning(|_, _, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
+            .returning(|_, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());

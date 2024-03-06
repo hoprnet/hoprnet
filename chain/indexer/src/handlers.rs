@@ -12,25 +12,24 @@ use ethers::abi::AbiEncode;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::{Hash, Keypair};
-use hopr_crypto_types::types::{OffchainPublicKey, OffchainSignature};
+use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::errors::DbError::{CorruptedData, LogicalError};
+use hopr_db_api::errors::DbError::LogicalError;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_db_api::{HoprDbGeneralModelOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::{
-    account, announcement, chain_info, channel, node_info, ticket,
+    account, announcement, chain_info, channel, ticket,
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use multiaddr::Multiaddr;
-use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use std::fmt::Formatter;
 use std::ops::{Add, Sub};
-use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_db_api::accounts::HoprDbAccountOperations;
+use hopr_db_api::errors::DbError;
 use hopr_db_api::info::HoprDbInfoOperations;
 use hopr_db_api::registry::HoprDbRegistryOperations;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
@@ -73,7 +72,7 @@ async fn channel_model_from_id(tx: &OpenTransaction, channel_id: Hash) -> Result
 
 impl<Db> ContractEventHandlers<Db>
 where
-    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations +
+    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbAccountOperations +
     HoprDbChannelOperations + HoprDbInfoOperations + HoprDbRegistryOperations + Clone,
 {
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: ChainKeypair, db: Db) -> Self {
@@ -93,11 +92,6 @@ where
     ) -> Result<Option<ChainEventType>> {
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
-                let maybe_account = account::Entity::find()
-                    .filter(account::Column::ChainKey.eq(address_announcement.node.encode_hex()))
-                    .one(tx.as_ref())
-                    .await?;
-
                 trace!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
                     &address_announcement.base_multiaddr,
@@ -107,31 +101,16 @@ where
                 if address_announcement.base_multiaddr.is_empty() {
                     return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
                 }
+                let node_address: Address = address_announcement.node.into();
 
-                return if let Some(account) = maybe_account {
-                    let new_entry_type = announcement::ActiveModel {
-                        account_id: Set(account.id),
-                        multiaddress: Set(address_announcement.base_multiaddr.clone()),
-                        at_block: Set(block_number as i32),
-                        ..Default::default()
-                    };
-
-                    announcement::Entity::insert(new_entry_type)
-                        .on_conflict(
-                            OnConflict::columns([announcement::Column::AccountId, announcement::Column::Multiaddress])
-                                .do_nothing()
-                                .to_owned(),
-                        )
-                        .exec(tx.as_ref())
-                        .await?;
-
-                    Ok(Some(ChainEventType::Announcement {
-                        peer: OffchainPublicKey::from_hex(&account.packet_key)?.into(),
-                        address: Address::from_hex(&account.chain_key)?,
-                        multiaddresses: vec![Multiaddr::from_str(&address_announcement.base_multiaddr)?],
-                    }))
-                } else {
-                    Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding)
+                return match self.db.insert_announcement(Some(tx), node_address, address_announcement.base_multiaddr.parse()?, block_number).await {
+                    Ok(account) =>  Ok(Some(ChainEventType::Announcement {
+                        peer: account.public_key.into(),
+                        address: account.chain_addr,
+                        multiaddresses: vec![account.get_multiaddr().expect("not must contain multiaddr")],
+                    })),
+                    Err(DbError::MissingAccount) => Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding),
+                    Err(e) => Err(e.into())
                 };
             }
             HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
@@ -402,11 +381,6 @@ where
         tx: &OpenTransaction,
         event: HoprTokenEvents,
     ) -> Result<Option<ChainEventType>> {
-        let node_info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-            .one(tx.as_ref())
-            .await?
-            .ok_or(CorruptedData)?;
-
         match event {
             HoprTokenEvents::TransferFilter(transferred) => {
                 let from: Address = transferred.from.into();
@@ -417,21 +391,20 @@ where
                     &self.safe_address,
                 );
 
-                let current_balance = U256::from_be_bytes(&node_info.safe_balance);
+                let mut current_balance = self.db.get_safe_balance(Some(tx)).await?;
                 let transferred_value = transferred.value;
-
-                let mut active_node_info = node_info.into_active_model();
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
-                    active_node_info.safe_balance = Set((current_balance + transferred_value).to_be_bytes().into());
+                    // This + is internally defined as saturating add
+                    current_balance = current_balance + transferred_value;
                 } else if from.eq(&self.safe_address) {
-                    active_node_info.safe_balance =
-                        Set(current_balance.saturating_sub(transferred_value).to_be_bytes().into());
+                    // This - is internally defined as saturating sub
+                    current_balance = current_balance - transferred_value;
                 }
 
-                active_node_info.save(tx.as_ref()).await?;
+                self.db.set_safe_balance(Some(tx), current_balance).await?;
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
                 let owner: Address = approved.owner.into();
@@ -442,12 +415,9 @@ where
                     &self.safe_address, approved.value
                 );
 
-                let mut active_node_info = node_info.into_active_model();
-
                 // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    active_node_info.safe_allowance = Set(approved.value.to_be_bytes().into());
-                    active_node_info.save(tx.as_ref()).await?;
+                    self.db.set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value)).await?;
                 } else {
                     return Ok(None);
                 }
@@ -466,7 +436,7 @@ where
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
-                self.db.deny_in_network_registry(Some(tx), node_address).await?;
+                self.db.set_access_in_network_registry(Some(tx), node_address, false).await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -475,7 +445,7 @@ where
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address: Address = deregistered.node_address.into();
-                self.db.deny_in_network_registry(Some(tx), node_address).await?;
+                self.db.set_access_in_network_registry(Some(tx), node_address, false).await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -484,7 +454,7 @@ where
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address: Address = registered.node_address.into();
-                self.db.allow_in_network_registry(Some(tx), node_address).await?;
+                self.db.set_access_in_network_registry(Some(tx), node_address, true).await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -493,7 +463,7 @@ where
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address: Address = registered.node_address.into();
-                self.db.allow_in_network_registry(Some(tx), node_address).await?;
+                self.db.set_access_in_network_registry(Some(tx), node_address, true).await?;
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
@@ -594,7 +564,7 @@ where
 #[async_trait]
 impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
 where
-    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations +
+    Db: HoprDbGeneralModelOperations + HoprDbTicketOperations + HoprDbAccountOperations +
     HoprDbChannelOperations + HoprDbInfoOperations + HoprDbRegistryOperations + Clone + Send + Sync,
 {
     fn contract_addresses(&self) -> Vec<Address> {
@@ -772,7 +742,7 @@ pub mod tests {
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
-        db.insert_account(None, account_entry).await.unwrap();
+        db.insert_account(None, account_entry.clone()).await.unwrap();
 
         let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
 
@@ -1055,7 +1025,7 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        db.allow_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap();
+        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true).await.unwrap();
 
         let registered_log = RawLog {
             topics: vec![
@@ -1082,7 +1052,7 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        db.allow_in_network_registry(None, *SELF_CHAIN_ADDRESS).await.unwrap();
+        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true).await.unwrap();
 
         let registered_log = RawLog {
             topics: vec![
