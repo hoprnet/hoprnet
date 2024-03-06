@@ -107,6 +107,7 @@ pub trait HoprDbTicketOperations {
     ) -> Result<TransportPacketWithChainData>;
 
     /// Process the incoming packet into data
+    #[allow(clippy::wrong_self_convention)]
     async fn from_recv<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -363,13 +364,15 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let next_peer = myself
-                        .resolve_chain_key(&path[0])
-                        .await?
-                        .ok_or_else(|| hopr_crypto_packet::errors::PacketError::PacketConstructionError)?;
+                    let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
+                        crate::errors::DbError::LogicalError(format!(
+                            "failed to find channel key for packet key {} on previous hop",
+                            path[0].to_peerid_str()
+                        ))
+                    })?;
 
                     let domain_separator = myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                        hopr_crypto_packet::errors::PacketError::LogicError("domain separator missing".into())
+                        crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
                     })?;
 
                     // Decide whether to create 0-hop or multihop ticket
@@ -415,7 +418,7 @@ impl HoprDbTicketOperations for HoprDb {
                 payload.extend_from_slice(&ticket.to_bytes());
 
                 Ok(TransportPacketWithChainData::Outgoing {
-                    next_hop: next_hop.into(),
+                    next_hop,
                     ack_challenge,
                     data: payload.into_boxed_slice(),
                 })
@@ -432,7 +435,9 @@ impl HoprDbTicketOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> Result<TransportPacketWithChainData> {
-        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)? {
+        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)
+            .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct an incoming packet: {e}")))?
+        {
             ChainPacketComponents::Final {
                 packet_tag,
                 ack_key,
@@ -444,7 +449,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                 Ok(TransportPacketWithChainData::Final {
                     packet_tag,
-                    previous_hop: previous_hop.into(),
+                    previous_hop,
                     plain_text,
                     ack,
                 })
@@ -479,14 +484,14 @@ impl HoprDbTicketOperations for HoprDb {
 
                             let previous_hop_addr =
                                 myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
-                                    hopr_crypto_packet::errors::PacketError::PacketDecodingError(format!(
+                                    crate::errors::DbError::LogicalError(format!(
                                         "failed to find channel key for packet key {} on previous hop",
                                         previous_hop.to_peerid_str()
                                     ))
                                 })?;
 
                             let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
-                                hopr_crypto_packet::errors::PacketError::PacketDecodingError(format!(
+                                crate::errors::DbError::LogicalError(format!(
                                     "failed to find channel key for packet key {} on next hop",
                                     next_hop.to_peerid_str()
                                 ))
@@ -506,7 +511,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 .unrealized_value
                                 .get(&channel.get_id())
                                 .await
-                                .map(|balance| balance.sub(channel.balance.clone()))
+                                .map(|balance| balance.sub(channel.balance))
                                 .unwrap_or(channel.balance);
 
                             if let Err(e) = validate_unacknowledged_ticket(
@@ -585,8 +590,8 @@ impl HoprDbTicketOperations for HoprDb {
 
                 Ok(TransportPacketWithChainData::Forwarded {
                     packet_tag,
-                    previous_hop: previous_hop,
-                    next_hop: next_hop,
+                    previous_hop,
+                    next_hop,
                     data: payload.into_boxed_slice(),
                     ack,
                 })
@@ -676,8 +681,7 @@ impl HoprDb {
             })
             .await?
             .ok_or(crate::errors::DbError::LogicalError(format!(
-                "channel not found {}",
-                destination.to_string()
+                "channel '{destination}' not found",
             )))?;
 
         let amount = Balance::new(

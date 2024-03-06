@@ -28,9 +28,6 @@ pub enum DbError {
     TicketValidationError(String),
 
     #[error(transparent)]
-    PacketError(#[from] hopr_crypto_packet::errors::PacketError),
-
-    #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),
 
     #[error(transparent)]

@@ -413,7 +413,7 @@ where
 
     let tbf = Arc::new(RwLock::new(tbf));
 
-    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone());
+    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, new_db.clone(), tbf.clone());
 
     let ((ping, ping_rx, pong_tx), (mut heartbeat, hb_ping_rx, hb_pong_tx), network_events_rx) =
         build_transport_components(

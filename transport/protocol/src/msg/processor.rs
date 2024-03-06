@@ -7,22 +7,15 @@ use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, warn};
 
-use chain_db::traits::HoprCoreEthereumDbActions;
 use core_path::path::{Path, TransportPath};
-use hopr_crypto_packet::{
-    chain::ChainPacketComponents,
-    errors::{
-        PacketError::{
-            self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
-            PathPositionMismatch, Retry, TagReplay, TransportError,
-        },
-        Result,
-    },
-    validation::validate_unacknowledged_ticket,
+use hopr_crypto_packet::errors::{
+    PacketError::{Retry, TagReplay, TransportError},
+    Result,
 };
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -90,95 +83,30 @@ pub enum MsgProcessed {
 }
 
 /// Implements protocol acknowledgement logic for msg packets
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
 {
-    db: Arc<RwLock<Db>>,
+    db: Db,
     cfg: PacketInteractionConfig,
-}
-
-impl<Db> Clone for PacketProcessor<Db>
-where
-    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
-{
-    fn clone(&self) -> Self {
-        Self {
-            db: self.db.clone(),
-            cfg: self.cfg.clone(),
-        }
-    }
 }
 
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     type Input = ApplicationData;
     type Packet = TransportPacket;
 
-    async fn to_send(&self, data: Self::Input, path: &Vec<OffchainPublicKey>) -> Result<Self::Packet> {
-        let next_peer = self.db.read().await.get_chain_key(&path[0]).await?.ok_or_else(|| {
-            debug!("Could not retrieve on-chain key for {}", path[0].to_peerid_str());
-            PacketConstructionError
-        })?;
-
-        let domain_separator = self
+    async fn to_send(&self, data: Self::Input, path: Vec<OffchainPublicKey>) -> Result<Self::Packet> {
+        Ok(self
             .db
-            .read()
+            .to_send(None, data.to_bytes(), self.cfg.chain_keypair.clone(), path.clone())
             .await
-            .get_channels_domain_separator()
-            .await?
-            .ok_or_else(|| {
-                warn!("Missing domain separator.");
-                MissingDomainSeparator
-            })?;
-
-        // Decide whether to create 0-hop or multihop ticket
-        let next_ticket = if path.len() == 1 {
-            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
-        } else {
-            self.create_multihop_ticket(next_peer, path.len() as u8).await?
-        };
-
-        match ChainPacketComponents::into_outgoing(
-            &data.to_bytes(),
-            path,
-            &self.cfg.chain_keypair,
-            next_ticket,
-            &domain_separator,
-        ) {
-            Ok(p) => match p {
-                ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
-                    Err(PacketError::LogicError("Must contain an outgoing packet type".into()))
-                }
-                ChainPacketComponents::Outgoing {
-                    packet,
-                    ticket,
-                    next_hop,
-                    ack_challenge,
-                } => {
-                    self.db
-                        .write()
-                        .await
-                        .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
-                        .await?;
-
-                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                    payload.extend_from_slice(packet.as_ref());
-                    payload.extend_from_slice(&ticket.to_bytes());
-
-                    Ok(TransportPacket::Outgoing {
-                        next_hop: next_hop.into(),
-                        ack_challenge,
-                        data: payload.into_boxed_slice(),
-                    })
-                }
-            },
-            Err(e) => Err(e),
-        }
+            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
+            .into())
     }
 
     async fn from_recv(
@@ -187,201 +115,21 @@ where
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> Result<Self::Packet> {
-        let components = ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)?;
-
-        match components {
-            ChainPacketComponents::Final {
-                packet_tag,
-                ack_key,
-                previous_hop,
-                plain_text,
-                ..
-            } => {
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
-
-                Ok(TransportPacket::Final {
-                    packet_tag,
-                    previous_hop: previous_hop.into(),
-                    plain_text,
-                    ack,
-                })
-            }
-            ChainPacketComponents::Forwarded {
-                packet,
-                ticket,
-                ack_challenge,
-                packet_tag,
-                ack_key,
-                previous_hop,
-                own_key,
-                next_hop,
-                next_challenge,
-                path_pos,
-            } => {
-                let domain_separator =
-                    self.db
-                        .read()
-                        .await
-                        .get_channels_domain_separator()
-                        .await?
-                        .ok_or_else(|| {
-                            warn!("Missing domain separator");
-                            MissingDomainSeparator
-                        })?;
-
-                let previous_peer = previous_hop.into();
-                let next_peer = next_hop.into();
-
-                // START: channel = get_channel_from_to(packet_key, packet_key)
-                let previous_hop_addr =
-                    self.db
-                        .read()
-                        .await
-                        .get_chain_key(&previous_hop)
-                        .await?
-                        .ok_or(PacketDecodingError(format!(
-                            "failed to find channel key for packet key {previous_peer} on previous hop"
-                        )))?;
-
-                let next_hop_addr = self
-                    .db
-                    .read()
-                    .await
-                    .get_chain_key(&next_hop)
-                    .await?
-                    .ok_or(PacketDecodingError(format!(
-                        "failed to find channel key for packet key {next_peer} on next hop",
-                    )))?;
-
-                // Find the corresponding channel
-                debug!("looking for channel with {previous_hop_addr} ({previous_peer})");
-                let channel = self
-                    .db
-                    .read()
-                    .await
-                    .get_channel_from(&previous_hop_addr)
-                    .await?
-                    .ok_or(ChannelNotFound(previous_hop.to_string()))?;
-                // END: channel = get_channel_from_to(packet_key, packet_key)
-
-                // Validate the ticket first
-                let price_per_packet = self
-                    .db
-                    .read()
-                    .await
-                    .get_ticket_price()
-                    .await
-                    .unwrap_or_else(|_| {
-                        warn!(
-                            "Error reading ticket price value from database, using default {:?}",
-                            *DEFAULT_PRICE_PER_PACKET
-                        );
-                        Some(*DEFAULT_PRICE_PER_PACKET)
-                    })
-                    .unwrap_or_else(|| {
-                        warn!(
-                            "No ticket price value set in database yet, using default {:?}",
-                            *DEFAULT_PRICE_PER_PACKET
-                        );
-                        *DEFAULT_PRICE_PER_PACKET
-                    });
-
-                debug!("price per packet is {price_per_packet}");
-
-                let validation_res = validate_unacknowledged_ticket(
-                    &ticket,
-                    &channel,
-                    &previous_hop_addr,
-                    Balance::new(price_per_packet, BalanceType::HOPR),
-                    TICKET_WIN_PROB,
-                    if self.cfg.check_unrealized_balance {
-                        Some(
-                            self.db
-                                .clone()
-                                .read()
-                                .await
-                                .get_unrealized_balance(&channel.get_id())
-                                .await?,
-                        )
-                    } else {
-                        None
-                    },
-                    &domain_separator,
-                )
-                .await;
-
-                if let Err(e) = validation_res {
-                    // Mark as reject and passthrough the error
-                    self.db.write().await.mark_rejected(&ticket).await?;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_REJECTED_TICKETS_COUNT.increment();
-
-                    return Err(e);
-                }
-
-                {
-                    let mut g = self.db.write().await;
-                    g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
-                        .await?;
-
-                    // Store the unacknowledged ticket
-                    g.store_pending_acknowledgment(
-                        ack_challenge,
-                        PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
-                            ticket.clone(),
-                            own_key.clone(),
-                            previous_hop_addr,
-                        )),
-                    )
-                    .await?;
-                }
-
-                // Check that the calculated path position from the ticket matches value from the packet header
-                let ticket_path_pos = ticket.get_path_position(price_per_packet)?;
-                if !ticket_path_pos.eq(&path_pos) {
-                    error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
-                    return Err(PathPositionMismatch);
-                }
-
-                // Create next ticket for the packet
-                let mut ticket = if ticket_path_pos == 1 {
-                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)?
-                } else {
-                    self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
-                };
-
-                // forward packet
-                ticket.challenge = next_challenge.to_ethereum_challenge();
-                ticket.sign(&self.cfg.chain_keypair, &domain_separator);
-
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
-
-                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                payload.extend_from_slice(packet.as_ref());
-                payload.extend_from_slice(&ticket.to_bytes());
-
-                Ok(TransportPacket::Forwarded {
-                    packet_tag,
-                    previous_hop: previous_peer,
-                    next_hop: next_peer,
-                    data: payload.into_boxed_slice(),
-                    ack,
-                })
-            }
-            ChainPacketComponents::Outgoing { .. } => {
-                Err(PacketError::LogicError("Cannot receive an outgoing packet".into()))
-            }
-        }
+        Ok(self
+            .db
+            .from_recv(None, data, self.cfg.chain_keypair.clone(), pkt_keypair, sender)
+            .await
+            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
+            .into())
     }
 }
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
     }
 
@@ -409,92 +157,17 @@ where
                 metadata.send_finalizer.replace(finalizer);
 
                 let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-                    path.hops().iter().map(|v| OffchainPublicKey::try_from(v)).collect();
+                    path.hops().iter().map(OffchainPublicKey::try_from).collect();
                 match path {
-                    Ok(path) => self.to_send(data, &path).await,
-                    Err(_) => Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError),
+                    Ok(path) => self.to_send(data, path).await,
+                    Err(e) => Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError(
+                        e.to_string(),
+                    )),
                 }
             }
         };
 
         (packet, metadata)
-    }
-
-    async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
-        trace!("begin creating multihop ticket for destination {destination}");
-
-        let (channel, channel_id, current_ticket_index) = {
-            let db = self.db.read().await;
-
-            let channel = db
-                .get_channel_to(&destination)
-                .await?
-                .ok_or(ChannelNotFound(destination.to_string()))?;
-
-            let channel_id = channel.get_id();
-
-            let current_index = db.get_current_ticket_index(&channel_id).await?.unwrap_or(U256::one());
-
-            (channel, channel_id, current_index)
-        };
-
-        self.db
-            .write()
-            .await
-            .set_current_ticket_index(&channel_id, current_ticket_index + 1u32)
-            .await?;
-
-        let ticket = {
-            let price_per_packet = self
-                .db
-                .read()
-                .await
-                .get_ticket_price()
-                .await
-                .unwrap_or_else(|_| {
-                    warn!(
-                        "Error reading ticket price value from database, using default {:?}",
-                        *DEFAULT_PRICE_PER_PACKET
-                    );
-                    Some(*DEFAULT_PRICE_PER_PACKET)
-                })
-                .unwrap_or_else(|| {
-                    warn!(
-                        "No ticket price value set in database yet, using default {:?}",
-                        *DEFAULT_PRICE_PER_PACKET
-                    );
-                    *DEFAULT_PRICE_PER_PACKET
-                });
-
-            let amount = Balance::new(
-                price_per_packet
-                    .div_f64(TICKET_WIN_PROB)
-                    .expect("winning probability outside of allowed interval (0.0, 1.0]")
-                    * U256::from(path_pos - 1),
-                BalanceType::HOPR,
-            );
-
-            if channel.balance.lt(&amount) {
-                return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")));
-            }
-
-            Ticket::new_partial(
-                &self.cfg.chain_keypair.public().to_address(),
-                &destination,
-                &amount,
-                current_ticket_index,
-                U256::one(),     // unaggregated always have index_offset == 1
-                TICKET_WIN_PROB, // 100% winning probability
-                channel.channel_epoch,
-            )
-        }?;
-
-        debug!("Creating ticket in channel {channel_id}.",);
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_TICKETS_COUNT.increment();
-
-        Ok(ticket)
     }
 }
 
@@ -641,9 +314,9 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db>(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
+    pub fn new<Db>(db: Db, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
+        Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
     {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);

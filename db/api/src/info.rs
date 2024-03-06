@@ -241,7 +241,7 @@ impl HoprDbInfoOperations for HoprDb {
 
     async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()> {
         let k = key.to_owned();
-        let value = value.map(|v| Vec::from(v));
+        let value = value.map(Vec::from);
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -256,7 +256,7 @@ impl HoprDbInfoOperations for HoprDb {
                                 key: Set(k),
                                 ..Default::default()
                             });
-                        am.value = Set(v.into());
+                        am.value = Set(v);
                         am.save(tx.as_ref()).await?;
                     } else {
                         global_settings::Entity::delete_many()
