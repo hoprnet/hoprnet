@@ -51,6 +51,7 @@ pub struct PrivateKeyArgs {
     /// Either provide a private key as argument or as an environment variable `PRIVATE_KEY`
     #[clap(
         long,
+        short = 'k',
         help = "Private key to unlock the account that broadcasts the transaction",
         name = "private_key",
         value_name = "PRIVATE_KEY"
@@ -85,9 +86,9 @@ impl PrivateKeyArgs {
 pub struct PasswordArgs {
     /// The path to a file containing the password that encrypts the identity file
     #[clap(
+        short,
         long,
-        help = "The path to a file containing the password that encrypts the identity file",
-        long_help = "The path to read the password. If not specified, the IDENTITY_PASSWORD environment variable.",
+        help = "The path to read the password. If not specified, the IDENTITY_PASSWORD environment variable.",
         value_hint = ValueHint::FilePath,
         name = "password_path",
         value_name = "PASSWORD_PATH"
@@ -175,6 +176,7 @@ pub struct IdentityFileArgs {
 
     /// Path to one identity file
     #[arg(
+        short,
         long,
         help = "The path to an identity file",
         value_hint = ValueHint::FilePath,
@@ -183,7 +185,7 @@ pub struct IdentityFileArgs {
     pub identity_from_path: Option<PathBuf>,
 
     /// Password to encrypt identity file(s)
-    #[clap(flatten)]
+    #[clap(help = "Password for the identit(ies)", flatten)]
     pub password: PasswordArgs,
 }
 
@@ -247,7 +249,7 @@ pub struct IdentityArgs {
     pub action: IdentityActionType,
 
     /// Arguments to locate one or multiple identity file(s)
-    #[clap(flatten)]
+    #[clap(help = "Action with identity `create` or `read`", flatten)]
     local_identity: IdentityFileArgs,
 
     /// Number of identities to be generated
@@ -330,7 +332,6 @@ impl Cmd for IdentityArgs {
 mod tests {
     use super::*;
     use crate::identity;
-    use ethers::core::k256::elliptic_curve::subtle::ConstantTimeEq;
     use tempfile::tempdir;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
