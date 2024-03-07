@@ -1,11 +1,13 @@
-use async_lock::RwLock;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::{network::Network, PeerId};
 use core_p2p::libp2p::swarm::derive_prelude::Multiaddr;
 use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use std::{pin::Pin, sync::Arc};
 use tracing::{error, warn};
+
+use hopr_db_api::{
+    peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
+};
 
 use async_std::task::spawn;
 
@@ -48,17 +50,23 @@ pub struct IndexerActions {
 }
 
 impl IndexerActions {
-    pub fn new<Db, T>(db: Arc<RwLock<Db>>, network: Arc<Network<T>>, emitter: Sender<IndexerProcessed>) -> Self
+    pub fn new<T>(db: T, network: Arc<Network<T>>, emitter: Sender<IndexerProcessed>) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
-        T: hopr_db_api::peers::HoprDbPeersOperations + Send + Sync + 'static + std::fmt::Debug,
+        T: HoprDbPeersOperations
+            + HoprDbResolverOperations
+            + HoprDbRegistryOperations
+            + Send
+            + Sync
+            + 'static
+            + std::fmt::Debug
+            + Clone,
     {
         let (to_process_tx, mut to_process_rx) =
             futures::channel::mpsc::channel::<IndexerToProcess>(crate::constants::INDEXER_UPDATE_QUEUE_SIZE);
 
         spawn(async move {
             let mut emitter = emitter;
-            let db_local: Arc<RwLock<Db>> = db.clone();
+            let db_local = db.clone();
 
             while let Some(value) = to_process_rx.next().await {
                 let event = match value {
@@ -83,14 +91,11 @@ impl IndexerActions {
                             let is_allowed = {
                                 let address = {
                                     if let Ok(key) = OffchainPublicKey::try_from(peer) {
-                                        match db_local.read().await.get_chain_key(&key).await.and_then(
-                                            |maybe_address| {
-                                                maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
-                                                    "No address available for peer '{}'",
-                                                    peer
-                                                )))
-                                            },
-                                        ) {
+                                        match db_local.resolve_chain_key(&key).await.and_then(|maybe_address| {
+                                            maybe_address.ok_or(hopr_db_api::errors::DbError::LogicalError(format!(
+                                                "No address available for peer '{peer}'",
+                                            )))
+                                        }) {
                                             Ok(v) => v,
                                             Err(e) => {
                                                 error!("{e}");
@@ -103,7 +108,7 @@ impl IndexerActions {
                                     }
                                 };
 
-                                match db_local.read().await.is_allowed_to_access_network(&address).await {
+                                match db_local.is_allowed_in_network_registry(None, address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }

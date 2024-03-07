@@ -49,7 +49,10 @@ pub use {
 };
 
 use async_lock::RwLock;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::{
+    peers::HoprDbPeersOperations, registry::HoprDbRegistryOperations, resolver::HoprDbResolverOperations,
+    tickets::HoprDbTicketOperations,
+};
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use tracing::{debug, error, info, warn};
 
@@ -88,7 +91,7 @@ use {async_std::task::sleep, hopr_platform::time::native::current_time};
 /// and telemetry about network connections.
 pub fn build_network<T>(peer_id: PeerId, addresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Arc<Network<T>>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     Arc::new(Network::new(peer_id, addresses, cfg, db))
 }
@@ -122,12 +125,7 @@ pub fn build_transport_components<T>(
     Receiver<NetworkTriggeredEvent>,
 )
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + std::fmt::Debug
-        + Clone
-        + Sync
-        + Send,
+    T: HoprDbPeersOperations + hopr_db_api::resolver::HoprDbResolverOperations + std::fmt::Debug + Clone + Sync + Send,
 {
     let (network_events_tx, network_events_rx) =
         futures::channel::mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
@@ -186,13 +184,19 @@ where
 }
 
 /// Build the index updater mechanism for indexer generated behavior inclusion.
-pub fn build_index_updater<Db, T>(
-    db: Arc<RwLock<Db>>,
+pub fn build_index_updater<T>(
+    db: T,
     network: Arc<Network<T>>,
 ) -> (processes::indexer::IndexerActions, Receiver<IndexerProcessed>)
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
-    T: hopr_db_api::peers::HoprDbPeersOperations + Send + Sync + 'static + std::fmt::Debug,
+    T: HoprDbPeersOperations
+        + HoprDbResolverOperations
+        + HoprDbRegistryOperations
+        + Send
+        + Sync
+        + 'static
+        + std::fmt::Debug
+        + Clone,
 {
     let (indexer_update_tx, indexer_update_rx) =
         futures::channel::mpsc::channel::<IndexerProcessed>(constants::INDEXER_UPDATE_QUEUE_SIZE);
@@ -279,12 +283,7 @@ use hopr_primitive_types::prelude::*;
 #[derive(Debug, Clone)]
 pub struct HoprTransport<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + std::fmt::Debug
-        + Clone
-        + Send
-        + Sync,
+    T: HoprDbPeersOperations + hopr_db_api::resolver::HoprDbResolverOperations + std::fmt::Debug + Clone + Send + Sync,
 {
     me: PeerId,
     me_onchain: Address,
@@ -302,12 +301,7 @@ where
 
 impl<T> HoprTransport<T>
 where
-    T: hopr_db_api::peers::HoprDbPeersOperations
-        + hopr_db_api::resolver::HoprDbResolverOperations
-        + std::fmt::Debug
-        + Clone
-        + Send
-        + Sync,
+    T: HoprDbPeersOperations + hopr_db_api::resolver::HoprDbResolverOperations + std::fmt::Debug + Clone + Send + Sync,
 {
     #[allow(clippy::too_many_arguments)] // TODO: Needs refactoring and cleanup once rearchitected
     pub fn new(

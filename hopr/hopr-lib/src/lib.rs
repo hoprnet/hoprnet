@@ -379,7 +379,7 @@ where
 
     let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
-    let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
+    let (indexer_updater, indexer_update_rx) = build_index_updater(new_db.clone(), network.clone());
 
     let indexer_refreshing_loop = to_chain_events_refresh_process(
         (*me.public()).into(),
