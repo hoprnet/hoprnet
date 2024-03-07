@@ -5,7 +5,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::warn;
+use tracing::{error, warn};
 
 pub fn read_identity(file: &PathBuf, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -22,7 +22,7 @@ pub fn read_identity(file: &PathBuf, password: &str) -> Result<(String, HoprKeys
             Ok((String::from(file_key.to_str().unwrap()), keys))
         }
         Err(e) => {
-            warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string());
+            error!("Could not decrypt keystore file at {}. {}", file_str, e.to_string());
             Err(HelperErrors::UnableToReadIdentity)
         }
     }
@@ -68,7 +68,7 @@ pub fn update_identity_password(
         .to_str()
         .ok_or(HelperErrors::IncorrectFilename(path.to_string_lossy().to_string()))?;
 
-    if file_path.ends_with(".id") {
+    if path.exists() && path.is_file() && file_path.ends_with(".id") {
         // insert remove actual file with name `file_path`
         match fs::remove_file(file_path) {
             Ok(_) => {

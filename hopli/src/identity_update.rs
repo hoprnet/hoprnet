@@ -39,17 +39,14 @@ impl IdentityUpdateArgs {
         let files = local_identity.get_files();
         debug!("Identities read {:?}", files.len());
 
-        for file in files {
-            let keys = match read_identity(&file, &pwd) {
-                Ok((_, keys)) => keys,
-                Err(_) => return Err(HelperErrors::UnableToUpdateIdentityPassword),
-            };
-
-            match update_identity_password(keys, &file, &new_pwd) {
-                Ok(_) => (),
-                Err(_) => return Err(HelperErrors::UnableToUpdateIdentityPassword),
-            }
-        }
+        let _ = files
+            .iter()
+            .map(|file| {
+                read_identity(file, &pwd)
+                    .map_err(|_| HelperErrors::UnableToUpdateIdentityPassword)
+                    .and_then(|(_, keys)| update_identity_password(keys, file, &new_pwd))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(())
     }
