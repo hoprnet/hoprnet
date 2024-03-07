@@ -7,14 +7,20 @@
 use crate::{
     environment_config::NetworkProviderArgs,
     identity::{IdentityFileArgs, PrivateKeyArgs},
+    methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };
+use bindings::hopr_token::HoprToken;
 use clap::Parser;
-use ethers::{types::U256, utils::parse_units};
-use hopr_crypto_types::types::ToChecksum;
+use ethers::{
+    providers::Middleware,
+    types::{H160, U256},
+    utils::parse_units,
+};
 use hopr_primitive_types::primitives::Address;
+// use ethers::types::Address;
 use log::info;
-use std::str::FromStr;
+use std::{ops::Sub, str::FromStr};
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
@@ -50,7 +56,7 @@ pub struct FaucetArgs {
     #[clap(
         help = "Native token amount in ether, e.g. 1",
         long,
-        short = 'n',
+        short = 'g',
         value_parser = clap::value_parser!(f64),
         default_value_t = 10.0
     )]
@@ -75,27 +81,16 @@ impl FaucetArgs {
         } = self;
 
         // Include provided address
-        let mut addresses_all = Vec::new();
-
+        let mut addresses_all: Vec<Address> = Vec::new();
         // validate and arrayfy provided list of addresses
         if let Some(addresses) = address {
-            let provided_addresses: Vec<String> = addresses
-                .split(',')
-                .map(|addr| Address::from_str(addr).unwrap().to_checksum())
-                .collect();
-            addresses_all.extend(provided_addresses);
+            addresses_all.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
         }
-
         // if local identity dirs/path is provided, read addresses from identity files
-        addresses_all.extend(
-            local_identity
-                .to_addresses()
-                .unwrap()
-                .into_iter()
-                .map(|adr| adr.to_string()),
-        );
+        addresses_all.extend(local_identity.to_addresses().unwrap());
 
-        info!("All the addresses: {:?}", addresses_all);
+        let eth_addresses_all: Vec<H160> = addresses_all.into_iter().map(|a| a.into()).collect();
+        info!("All the addresses: {:?}", eth_addresses_all);
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
         let signer_private_key = private_key.read()?;
@@ -104,18 +99,50 @@ impl FaucetArgs {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        // convert hopr_amount and native_amount from f64 to uint256 string
-        let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
-        let hopr_amount_uint256_string = U256::from(hopr_amount_uint256).to_string();
-        let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
-        let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
+        let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
 
-        // TODO: complete actions as defined in `transferOrMintHoprAndSendNativeToAmount` in `SingleActions.s.sol`
+        // complete actions as defined in `transferOrMintHoprAndSendNativeToAmount` in `SingleActions.s.sol`
         // get token and native balances for addresses
+        let (native_balances, token_balances) =
+            get_native_and_token_balances(hopr_token.clone(), eth_addresses_all.clone())
+                .await
+                .unwrap();
         // Get the amount of HOPR tokens that addresses need to receive to reach the desired amount
+        let hopr_token_amounts: Vec<U256> =
+            vec![U256::from(parse_units(hopr_amount, "ether").unwrap()); eth_addresses_all.len()]
+                .into_iter()
+                .enumerate()
+                .map(|(i, h)| {
+                    if h.gt(&token_balances[i]) {
+                        h.sub(token_balances[i])
+                    } else {
+                        U256::zero()
+                    }
+                })
+                .collect();
+
         // Get the amount of native tokens that addresses need to receive to reach the desired amount
+        let native_token_amounts: Vec<U256> =
+            vec![U256::from(parse_units(native_amount, "ether").unwrap()); eth_addresses_all.len()]
+                .into_iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    if n.gt(&native_balances[i]) {
+                        n.sub(native_balances[i])
+                    } else {
+                        U256::zero()
+                    }
+                })
+                .collect();
+
         // transfer of mint HOPR tokens
+        let total_transferred_hopr_token =
+            transfer_or_mint_tokens(hopr_token, eth_addresses_all.clone(), hopr_token_amounts).await?;
+        info!("total transferred hopr-token is {:?}", total_transferred_hopr_token);
         // send native tokens
+        let total_transferred_native_token =
+            transfer_native_tokens(rpc_provider, eth_addresses_all, native_token_amounts).await?;
+        info!("total transferred native-token is {:?}", total_transferred_native_token);
         Ok(())
     }
 }
