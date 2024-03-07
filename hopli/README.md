@@ -4,20 +4,7 @@ CLI tool to manage HOPR identity generation, decryption, funding and registering
 
 ## Installation
 
-It uses Foundry's `forge` component to prepare, sign and broadcast transaction.
-Please ensure that `forge` binary exists in your PATH.
-It should return the version when running
-
-```
-forge --version
-```
-
-If an error returns, please follow the [Foundry installation guide](https://book.getfoundry.sh/getting-started/installation) to install it on your machine.
-
-```
-cargo build --release
-cargo install --path .
-```
+hopli requires contract bindings (`../ethereum/contracts/bindings`) which is build by foundry (`forge bind`)
 
 ## Commands
 
@@ -45,31 +32,33 @@ Note: when CREATing identities, you must pass `--identity-directory`. `--identit
 
 Password can be passed either as an env variable `IDENTITY_PASSWORD`, or via a path to the password file `--password-path`, e.g. `--password-path ./.pwd`
 
+#### Private key
+
+Private key to signer wallet can be passed either as an env variable `PRIVATE_KEY`, or as a command line argument `--private-key`, e.g. `--private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+
 ### Create/Read identities
-
-To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
-
+To create or read identities, a [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
 ```
-IDENTITY_PASSWORD=local \
-    hopli identity \
-    --action create \
-    --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 3
+hopli identity \
+  --action create \
+  --identity-directory "./test" \
+  --identity-prefix node_ \
+  --number 3 \
+  --password-path "./test/pwd"
 ```
 
 Read ethereum addresses from identities
 
 ```
-IDENTITY_PASSWORD=switzerland \
-    hopli identity \
-    --action read \
-    --identity-directory "./test" \
-    --identity-prefix node_
-
+hopli identity \
+  --action read \
+  --identity-directory "./test" \
+  --identity-prefix node_ \
+  --password-path "./test/pwd"
 ```
 
-To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
+### Faucet
+To fund nodes with password, a [path to it](####Identity-directory-or-path), a [password](####Password), and a [private key](####Private-key) to the faucet wallet (EOA) must be provided.
 
 `--hopr-amount` and `native-amount` can be floating number
 
@@ -78,13 +67,13 @@ IDENTITY_PASSWORD=local \
 PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --network anvil-localhost \
-    --use-local-identities --identity-directory "/app/.hoprd-db" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts" \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+    --identity-directory "./test" --identity-prefix node_ \
+    --password-path "./test/pwd" \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --hopr-amount 10 --native-amount 0.1
 ```
-
-Note that only identity files ending with `.id` are recognized by the CLI
 
 To register nodes
 
