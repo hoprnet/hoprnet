@@ -92,6 +92,18 @@ pub enum HelperErrors {
     /// Error with signer wallet error
     #[error(transparent)]
     WalletError(#[from] WalletError),
+
+    /// Fail to make a multicall
+    #[error("multicall Error: {0}")]
+    MulticallError(String),
+
+    /// Txn caller does not have the minter role
+    #[error("caller does not have the privilege to mint tokens")]
+    NotAMinter,
+
+    /// Error with middleware
+    #[error("middleware Error: {0}")]
+    MiddlewareError(String),
 }
 
 /// Multicall3 deployer wallet
