@@ -118,7 +118,7 @@ pub struct NetworkConfig {
 #[derive(Debug, Clone, Parser)]
 pub struct NetworkProviderArgs {
     /// Name of the network that the node is running on
-    #[clap(help = "Network name. E.g. monte_rosa", long)]
+    #[clap(help = "Network name. E.g. monte_rosa", long, short)]
     network: String,
 
     /// Path to the root of foundry project (etehereum/contracts), where all the contracts and `contracts-addresses.json` are stored
@@ -131,7 +131,7 @@ pub struct NetworkProviderArgs {
     contracts_root: Option<String>,
 
     /// Customized RPC provider endpoint
-    #[clap(help = "Blockchain RPC provider endpoint.", long)]
+    #[clap(help = "Blockchain RPC provider endpoint.", long, short = 'r')]
     provider_url: Option<String>,
 }
 
@@ -229,7 +229,7 @@ impl NetworkProviderArgs {
     pub async fn get_provider_with_signer(
         &self,
         chain_key: &ChainKeypair,
-    ) -> Result<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>, HelperErrors>
+    ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
     {
         // default values
         let default_rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
@@ -267,14 +267,18 @@ impl NetworkProviderArgs {
                 .await
                 .map_err(RpcError::ProviderError)?;
             if customized_chain_id.eq(&chain_id) {
-                return Ok(customized_proivder
-                    .with_signer(wallet)
-                    .nonce_manager(chain_key.public().to_address().into()));
+                return Ok(Arc::new(
+                    customized_proivder
+                        .with_signer(wallet)
+                        .nonce_manager(chain_key.public().to_address().into()),
+                ));
             }
         }
-        Ok(default_provider
-            .with_signer(wallet)
-            .nonce_manager(chain_key.public().to_address().into()))
+        Ok(Arc::new(
+            default_provider
+                .with_signer(wallet)
+                .nonce_manager(chain_key.public().to_address().into()),
+        ))
     }
 }
 
