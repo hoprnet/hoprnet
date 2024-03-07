@@ -61,7 +61,7 @@ use chain_actions::{
 };
 use chain_api::HoprChain;
 use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
-use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+use chain_db::db::CoreEthereumDb;
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
@@ -87,6 +87,7 @@ use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use hopr_db_api::{
     accounts::HoprDbAccountOperations,
     db::{HoprDb, HoprDbConfig},
+    info::{HoprDbInfoOperations, SafeInfo},
     resolver::HoprDbResolverOperations,
 };
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
@@ -561,7 +562,6 @@ pub struct Hopr {
     transport_api: HoprTransport<HoprDb>,
     chain_api: HoprChain<HoprDb>,
     db: HoprDb,
-    old_db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
     chain_cfg: ChainNetworkConfig,
     safe_module_cfg: SafeModule,
     multistrategy: Arc<MultiStrategy>,
@@ -653,7 +653,7 @@ impl Hopr {
             resolved_environment.clone(),
             me.clone(),
             me_onchain.clone(),
-            old_db.clone(),
+            old_db,
             db.clone(),
             tbf,
             save_tbf,
@@ -681,7 +681,6 @@ impl Hopr {
             ingress_rx: Some(transport_ingress),
             me: me.clone(),
             db,
-            old_db,
             transport_api,
             chain_api,
             chain_cfg: resolved_environment,
@@ -858,10 +857,14 @@ impl Hopr {
                 .await
                 .is_ok()
             {
-                let db = self.old_db.clone();
-                let mut db = db.write().await;
-                db.set_staking_safe_address(&self.safe_module_cfg.safe_address).await?;
-                db.set_staking_module_address(&self.safe_module_cfg.module_address)
+                self.db
+                    .set_safe_info(
+                        None,
+                        SafeInfo {
+                            safe_address: self.safe_module_cfg.safe_address.clone(),
+                            module_address: self.safe_module_cfg.module_address.clone(),
+                        },
+                    )
                     .await?;
             } else {
                 // Intentionally ignoring the errored state
