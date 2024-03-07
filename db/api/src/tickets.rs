@@ -543,7 +543,7 @@ impl HoprDbTicketOperations for HoprDb {
                             let ticket_index = myself
                                 .ticket_index
                                 .get_with(channel.get_id(), async {
-                                    let channel_ticket_index = channel.ticket_index.as_u128() as usize;
+                                    let channel_ticket_index = channel.ticket_index.as_usize();
                                     Arc::new(AtomicUsize::from(channel_ticket_index))
                                 })
                                 .await;
@@ -697,7 +697,7 @@ impl HoprDb {
                                 .ticket_index
                                 .get_with(channel_id, async {
                                     let channel_ticket_index =
-                                        U256::from_be_bytes(model.ticket_index.clone()).as_u128() as usize;
+                                        U256::from_be_bytes(model.ticket_index.clone()).as_usize();
                                     Arc::new(AtomicUsize::from(channel_ticket_index))
                                 })
                                 .await;

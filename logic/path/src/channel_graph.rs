@@ -1,5 +1,4 @@
 use crate::errors::Result;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use petgraph::algo::has_path_connecting;
@@ -204,15 +203,15 @@ impl ChannelGraph {
     }
 
     /// Synchronizes the channel entries in this graph with the database.
+    ///
     /// The synchronization is one-way from DB to the graph, not vice versa.
-    pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
-        db.get_channels()
-            .await
-            .map_err(|_| hopr_db_api::errors::DbError::DecodingError)?
-            .into_iter()
-            .for_each(|c| {
-                self.update_channel(c);
-            });
+    pub fn sync_channels<I>(&mut self, channels: I) -> Result<()>
+    where
+        I: IntoIterator<Item = ChannelEntry>,
+    {
+        channels.into_iter().for_each(|c| {
+            self.update_channel(c);
+        });
         info!("synced {} channels to the graph", self.graph.edge_count());
         Ok(())
     }
@@ -452,7 +451,8 @@ mod tests {
             .unwrap();
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        cg.sync_channels(&db).await.expect("should sync graph");
+        cg.sync_channels(db.get_channels().await.expect("channels should be present"))
+            .expect("should sync graph");
 
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[4]), "must have path from 0 -> 4");
         assert!(
