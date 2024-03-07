@@ -9,6 +9,7 @@ license = "GPL-3.0-only"
 
 
 [dependencies]
+async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }

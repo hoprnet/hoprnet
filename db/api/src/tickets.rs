@@ -71,8 +71,6 @@ pub trait HoprDbTicketOperations {
         chain_keypair: &ChainKeypair,
     ) -> Result<Option<AcknowledgedTicket>>;
 
-    async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()>;
-
     // async fn update_ticket_status_range(channel_id: &Hash, epoch: u32, new_status: AcknowledgedTicketStatus);
 
     // async fn compact_tickets(compacted_ticket: AcknowledgedTicket);
@@ -95,7 +93,6 @@ pub trait HoprDbTicketOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-
     async fn handle_acknowledgement<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -174,22 +171,13 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move { ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await })
-            })
-            .await?;
-        Ok(())
-    }
-
     async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: &AcknowledgedTicket) -> Result<()> {
         let channel_id = ticket.ticket.channel_id;
         let epoch: U256 = ticket.ticket.channel_epoch.into();
         let index = ticket.ticket.index;
         let ticket_value = ticket.ticket.amount.amount();
 
+        let _guard = self.ticket_table_mutex.lock().await;
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -229,6 +217,7 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()> {
+        let myself = self.clone();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -245,6 +234,8 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?;
 
                     if neglectable_count > 0 {
+                        let _guard = myself.ticket_table_mutex.lock().await;
+
                         // Delete the neglectable tickets first
                         let deleted = ticket::Entity::delete_many()
                             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
@@ -292,7 +283,8 @@ impl HoprDbTicketOperations for HoprDb {
     ) -> Result<AckResult> {
         let myself = self.clone();
 
-        self.nest_transaction(tx)
+        let result = self
+            .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -341,18 +333,23 @@ impl HoprDbTicketOperations for HoprDb {
 
                             if ack_ticket.is_winning_ticket(&domain_separator) {
                                 debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
-                                myself.insert_ticket(Some(tx), ack_ticket.clone()).await?;
                                 Ok(AckResult::RelayerWinning(ack_ticket))
                             } else {
                                 trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
-
                                 Ok(AckResult::RelayerLosing)
                             }
                         }
                     }
                 })
             })
-            .await
+            .await?;
+
+        if let AckResult::RelayerWinning(ack_ticket) = &result {
+            let _guard = self.ticket_table_mutex.lock().await;
+            self.insert_ticket(None, ack_ticket.clone()).await?;
+        }
+
+        Ok(result)
     }
 
     #[instrument(level = "trace", skip(self, tx))]
@@ -758,6 +755,16 @@ impl HoprDb {
         //         METRIC_TICKETS_COUNT.increment();
 
         Ok(ticket)
+    }
+
+    async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move { ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await })
+            })
+            .await?;
+        Ok(())
     }
 }
 

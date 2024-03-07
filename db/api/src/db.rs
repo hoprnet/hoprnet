@@ -1,4 +1,5 @@
-use crate::HoprDbAllOperations;
+use std::sync::Arc;
+
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_primitive_types::primitives::Balance;
@@ -12,6 +13,7 @@ use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use tracing::log::LevelFilter;
 
+use crate::HoprDbAllOperations;
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
     #[default(true)]
@@ -36,6 +38,7 @@ pub struct HoprDb {
     pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
+    pub(crate) ticket_table_mutex: Arc<async_lock::Mutex<()>>,
 }
 
 pub const SQL_DB_FILE_NAME: &str = "hopr_db_1.db";
@@ -93,6 +96,7 @@ impl HoprDb {
             unacked_tickets,
             unrealized_value,
             ticket_index,
+            ticket_table_mutex: Arc::new(async_lock::Mutex::new(())),
         }
     }
 }

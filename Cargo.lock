@@ -3514,6 +3514,7 @@ dependencies = [
 name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
+ "async-lock 3.3.0",
  "async-std",
  "async-stream",
  "async-trait",
