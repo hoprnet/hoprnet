@@ -70,13 +70,9 @@ pub fn update_identity_password(
 
     if path.exists() && path.is_file() && file_path.ends_with(".id") {
         // insert remove actual file with name `file_path`
-        match fs::remove_file(file_path) {
-            Ok(_) => {
-                keys.write_eth_keystore(file_path, password)?;
-                Ok(Some((String::from(file_path), keys)))
-            }
-            Err(_) => Err(HelperErrors::UnableToUpdateIdentityPassword),
-        }
+        fs::remove_file(file_path).map_err(|_err| HelperErrors::UnableToUpdateIdentityPassword)?;
+        keys.write_eth_keystore(file_path, password)?;
+        Ok(Some((String::from(file_path), keys)))
     } else {
         warn!(
             "Could not update keystore file at {}. {}",
