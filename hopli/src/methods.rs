@@ -1,12 +1,20 @@
+use crate::utils::HelperErrors;
 use bindings::hopr_token::HoprToken;
+use chain_rpc::TypedTransaction;
 use ethers::{
-    contract::{ContractError, Multicall, MulticallError, MULTICALL_ADDRESS},
+    abi::AbiEncode,
+    contract::{
+        multicall_contract::{Aggregate3ValueCall, Call3Value},
+        ContractError, Multicall, MulticallError, MULTICALL_ADDRESS,
+    },
     providers::Middleware,
-    types::{Address, Eip1559TransactionRequest, H160, U256},
+    types::{Address, Bytes, Eip1559TransactionRequest, H160, U256},
+    utils::keccak256,
 };
 use hex_literal::hex;
-use std::str::FromStr;
+use log::info;
 use std::sync::Arc;
+use std::{ops::Add, str::FromStr};
 
 /// Deploy a MULTICALL contract into Anvil local chain for testing
 pub async fn deploy_multicall3_for_testing<M>(provider: Arc<M>) -> Result<(), ContractError<M>>
@@ -32,16 +40,15 @@ where
 
 /// Get native balance and hopr token balance for given addresses
 pub async fn get_native_and_token_balances<M>(
-    provider: Arc<M>,
-    // network_detail: NetworkDetail,
     hopr_token: HoprToken<M>,
     addresses: Vec<Address>,
 ) -> Result<(Vec<U256>, Vec<U256>), MulticallError<M>>
 where
     M: Middleware,
 {
+    let provider = hopr_token.client();
     let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS)).await?;
-    // let hopr_token = HoprToken::new(network_detail.addresses.token, provider.clone());
+
     for address in addresses {
         multicall.add_get_eth_balance(address, false).add_call(
             hopr_token
@@ -66,6 +73,148 @@ where
     Ok((native_balance, token_balance))
 }
 
+/// Transfer some HOPR tokens from the caller to the list of addresses
+/// Address_i receives amounts_i HOPR tokens.
+/// When there's not enough token in caller's balance, if the caller is
+/// a minter, mint the missing tokens. If not, returns error
+pub async fn transfer_or_mint_tokens<M>(
+    hopr_token: HoprToken<M>,
+    addresses: Vec<Address>,
+    amounts: Vec<U256>,
+) -> Result<U256, HelperErrors>
+where
+    M: Middleware,
+{
+    let caller = hopr_token.client().default_sender().expect("client must have a sender");
+    let provider = hopr_token.client();
+    let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
+        .await
+        .expect("cannot create multicall");
+
+    // check if two vectors have the same length
+    assert_eq!(
+        addresses.len(),
+        amounts.len(),
+        "addresses and amounts are of different lengths in transfer_or_mint_tokens"
+    );
+    // calculate the sum of tokens to be sent
+    let total = amounts.iter().fold(U256::zero(), |acc, cur| acc.add(cur));
+    info!("total amount of HOPR tokens to be transferred {:?}", total.to_string());
+
+    // get caller balance and its role
+    let encoded_minter_role: [u8; 32] = keccak256(b"MINTER_ROLE");
+    multicall
+        .add_call(
+            hopr_token
+                .method::<_, U256>("balanceOf", caller)
+                .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
+            false,
+        )
+        .add_call(
+            hopr_token
+                .method::<_, bool>("hasRole", (encoded_minter_role, caller))
+                .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
+            false,
+        );
+    let result: (U256, bool) = multicall.call().await.map_err(|_| {
+        HelperErrors::MulticallError(
+            "failed in getting caller balance and its role in transfer_or_mint_tokens".to_string(),
+        )
+    })?;
+
+    // compare the total with caller's current balance. If caller doens't have enough balance, try to mint some. Otherwise, revert
+    if total.gt(&result.0) {
+        info!("caller does not have enough balance to transfer tokens to recipients.");
+        if result.1 {
+            info!("caller tries to mint tokens");
+            hopr_token
+                .mint(caller, total, Bytes::default(), Bytes::default())
+                .send()
+                .await
+                .unwrap()
+                .await
+                .unwrap();
+        } else {
+            return Err(HelperErrors::NotAMinter);
+        }
+    }
+
+    // approve the multicall to be able to transfer from caller's wallet
+    hopr_token
+        .approve(MULTICALL_ADDRESS, total)
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    // transfer token to multicall contract and transfer to multiple recipients
+    for (i, address) in addresses.iter().enumerate() {
+        // skip transferring zero amount of tokens
+        if amounts[i].gt(&U256::zero()) {
+            multicall.add_call(
+                hopr_token
+                    .method::<_, bool>("transferFrom", (caller.clone(), address.clone(), amounts[i]))
+                    .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
+                false,
+            );
+        }
+    }
+
+    multicall.send().await.unwrap().await.unwrap();
+
+    Ok(total)
+}
+
+/// Transfer some native tokens from the caller to the list of addresses
+/// Address_i receives amounts_i native tokens.
+/// TODO: improve this to use `aggregate3Value` if possible
+pub async fn transfer_native_tokens<M: Middleware>(
+    provider: Arc<M>,
+    addresses: Vec<Address>,
+    amounts: Vec<U256>,
+) -> Result<U256, HelperErrors> {
+    // let caller = provider.default_sender().expect("client must have a sender");
+
+    // check if two vectors have the same length
+    assert_eq!(
+        addresses.len(),
+        amounts.len(),
+        "addresses and amounts are of different lengths in transfer_native_tokens"
+    );
+    // calculate the sum of tokens to be sent
+    let total = amounts.iter().fold(U256::zero(), |acc, cur| acc.add(cur));
+    info!(
+        "total amount of native tokens to be transferred {:?}",
+        total.to_string()
+    );
+
+    let call3values: Vec<Call3Value> = addresses
+        .iter()
+        .enumerate()
+        .map(|(i, addr)| Call3Value {
+            target: addr.clone(),
+            allow_failure: false,
+            value: amounts[i].into(),
+            call_data: Bytes::default(),
+        })
+        .collect();
+    // transfer native tokens to multicall contract and transfer to multiple recipients
+    let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+    tx.set_to(MULTICALL_ADDRESS);
+    tx.set_data(Aggregate3ValueCall { calls: call3values }.encode().into());
+    tx.set_value(total);
+
+    provider
+        .send_transaction(tx, None)
+        .await
+        .map_err(|e| HelperErrors::MiddlewareError(e.to_string()))?
+        .await
+        .unwrap();
+
+    Ok(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,7 +222,6 @@ mod tests {
     use chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
-    use hopr_primitive_types::traits::BinarySerializable;
 
     #[async_std::test]
     async fn test_native_and_token_balances_in_anvil_with_multicall() {
@@ -93,14 +241,122 @@ mod tests {
         deploy_multicall3_for_testing(client.clone()).await.unwrap();
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(client, instances.token, vec![kp_address.into()])
-                .await
-                .unwrap();
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, vec![kp_address.into()])
+            .await
+            .unwrap();
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
-        assert_eq!(token_balance.len(), 1, "invalid native balance lens");
+        assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         assert_eq!(native_balance[0].as_u64(), 0u64, "wrong native balance");
         assert_eq!(token_balance[0].as_u64(), 0u64, "wrong token balance");
         drop(anvil);
+    }
+
+    #[async_std::test]
+    async fn test_transfer_or_mint_tokens_in_anvil_with_multicall() {
+        let mut addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..4 {
+            addresses.push(Address::random().into());
+        }
+        let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        // deploy hopr contracts
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // grant deployer token minter role
+        let encoded_minter_role: [u8; 32] = keccak256(b"MINTER_ROLE");
+        instances
+            .token
+            .grant_role(
+                encoded_minter_role.clone(),
+                contract_deployer.public().to_address().into(),
+            )
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+        // test the deployer has minter role now
+        let check_minter_role = instances
+            .token
+            .has_role(
+                encoded_minter_role.clone(),
+                contract_deployer.public().to_address().into(),
+            )
+            .call()
+            .await
+            .unwrap();
+        assert!(check_minter_role, "deployer does not have minter role yet");
+
+        // transfer or mint tokens to addresses
+        let total_transferred_amount =
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
+                .await
+                .unwrap();
+
+        // get native and token balances
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
+            .await
+            .unwrap();
+        assert_eq!(native_balance.len(), 4, "invalid native balance lens");
+        assert_eq!(token_balance.len(), 4, "invalid token balance lens");
+        for (i, amount) in desired_amount.iter().enumerate() {
+            assert_eq!(token_balance[i].as_u64(), amount.as_u64(), "token balance unmatch");
+        }
+
+        assert_eq!(
+            total_transferred_amount,
+            U256::from(10),
+            "amount transferred does not equal to the desired amount"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_transfer_native_tokens_in_anvil_with_multicall() {
+        let mut addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..4 {
+            addresses.push(Address::random().into());
+        }
+        let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+
+        // transfer native tokens to addresses
+        let total_transferred_amount =
+            transfer_native_tokens(client.clone(), addresses.clone(), desired_amount.clone())
+                .await
+                .unwrap();
+
+        // get native and token balances
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
+            .await
+            .unwrap();
+        assert_eq!(native_balance.len(), 4, "invalid native balance lens");
+        assert_eq!(token_balance.len(), 4, "invalid token balance lens");
+        for (i, amount) in desired_amount.iter().enumerate() {
+            assert_eq!(native_balance[i].as_u64(), amount.as_u64(), "native balance unmatch");
+        }
+
+        assert_eq!(
+            total_transferred_amount,
+            U256::from(10),
+            "amount transferred does not equal to the desired amount"
+        );
     }
 }
