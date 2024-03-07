@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{error, warn};
 
-pub fn read_identity(file: &PathBuf, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
+pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
         .to_str()
         .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))
@@ -61,7 +61,7 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
 
 pub fn update_identity_password(
     keys: HoprKeys,
-    path: &PathBuf,
+    path: &Path,
     password: &str,
 ) -> Result<Option<(String, HoprKeys)>, HelperErrors> {
     let file_path = path
@@ -73,9 +73,9 @@ pub fn update_identity_password(
         match fs::remove_file(file_path) {
             Ok(_) => {
                 keys.write_eth_keystore(file_path, password)?;
-                return Ok(Some((String::from(file_path), keys)));
+                Ok(Some((String::from(file_path), keys)))
             }
-            Err(_) => return Err(HelperErrors::UnableToUpdateIdentityPassword),
+            Err(_) => Err(HelperErrors::UnableToUpdateIdentityPassword),
         }
     } else {
         warn!(

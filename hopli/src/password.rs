@@ -66,49 +66,33 @@ pub struct PasswordsArgs {
 }
 
 impl PasswordsArgs {
-    pub fn read_old_password(&self) -> Result<String, HelperErrors> {
-        match self.old_password_path {
-            Some(ref old_password_path) => {
+    fn read_password(&self, password_path: &Option<PathBuf>, default_key: &str) -> Result<String, HelperErrors> {
+        match password_path {
+            Some(ref password_path) => {
                 // read password from file
-                if let Ok(pwd_from_file) = read_to_string(old_password_path) {
+                if let Ok(pwd_from_file) = read_to_string(password_path) {
                     Ok(pwd_from_file)
                 } else {
-                    println!("Cannot read from password_path");
+                    println!("Cannot read from password_path {}", password_path.display());
                     Err(HelperErrors::UnableToReadPassword)
                 }
             }
             None => {
                 // read password from environment variable
-                if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
+                if let Ok(pwd_from_env) = env::var(default_key) {
                     Ok(pwd_from_env)
                 } else {
-                    println!("Cannot read old password from env var");
+                    println!("Cannot read from env var for {}", default_key);
                     Err(HelperErrors::UnableToReadPassword)
                 }
             }
         }
     }
+    pub fn read_old_password(&self) -> Result<String, HelperErrors> {
+        self.read_password(&self.old_password_path, "IDENTITY_PASSWORD")
+    }
 
     pub fn read_new_password(&self) -> Result<String, HelperErrors> {
-        match self.new_password_path {
-            Some(ref new_password_path) => {
-                // read password from file
-                if let Ok(pwd_from_file) = read_to_string(new_password_path) {
-                    Ok(pwd_from_file)
-                } else {
-                    println!("Cannot read from password_path");
-                    Err(HelperErrors::UnableToReadPassword)
-                }
-            }
-            None => {
-                // read password from environment variable
-                if let Ok(pwd_from_env) = env::var("NEW_IDENTITY_PASSWORD") {
-                    Ok(pwd_from_env)
-                } else {
-                    println!("Cannot read new password from env var");
-                    Err(HelperErrors::UnableToReadPassword)
-                }
-            }
-        }
+        self.read_password(&self.new_password_path, "NEW_IDENTITY_PASSWORD")
     }
 }
