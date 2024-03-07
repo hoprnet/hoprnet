@@ -85,6 +85,10 @@ pub trait HoprDbTicketOperations {
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
+    async fn invalidate_cached_ticket_index(&self, channel_id: &Hash);
+
+    async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
+
     /// Processes the acknowledgements for the pending tickets
     ///
     /// There are three cases:
@@ -645,6 +649,23 @@ impl HoprDbTicketOperations for HoprDb {
                         rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
                     })
                 })
+            })
+            .await
+    }
+
+    async fn invalidate_cached_ticket_index(&self, channel_id: &Hash) {
+        self.ticket_index.invalidate(channel_id).await;
+    }
+
+    async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>> {
+        let db = self.clone();
+        self.ticket_index
+            .optionally_get_with_by_ref(channel_id, async move {
+                db.get_channel_by_id(None, *channel_id)
+                    .await
+                    .ok() // TODO: log the error here
+                    .flatten()
+                    .map(|c| Arc::new(AtomicUsize::from(c.ticket_index.as_usize())))
             })
             .await
     }

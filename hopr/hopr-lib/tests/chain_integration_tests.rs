@@ -24,6 +24,7 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::db::HoprDb;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::sync::Arc;
@@ -163,7 +164,7 @@ struct ChainNode {
     chain_key: ChainKeypair,
     db: Arc<RwLock<TestDb>>,
     actions: ChainActions<TestDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<TestDb>, TestDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
 
@@ -184,6 +185,8 @@ async fn start_node_chain_logic(
         inner_db,
         chain_key.public().to_address(),
     )));
+
+    let new_db = HoprDb::new_in_memory().await;
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(
@@ -220,10 +223,9 @@ async fn start_node_chain_logic(
     }));
 
     // Indexer
-    let chain_log_handler =
-        ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.public().to_address(), db.clone());
+    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), new_db.clone());
 
-    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, new_db.clone(), indexer_cfg, sce_tx);
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {

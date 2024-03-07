@@ -33,4 +33,5 @@ utils-db = { workspace = true }
 tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-db-api = { workspace = true }
 

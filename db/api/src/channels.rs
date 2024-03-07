@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
@@ -17,6 +18,8 @@ pub trait HoprDbChannelOperations {
     async fn get_channel_to<'a>(&'a self, tx: OptTx<'a>, destination: Address) -> Result<Option<ChannelEntry>>;
 
     async fn get_channel_from<'a>(&'a self, tx: OptTx<'a>, source: Address) -> Result<Option<ChannelEntry>>;
+
+    async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     async fn insert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 }
@@ -81,6 +84,23 @@ impl HoprDbChannelOperations for HoprDb {
                             None
                         },
                     )
+                })
+            })
+            .await
+    }
+
+    async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Channel::find()
+                        .stream(tx.as_ref())
+                        .await?
+                        .map_err(DbError::from)
+                        .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
+                        .try_collect()
+                        .await
                 })
             })
             .await

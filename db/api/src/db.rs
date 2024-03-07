@@ -1,3 +1,4 @@
+use crate::HoprDbAllOperations;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_primitive_types::primitives::Balance;
@@ -95,6 +96,8 @@ impl HoprDb {
         }
     }
 }
+
+impl HoprDbAllOperations for HoprDb {}
 
 #[cfg(test)]
 mod tests {

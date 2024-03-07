@@ -25,12 +25,19 @@ pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
 pub use sea_orm::DatabaseConnection;
 pub use sea_orm::DatabaseTransaction;
 
+use crate::accounts::HoprDbAccountOperations;
+use crate::channels::HoprDbChannelOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sea_orm::TransactionTrait;
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
+use crate::info::HoprDbInfoOperations;
+use crate::peers::HoprDbPeersOperations;
+use crate::registry::HoprDbRegistryOperations;
+use crate::resolver::HoprDbResolverOperations;
+use crate::tickets::HoprDbTicketOperations;
 
 pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 
@@ -121,4 +128,16 @@ impl HoprDbGeneralModelOperations for HoprDb {
     async fn begin_transaction(&self) -> Result<OpenTransaction> {
         Ok(OpenTransaction(self.db.begin_with_config(None, None).await?))
     }
+}
+
+pub trait HoprDbAllOperations:
+    HoprDbGeneralModelOperations
+    + HoprDbAccountOperations
+    + HoprDbChannelOperations
+    + HoprDbInfoOperations
+    + HoprDbRegistryOperations
+    + HoprDbTicketOperations
+    + HoprDbPeersOperations
+    + HoprDbResolverOperations
+{
 }

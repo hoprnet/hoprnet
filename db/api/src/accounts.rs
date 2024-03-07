@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Related, Set};
 use sea_query::OnConflict;
 
 use hopr_db_entity::prelude::{Account, Announcement};
@@ -34,6 +34,14 @@ pub trait HoprDbAccountOperations {
         multiaddr: Multiaddr,
         at_block: u32,
     ) -> Result<AccountEntry>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync;
+
+    async fn delete_all_announcements<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync;
+
+    async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
@@ -82,6 +90,7 @@ impl HoprDbAccountOperations for HoprDb {
                                 account::Column::PacketKey.eq(packet_key.to_string())
                             }
                         })
+                        .order_by_desc(announcement::Column::AtBlock)
                         .all(tx.as_ref())
                         .await?
                         .pop();
@@ -217,6 +226,67 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
+    async fn delete_all_announcements<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync,
+    {
+        let cpk = key.into();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let to_delete = account::Entity::find_related()
+                        .filter(match cpk {
+                            ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
+                            ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex()),
+                        })
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|x| x.id)
+                        .collect::<Vec<_>>();
+
+                    if !to_delete.is_empty() {
+                        announcement::Entity::delete_many()
+                            .filter(announcement::Column::Id.is_in(to_delete))
+                            .exec(tx.as_ref())
+                            .await?;
+
+                        Ok::<_, DbError>(())
+                    } else {
+                        Err(MissingAccount)
+                    }
+                })
+            })
+            .await
+    }
+
+    async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
+    where
+        T: Into<ChainOrPacketKey> + Send + Sync,
+    {
+        let cpk = key.into();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let r = account::Entity::delete_many()
+                        .filter(match cpk {
+                            ChainOrPacketKey::ChainKey(a) => account::Column::ChainKey.eq(a.to_hex()),
+                            ChainOrPacketKey::PacketKey(k) => account::Column::PacketKey.eq(k.to_hex()),
+                        })
+                        .exec(tx.as_ref())
+                        .await?;
+                    if r.rows_affected != 0 {
+                        Ok::<_, DbError>(())
+                    } else {
+                        Err(MissingAccount)
+                    }
+                })
+            })
+            .await
+    }
+
     async fn translate_key<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
         &'a self,
         tx: OptTx<'a>,
@@ -264,6 +334,7 @@ mod tests {
     use crate::errors::DbError::DecodingError;
     use crate::HoprDbGeneralModelOperations;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_internal_types::prelude::AccountType::NotAnnounced;
 
     #[async_std::test]
     async fn test_insert_account_announcement() {
@@ -306,6 +377,22 @@ mod tests {
             .insert_announcement(None, chain_1, maddr.clone(), block)
             .await
             .expect("should insert duplicate announcement");
+
+        let acc = db
+            .get_account(None, chain_1)
+            .await
+            .unwrap()
+            .expect("should contain account");
+        assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
+        assert_eq!(Some(block), acc.updated_at());
+        assert_eq!(acc, db_acc);
+
+        let maddr: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
+        let block = 300;
+        let db_acc = db
+            .insert_announcement(None, chain_1, maddr.clone(), block)
+            .await
+            .expect("should insert updated announcement");
 
         let acc = db
             .get_account(None, chain_1)
@@ -380,6 +467,85 @@ mod tests {
         assert_eq!(Some(maddr.clone()), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
         assert_eq!(acc, db_acc_2);
+    }
+
+    #[async_std::test]
+    async fn test_delete_account() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        db.insert_account(
+            None,
+            AccountEntry::new(
+                OffchainKeypair::random().public().clone(),
+                chain_1,
+                AccountType::Announced {
+                    multiaddr: "/ip4/1.2.3.4/tcp/1234".parse().unwrap(),
+                    updated_block: 10,
+                },
+            ),
+        )
+        .await
+        .unwrap();
+
+        assert!(db.get_account(None, chain_1).await.unwrap().is_some());
+
+        db.delete_account(None, chain_1)
+            .await
+            .expect("should not fail to delete");
+
+        assert!(db.get_account(None, chain_1).await.unwrap().is_none());
+    }
+
+    #[async_std::test]
+    async fn test_should_fail_to_delete_nonexistent_account() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+
+        let r = db.delete_account(None, chain_1).await;
+        assert!(
+            matches!(r, Err(MissingAccount)),
+            "should not delete non-existing account"
+        )
+    }
+
+    #[async_std::test]
+    async fn test_delete_announcements() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let mut entry = AccountEntry::new(
+            OffchainKeypair::random().public().clone(),
+            chain_1,
+            AccountType::Announced {
+                multiaddr: "/ip4/1.2.3.4/tcp/1234".parse().unwrap(),
+                updated_block: 10,
+            },
+        );
+
+        db.insert_account(None, entry.clone()).await.unwrap();
+
+        assert_eq!(Some(entry.clone()), db.get_account(None, chain_1).await.unwrap());
+
+        db.delete_all_announcements(None, chain_1).await.unwrap();
+
+        entry.entry_type = NotAnnounced;
+
+        assert_eq!(Some(entry), db.get_account(None, chain_1).await.unwrap());
+    }
+
+    #[async_std::test]
+    async fn test_should_fail_to_delete_nonexistent_account_announcements() {
+        let db = HoprDb::new_in_memory().await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+
+        let r = db.delete_all_announcements(None, chain_1).await;
+        assert!(
+            matches!(r, Err(MissingAccount)),
+            "should not delete non-existing account"
+        )
     }
 
     #[async_std::test]
