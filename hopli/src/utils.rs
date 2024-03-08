@@ -7,7 +7,7 @@ use thiserror::Error;
 
 pub trait Cmd: clap::Parser + Sized {
     fn run(self) -> Result<(), HelperErrors>;
-    async fn async_run(self) -> Result<(), HelperErrors>;
+    fn async_run(self) -> impl std::future::Future<Output = Result<(), HelperErrors>> + Send;
 }
 
 /// Enumerates different errors produced by this crate.

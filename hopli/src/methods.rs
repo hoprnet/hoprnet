@@ -1,5 +1,5 @@
 use crate::utils::HelperErrors;
-use bindings::hopr_token::HoprToken;
+use bindings::{hopr_network_registry::HoprNetworkRegistry, hopr_token::HoprToken};
 use chain_rpc::TypedTransaction;
 use ethers::{
     abi::AbiEncode,
@@ -215,6 +215,175 @@ pub async fn transfer_native_tokens<M: Middleware>(
     Ok(total)
 }
 
+/// Get registered safes for given nodes on the network registry
+pub async fn get_registered_safes_for_nodes_on_network_registry<M>(
+    network_registry: HoprNetworkRegistry<M>,
+    node_addresses: Vec<H160>,
+) -> Result<Vec<H160>, MulticallError<M>>
+where
+    M: Middleware,
+{
+    let provider = network_registry.client();
+    let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
+        .await
+        .expect("cannot create multicall");
+
+    for node in node_addresses {
+        multicall.add_call(
+            network_registry
+                .method::<_, Address>("nodeRegisterdToAccount", node)
+                .map_err(|e| MulticallError::ContractError(ContractError::AbiError(e)))?,
+            false,
+        );
+    }
+
+    let response: Vec<Address> = multicall.call_array().await?;
+
+    Ok(response)
+}
+
+/// Register safes and nodes to the network registry, and force-sync the eligibility to true.
+/// It returns the number of removed nodes and nodes being added.
+/// - If nodes have been registered to a different safe, overwrite it (remove the old safe and regsiter with the new safe)
+/// - If ndoes have been registered to the same safe, no op
+/// - If nodes have not been registered to any safe, register it
+/// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to true
+pub async fn register_safes_and_nodes_on_network_registry<M>(
+    network_registry: HoprNetworkRegistry<M>,
+    safe_addresses: Vec<H160>,
+    node_addresses: Vec<H160>,
+) -> Result<(usize, usize), HelperErrors>
+where
+    M: Middleware,
+{
+    assert_eq!(
+        safe_addresses.len(),
+        node_addresses.len(),
+        "unmatched lengths of safes and nodes"
+    );
+
+    // check registered safes of given node addresses
+    let registered_safes =
+        get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone())
+            .await
+            .unwrap();
+
+    let mut nodes_to_remove: Vec<H160> = Vec::new();
+    let mut safes_to_add: Vec<H160> = Vec::new();
+    let mut nodes_to_add: Vec<H160> = Vec::new();
+
+    for (i, registered_safe) in registered_safes.iter().enumerate() {
+        if registered_safe.eq(&H160::zero()) {
+            // no entry, add to network registry
+            safes_to_add.push(safe_addresses[i]);
+            nodes_to_add.push(node_addresses[i]);
+        } else if registered_safe.ne(&safe_addresses[i]) {
+            // remove first then add
+            nodes_to_remove.push(node_addresses[i]);
+            safes_to_add.push(safe_addresses[i]);
+            nodes_to_add.push(node_addresses[i]);
+        } else {
+            // no-op
+        }
+    }
+
+    if !nodes_to_remove.is_empty() {
+        // need to remove some nodes
+        network_registry
+            .manager_deregister(nodes_to_remove.clone())
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    }
+
+    network_registry
+        .manager_register(safes_to_add.clone(), nodes_to_add.clone())
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    // force sync their eligibility
+    network_registry
+        .manager_force_sync(safes_to_add.clone(), vec![true; safes_to_add.len()])
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    Ok((nodes_to_remove.len(), nodes_to_add.len()))
+}
+
+/// Deregister safes and nodes to the network registry. Does not do any action on the eligibility.
+/// It returns the number of removed nodes
+/// - If nodes have been registered to a safe, remove the node
+/// - If nodes have not been registered to any safe, no op
+pub async fn deregister_nodes_from_network_registry<M>(
+    network_registry: HoprNetworkRegistry<M>,
+    node_addresses: Vec<H160>,
+) -> Result<usize, HelperErrors>
+where
+    M: Middleware,
+{
+    // check registered safes of given node addresses
+    let registered_safes =
+        get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone())
+            .await
+            .unwrap();
+
+    let mut nodes_to_remove: Vec<H160> = Vec::new();
+
+    for (i, registered_safe) in registered_safes.iter().enumerate() {
+        if registered_safe.ne(&H160::zero()) {
+            // remove the node
+            nodes_to_remove.push(node_addresses[i]);
+        }
+    }
+
+    if !nodes_to_remove.is_empty() {
+        // need to remove some nodes
+        network_registry
+            .manager_deregister(nodes_to_remove.clone())
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    }
+    Ok(nodes_to_remove.len())
+}
+
+/// Force-sync the eligibility to given values. This can only be called with a manager account
+pub async fn force_sync_safes_on_network_registry<M>(
+    network_registry: HoprNetworkRegistry<M>,
+    safe_addresses: Vec<H160>,
+    eligibilities: Vec<bool>,
+) -> Result<(), HelperErrors>
+where
+    M: Middleware,
+{
+    assert_eq!(
+        safe_addresses.len(),
+        eligibilities.len(),
+        "unmatched lengths of safes and eligibilities"
+    );
+
+    // force sync their eligibility
+    network_registry
+        .manager_force_sync(safe_addresses, eligibilities)
+        .send()
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,6 +436,7 @@ mod tests {
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
+
         // deploy multicall contract
         deploy_multicall3_for_testing(client.clone()).await.unwrap();
         // grant deployer token minter role
@@ -358,5 +528,71 @@ mod tests {
             U256::from(10),
             "amount transferred does not equal to the desired amount"
         );
+    }
+
+    #[async_std::test]
+    async fn test_register_safes_and_nodes_then_deregister_nodes_in_anvil_with_multicall() {
+        let mut safe_addresses: Vec<ethers::types::Address> = Vec::new();
+        let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..4 {
+            safe_addresses.push(Address::random().into());
+            node_addresses.push(Address::random().into());
+        }
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+
+        // register some nodes
+        let (removed_amt, added_amt) = register_safes_and_nodes_on_network_registry(
+            instances.network_registry.clone(),
+            safe_addresses.clone(),
+            node_addresses.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(removed_amt, 0, "should not remove any safe");
+        assert_eq!(added_amt, 4, "there should be 4 additions");
+
+        // get registered safes from nodes
+        let registered_safes = get_registered_safes_for_nodes_on_network_registry(
+            instances.network_registry.clone(),
+            node_addresses.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(safe_addresses.len(), registered_safes.len(), "returned length unmatch");
+        for (i, safe_addr) in safe_addresses.iter().enumerate() {
+            assert_eq!(safe_addr, &registered_safes[i], "registered safe addresses unmatch");
+        }
+
+        // deregister 3 of them
+        let deregisterd_nodes = deregister_nodes_from_network_registry(
+            instances.network_registry.clone(),
+            node_addresses.split_at(3).0.to_vec(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(deregisterd_nodes, 3, "cannot deregister all the nodes");
+
+        // re-register 4 of them
+        let (removed_amt_2, added_amt_2) = register_safes_and_nodes_on_network_registry(
+            instances.network_registry.clone(),
+            safe_addresses.clone(),
+            node_addresses.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(removed_amt_2, 0, "should not remove any safe");
+        assert_eq!(added_amt_2, 3, "there should be 3 additions");
     }
 }

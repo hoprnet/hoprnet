@@ -13,11 +13,9 @@ use crate::{
 use bindings::hopr_token::HoprToken;
 use clap::Parser;
 use ethers::{
-    providers::Middleware,
     types::{H160, U256},
     utils::parse_units,
 };
-use hopr_primitive_types::primitives::Address;
 // use ethers::types::Address;
 use log::info;
 use std::{ops::Sub, str::FromStr};
@@ -81,15 +79,12 @@ impl FaucetArgs {
         } = self;
 
         // Include provided address
-        let mut addresses_all: Vec<Address> = Vec::new();
-        // validate and arrayfy provided list of addresses
+        let mut eth_addresses_all: Vec<H160> = Vec::new();
         if let Some(addresses) = address {
-            addresses_all.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
+            eth_addresses_all.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        addresses_all.extend(local_identity.to_addresses().unwrap());
-
-        let eth_addresses_all: Vec<H160> = addresses_all.into_iter().map(|a| a.into()).collect();
+        eth_addresses_all.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
         info!("All the addresses: {:?}", eth_addresses_all);
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions

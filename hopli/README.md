@@ -24,7 +24,7 @@ An additional parameter which specifies its prefix can also be passed.
 
 When reading from a path, use `--identity-from-path "./test/hopr.id"`
 
-Path and directory can be passed at the same time.
+Path and directory can be passed at the same time. When both are provided, files from the directory are read first and file from path is read later.
 
 Note: when CREATing identities, you must pass `--identity-directory`. `--identity-from-path` is not accepted
 
@@ -63,8 +63,6 @@ To fund nodes with password, a [path to it](####Identity-directory-or-path), a [
 `--hopr-amount` and `native-amount` can be floating number
 
 ```
-IDENTITY_PASSWORD=local \
-PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --network anvil-localhost \
     --contracts-root "../ethereum/contracts" \
@@ -75,28 +73,70 @@ hopli faucet \
     --hopr-amount 10 --native-amount 0.1
 ```
 
-To register nodes
+### Network registery
+#### Register nodes
+A manager (EOA) of the network registry can register node and safe pairs to the network. Nodes' Ethereum addresses can either be provided as string or read from identity files.
+
+The private key to the manager wallet (EOA) should be provided as in [private key](####Private-key).
+
+Note that when registering a node, if the said node:
+- has been registered with the given safe, skip it. (It's idempotent) 
+- has been registered to a different safe, remove the registration with the old safe and register with the new safe
+- has not been registered to the network registry, register it.
+
+After the registration, manager will also call "force-sync" to set all the added safes to be "eligible" to the network.
 
 ```
 export PRIVATE_KEY=<bank_private_key> \
-hopli register-in-network-registry \
+hopli network-registry \
+    --action manager-register \
     --network anvil-localhost \
-    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
     --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
-    --contracts-root "../ethereum/contracts"
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
 with node identities in the network registry contract
 
 ```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=switzerland \
-hopli register-in-network-registry \
+hopli -- network-registry \
+    --action manager-register \
     --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
-    --contracts-root "../ethereum/contracts"
+    --contracts-root "../ethereum/contracts" \
+    --identity-directory "./test" --password-path "./test/pwd" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
+```
+
+#### Deregister nodes
+A manager (EOA) of the network registry can remove node and safe pairs from the network. Nodes' Ethereum addresses can either be provided as string or read from identity files.
+
+The private key to the manager wallet (EOA) should be provided as in [private key](####Private-key).
+
+If the node address has not been registered in the network registry contract, it's will be skipped. 
+
+```
+hopli -- network-registry \
+    --action manager-deregister \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
+```
+
+#### Sync eligibility
+A manager (EOA) of the network registry can forcely set eligibility of safes.
+
+```
+hopli -- network-registry \
+    --action manager-force-sync \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --eligibility true \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
 Express create a safe and a module instances, then set default permissions

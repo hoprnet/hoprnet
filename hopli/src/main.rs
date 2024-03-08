@@ -5,8 +5,7 @@ use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
-use crate::network_registry::RegisterInNetworkRegistryArgs;
-use crate::sync_network_registry::SyncNetworkRegistryArgs;
+use crate::network_registry::NetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 pub mod create_safe_module;
@@ -19,7 +18,6 @@ pub mod migrate_safe_module;
 pub mod move_node_to_safe_module;
 pub mod network_registry;
 pub mod process;
-pub mod sync_network_registry;
 pub mod utils;
 
 #[derive(Parser, Debug)]
@@ -50,7 +48,7 @@ enum Commands {
     #[clap(
         about = "Registry some nodes Ethereum address with its staking account address onto the network registry contract. It requires a manager account to perform this action."
     )]
-    RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
+    NetworkRegistry(NetworkRegistryArgs),
 
     /// Perform all the necessary steps before staring hopd.
     /// - Create a Safe proxy instance and a node management instance. Include nodes to module
@@ -74,11 +72,6 @@ enum Commands {
     /// It requires a manager account to perform this action.
     #[clap(about = "Move a registered node to a new safe and module pair. It requires access to a manager account.")]
     MoveNodeToSafeModule(MoveNodeToSafeModuleArgs),
-
-    /// Sync eligibility of safes on network registry.
-    /// It requires a manager account to perform this action.
-    #[clap(about = "Sync eligibility of safes on network registry. It requires access to a manager account.")]
-    SyncNetworkRegistry(SyncNetworkRegistryArgs),
 }
 
 #[async_std::main]
@@ -92,8 +85,8 @@ async fn main() -> Result<(), HelperErrors> {
         Commands::Faucet(opt) => {
             opt.async_run().await?;
         }
-        Commands::RegisterInNetworkRegistry(opt) => {
-            opt.run()?;
+        Commands::NetworkRegistry(opt) => {
+            opt.async_run().await?;
         }
         Commands::CreateSafeModule(opt) => {
             opt.run()?;
@@ -102,9 +95,6 @@ async fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::MoveNodeToSafeModule(opt) => {
-            opt.run()?;
-        }
-        Commands::SyncNetworkRegistry(opt) => {
             opt.run()?;
         }
     }

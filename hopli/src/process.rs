@@ -41,38 +41,6 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -
     Ok(())
 }
 
-/// Launch a child process to call foundry faucet command
-///
-/// # Arguments
-///
-/// * `network` - Name of the environment that nodes run in
-/// * `address` - Address that the tool fund
-/// * `hopr_amount` - Amount of HOPR tokens to be funded
-/// * `native_amount` - Amount of native tokens to be funded
-pub fn child_process_call_foundry_faucet(
-    network: &str,
-    address: &String,
-    hopr_amount: &str,
-    native_amount: &str,
-) -> Result<(), HelperErrors> {
-    let hopr_amount_str = hopr_amount.to_string();
-    let native_amount_str = native_amount.to_string();
-    // let addresses_str = format!("{:#x}", &address);
-
-    let faucet_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "transferOrMintHoprAndSendNativeToAmount(address,uint256,uint256)",
-        &address,
-        &hopr_amount_str,
-        &native_amount_str,
-    ];
-
-    child_process_call_foundry(network, &faucet_args)
-}
-
 /// Launch a child process to call foundry self-register command
 ///
 /// # Arguments
@@ -188,81 +156,6 @@ pub fn child_process_call_foundry_express_setup_safe_module(
     ];
 
     child_process_call_foundry(network, &express_setup_safe_args)
-}
-
-/// Launch a child process to call foundry command. Note that self-register is disabled
-///
-/// # Arguments
-///
-/// * `network` - Name of the network that nodes run in
-/// * `node_address` - Ethereum addresses of HOPR nodes to be registered under the caller
-pub fn child_process_call_foundry_self_register(network: &str, node_address: &String) -> Result<(), HelperErrors> {
-    // add brackets to around the string
-    let peer_id_string = ["[", node_address, "]"].concat();
-    let self_register_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "selfRegisterNodes(string[])",
-        &peer_id_string,
-    ];
-
-    child_process_call_foundry(network, &self_register_args)
-}
-
-/// Launch a child process to call foundry command
-///
-/// # Arguments
-///
-/// * `network` - Name of the network that nodes run in
-/// * `staking_address` - Ethereum addresses of staking safes
-/// * `node_address` - Ethereum addresses of HOPR nodes to be registered under the caller
-pub fn child_process_call_foundry_manager_register(
-    network: &str,
-    staking_address: &String,
-    node_address: &String,
-) -> Result<(), HelperErrors> {
-    // add brackets to around the string
-    let staking_address_string = ["[", staking_address, "]"].concat();
-    let node_address_string = ["[", node_address, "]"].concat();
-    let manager_register_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "registerNodes(address[],address[])",
-        &staking_address_string,
-        &node_address_string,
-    ];
-
-    child_process_call_foundry(network, &manager_register_args)
-}
-
-/// Launch a child process to call foundry command
-///
-/// # Arguments
-///
-/// * `network` - Name of the network that nodes run in
-/// * `staking_address` - Addresses of staking accounts
-/// * `eligibilities` - Array of eligibility
-pub fn child_process_call_foundry_set_eligibility(
-    network: &str,
-    staking_address: &String,
-    eligibilities: &String,
-) -> Result<(), HelperErrors> {
-    // add brackets to around the string
-    let set_eligibility_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "forceSyncEligibility(address[],bool[])",
-        staking_address,
-        eligibilities,
-    ];
-
-    child_process_call_foundry(network, &set_eligibility_args)
 }
 
 /// Launch a child process to call foundry command

@@ -250,7 +250,7 @@ pub struct IdentityArgs {
 
     /// Arguments to locate one or multiple identity file(s)
     #[clap(help = "Action with identity `create` or `read`", flatten)]
-    local_identity: IdentityFileArgs,
+    pub local_identity: IdentityFileArgs,
 
     /// Number of identities to be generated
     #[clap(
@@ -260,7 +260,7 @@ pub struct IdentityArgs {
         value_parser = RangedU64ValueParser::<u32>::new().range(1..),
         default_value_t = 1
     )]
-    number: u32,
+    pub number: u32,
 }
 
 impl IdentityArgs {
@@ -485,6 +485,34 @@ mod tests {
 
         let vp = path_args.get_files();
         assert_eq!(1, vp.len());
+    }
+
+    #[test]
+    fn pass_get_files_from_directory_and_path() {
+        // an path to file
+        let tmp_file = tempdir().unwrap();
+        let path_file = tmp_file.path().to_str().unwrap();
+        create_file(path_file, None, 4);
+        let id_path = PathBuf::from(format!("{path_file}/fileid1"));
+
+        // a dir for files
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().to_str().unwrap();
+        create_file(path, None, 4);
+
+        let dir_args = IdentityFromDirectoryArgs {
+            identity_directory: Some(path.to_string()),
+            identity_prefix: None,
+        };
+
+        let path_args: IdentityFileArgs = IdentityFileArgs {
+            identity_from_directory: Some(dir_args),
+            identity_from_path: Some(id_path),
+            password: identity::PasswordArgs { password_path: None },
+        };
+
+        let vp = path_args.get_files();
+        assert_eq!(5, vp.len());
     }
 
     fn create_file(dir_name: &str, prefix: Option<String>, num: u32) {
