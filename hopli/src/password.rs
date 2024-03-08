@@ -49,8 +49,8 @@ pub struct PasswordsArgs {
         help = "The path to a file containing the old password",
         long_help = "The path to read the old password. If not specified, the IDENTITY_PASSWORD environment variable.",
         value_hint = ValueHint::FilePath,
-        name = "old_password",
-        value_name = "OLD_PASSWORD"
+        name = "old-password-path",
+        value_name = "IDENTITY_PASSWORD"
     )]
     old_password_path: Option<PathBuf>,
 
@@ -59,8 +59,8 @@ pub struct PasswordsArgs {
         help = "The path to a file containing the new password",
         long_help = "The path to read the new password. If not specified, the NEW_IDENTITY_PASSWORD environment variable.",
         value_hint = ValueHint::FilePath,
-        name = "new_password",
-        value_name = "NEW_PASSWORD"
+        name = "new-password-path",
+        value_name = "NEW_IDENTITY_PASSWORD"
     )]
     new_password_path: Option<PathBuf>,
 }
