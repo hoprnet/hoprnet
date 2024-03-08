@@ -139,6 +139,13 @@ hopli -- network-registry \
     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
+### Safe module
+To launch a HOPR node, it requires a Safe with HOPR node management module to be pre-established. 
+Such a safe is designed to hold assets (wxHOPR tokens in particular) so that funds are held outside of node for better security. 
+HOPR node management module is a plugin to the safe so that permitted nodes can interact with the Safe to transfer funds between the said Safe and the HoprChannels smart contract.
+The node management module manages all the permissions that its registered node can perform on the Safe.
+
+#### Create a safe and module pair, and set default permissions 
 Express create a safe and a module instances, then set default permissions
 
 ```

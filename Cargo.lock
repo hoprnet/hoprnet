@@ -3229,6 +3229,7 @@ dependencies = [
  "chain-rpc",
  "chain-types",
  "clap",
+ "env_logger",
  "ethers",
  "hex",
  "hex-literal",
