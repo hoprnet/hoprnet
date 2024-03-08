@@ -88,7 +88,7 @@ jobs:
           if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
             docker_pr_tag=$(./scripts/get-current-version.sh docker)
           else
-            docker_pr_tag=$(./scripts/get-next-version.sh Build | sed 's/+/-/')
+            docker_pr_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           fi
           # Set docker release latest tag
           declare base_branch=${{ github.event.pull_request.base.ref }}

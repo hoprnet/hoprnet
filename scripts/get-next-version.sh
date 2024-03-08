@@ -93,7 +93,7 @@ fi
 
 # Adds Build information if needed
 if [ "${release_type}" = "Build" ]; then
-    short_sha=$(git rev-parse --short HEAD)
+    short_sha=$(git rev-parse --short "${COMMIT_SHA:-HEAD}")
     new_version="${new_version}+commit.${short_sha}"
 fi
 
