@@ -5,17 +5,37 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::warn;
+use tracing::{error, warn};
 
-/// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
+pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
+    let file_str = file
+        .to_str()
+        .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))
+        .unwrap();
+
+    match HoprKeys::read_eth_keystore(file_str, password) {
+        Ok((keys, needs_migration)) => {
+            if needs_migration {
+                keys.write_eth_keystore(file_str, password).unwrap();
+            }
+            let file_key = file.file_name().unwrap();
+            Ok((String::from(file_key.to_str().unwrap()), keys))
+        }
+        Err(e) => {
+            error!("Could not decrypt keystore file at {}. {}", file_str, e.to_string());
+            Err(HelperErrors::UnableToReadIdentity)
+        }
+    }
+}
+
+/// Decrypts identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
 /// # Arguments
 ///
-/// * `identity_directory` - Directory to all the identity files
+/// * `files` - List of identity files
 /// * `password` - Password to unlock all the identity files
-/// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
 pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
-    let mut results = HashMap::with_capacity(files.len());
+    let mut results: HashMap<String, HoprKeys> = HashMap::with_capacity(files.len());
 
     for file in files.iter() {
         let file_str = file
@@ -37,6 +57,29 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
     }
 
     Ok(results)
+}
+
+pub fn update_identity_password(
+    keys: HoprKeys,
+    path: &Path,
+    password: &str,
+) -> Result<Option<(String, HoprKeys)>, HelperErrors> {
+    let file_path = path
+        .to_str()
+        .ok_or(HelperErrors::IncorrectFilename(path.to_string_lossy().to_string()))?;
+
+    if path.exists() && path.is_file() && file_path.ends_with(".id") {
+        // insert remove actual file with name `file_path`
+        fs::remove_file(file_path).map_err(|_err| HelperErrors::UnableToUpdateIdentityPassword)?;
+        keys.write_eth_keystore(file_path, password)?;
+        Ok(Some((String::from(file_path), keys)))
+    } else {
+        warn!(
+            "Could not update keystore file at {}. {}",
+            file_path, "File name does not end with `.id`"
+        );
+        Err(HelperErrors::UnableToUpdateIdentityPassword)
+    }
 }
 
 /// Create one identity file and return the ethereum address

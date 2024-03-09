@@ -27,43 +27,40 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Checkout hoprd-nodes
+      - name: Checkout hoprnet-ci
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/hoprd-nodes
-          path: "./hoprd-nodes"
+          repository: hoprnet/hoprnet-ci
+          path: "./hoprnet-ci"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
       - name: Set up environment
         id: setup
         run: |
-          docker_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
-            namespace=dufour
-            identity_pool=pull-requests-dufour
+            network=dufour
           else
-            namespace=rotsee
-            identity_pool=pull-requests-rotsee
+            network=rotsee
           fi
-          cd ./hoprd-nodes
+          cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a deploy -n ${namespace} -i ${identity_pool} -v ${docker_tag}
+          python3 ./scripts/sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
 
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./hoprd-nodes"
+          path: "./hoprnet-ci"
           commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "deployments/pr-${{ github.event.pull_request.number }}"
           title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
           body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
-          labels: ClusterHoprd
+          labels: deploy_nodes
           assignees: ${{ github.event.pull_request.user.login }}
-          # reviewers: hopr-version-bot
 
   undeploy:
     name: undeploy
@@ -79,36 +76,28 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Checkout hoprd-nodes
+      - name: Checkout hoprnet-ci
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/hoprd-nodes
-          path: "./hoprd-nodes"
+          repository: hoprnet/hoprnet-ci
+          path: "./hoprnet-ci"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
       - name: Set up environment
         run: |
-          docker_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
-          base_branch="${{ github.event.pull_request.base.ref }}"
-          # Identify parameters depending on branch
-          if [[ "${base_branch}" =~ ^"release" ]]; then
-            namespace=dufour
-          else
-            namespace=rotsee
-          fi
-          cd ./hoprd-nodes
+          docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
+          cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a undeploy -n ${namespace} -v ${docker_tag}
+          python3 ./scripts/sync-deployment.py -a undeploy -v ${docker_tag}
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./hoprd-nodes"
+          path: "./hoprnet-ci"
           commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "undeployments/pr-${{ github.event.pull_request.number }}"
           title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
           body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
-          labels: ClusterHoprd
+          labels: deploy_nodes
           assignees: ${{ github.event.pull_request.user.login }}
-          # reviewers: hopr-version-bot

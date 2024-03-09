@@ -166,6 +166,20 @@ hopli sync-network-registry --network anvil-localhost \
     --eligibility true
 ```
 
+### Update identities password
+
+To update some identites' password with old and new password as env variables. Alternatively, paths to the passwords files can be provided with `--old-password-path` and `--new-password-path`.
+
+```
+IDENTITY_PASSWORD=old_pwd
+NEW_IDENTITY_PASSWORD=new_pwd
+hopli update_identity_password \
+    --identity-directory "./test"
+```
+
+The identities will be modified inplace.
+
+
 ## Development
 
 ### Run local development
