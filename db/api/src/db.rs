@@ -59,7 +59,8 @@ impl HoprDb {
                 .auto_vacuum(SqliteAutoVacuum::Full)
                 .optimize_on_close(true, None)
                 .page_size(4096)
-                .pragma("cache_size", "-30000"), // 32M
+                .pragma("cache_size", "-30000") // 32M
+                .pragma("busy_timeout", "1000"), // 1000ms
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
