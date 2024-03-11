@@ -225,16 +225,13 @@ impl ChannelGraph {
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
+    use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::ops::Add;
     use std::str::FromStr;
     use std::time::{Duration, SystemTime};
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -430,28 +427,23 @@ mod tests {
 
     #[async_std::test]
     async fn test_channel_graph_sync() {
-        let testing_snapshot = Snapshot::default();
         let mut last_addr = ADDRESSES[0];
-        let mut db = CoreEthereumDb::new(DB::new(CurrentDbShim::new_in_memory().await), last_addr);
+        let db = hopr_db_api::db::HoprDb::new_in_memory().await;
 
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us
             let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
-            db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
-                .unwrap();
+            db.insert_channel(None, channel).await.unwrap();
 
             last_addr = *current_addr;
         }
 
         // Add a pending to close channel between 4 -> 0
         let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
-        db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-            .await
-            .unwrap();
+        db.insert_channel(None, channel).await.unwrap();
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
-        cg.sync_channels(db.get_channels().await.expect("channels should be present"))
+        cg.sync_channels(db.get_all_channels(None).await.expect("channels should be present"))
             .expect("should sync graph");
 
         assert!(cg.has_path(ADDRESSES[0], ADDRESSES[4]), "must have path from 0 -> 4");
@@ -460,7 +452,7 @@ mod tests {
             "must not sync closed channel"
         );
         assert!(
-            db.get_channels()
+            db.get_all_channels(None)
                 .await
                 .unwrap()
                 .into_iter()

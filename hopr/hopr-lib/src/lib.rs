@@ -787,7 +787,7 @@ impl Hopr {
             .insert_account(
                 None,
                 AccountEntry {
-                    public_key: self.me.public().clone(),
+                    public_key: *self.me.public(),
                     chain_addr: self.chain_api.me_onchain(),
                     entry_type: AccountType::Announced {
                         multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
@@ -861,8 +861,8 @@ impl Hopr {
                     .set_safe_info(
                         None,
                         SafeInfo {
-                            safe_address: self.safe_module_cfg.safe_address.clone(),
-                            module_address: self.safe_module_cfg.module_address.clone(),
+                            safe_address: self.safe_module_cfg.safe_address,
+                            module_address: self.safe_module_cfg.module_address,
                         },
                     )
                     .await?;
@@ -1082,7 +1082,7 @@ impl Hopr {
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
     pub async fn channel_from_hash(&self, channel: &Hash) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_by_id(None, channel.clone()).await?)
+        Ok(self.db.get_channel_by_id(None, *channel).await?)
     }
 
     /// Get the channel entry between source and destination node.
@@ -1236,7 +1236,7 @@ impl Hopr {
     pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<usize> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel = self.db.get_channel_by_id(None, channel.clone()).await?;
+        let channel = self.db.get_channel_by_id(None, *channel).await?;
         let mut redeem_count = 0;
 
         if let Some(channel) = channel {

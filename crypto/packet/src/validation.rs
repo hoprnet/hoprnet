@@ -75,15 +75,10 @@ mod tests {
     use super::*;
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
     use hex_literal::hex;
-    use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use lazy_static::lazy_static;
     use std::ops::Add;
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
 
     const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const TARGET_PRIV_BYTES: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
@@ -285,118 +280,5 @@ mod tests {
             PacketError::OutOfFunds(_) => {}
             _ => panic!("invalid error type"),
         }
-    }
-
-    #[async_std::test]
-    async fn test_ticket_workflow() {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
-
-        let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
-        let unack = UnacknowledgedTicket::new(
-            create_valid_ticket(),
-            HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
-
-        db.store_pending_acknowledgment(hkc, PendingAcknowledgement::WaitingAsRelayer(unack))
-            .await
-            .unwrap();
-        let num_tickets = db.get_tickets(None).await.unwrap();
-        assert_eq!(1, num_tickets.len(), "db should find one ticket");
-
-        let pending = db
-            .get_pending_acknowledgement(&hkc)
-            .await
-            .unwrap()
-            .expect("db should contain pending ack");
-        match pending {
-            PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
-            PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-                let ack = ticket
-                    .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
-                    .unwrap();
-                db.replace_unack_with_ack(&hkc, ack).await.unwrap();
-
-                let num_tickets = db.get_tickets(None).await.unwrap().len();
-                let num_unack = db.get_unacknowledged_tickets(None).await.unwrap().len();
-                let num_ack = db.get_acknowledged_tickets(None).await.unwrap().len();
-                assert_eq!(1, num_tickets, "db should find one ticket");
-                assert_eq!(0, num_unack, "db should not contain any unacknowledged tickets");
-                assert_eq!(1, num_ack, "db should contain exactly one acknowledged ticket");
-            }
-        }
-    }
-
-    #[async_std::test]
-    async fn test_db_should_store_ticket_index() {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
-
-        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-        let dummy_index = U256::one();
-
-        db.set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
-        let idx = db
-            .get_current_ticket_index(&dummy_channel)
-            .await
-            .unwrap()
-            .expect("db must contain ticket index");
-
-        assert_eq!(dummy_index, idx, "ticket index mismatch");
-    }
-
-    #[async_std::test]
-    async fn test_db_should_increase_ticket_index() {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
-
-        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-
-        // increase current ticket index of a non-existing channel, the result should be 1
-        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
-        let idx = db
-            .get_current_ticket_index(&dummy_channel)
-            .await
-            .unwrap()
-            .expect("db must contain ticket index");
-        assert_eq!(idx, U256::one(), "ticket index mismatch. Expecting 1");
-
-        // increase current ticket index of an existing channel where previous value is 1, the result should be 2
-        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
-        let idx = db
-            .get_current_ticket_index(&dummy_channel)
-            .await
-            .unwrap()
-            .expect("db must contain ticket index");
-        assert_eq!(idx, 2_u32.into(), "ticket index mismatch. Expecting 2");
-    }
-
-    #[async_std::test]
-    async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
-        let mut db = CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
-
-        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-        let dummy_index = 123_u32.into();
-
-        // the ticket index should be equal or greater than the given dummy index
-        db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)
-            .await
-            .unwrap();
-        let idx = db
-            .get_current_ticket_index(&dummy_channel)
-            .await
-            .unwrap()
-            .expect("db must contain ticket index");
-        assert_eq!(idx, dummy_index, "ticket index mismatch. Expecting 2");
     }
 }
