@@ -4,7 +4,6 @@
 //! as they are being popped up from the queue by a runner task.
 use async_lock::RwLock;
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
 use futures::channel::mpsc::{channel, Receiver, Sender};
@@ -28,6 +27,10 @@ use crate::errors::ChainActionsError::{
 use crate::errors::Result;
 
 use async_std::task::spawn;
+use hopr_db_api::HoprDbAllOperations;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::ticket_manager::TicketManager;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;
@@ -132,28 +135,24 @@ pub struct ActionQueueConfig {
     pub max_action_confirmation_wait: Duration,
 }
 
-struct ExecutionContext<Db, S, TxExec>
+struct ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
-    db: Arc<RwLock<Db>>,
     action_state: Arc<S>,
     tx_exec: Arc<TxExec>,
     cfg: ActionQueueConfig,
 }
 
 // Needs manual implementation, so we don't need to impose Clone restrictions on the generic args
-impl<Db, S, TxExec> Clone for ExecutionContext<Db, S, TxExec>
+impl<S, TxExec> Clone for ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
     fn clone(&self) -> Self {
         Self {
-            db: self.db.clone(),
             action_state: self.action_state.clone(),
             tx_exec: self.tx_exec.clone(),
             cfg: self.cfg,
@@ -161,25 +160,16 @@ where
     }
 }
 
-impl<Db, S, TxExec> ExecutionContext<Db, S, TxExec>
+impl<S, TxExec> ExecutionContext<S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions,
     S: ActionState,
     TxExec: TransactionExecutor,
 {
-    pub async fn execute_action(self, action: Action) -> Result<ActionConfirmation> {
+    pub async fn execute_action(self, action: Action, channel_dst: Hash) -> Result<ActionConfirmation> {
         let expectation = match action.clone() {
             Action::RedeemTicket(ack) => match ack.status {
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {
-                    let domain_separator = self
-                        .db
-                        .read()
-                        .await
-                        .get_channels_domain_separator()
-                        .await?
-                        .ok_or(MissingDomainSeparator)?;
-
-                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), domain_separator).await?;
+                    let tx_hash = self.tx_exec.redeem_ticket(ack.clone(), channel_dst).await?;
                     IndexerExpectation::new(
                         tx_hash,
                         move |event| matches!(event, ChainEventType::TicketRedeemed(channel, _) if ack.ticket.channel_id == channel.get_id()),
@@ -306,23 +296,26 @@ where
 }
 
 /// A queue of [Actions](Action) to be executed.
+///
 /// This queue awaits new Actions to arrive, translates them into Ethereum
 /// transactions via [TransactionExecutor] to execute them and await their confirmation
 /// by registering their corresponding expectations in [ActionState].
-pub struct ActionQueue<Db, S, TxExec>
+pub struct ActionQueue<T, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync,
+    T: Send + Sync + 'static,
     S: ActionState + Send + Sync,
     TxExec: TransactionExecutor + Send + Sync,
 {
+    ticket_mgr: T,
+    channel_dst: Hash,
     queue_send: Sender<(Action, ActionFinisher)>,
     queue_recv: Receiver<(Action, ActionFinisher)>,
-    ctx: ExecutionContext<Db, S, TxExec>,
+    ctx: ExecutionContext<S, TxExec>,
 }
 
-impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
+impl<T, S, TxExec> ActionQueue<T, S, TxExec>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    T: TicketManager + Clone + Send + Sync + 'static,
     S: ActionState + Send + Sync + 'static,
     TxExec: TransactionExecutor + Send + Sync + 'static,
 {
@@ -330,11 +323,12 @@ where
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
     /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
-    pub fn new(db: Arc<RwLock<Db>>, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
+    pub fn new(action_state: S, ticket_mgr: T, tx_exec: TxExec, cfg: ActionQueueConfig, channel_dst: Hash) -> Self {
         let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {
+            ticket_mgr,
+            channel_dst,
             ctx: ExecutionContext {
-                db,
                 action_state: Arc::new(action_state),
                 tx_exec: Arc::new(tx_exec),
                 cfg,
@@ -361,13 +355,14 @@ where
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
             let exec_context = self.ctx.clone();
+            let ticket_mgr_clone = self.ticket_mgr.clone();
+            let channel_dst = self.channel_dst;
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
                 trace!("start executing {act_id} ({act_name})");
 
-                let db_clone = exec_context.db.clone();
-                let tx_result = exec_context.execute_action(act.clone()).await;
+                let tx_result = exec_context.execute_action(act.clone(), channel_dst).await;
                 match &tx_result {
                     Ok(confirmation) => {
                         info!("successful {confirmation}");
@@ -377,11 +372,10 @@ where
                     }
                     Err(err) => {
                         // On error in Ticket redeem action, we also need to reset ack ticket state
-                        if let Action::RedeemTicket(mut ack) = act {
+                        if let Action::RedeemTicket(ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
-                            ack.status = AcknowledgedTicketStatus::Untouched;
 
-                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
+                            if let Err(e) = ticket_mgr_clone.update_ticket_state(&ack, AcknowledgedTicketStatus::Untouched) {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
                         }

@@ -14,22 +14,22 @@
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
 use tracing::{debug, error, info};
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::HoprDbAllOperations;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::ticket_manager::TicketManager;
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
-use crate::errors::{
-    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
-    Result,
-};
+use crate::errors::{ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist}, ChainActionsError, Result};
 use crate::redeem::TicketRedeemActions;
 use crate::ChainActions;
 
@@ -54,7 +54,10 @@ pub trait ChannelActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> ChannelActions for ChainActions<Db> {
+impl<Db, T> ChannelActions for ChainActions<Db, T>
+where
+    Db: HoprDbInfoOperations + HoprDbChannelOperations + Clone + Send + Sync + std::fmt::Debug,
+    T: TicketManager + Clone + Send + Sync + std::fmt::Debug {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.me == destination {
@@ -65,32 +68,40 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
-        debug!("current staking safe allowance is {allowance}");
-        if allowance.lt(&amount) {
-            return Err(NotEnoughAllowance);
-        }
+        // Perform all checks
+        self.db.begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move {
+                let allowance = self.db.get_safe_allowance(Some(tx)).await?;
+                debug!("current staking safe allowance is {allowance}");
+                if allowance.lt(&amount) {
+                    return Err(NotEnoughAllowance);
+                }
 
-        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current Safe HOPR balance is {hopr_balance}");
-        if hopr_balance.lt(&amount) {
-            return Err(BalanceTooLow);
-        }
+                let hopr_balance = self.db.await.get_safe_balance().await?;
+                debug!("current Safe HOPR balance is {hopr_balance}");
+                if hopr_balance.lt(&amount) {
+                    return Err(BalanceTooLow);
+                }
 
-        if self.db.read().await.is_network_registry_enabled().await?
-            && !self.db.read().await.is_allowed_to_access_network(&destination).await?
-        {
-            return Err(PeerAccessDenied);
-        }
+                if self.db.get_chain_data(Some(tx)).await?.nr_enabled
+                    && !self.db.is_allowed_in_network_registry(Some(tx), destination).await?
+                {
+                    return Err(PeerAccessDenied);
+                }
 
-        let maybe_channel = self.db.read().await.get_channel_x(&self.me, &destination).await?;
-        if let Some(channel) = maybe_channel {
-            debug!("already found existing {channel}");
-            if channel.status != ChannelStatus::Closed {
-                error!("channel to {destination} is already opened or pending to close");
-                return Err(ChannelAlreadyExists);
-            }
-        }
+                let channel_id = generate_channel_id(&self.me, &destination);
+                let maybe_channel = self.db.get_channel_by_id(Some(tx), channel_id).await?;
+                if let Some(channel) = maybe_channel {
+                    debug!("already found existing {channel}");
+                    if channel.status != ChannelStatus::Closed {
+                        error!("channel to {destination} is already opened or pending to close");
+                        return Err(ChannelAlreadyExists);
+                    }
+                }
+                Ok(())
+            })).await?;
+
 
         info!("initiating channel open to {destination} with {amount}");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
@@ -102,19 +113,24 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
-        debug!("current staking safe allowance is {allowance}");
-        if allowance.lt(&amount) {
-            return Err(NotEnoughAllowance);
-        }
+        let maybe_channel = self.db.begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move {
+                let allowance = self.db.get_safe_allowance(Some(tx)).await?;
+                debug!("current staking safe allowance is {allowance}");
+                if allowance.lt(&amount) {
+                    return Err(NotEnoughAllowance);
+                }
 
-        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current Safe HOPR balance is {hopr_balance}");
-        if hopr_balance.lt(&amount) {
-            return Err(BalanceTooLow);
-        }
+                let hopr_balance = self.db.get_safe_balance(Some(tx)).await?;
+                debug!("current Safe HOPR balance is {hopr_balance}");
+                if hopr_balance.lt(&amount) {
+                    return Err(BalanceTooLow);
+                }
 
-        let maybe_channel = self.db.read().await.get_channel(&channel_id).await?;
+                Ok(self.db.get_channel_by_id(Some(tx),channel_id).await?)
+            })).await?;
+
         match maybe_channel {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
@@ -135,10 +151,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
-        let maybe_channel = match direction {
-            ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
-            ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
+        let channel_id = match direction {
+            ChannelDirection::Incoming => generate_channel_id(&counterparty, &self.me),
+            ChannelDirection::Outgoing => generate_channel_id(&self.me, &counterparty),
         };
+
+        let maybe_channel = self.db.get_channel_by_id(None, channel_id).await?;
 
         match maybe_channel {
             Some(channel) => {

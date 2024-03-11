@@ -19,6 +19,11 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
+use hopr_db_api::accounts::HoprDbAccountOperations;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::HoprDbAllOperations;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::ticket_manager::TicketManager;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
@@ -42,7 +47,10 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> NodeActions for ChainActions<Db> {
+impl<Db, T> NodeActions for ChainActions<Db, T>
+where
+    Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
+    T: TicketManager + Clone + Send + Sync + std::fmt::Debug {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
@@ -63,9 +71,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Node
 
         if !self
             .db
-            .read()
-            .await
-            .get_public_node_accounts()
+            .get_accounts(None, true)
             .await?
             .into_iter()
             .any(|account| {
@@ -97,8 +103,6 @@ mod tests {
     use crate::node::NodeActions;
     use crate::ChainActions;
     use async_lock::RwLock;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;

@@ -23,14 +23,17 @@
 //! by the Indexer.
 use async_lock::RwLock;
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use futures::StreamExt;
 use tracing::{debug, error, info, warn};
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::ticket_manager::{TicketManager, TicketSelector};
 use utils_db::errors::DbError;
 
 use crate::action_queue::{ActionSender, PendingAction};
@@ -71,49 +74,11 @@ pub trait TicketRedeemActions {
     async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> Result<PendingAction>;
 }
 
-async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    match ack_ticket.status {
-        AcknowledgedTicketStatus::Untouched => {
-            let dst = db
-                .get_channels_domain_separator()
-                .await
-                .and_then(|separator| separator.ok_or(DbError::NotFound))?;
-
-            // Check if we're going to redeem a winning ticket
-            if !ack_ticket.is_winning_ticket(&dst) {
-                return Err(NotAWinningTicket);
-            }
-        }
-        AcknowledgedTicketStatus::BeingAggregated => return Err(WrongTicketState(ack_ticket.to_string())),
-        AcknowledgedTicketStatus::BeingRedeemed => {}
-    }
-
-    ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
-    debug!(
-        "setting a winning {} as being redeemed with TX hash {tx_hash}",
-        ack_ticket.ticket
-    );
-    Ok(db.update_acknowledged_ticket(ack_ticket).await?)
-}
-
-#[tracing::instrument(level = "debug")]
-async fn unchecked_ticket_redeem<Db>(
-    db: Arc<RwLock<Db>>,
-    mut ack_ticket: AcknowledgedTicket,
-    on_chain_tx_sender: ActionSender,
-) -> Result<PendingAction>
-where
-    Db: HoprCoreEthereumDbActions + std::fmt::Debug,
-{
-    set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
-}
-
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> TicketRedeemActions for ChainActions<Db> {
+impl<Db, T> TicketRedeemActions for ChainActions<Db, T>
+where
+    Db: HoprDbChannelOperations + Clone + Send + Sync + std::fmt::Debug,
+    T: TicketManager + Clone + Send + Sync + std::fmt::Debug {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
@@ -167,19 +132,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Tick
     ) -> Result<Vec<PendingAction>> {
         let channel_id = channel.get_id();
 
-        let count_redeemable_tickets = self
-            .db
-            .read()
-            .await
-            .get_acknowledged_tickets(Some(*channel))
-            .await?
-            .into_iter()
-            .filter(|t| {
-                t.status == AcknowledgedTicketStatus::Untouched
-                    && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
-                    && (!only_aggregated || t.ticket.is_aggregated())
-            })
-            .count();
+        let mut selector: TicketSelector = channel.into();
+        selector.only_aggregated = only_aggregated;
+        selector.state = Some(AcknowledgedTicketStatus::Untouched);
+
+        let count_redeemable_tickets = self.ticket_manager.count_tickets(selector).await?;
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
         );
@@ -189,51 +146,27 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Tick
             return Ok(vec![]);
         }
 
-        // Keep holding the DB write lock until we mark all the eligible tickets as BeginRedeemed
-        let mut to_redeem = Vec::new();
-        {
-            // Lock the database and retrieve again all the redeemable tickets
-            let mut db = self.db.write().await;
-            let redeemable = db
-                .get_acknowledged_tickets(Some(*channel))
-                .await?
-                .into_iter()
-                .filter(|t| {
-                    AcknowledgedTicketStatus::Untouched == t.status
-                        && channel.channel_epoch == U256::from(t.ticket.channel_epoch)
-                        && (!only_aggregated || t.ticket.is_aggregated())
-                });
-
-            for mut avail_to_redeem in redeemable {
-                if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
-                    error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
-                } else {
-                    to_redeem.push(avail_to_redeem);
-                }
-            }
-        }
-
-        info!(
-            "{} acknowledged tickets are still available to redeem in {channel_id}",
-            to_redeem.len()
-        );
-
+        let mut redeem_stream = self.ticket_manager.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed).await?;
         let mut receivers: Vec<PendingAction> = vec![];
-
-        for acked_ticket in to_redeem {
-            let ticket_index = acked_ticket.ticket.index;
-            match unchecked_ticket_redeem(self.db.clone(), acked_ticket, self.tx_sender.clone()).await {
+        while let Some(ack_ticket) = redeem_stream.next().await {
+            let action = self.tx_sender.send(Action::RedeemTicket(ack_ticket)).await;
+            match action {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to submit transaction that redeem ticket with index {} in channel {} due to {}",
-                        ticket_index, channel_id, e
+                        "Failed to submit transaction that redeem {ack_ticket}: {e}",
                     );
                 }
             }
         }
+
+
+        info!(
+            "{} acknowledged tickets were submitted to redeem in {channel_id}",
+            receivers.len()
+        );
 
         Ok(receivers)
     }

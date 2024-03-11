@@ -50,7 +50,7 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 /// streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
-/// 1. prime the RPC endpoinnt
+/// 1. prime the RPC endpoint
 /// 2. request an RPC stream of changes to process
 /// 3. process block and log stream
 /// 4. ensure finalization by postponing processing until the head is far enough

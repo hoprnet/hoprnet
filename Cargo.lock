@@ -1152,7 +1152,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "bindings",
- "chain-db",
  "chain-rpc",
  "chain-types",
  "env_logger",
@@ -1162,6 +1161,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1173,7 +1173,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]

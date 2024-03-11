@@ -26,10 +26,9 @@ thiserror = { workspace = true }
 
 bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-db = { workspace = true }
+hopr-db-api = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
-utils-db = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 tracing = { workspace = true }
