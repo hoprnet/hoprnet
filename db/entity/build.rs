@@ -53,7 +53,7 @@ fn main() {
     );
 
     let codegen_path = Path::new(&cargo_manifest_dir)
-        .join("src/codegen")
+        .join("src/codegen/sqlite")
         .into_os_string()
         .into_string()
         .expect("should contain valid temporary db path");

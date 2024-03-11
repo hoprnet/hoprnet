@@ -145,7 +145,7 @@ impl HoprDbPeersOperations for HoprDb {
             ..Default::default()
         };
 
-        let _ = new_peer.insert(&self.db).await?;
+        let _ = new_peer.insert(&self.peers_db).await?;
 
         Ok(())
     }
@@ -159,7 +159,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .to_bytes(),
                 )),
             )
-            .exec(&self.db)
+            .exec(&self.peers_db)
             .await?;
 
         if res.rows_affected > 0 {
@@ -180,7 +180,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .to_bytes(),
                 )),
             )
-            .one(&self.db)
+            .one(&self.peers_db)
             .await?;
 
         if let Some(model) = row {
@@ -214,7 +214,7 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.heartbeats_sent = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_sent as i32));
             peer_data.heartbeats_successful = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_succeeded as i32));
 
-            peer_data.update(&self.db).await?;
+            peer_data.update(&self.peers_db).await?;
 
             Ok(())
         } else {
@@ -234,7 +234,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .to_bytes(),
                 )),
             )
-            .one(&self.db)
+            .one(&self.peers_db)
             .await?;
 
         if let Some(model) = row {
@@ -256,7 +256,7 @@ impl HoprDbPeersOperations for HoprDb {
                 hopr_db_entity::network_peer::Column::LastSeen,
                 if sort_last_seen_asc { Order::Asc } else { Order::Desc },
             )
-            .stream(&self.db)
+            .stream(&self.peers_db)
             .await?;
 
         Ok(Box::pin(stream! {
@@ -291,7 +291,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
                 )
-                .count(&self.db)
+                .count(&self.peers_db)
                 .await? as u32,
             good_quality_non_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
@@ -300,7 +300,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
                 )
-                .count(&self.db)
+                .count(&self.peers_db)
                 .await? as u32,
             bad_quality_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
@@ -309,7 +309,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
                 )
-                .count(&self.db)
+                .count(&self.peers_db)
                 .await? as u32,
             bad_quality_non_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
@@ -318,7 +318,7 @@ impl HoprDbPeersOperations for HoprDb {
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
                 )
-                .count(&self.db)
+                .count(&self.peers_db)
                 .await? as u32,
         })
     }
@@ -326,7 +326,7 @@ impl HoprDbPeersOperations for HoprDb {
     async fn cleanup(&self) -> Result<()> {
         let res = hopr_db_entity::network_peer::Entity::delete_many()
             .filter(sea_orm::Condition::all())
-            .exec(&self.db)
+            .exec(&self.peers_db)
             .await?;
 
         info!("Cleaned up {} rows from the 'peers' table", res.rows_affected);

@@ -1,31 +1,38 @@
 use sea_orm_migration::prelude::*;
 
+use crate::BackendType;
+
 #[derive(DeriveMigrationName)]
-pub struct Migration;
+pub struct Migration(pub crate::BackendType);
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let mut table = Table::create()
+            .table(Ticket::Table)
+            .if_not_exists()
+            .col(
+                ColumnDef::new(Ticket::Id)
+                    .integer()
+                    .not_null()
+                    .auto_increment()
+                    .primary_key(),
+            )
+            .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
+            .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
+            .col(ColumnDef::new(Ticket::Index).binary_len(8).not_null())
+            .col(ColumnDef::new(Ticket::IndexOffset).unsigned().not_null())
+            .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
+            .col(ColumnDef::new(Ticket::ChannelEpoch).binary_len(8).not_null())
+            .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
+            .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
+            .clone();
+
         manager
-            .create_table(
-                Table::create()
-                    .table(Ticket::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Ticket::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
-                    .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
-                    .col(ColumnDef::new(Ticket::Index).binary_len(8).not_null())
-                    .col(ColumnDef::new(Ticket::IndexOffset).unsigned().not_null())
-                    .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
-                    .col(ColumnDef::new(Ticket::ChannelEpoch).binary_len(8).not_null())
-                    .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
-                    .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
+            .create_table(if self.0 == BackendType::SQLite {
+                table.to_owned()
+            } else {
+                table
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_ticket_channel")
@@ -38,8 +45,8 @@ impl MigrationTrait for Migration {
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Restrict),
                     )
-                    .to_owned(),
-            )
+                    .to_owned()
+            })
             .await?;
 
         manager

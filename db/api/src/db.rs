@@ -3,7 +3,7 @@ use std::sync::Arc;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_primitive_types::primitives::Balance;
-use migration::{Migrator, MigratorTrait};
+use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::SqlxSqliteConnector;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
@@ -35,22 +35,26 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
+    pub(crate) tickets_db: sea_orm::DatabaseConnection,
+    pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_table_mutex: Arc<async_lock::Mutex<()>>,
 }
 
-pub const SQL_DB_FILE_NAME: &str = "hopr_db_1.db";
+pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
+pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
+pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
 impl HoprDb {
     pub async fn new(directory: String, cfg: HoprDbConfig) -> Self {
         let dir = Path::new(&directory);
         std::fs::create_dir_all(dir).unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
 
-        let pool = SqlitePool::connect_with(
+        let index = SqlitePool::connect_with(
             SqliteConnectOptions::default()
-                .filename(dir.join(SQL_DB_FILE_NAME))
+                .filename(dir.join(SQL_DB_INDEX_FILE_NAME))
                 .create_if_missing(cfg.create_if_missing)
                 .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
                 .log_statements(LevelFilter::Debug)
@@ -65,17 +69,70 @@ impl HoprDb {
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        Self::new_sqlx_sqlite(pool).await
+        let peers = SqlitePool::connect_with(
+            SqliteConnectOptions::default()
+                .filename(dir.join(SQL_DB_PEERS_FILE_NAME))
+                .create_if_missing(cfg.create_if_missing)
+                .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
+                .log_statements(LevelFilter::Debug)
+                .journal_mode(SqliteJournalMode::Wal)
+                .synchronous(SqliteSynchronous::Normal)
+                .auto_vacuum(SqliteAutoVacuum::Full)
+                .optimize_on_close(true, None)
+                .page_size(4096)
+                .pragma("cache_size", "-30000") // 32M
+                .pragma("busy_timeout", "1000"), // 1000ms
+        )
+        .await
+        .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
+
+        let tickets = SqlitePool::connect_with(
+            SqliteConnectOptions::default()
+                .filename(dir.join(SQL_DB_TICKETS_FILE_NAME))
+                .create_if_missing(cfg.create_if_missing)
+                .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
+                .log_statements(LevelFilter::Debug)
+                .journal_mode(SqliteJournalMode::Wal)
+                .synchronous(SqliteSynchronous::Normal)
+                .auto_vacuum(SqliteAutoVacuum::Full)
+                .optimize_on_close(true, None)
+                .page_size(4096)
+                .pragma("cache_size", "-30000") // 32M
+                .pragma("busy_timeout", "1000"), // 1000ms
+        )
+        .await
+        .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
+
+        Self::new_sqlx_sqlite(index, peers, tickets).await
     }
 
     pub async fn new_in_memory() -> Self {
-        Self::new_sqlx_sqlite(SqlitePool::connect(":memory:").await.unwrap()).await
+        Self::new_sqlx_sqlite(
+            SqlitePool::connect(":memory:").await.unwrap(),
+            SqlitePool::connect(":memory:").await.unwrap(),
+            SqlitePool::connect(":memory:").await.unwrap(),
+        )
+        .await
     }
 
-    async fn new_sqlx_sqlite(pool: SqlitePool) -> Self {
-        let db = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
+    async fn new_sqlx_sqlite(index_db: SqlitePool, tickets_db: SqlitePool, peers_db: SqlitePool) -> Self {
+        let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
 
-        Migrator::up(&db, None).await.expect("cannot apply database migration");
+        MigratorIndex::up(&index_db, None)
+            .await
+            .expect("cannot apply database migration");
+
+        let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db);
+
+        MigratorTickets::up(&index_db, None)
+            .await
+            .expect("cannot apply database migration");
+
+        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db);
+
+        MigratorPeers::up(&index_db, None)
+            .await
+            .expect("cannot apply database migration");
 
         let unacked_tickets = Cache::builder()
             .time_to_idle(std::time::Duration::from_secs(30))
@@ -93,7 +150,9 @@ impl HoprDb {
             .build();
 
         Self {
-            db,
+            db: index_db,
+            tickets_db,
+            peers_db,
             unacked_tickets,
             unrealized_value,
             ticket_index,
