@@ -115,7 +115,7 @@ impl HoprDb {
         .await
     }
 
-    async fn new_sqlx_sqlite(index_db: SqlitePool, tickets_db: SqlitePool, peers_db: SqlitePool) -> Self {
+    async fn new_sqlx_sqlite(index_db: SqlitePool, peers_db: SqlitePool, tickets_db: SqlitePool) -> Self {
         let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
 
         MigratorIndex::up(&index_db, None)
