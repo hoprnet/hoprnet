@@ -93,17 +93,11 @@ pub trait HoprDbTicketOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        ack: Acknowledgement,
-        me: ChainKeypair,
-    ) -> Result<AckResult>;
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> Result<AckResult>;
 
     /// Process the data into an outgoing packet
-    async fn to_send<'a>(
-        &'a self,
-        tx: OptTx<'a>,
+    async fn to_send(
+        &self,
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
@@ -111,9 +105,8 @@ pub trait HoprDbTicketOperations {
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
-    async fn from_recv<'a>(
-        &'a self,
-        tx: OptTx<'a>,
+    async fn from_recv(
+        &self,
         data: Box<[u8]>,
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
@@ -218,6 +211,7 @@ impl HoprDbTicketOperations for HoprDb {
 
     async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()> {
         let myself = self.clone();
+
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -274,17 +268,12 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    #[instrument(level = "trace", skip(self, tx))]
-    async fn handle_acknowledgement<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        ack: Acknowledgement,
-        me: ChainKeypair,
-    ) -> Result<AckResult> {
+    #[instrument(level = "trace", skip(self))]
+    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> Result<AckResult> {
         let myself = self.clone();
 
         let result = self
-            .nest_transaction(tx)
+            .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -352,10 +341,9 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(result)
     }
 
-    #[instrument(level = "trace", skip(self, tx))]
-    async fn to_send<'a>(
-        &'a self,
-        tx: OptTx<'a>,
+    #[instrument(level = "trace", skip(self))]
+    async fn to_send(
+        &self,
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
@@ -363,7 +351,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
 
         let components = self
-            .nest_transaction(tx)
+            .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -429,10 +417,9 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    #[instrument(level = "trace", skip(self, tx))]
-    async fn from_recv<'a>(
-        &'a self,
-        tx: OptTx<'a>,
+    #[instrument(level = "trace", skip(self))]
+    async fn from_recv(
+        &self,
         data: Box<[u8]>,
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
@@ -472,7 +459,7 @@ impl HoprDbTicketOperations for HoprDb {
                 let myself = self.clone();
 
                 let t = self
-                    .nest_transaction(tx)
+                    .begin_transaction()
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
