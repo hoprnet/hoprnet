@@ -41,37 +41,6 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -
     Ok(())
 }
 
-/// Launch a child process to call foundry self-register command
-///
-/// # Arguments
-///
-/// * `network` - Name of the network that nodes run in
-/// * `environment_type` - Type of the environment that nodes run in
-/// * `chain_keys` - Ethereum addresses of Chain keys of HOPR nodes to be registered under the caller (comma separated)
-pub fn child_process_call_foundry_express_initialization(
-    network: &str,
-    ethereum_address: &String,
-    hopr_amount: &str,
-    native_amount: &str,
-    chain_keys: &String,
-) -> Result<(), HelperErrors> {
-    // add brackets to around the string
-    let chain_addresses_str = ["[", &chain_keys, "]"].concat();
-    let self_register_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "expressInitialization(address[],uint256,uint256,string[])",
-        &ethereum_address,
-        &hopr_amount,
-        &native_amount,
-        &chain_addresses_str,
-    ];
-
-    child_process_call_foundry(network, &self_register_args)
-}
-
 /// Launch a child process to call foundry migrate-safe-module command
 ///
 /// # Arguments
@@ -128,34 +97,6 @@ pub fn child_process_call_foundry_move_node_to_safe_module(
     ];
 
     child_process_call_foundry(network, &move_node_args)
-}
-
-/// Launch a child process to call foundry express-setup-safe-module command
-///
-/// # Arguments
-///
-/// * `network` - Name of the network that nodes run in
-/// * `environment_type` - Type of the environment that nodes run in
-/// * `node_address` - Addresses of HOPR nodes to be included in the module
-pub fn child_process_call_foundry_express_setup_safe_module(
-    network: &str,
-    ethereum_address: &String,
-    hopr_amount: &str,
-    native_amount: &str,
-) -> Result<(), HelperErrors> {
-    // add brackets to around the string
-    let express_setup_safe_args = vec![
-        "script",
-        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-        "--broadcast",
-        "--sig",
-        "expressSetupSafeModule(address[],uint256,uint256)",
-        ethereum_address,
-        hopr_amount,
-        native_amount,
-    ];
-
-    child_process_call_foundry(network, &express_setup_safe_args)
 }
 
 /// Launch a child process to call foundry command

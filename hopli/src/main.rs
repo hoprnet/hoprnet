@@ -1,14 +1,13 @@
 //! `hopli` is a collection of commands to help with identity creation, funding, registration, etc. for HOPR nodes
 
-use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
 use crate::network_registry::NetworkRegistryArgs;
+use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
-pub mod create_safe_module;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
@@ -18,6 +17,7 @@ pub mod migrate_safe_module;
 pub mod move_node_to_safe_module;
 pub mod network_registry;
 pub mod process;
+pub mod safe_module;
 pub mod utils;
 
 #[derive(Parser, Debug)]
@@ -50,16 +50,22 @@ enum Commands {
     )]
     NetworkRegistry(NetworkRegistryArgs),
 
-    /// Perform all the necessary steps before staring hopd.
-    /// - Create a Safe proxy instance and a node management instance. Include nodes to module
-    /// - Configure default permissions (for HOPR- Token, Channels, and Announcement contracts)
-    /// - Approve token transfer for the Safe proxy
-    /// - Fund Safe with tokens and fund nodes with xDAI
-    /// - Use the manager account to include the created Safe and provided node address to the Network Registry contract.
-    #[clap(
-        about = "Create a safe proxy instance and a node management module instance, include nodes to the created module, configure default permissions, fund, register it to the Network Registry. It requires access to a manager account."
-    )]
-    CreateSafeModule(CreateSafeModuleArgs),
+    // /// Perform all the necessary steps before staring hopd.
+    // /// - Create a Safe proxy instance and a node management instance. Include nodes to module
+    // /// - Configure default permissions (for HOPR- Token, Channels, and Announcement contracts)
+    // /// - Approve token transfer for the Safe proxy
+    // /// - Fund Safe with tokens and fund nodes with xDAI
+    // /// - Use the manager account to include the created Safe and provided node address to the Network Registry contract.
+    // #[clap(
+    //     about = "Create a safe proxy instance and a node management module instance, include nodes to the created module, configure default permissions, fund, register it to the Network Registry. It requires access to a manager account."
+    // )]
+    // CreateSafeModule(CreateSafeModuleArgs),
+    /// Commands around safe module
+    #[command(visible_alias = "se")]
+    SafeModule {
+        #[command(subcommand)]
+        command: SafeModuleSubcommands,
+    },
 
     /// Given existing node(s), safe and module, migrate them to a different network.
     /// It requires a manager account to perform this action.
@@ -88,8 +94,8 @@ async fn main() -> Result<(), HelperErrors> {
         Commands::NetworkRegistry(opt) => {
             opt.async_run().await?;
         }
-        Commands::CreateSafeModule(opt) => {
-            opt.run()?;
+        Commands::SafeModule { command } => {
+            command.async_run().await?;
         }
         Commands::MigrateSafeModule(opt) => {
             opt.run()?;

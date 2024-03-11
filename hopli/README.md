@@ -145,16 +145,25 @@ Such a safe is designed to hold assets (wxHOPR tokens in particular) so that fun
 HOPR node management module is a plugin to the safe so that permitted nodes can interact with the Safe to transfer funds between the said Safe and the HoprChannels smart contract.
 The node management module manages all the permissions that its registered node can perform on the Safe.
 
-#### Create a safe and module pair, and set default permissions 
-Express create a safe and a module instances, then set default permissions
+#### Express create and setup a safe and a module
+
+Express create a safe and a module instances, and
+- set default permissions to scope channels and token contracts as targets.
+- add announcement as a permitted target in the deployed module proxy
+- approve token transfer to be done for the safe by channels contracts
+- if node addresses are known, include nodes to the module by the safe
+- set desired threshold
+
 
 ```
-PRIVATE_KEY=<bank_private_key> \
-hopli create-safe-module --network anvil-localhost \
+hopli safe-module create \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
     --identity-directory "./test" \
+    --admin-address 0x47f2710069F01672D01095cA252018eBf08bF85e,0x0D07Eb66Deb54D48D004765E13DcC028cf56592b \
     --password-path "/test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
+    --allowance 10.5 \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
 Migrate an exising set of node(d) with safe and module to a new network

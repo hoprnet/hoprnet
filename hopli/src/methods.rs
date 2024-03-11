@@ -596,12 +596,12 @@ where
     debug!("default target {:?}", default_target);
     // salt nonce
     let curr_nonce = provider
-        .get_transaction_count(MULTICALL_ADDRESS, Some(ethers::types::BlockNumber::Pending.into()))
+        .get_transaction_count(caller, Some(ethers::types::BlockNumber::Pending.into()))
         .await
         .unwrap();
     let nonce = keccak256(
         ethers::abi::encode_packed(&[
-            ethers::abi::Token::Address(MULTICALL_ADDRESS),
+            ethers::abi::Token::Address(caller),
             ethers::abi::Token::Uint(curr_nonce),
         ])
         .unwrap(),
