@@ -3585,6 +3585,7 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "multiaddr",
+ "num_enum",
  "serde",
  "serde_bytes",
  "serde_repr",

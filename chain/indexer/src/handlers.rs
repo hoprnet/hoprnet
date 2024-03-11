@@ -1190,7 +1190,7 @@ pub mod tests {
             network_registry_enabled: Set(true),
             ..Default::default()
         }
-        .save(db.conn())
+        .save(db.conn(Default::default()))
         .await
         .unwrap();
 
