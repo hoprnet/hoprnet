@@ -273,7 +273,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
 
         let result = self
-            .begin_transaction()
+            .begin_tickets_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -351,7 +351,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
 
         let components = self
-            .begin_transaction()
+            .begin_tickets_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -459,7 +459,7 @@ impl HoprDbTicketOperations for HoprDb {
                 let myself = self.clone();
 
                 let t = self
-                    .begin_transaction()
+                    .begin_tickets_transaction()
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -817,7 +817,7 @@ mod tests {
 
         let db_clone = db.clone();
         let tickets_clone = tickets.clone();
-        db.begin_transaction()
+        db.begin_tickets_transaction()
             .await
             .unwrap()
             .perform(|tx| {
@@ -891,7 +891,7 @@ mod tests {
 
         const TO_REDEEM: u64 = 2;
         let db_clone = db.clone();
-        db.begin_transaction()
+        db.begin_tickets_transaction()
             .await
             .unwrap()
             .perform(|tx| {

@@ -104,6 +104,12 @@ pub trait HoprDbGeneralModelOperations {
     /// Creates a new transaction.
     async fn begin_transaction(&self) -> Result<OpenTransaction>;
 
+    /// Creates a new tickets transaction.
+    async fn begin_tickets_transaction(&self) -> Result<OpenTransaction>;
+
+    /// Creates a new peers transaction
+    async fn begin_peers_transaction(&self) -> Result<OpenTransaction>;
+
     /// Creates a nested transaction inside the given transaction.
     ///
     /// If `None` is given, behaves exactly as [`HoprDbGeneralModelOperations::begin_transaction`].
@@ -127,6 +133,14 @@ impl HoprDbGeneralModelOperations for HoprDb {
 
     async fn begin_transaction(&self) -> Result<OpenTransaction> {
         Ok(OpenTransaction(self.db.begin_with_config(None, None).await?))
+    }
+
+    async fn begin_tickets_transaction(&self) -> Result<OpenTransaction> {
+        Ok(OpenTransaction(self.tickets_db.begin_with_config(None, None).await?))
+    }
+
+    async fn begin_peers_transaction(&self) -> Result<OpenTransaction> {
+        Ok(OpenTransaction(self.peers_db.begin_with_config(None, None).await?))
     }
 }
 

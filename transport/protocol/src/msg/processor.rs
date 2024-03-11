@@ -103,7 +103,7 @@ where
     async fn to_send(&self, data: Self::Input, path: Vec<OffchainPublicKey>) -> Result<Self::Packet> {
         Ok(self
             .db
-            .to_send(None, data.to_bytes(), self.cfg.chain_keypair.clone(), path.clone())
+            .to_send(data.to_bytes(), self.cfg.chain_keypair.clone(), path.clone())
             .await
             .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
             .into())
@@ -117,7 +117,7 @@ where
     ) -> Result<Self::Packet> {
         Ok(self
             .db
-            .from_recv(None, data, self.cfg.chain_keypair.clone(), pkt_keypair, sender)
+            .from_recv(data, self.cfg.chain_keypair.clone(), pkt_keypair, sender)
             .await
             .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
             .into())
