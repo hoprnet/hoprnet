@@ -318,8 +318,3 @@ inbox:
 
   # Tags which are not allowed into the Inbox
   excluded_tags: [ 0 ]
-
-# HOPRd Telemetry
-telemetry:
-  # URL of the opentelemetry collector service 
-  url: http://localhost:5417
