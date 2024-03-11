@@ -145,7 +145,7 @@ Such a safe is designed to hold assets (wxHOPR tokens in particular) so that fun
 HOPR node management module is a plugin to the safe so that permitted nodes can interact with the Safe to transfer funds between the said Safe and the HoprChannels smart contract.
 The node management module manages all the permissions that its registered node can perform on the Safe.
 
-#### Express create and setup a safe and a module
+#### Create: express create and setup a safe and a module
 
 Express create a safe and a module instances, and
 - set default permissions to scope channels and token contracts as targets.
@@ -166,6 +166,7 @@ hopli safe-module create \
     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
+#### Migrate:
 Migrate an exising set of node(d) with safe and module to a new network
 
 ```
@@ -178,16 +179,21 @@ hopli migrate-safe-module --network anvil-localhost \
     --contracts-root "../ethereum/contracts"
 ```
 
-Move a registered node to a new pair of safe and module
+#### Move: move registered nodes to a new pair of safe and module
+For each node, if the node has been registered to the NodeSafeRegistry, deregister itself and register it to the new pair of safe and module.
+
 
 ```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli move-node-to-safe-module --network anvil-localhost \
+DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
+hopli safe-module move  \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts"  \
     --identity-directory "./test" \
     --password-path "./test/.pwd" \
     --safe-address <safe_address> \
     --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
 Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
@@ -200,140 +206,4 @@ hopli sync-network-registry --network anvil-localhost \
     --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
     --sync-type forced-sync \
     --eligibility true
-```
-
-## Development
-
-### Run local development
-
-```
-cargo run -- -h
-```
-
-### Commands
-
-Create 3 identity files in `./test` folder where password is saved in `.pwd` file
-
-```
-cargo run -- identity \
-    --action create \
-    --password-path ./.pwd \
-    --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 3
-```
-
-Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
-
-```
-IDENTITY_PASSWORD=switzerland \
-cargo run -- identity \
-    --action create \
-    --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 2
-```
-
-Read ethereum addresses from identities
-
-```
-IDENTITY_PASSWORD=switzerland \
-cargo run -- identity \
-    --action read \
-    --identity-directory "./test" \
-    --identity-prefix node_
-
-```
-
-Fund nodes with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
-
-```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=local \
-    cargo run -- faucet --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
-    --contracts-root "../ethereum/contracts"  \
-    --hopr-amount 10 --native-amount 0.1
-```
-
-Register some peer ids in the network registry contract
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- register-in-network-registry --network anvil-localhost \
-    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Register some peer ids as well as some node identities in the network registry contract
-
-```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=local \
-    cargo run -- register-in-network-registry --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --node-address 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
-    --contracts-root "../ethereum/contracts"
-```
-
-> If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.networks."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
-
-Express create a safe and a module instances, then set default permissions
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- create-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Migrate an exising set of node(d) with safe and module to a new network
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- migrate-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Move a registered node to a new pair of safe and module
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- move-node-to-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
-If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
-
-```
-PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- sync-network-registry --network anvil-localhost \
-    --contracts-root "../ethereum/contracts" \
-    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
-    --sync-type forced-sync \
-    --eligibility true
-```
-
-### Test
-
-```
-cargo test -- --nocapture
-```
-
-## Note:
-
-1. When ` --use-local-identities`, the identity file should contain "id" in its name, either as part of the extention, or in the file stem.
+``` 
