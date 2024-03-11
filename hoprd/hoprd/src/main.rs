@@ -47,6 +47,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
 
+    let telemetry_url = Some("http://localhost:4317".to_owned());
+    if let Some(telemetry_url) = telemetry_url {
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    .with_timeout(Duration::from_secs(5))
+                    .with_endpoint(),
+            )
+            .with_trace_config(
+                opentelemetry_sdk::trace::config()
+                    .with_max_events_per_span(64)
+                    .with_max_attributes_per_span(16)
+                    .with_max_events_per_span(16)
+                    .with_resource(Resource::new(vec![KeyValue::new(
+                        "service.name",
+                        env!("CARGO_PKG_NAME"),
+                    )])),
+            )
+            .install_batch(opentelemetry::runtime::AsyncStd)
+            .expect("creating exporter");
+
+        subscriber = subscriber.with(tracing_opentelemetry::layer().with_tracer(tracer));
+    }
+
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);

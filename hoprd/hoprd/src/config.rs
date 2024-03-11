@@ -78,6 +78,13 @@ impl std::fmt::Debug for Identity {
     }
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+pub struct Telemetry {
+    #[validate(url)]
+    #[serde(default)]
+    url: Option<String>,
+}
+
 /// The main configuration object of the entire node.
 ///
 /// The configuration is composed of individual configuration of corresponding
@@ -105,6 +112,10 @@ pub struct HoprdConfig {
     #[validate]
     #[serde(default)]
     pub api: Api,
+
+    #[validate]
+    #[serde(default)]
+    pub telemetry: Telemetry,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
