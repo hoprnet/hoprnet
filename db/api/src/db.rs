@@ -124,13 +124,13 @@ impl HoprDb {
 
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db);
 
-        MigratorTickets::up(&index_db, None)
+        MigratorTickets::up(&tickets_db, None)
             .await
             .expect("cannot apply database migration");
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db);
 
-        MigratorPeers::up(&index_db, None)
+        MigratorPeers::up(&peers_db, None)
             .await
             .expect("cannot apply database migration");
 
