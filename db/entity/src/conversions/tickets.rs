@@ -30,13 +30,16 @@ pub fn model_to_acknowledged_ticket(
 
     let signer = ticket.recover_signer(&domain_separator)?.to_address();
 
-    Ok(AcknowledgedTicket::new(
+    let mut ticket = AcknowledgedTicket::new(
         ticket,
         response,
         signer,
         chain_keypair,
         &domain_separator,
-    )?)
+    )?;
+    ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8).map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
+
+    Ok(ticket)
 }
 
 impl From<AcknowledgedTicket> for ticket::ActiveModel {
@@ -50,6 +53,7 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             channel_epoch: Set(U256::from(value.ticket.channel_epoch).to_be_bytes().to_vec()),
             signature: Set(value.ticket.signature.unwrap().to_bytes().to_vec()),
             response: Set(value.response.to_bytes().to_vec()),
+            state: Set(value.status as u8 as i32),
             ..Default::default()
         }
     }

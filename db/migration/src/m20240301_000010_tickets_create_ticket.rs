@@ -26,6 +26,7 @@ impl MigrationTrait for Migration {
             .col(ColumnDef::new(Ticket::ChannelEpoch).binary_len(8).not_null())
             .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
             .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
+            .col(ColumnDef::new(Ticket::State).tiny_unsigned().not_null().default(0))
             .clone();
 
         manager
@@ -101,6 +102,7 @@ enum Ticket {
     ChannelEpoch,
     Signature,
     Response,
+    State,
 }
 
 #[allow(clippy::enum_variant_names)]

@@ -5,13 +5,16 @@ use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_primitive_types::primitives::Balance;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use moka::{future::Cache, Expiry};
-use sea_orm::SqlxSqliteConnector;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
+use sea_query::Expr;
 use tracing::log::LevelFilter;
+use hopr_db_entity::ticket;
+use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 
 use crate::HoprDbAllOperations;
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
@@ -52,53 +55,34 @@ impl HoprDb {
         let dir = Path::new(&directory);
         std::fs::create_dir_all(dir).unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
 
+        // Default SQLite config values for all 3 DBs.
+        // Each DB can customize with its own specific values
+        let cfg_template = SqliteConnectOptions::default()
+            .create_if_missing(cfg.create_if_missing)
+            .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
+            .log_statements(LevelFilter::Debug)
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .auto_vacuum(SqliteAutoVacuum::Full)
+            .optimize_on_close(true, None)
+            .page_size(4096)
+            .pragma("cache_size", "-30000") // 32M
+            .pragma("busy_timeout", "1000"); // 1000ms
+
         let index = SqlitePool::connect_with(
-            SqliteConnectOptions::default()
-                .filename(dir.join(SQL_DB_INDEX_FILE_NAME))
-                .create_if_missing(cfg.create_if_missing)
-                .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
-                .log_statements(LevelFilter::Debug)
-                .journal_mode(SqliteJournalMode::Wal)
-                .synchronous(SqliteSynchronous::Normal)
-                .auto_vacuum(SqliteAutoVacuum::Full)
-                .optimize_on_close(true, None)
-                .page_size(4096)
-                .pragma("cache_size", "-30000") // 32M
-                .pragma("busy_timeout", "1000"), // 1000ms
+            cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME))
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
         let peers = SqlitePool::connect_with(
-            SqliteConnectOptions::default()
-                .filename(dir.join(SQL_DB_PEERS_FILE_NAME))
-                .create_if_missing(cfg.create_if_missing)
-                .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
-                .log_statements(LevelFilter::Debug)
-                .journal_mode(SqliteJournalMode::Wal)
-                .synchronous(SqliteSynchronous::Normal)
-                .auto_vacuum(SqliteAutoVacuum::Full)
-                .optimize_on_close(true, None)
-                .page_size(4096)
-                .pragma("cache_size", "-30000") // 32M
-                .pragma("busy_timeout", "1000"), // 1000ms
+            cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME))
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
         let tickets = SqlitePool::connect_with(
-            SqliteConnectOptions::default()
-                .filename(dir.join(SQL_DB_TICKETS_FILE_NAME))
-                .create_if_missing(cfg.create_if_missing)
-                .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
-                .log_statements(LevelFilter::Debug)
-                .journal_mode(SqliteJournalMode::Wal)
-                .synchronous(SqliteSynchronous::Normal)
-                .auto_vacuum(SqliteAutoVacuum::Full)
-                .optimize_on_close(true, None)
-                .page_size(4096)
-                .pragma("cache_size", "-30000") // 32M
-                .pragma("busy_timeout", "1000"), // 1000ms
+            cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME))
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
@@ -149,6 +133,14 @@ impl HoprDb {
             .max_capacity(10_000)
             .build();
 
+        // Reset all ticket states to Untouched
+        ticket::Entity::update_many()
+            .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::Untouched as u8))
+            .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::Untouched as u8))
+            .exec(&tickets_db)
+            .await
+            .expect("must reset ticket state on init");
+
         Self {
             db: index_db,
             tickets_db,
@@ -166,13 +158,16 @@ impl HoprDbAllOperations for HoprDb {}
 #[cfg(test)]
 mod tests {
     use crate::db::HoprDb;
-    use crate::HoprDbGeneralModelOperations;
-    use migration::{Migrator, MigratorTrait};
+    use crate::{HoprDbGeneralModelOperations, TargetDb};
+    use migration::{Migrator, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 
     #[async_std::test]
     async fn test_basic_db_init() {
         let db = HoprDb::new_in_memory().await;
 
-        Migrator::status(db.conn()).await.expect("status must be ok");
+        // TODO: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
+        MigratorIndex::status(db.conn(TargetDb::Index)).await.expect("status must be ok");
+        MigratorTickets::status(db.conn(TargetDb::Tickets)).await.expect("status must be ok");
+        MigratorPeers::status(db.conn(TargetDb::Peers)).await.expect("status must be ok");
     }
 }

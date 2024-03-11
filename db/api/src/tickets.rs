@@ -23,7 +23,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
+use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb};
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
@@ -140,16 +140,16 @@ impl HoprDbTicketOperations for HoprDb {
         chain_keypair: &ChainKeypair,
     ) -> Result<Option<AcknowledgedTicket>> {
         let ticket = self
-            .nest_transaction(tx)
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    ticket::Entity::find()
+                    Ok::<_, DbError>(ticket::Entity::find()
                         .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
                         .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
                         .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().to_vec()))
                         .one(tx.as_ref())
-                        .await
+                        .await?)
                 })
             })
             .await?;
@@ -171,7 +171,8 @@ impl HoprDbTicketOperations for HoprDb {
         let ticket_value = ticket.ticket.amount.amount();
 
         let _guard = self.ticket_table_mutex.lock().await;
-        self.nest_transaction(tx)
+        self
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -212,7 +213,8 @@ impl HoprDbTicketOperations for HoprDb {
     async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()> {
         let myself = self.clone();
 
-        self.nest_transaction(tx)
+        self
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -273,7 +275,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
 
         let result = self
-            .begin_tickets_transaction()
+            .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -351,7 +353,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
 
         let components = self
-            .begin_tickets_transaction()
+            .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -459,7 +461,7 @@ impl HoprDbTicketOperations for HoprDb {
                 let myself = self.clone();
 
                 let t = self
-                    .begin_tickets_transaction()
+                    .begin_transaction()
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -601,7 +603,8 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
-        self.nest_transaction(tx)
+        self
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -745,10 +748,10 @@ impl HoprDb {
     }
 
     async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
-        self.nest_transaction(tx)
+        self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
-                Box::pin(async move { ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await })
+                Box::pin(async move { Ok::<_, DbError>(ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await?) })
             })
             .await?;
         Ok(())
@@ -766,7 +769,7 @@ mod tests {
     use crate::db::HoprDb;
     use crate::errors::DbError;
     use crate::tickets::HoprDbTicketOperations;
-    use crate::HoprDbGeneralModelOperations;
+    use crate::{HoprDbGeneralModelOperations, TargetDb};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -810,6 +813,8 @@ mod tests {
             4_u32.into(),
         );
 
+        db.insert_channel(None, channel).await.unwrap();
+
         let tickets = (0..count_tickets)
             .into_iter()
             .map(|i| generate_random_ack_ticket(i as u32))
@@ -817,12 +822,11 @@ mod tests {
 
         let db_clone = db.clone();
         let tickets_clone = tickets.clone();
-        db.begin_tickets_transaction()
+        db.begin_transaction_in_db(TargetDb::Tickets)
             .await
             .unwrap()
             .perform(|tx| {
                 Box::pin(async move {
-                    db_clone.insert_channel(Some(tx), channel).await?;
                     for t in tickets_clone {
                         db_clone.insert_ticket(Some(tx), t).await?;
                     }
@@ -891,7 +895,7 @@ mod tests {
 
         const TO_REDEEM: u64 = 2;
         let db_clone = db.clone();
-        db.begin_tickets_transaction()
+        db.begin_transaction_in_db(TargetDb::Tickets)
             .await
             .unwrap()
             .perform(|tx| {

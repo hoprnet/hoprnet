@@ -109,7 +109,7 @@ impl HoprDbChannelOperations for HoprDb {
     async fn insert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move { channel::ActiveModel::from(channel_entry).save(tx.as_ref()).await }))
+            .perform(|tx| Box::pin(async move { Ok::<_, DbError>(channel::ActiveModel::from(channel_entry).save(tx.as_ref()).await?) }))
             .await?;
         Ok(())
     }

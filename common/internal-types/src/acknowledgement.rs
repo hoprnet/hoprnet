@@ -76,16 +76,16 @@ impl BinarySerializable for Acknowledgement {
 
 /// Status of the acknowledged ticket.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display, strum::EnumString)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display, strum::EnumString, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
 #[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
     #[default]
-    Untouched,
-    /// Ticket is currently being redeemed in and on-going redemption process
-    BeingRedeemed,
-    /// Ticket is currently being aggregated in and on-going aggregation process
-    BeingAggregated,
+    Untouched = 0,
+    /// Ticket is currently being redeemed in and ongoing redemption process
+    BeingRedeemed = 1,
+    /// Ticket is currently being aggregated in and ongoing aggregation process
+    BeingAggregated = 2,
 }
 
 /// Contains acknowledgment information and the respective ticket
