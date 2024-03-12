@@ -33,6 +33,10 @@ use core_network::network::Network;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::errors::DbError;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -41,10 +45,6 @@ use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::Arc;
 use validator::Validate;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::errors::DbError;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::resolver::HoprDbResolverOperations;
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -180,12 +180,7 @@ where
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    pub fn new(
-        cfg: PromiscuousStrategyConfig,
-        db: Db,
-        network: Arc<Network<T>>,
-        chain_actions: A,
-    ) -> Self {
+    pub fn new(cfg: PromiscuousStrategyConfig, db: Db, network: Arc<Network<T>>, chain_actions: A) -> Self {
         Self {
             db,
             network,
@@ -490,12 +485,12 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_platform::time::native::current_time;
-    use lazy_static::lazy_static;
-    use mockall::mock;
     use hopr_db_api::accounts::HoprDbAccountOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::HoprDbGeneralModelOperations;
+    use hopr_platform::time::native::current_time;
+    use lazy_static::lazy_static;
+    use mockall::mock;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
@@ -562,11 +557,7 @@ mod tests {
         }
     }
 
-    async fn mock_channel(
-        db: HoprDb,
-        dst: Address,
-        balance: Balance,
-    ) -> ChannelEntry {
+    async fn mock_channel(db: HoprDb, dst: Address, balance: Balance) -> ChannelEntry {
         let channel = ChannelEntry::new(
             PEERS[0].0,
             dst,
@@ -613,14 +604,24 @@ mod tests {
         db.begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| Box::pin(async move {
-                db.set_safe_balance(Some(tx), node_balance).await?;
-                db.set_safe_allowance(Some(tx), node_balance).await?;
-                for (chain_key, peer_id) in PEERS.iter() {
-                    db.insert_account(Some(tx), AccountEntry::new(OffchainPublicKey::try_from(*peer_id).unwrap(), *chain_key, AccountType::NotAnnounced)).await?;
-                }
-                Ok::<_, DbError>(())
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    db.set_safe_balance(Some(tx), node_balance).await?;
+                    db.set_safe_allowance(Some(tx), node_balance).await?;
+                    for (chain_key, peer_id) in PEERS.iter() {
+                        db.insert_account(
+                            Some(tx),
+                            AccountEntry::new(
+                                OffchainPublicKey::try_from(*peer_id).unwrap(),
+                                *chain_key,
+                                AccountType::NotAnnounced,
+                            ),
+                        )
+                        .await?;
+                    }
+                    Ok::<_, DbError>(())
+                })
+            })
             .await
             .unwrap();
     }

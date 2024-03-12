@@ -26,7 +26,9 @@ pub struct SafeInfo {
 }
 
 pub enum DomainSeparator {
-    Ledger, SafeRegistry, Channel
+    Ledger,
+    SafeRegistry,
+    Channel,
 }
 
 #[async_trait]
@@ -218,28 +220,31 @@ impl HoprDbInfoOperations for HoprDb {
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                let mut active_model = chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    ..Default::default()
-                };
+            .perform(|tx| {
+                Box::pin(async move {
+                    let mut active_model = chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        ..Default::default()
+                    };
 
-                match dst_type {
-                    DomainSeparator::Ledger => {
-                        active_model.ledger_dst = Set(Some(value.to_bytes().into()));
-                    },
-                    DomainSeparator::SafeRegistry => {
-                        active_model.safe_registry_dst = Set(Some(value.to_bytes().into()));
+                    match dst_type {
+                        DomainSeparator::Ledger => {
+                            active_model.ledger_dst = Set(Some(value.to_bytes().into()));
+                        }
+                        DomainSeparator::SafeRegistry => {
+                            active_model.safe_registry_dst = Set(Some(value.to_bytes().into()));
+                        }
+                        DomainSeparator::Channel => {
+                            active_model.channels_dst = Set(Some(value.to_bytes().into()));
+                        }
                     }
-                    DomainSeparator::Channel => {
-                        active_model.channels_dst = Set(Some(value.to_bytes().into()));
-                    }
-                }
 
-                active_model.update(tx.as_ref()).await?;
+                    active_model.update(tx.as_ref()).await?;
 
-                Ok::<(), DbError>(())
-            })).await
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await
     }
 
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
@@ -289,8 +294,8 @@ impl HoprDbInfoOperations for HoprDb {
                         network_registry_enabled: Set(enabled),
                         ..Default::default()
                     }
-                        .save(tx.as_ref())
-                        .await?;
+                    .save(tx.as_ref())
+                    .await?;
                     Ok::<_, DbError>(())
                 })
             })

@@ -532,6 +532,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::info::DomainSeparator;
     use hopr_db_api::{
         accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
     };
@@ -543,7 +544,6 @@ mod tests {
     use serial_test::serial;
     use std::{str::FromStr, sync::Arc, time::Duration};
     use tracing::debug;
-    use hopr_db_api::info::DomainSeparator;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [

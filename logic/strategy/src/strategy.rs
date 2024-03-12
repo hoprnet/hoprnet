@@ -36,9 +36,9 @@ use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
+use hopr_db_api::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
-use hopr_db_api::HoprDbAllOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

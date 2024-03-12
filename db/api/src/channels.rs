@@ -16,7 +16,12 @@ pub trait HoprDbChannelOperations {
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
-    async fn get_channels_via<'a>(&'a self, tx: OptTx<'a>, direction: ChannelDirection, target: Address) -> Result<Vec<ChannelEntry>>;
+    async fn get_channels_via<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        direction: ChannelDirection,
+        target: Address,
+    ) -> Result<Vec<ChannelEntry>>;
 
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
@@ -46,7 +51,12 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn get_channels_via<'a>(&'a self, tx: OptTx<'a>, direction: ChannelDirection, target: Address) -> Result<Vec<ChannelEntry>> {
+    async fn get_channels_via<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        direction: ChannelDirection,
+        target: Address,
+    ) -> Result<Vec<ChannelEntry>> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -61,7 +71,7 @@ impl HoprDbChannelOperations for HoprDb {
                             .await?
                             .into_iter()
                             .map(|x| ChannelEntry::try_from(x).map_err(DbError::from))
-                            .collect::<Result<Vec<_>>>()?
+                            .collect::<Result<Vec<_>>>()?,
                     )
                 })
             })
@@ -88,17 +98,20 @@ impl HoprDbChannelOperations for HoprDb {
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| Box::pin(async move {
-                let mut model = channel::ActiveModel::from(channel_entry);
-                if let Some(channel) = channel::Entity::find()
-                    .filter(channel::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
-                    .one(tx.as_ref())
-                    .await? {
-                    model.id = Set(channel.id);
-                }
+            .perform(|tx| {
+                Box::pin(async move {
+                    let mut model = channel::ActiveModel::from(channel_entry);
+                    if let Some(channel) = channel::Entity::find()
+                        .filter(channel::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .one(tx.as_ref())
+                        .await?
+                    {
+                        model.id = Set(channel.id);
+                    }
 
-                Ok::<_, DbError>(model.save(tx.as_ref()).await?)
-            }))
+                    Ok::<_, DbError>(model.save(tx.as_ref()).await?)
+                })
+            })
             .await?;
         Ok(())
     }

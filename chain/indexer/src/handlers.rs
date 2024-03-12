@@ -15,6 +15,8 @@ use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_api::errors::DbError;
 use hopr_db_api::errors::DbError::LogicalError;
+use hopr_db_api::info::DomainSeparator;
+use hopr_db_api::tickets::TicketSelector;
 use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
@@ -27,8 +29,6 @@ use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
-use hopr_db_api::info::DomainSeparator;
-use hopr_db_api::tickets::TicketSelector;
 
 /// Event handling object for on-chain operations
 ///
@@ -205,9 +205,7 @@ where
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_entry.destination == self.chain_key.public().to_address() {
-                        self.db
-                            .mark_tickets_neglected((&channel_entry).into())
-                            .await?;
+                        self.db.mark_tickets_neglected((&channel_entry).into()).await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -380,12 +378,24 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                self.db.set_domain_separator(Some(tx), DomainSeparator::Channel, domain_separator_updated.domain_separator.into()).await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::Channel,
+                        domain_separator_updated.domain_separator.into(),
+                    )
+                    .await?;
 
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
-                self.db.set_domain_separator(Some(tx), DomainSeparator::Ledger, ledger_domain_separator_updated.ledger_domain_separator.into()).await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::Ledger,
+                        ledger_domain_separator_updated.ledger_domain_separator.into(),
+                    )
+                    .await?;
 
                 Ok(None)
             }
@@ -538,7 +548,13 @@ where
                 }
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                self.db.set_domain_separator(Some(tx), DomainSeparator::SafeRegistry, domain_separator_updated.domain_separator.into()).await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::SafeRegistry,
+                        domain_separator_updated.domain_separator.into(),
+                    )
+                    .await?;
             }
         }
 

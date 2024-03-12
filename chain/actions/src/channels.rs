@@ -16,17 +16,20 @@
 use async_trait::async_trait;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
+use hopr_db_api::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
 use tracing::{debug, error, info};
-use hopr_db_api::HoprDbAllOperations;
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
-use crate::errors::{ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist}, Result};
+use crate::errors::{
+    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
+    Result,
+};
 use crate::redeem::TicketRedeemActions;
 use crate::ChainActions;
 
@@ -53,7 +56,8 @@ pub trait ChannelActions {
 #[async_trait]
 impl<Db> ChannelActions for ChainActions<Db>
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static, {
+    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+{
     #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
         if self.self_address() == destination {
@@ -67,39 +71,42 @@ where
         // Perform all checks
         let db_clone = self.db.clone();
         let self_addr = self.self_address();
-        self.db.begin_transaction()
+        self.db
+            .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move {
-                let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
-                debug!("current staking safe allowance is {allowance}");
-                if allowance.lt(&amount) {
-                    return Err(NotEnoughAllowance);
-                }
-
-                let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
-                debug!("current Safe HOPR balance is {hopr_balance}");
-                if hopr_balance.lt(&amount) {
-                    return Err(BalanceTooLow);
-                }
-
-                if db_clone.get_chain_data(Some(tx)).await?.nr_enabled
-                    && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
-                {
-                    return Err(PeerAccessDenied);
-                }
-
-                let channel_id = generate_channel_id(&self_addr, &destination);
-                let maybe_channel = db_clone.get_channel_by_id(Some(tx), channel_id).await?;
-                if let Some(channel) = maybe_channel {
-                    debug!("already found existing {channel}");
-                    if channel.status != ChannelStatus::Closed {
-                        error!("channel to {destination} is already opened or pending to close");
-                        return Err(ChannelAlreadyExists);
+            .perform(|tx| {
+                Box::pin(async move {
+                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    debug!("current staking safe allowance is {allowance}");
+                    if allowance.lt(&amount) {
+                        return Err(NotEnoughAllowance);
                     }
-                }
-                Ok(())
-            })).await?;
 
+                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    if hopr_balance.lt(&amount) {
+                        return Err(BalanceTooLow);
+                    }
+
+                    if db_clone.get_chain_data(Some(tx)).await?.nr_enabled
+                        && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
+                    {
+                        return Err(PeerAccessDenied);
+                    }
+
+                    let channel_id = generate_channel_id(&self_addr, &destination);
+                    let maybe_channel = db_clone.get_channel_by_id(Some(tx), channel_id).await?;
+                    if let Some(channel) = maybe_channel {
+                        debug!("already found existing {channel}");
+                        if channel.status != ChannelStatus::Closed {
+                            error!("channel to {destination} is already opened or pending to close");
+                            return Err(ChannelAlreadyExists);
+                        }
+                    }
+                    Ok(())
+                })
+            })
+            .await?;
 
         info!("initiating channel open to {destination} with {amount}");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
@@ -112,23 +119,28 @@ where
         }
 
         let db_clone = self.db.clone();
-        let maybe_channel = self.db.begin_transaction()
+        let maybe_channel = self
+            .db
+            .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move {
-                let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
-                debug!("current staking safe allowance is {allowance}");
-                if allowance.lt(&amount) {
-                    return Err(NotEnoughAllowance);
-                }
+            .perform(|tx| {
+                Box::pin(async move {
+                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    debug!("current staking safe allowance is {allowance}");
+                    if allowance.lt(&amount) {
+                        return Err(NotEnoughAllowance);
+                    }
 
-                let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
-                debug!("current Safe HOPR balance is {hopr_balance}");
-                if hopr_balance.lt(&amount) {
-                    return Err(BalanceTooLow);
-                }
+                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    if hopr_balance.lt(&amount) {
+                        return Err(BalanceTooLow);
+                    }
 
-                Ok(db_clone.get_channel_by_id(Some(tx),channel_id).await?)
-            })).await?;
+                    Ok(db_clone.get_channel_by_id(Some(tx), channel_id).await?)
+                })
+            })
+            .await?;
 
         match maybe_channel {
             Some(channel) => {
@@ -201,12 +213,16 @@ mod tests {
     use crate::channels::ChannelActions;
     use crate::errors::ChainActionsError;
     use crate::ChainActions;
-        use chain_types::actions::Action;
+    use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::channels::HoprDbChannelOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -215,15 +231,16 @@ mod tests {
         ops::{Add, Sub},
         time::{Duration, SystemTime},
     };
-    use hopr_db_api::channels::HoprDbChannelOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::HoprDbGeneralModelOperations;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
 
     lazy_static! {
-        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
-
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
+        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
+        ))
+        .unwrap();
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = BOB_KP.public().to_address();
     }
@@ -237,12 +254,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -301,13 +331,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -333,15 +376,27 @@ mod tests {
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -367,12 +422,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -410,12 +478,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -443,12 +524,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -478,13 +572,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -539,12 +646,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -572,12 +692,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -614,12 +747,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -639,7 +785,6 @@ mod tests {
         );
     }
 
-
     #[async_std::test]
     async fn test_should_not_fund_if_not_enough_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -648,12 +793,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(100_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(100_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -684,14 +842,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-        })).await.expect("must initialize db");
-
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -792,14 +962,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -862,13 +1044,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -898,12 +1093,25 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -935,13 +1143,26 @@ mod tests {
 
         let db = HoprDb::new_in_memory().await;
         let db_clone = db.clone();
-        db.begin_transaction().await.unwrap().perform(|tx| Box::pin(async move {
-            db_clone.set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR)).await?;
-            db_clone.set_network_registry_enabled(Some(tx), false).await?;
-            db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
-            db_clone.upsert_channel(Some(tx), channel).await
-        })).await.expect("must initialize db");
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),

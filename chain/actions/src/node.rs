@@ -14,11 +14,11 @@ use async_trait::async_trait;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_crypto_types::prelude::Keypair;
+use hopr_db_api::accounts::HoprDbAccountOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
-use hopr_db_api::accounts::HoprDbAccountOperations;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
@@ -43,7 +43,9 @@ pub trait NodeActions {
 
 #[async_trait]
 impl<Db> NodeActions for ChainActions<Db>
-where Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug {
+where
+    Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
+{
     #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
@@ -59,21 +61,17 @@ where Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
-        let announcement_data =
-            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.self_address(), offchain_key)))?;
+        let announcement_data = AnnouncementData::new(
+            multiaddrs[0].clone(),
+            Some(KeyBinding::new(self.self_address(), offchain_key)),
+        )?;
 
-        if !self
-            .db
-            .get_accounts(None, true)
-            .await?
-            .into_iter()
-            .any(|account| {
-                account.public_key.eq(offchain_key.public())
-                    && account
-                        .get_multiaddr()
-                        .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
-            })
-        {
+        if !self.db.get_accounts(None, true).await?.into_iter().any(|account| {
+            account.public_key.eq(offchain_key.public())
+                && account
+                    .get_multiaddr()
+                    .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
+        }) {
             info!("initiating announcement {announcement_data}");
             self.tx_sender.send(Action::Announce(announcement_data)).await
         } else {
@@ -101,13 +99,13 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
-    use hopr_db_api::accounts::HoprDbAccountOperations;
-    use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
 
     lazy_static::lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -125,7 +123,9 @@ mod tests {
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let ma = announce_multiaddr.clone();
         let pubkey_clone = ALICE_OFFCHAIN.public().clone();
@@ -186,16 +186,23 @@ mod tests {
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
-        db.insert_account(None, AccountEntry::new(
-            *ALICE_OFFCHAIN.public(),
-            *ALICE,
-            AccountType::Announced {
-                multiaddr: announce_multiaddr.clone(),
-                updated_block: 0,
-            },
-        )).await.unwrap();
+        db.insert_account(
+            None,
+            AccountEntry::new(
+                *ALICE_OFFCHAIN.public(),
+                *ALICE,
+                AccountType::Announced {
+                    multiaddr: announce_multiaddr.clone(),
+                    updated_block: 0,
+                },
+            ),
+        )
+        .await
+        .unwrap();
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -222,7 +229,9 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -265,7 +274,9 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let tx_queue = ActionQueue::new(
             db.clone(),

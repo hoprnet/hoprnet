@@ -20,9 +20,7 @@ use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{
-    ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
-};
+use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
 use crate::errors::{ChainActionsError, Result};
 
 use async_std::task::spawn;
@@ -347,7 +345,10 @@ where
     ///
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
     pub async fn action_loop(mut self) {
-        let channel_dst = self.db.get_chain_data(None).await
+        let channel_dst = self
+            .db
+            .get_chain_data(None)
+            .await
             .map_err(ChainActionsError::from)
             .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
             .unwrap();
@@ -376,7 +377,10 @@ where
                         if let Action::RedeemTicket(ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
 
-                            if let Err(e) = db_clone.update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched).await {
+                            if let Err(e) = db_clone
+                                .update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched)
+                                .await
+                            {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
                         }

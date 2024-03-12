@@ -23,20 +23,17 @@
 //! by the Indexer.
 use async_trait::async_trait;
 use chain_types::actions::Action;
-use hopr_crypto_types::types::Hash;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use futures::StreamExt;
-use tracing::{debug, error, info, warn};
+use hopr_crypto_types::types::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info, warn};
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::ChannelDoesNotExist;
-use crate::errors::{
-    ChainActionsError::WrongTicketState,
-    Result,
-};
+use crate::errors::{ChainActionsError::WrongTicketState, Result};
 use crate::ChainActions;
 
 lazy_static::lazy_static! {
@@ -72,10 +69,14 @@ pub trait TicketRedeemActions {
 #[async_trait]
 impl<Db> TicketRedeemActions for ChainActions<Db>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug, {
+    Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug,
+{
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
-        let incoming_channels = self.db.get_channels_via(None, ChannelDirection::Incoming, self.self_address()).await?;
+        let incoming_channels = self
+            .db
+            .get_channels_via(None, ChannelDirection::Incoming, self.self_address())
+            .await?;
         debug!(
             "starting to redeem all tickets in {} incoming channels to us.",
             incoming_channels.len()
@@ -109,7 +110,10 @@ where
         counterparty: &Address,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>> {
-        let maybe_channel = self.db.get_channel_by_id(None, generate_channel_id(counterparty, &self.self_address())).await?;
+        let maybe_channel = self
+            .db
+            .get_channel_by_id(None, generate_channel_id(counterparty, &self.self_address()))
+            .await?;
         if let Some(channel) = maybe_channel {
             self.redeem_tickets_in_channel(&channel, only_aggregated).await
         } else {
@@ -141,7 +145,10 @@ where
             return Ok(vec![]);
         }
 
-        let mut redeem_stream = self.db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me).await?;
+        let mut redeem_stream = self
+            .db
+            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
+            .await?;
         let mut receivers: Vec<PendingAction> = vec![];
         while let Some(ack_ticket) = redeem_stream.next().await {
             let ticket_id = ack_ticket.to_string();
@@ -151,13 +158,10 @@ where
                     receivers.push(successful_tx);
                 }
                 Err(e) => {
-                    error!(
-                        "Failed to submit transaction that redeems {ticket_id}: {e}",
-                    );
+                    error!("Failed to submit transaction that redeems {ticket_id}: {e}",);
                 }
             }
         }
-
 
         info!(
             "{} acknowledged tickets were submitted to redeem in {channel_id}",
@@ -176,14 +180,17 @@ where
             selector.state = Some(AcknowledgedTicketStatus::Untouched);
             selector.index = Some(ack_ticket.ticket.index);
 
-                if let Some(ticket) = self.db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
-                    .await?
-                    .next()
-                    .await {
-                    Ok(self.tx_sender.send(Action::RedeemTicket(ticket)).await?)
-                } else {
-                    Err(WrongTicketState(ack_ticket.to_string()))
-                }
+            if let Some(ticket) = self
+                .db
+                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
+                .await?
+                .next()
+                .await
+            {
+                Ok(self.tx_sender.send(Action::RedeemTicket(ticket)).await?)
+            } else {
+                Err(WrongTicketState(ack_ticket.to_string()))
+            }
         } else {
             Err(ChannelDoesNotExist)
         }
@@ -201,8 +208,8 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::errors::DbError;
-    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
 
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
@@ -248,37 +255,47 @@ mod tests {
     ) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
         let ckp = counterparty.clone();
         let db_clone = db.clone();
-        let channel = db.begin_transaction()
+        let channel = db
+            .begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| Box::pin(async move {
-                db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
 
-                let channel = ChannelEntry::new(
-                    ckp.public().to_address(),
-                    ALICE.public().to_address(),
-                    Balance::zero(BalanceType::HOPR),
-                    U256::zero(),
-                    ChannelStatus::Open,
-                    channel_epoch,
-                );
-                db_clone.upsert_channel(Some(tx), channel).await?;
-                Ok::<_, DbError>(channel)
-            }))
+                    let channel = ChannelEntry::new(
+                        ckp.public().to_address(),
+                        ALICE.public().to_address(),
+                        Balance::zero(BalanceType::HOPR),
+                        U256::zero(),
+                        ChannelStatus::Open,
+                        channel_epoch,
+                    );
+                    db_clone.upsert_channel(Some(tx), channel).await?;
+                    Ok::<_, DbError>(channel)
+                })
+            })
             .await
             .unwrap();
 
         let ckp = counterparty.clone();
-        let input_tickets = db.begin_transaction_in_db(TargetDb::Tickets).await.unwrap()
-            .perform(|tx| Box::pin(async move {
-                let mut input_tickets = Vec::new();
-                for i in 0..ticket_count {
-                    let ack_ticket = generate_random_ack_ticket(i as u32, &ckp, channel_epoch);
-                    db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
-                    input_tickets.push(ack_ticket);
-                }
-                Ok::<_, DbError>(input_tickets)
-            }))
+        let input_tickets = db
+            .begin_transaction_in_db(TargetDb::Tickets)
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    let mut input_tickets = Vec::new();
+                    for i in 0..ticket_count {
+                        let ack_ticket = generate_random_ack_ticket(i as u32, &ckp, channel_epoch);
+                        db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
+                        input_tickets.push(ack_ticket);
+                    }
+                    Ok::<_, DbError>(input_tickets)
+                })
+            })
             .await
             .unwrap();
 
@@ -376,7 +393,10 @@ mod tests {
 
         let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into(), &ALICE).await.unwrap();
+        let db_acks_charlie = db
+            .get_tickets(None, (&channel_from_charlie).into(), &ALICE)
+            .await
+            .unwrap();
 
         assert!(
             db_acks_bob
@@ -458,7 +478,10 @@ mod tests {
 
         let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
 
-        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into(), &ALICE).await.unwrap();
+        let db_acks_charlie = db
+            .get_tickets(None, (&channel_from_charlie).into(), &ALICE)
+            .await
+            .unwrap();
 
         assert!(
             db_acks_bob
@@ -489,13 +512,17 @@ mod tests {
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
         let mut selector: TicketSelector = (&tickets[0]).into();
         selector.state = None;
-        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated).await.unwrap();
+        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated)
+            .await
+            .unwrap();
 
         // Make the second ticket unredeemable
         tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
         let mut selector: TicketSelector = (&tickets[1]).into();
         selector.state = None;
-        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed).await.unwrap();
+        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
+            .await
+            .unwrap();
 
         // Expect only the redeemable tickets get redeemed
         let tickets_clone = tickets.clone();
