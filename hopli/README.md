@@ -166,17 +166,19 @@ hopli safe-module create \
     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 
-#### Migrate:
+#### Migrate: make safe and module compatible with a new network
 Migrate an exising set of node(d) with safe and module to a new network
 
 ```
 PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli migrate-safe-module --network anvil-localhost \
+hopli safe-module migrate \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
     --identity-directory "./test" \
     --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
+    --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
+    --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
 #### Move: move registered nodes to a new pair of safe and module
@@ -184,7 +186,7 @@ For each node, if the node has been registered to the NodeSafeRegistry, deregist
 
 ```
 DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli safe-module safe-module move  \
+hopli safe-module safe-module move \
     --network anvil-localhost \
     --contracts-root "../ethereum/contracts"  \
     --old-module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \

@@ -10,7 +10,6 @@
 //! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].
 use clap::{builder::RangedU64ValueParser, Parser, ValueHint};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_crypto_types::types::ToChecksum;
 use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::{debug, error, info};

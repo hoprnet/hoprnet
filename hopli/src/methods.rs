@@ -5,7 +5,9 @@ use crate::utils::{
 };
 use bindings::{
     hopr_network_registry::HoprNetworkRegistry,
-    hopr_node_management_module::{HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall},
+    hopr_node_management_module::{
+        AddChannelsAndTokenTargetCall, HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall,
+    },
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, HoprNodeSafeRegistry},
     hopr_node_stake_factory::HoprNodeStakeFactory,
     hopr_token::{ApproveCall, HoprToken},
@@ -308,10 +310,7 @@ pub async fn send_safe_transaction_with_threshold_one<M: Middleware>(
 }
 
 /// Deploy a MULTICALL contract into Anvil local chain for testing
-pub async fn deploy_multicall3_for_testing<M>(provider: Arc<M>) -> Result<(), ContractError<M>>
-where
-    M: Middleware,
-{
+pub async fn deploy_multicall3_for_testing<M: Middleware>(provider: Arc<M>) -> Result<(), ContractError<M>> {
     // Fund Multicall3 deployer and deploy ERC1820Registry
     let mut tx = Eip1559TransactionRequest::new();
     tx = tx.to(H160::from_str(crate::utils::MULTICALL3_DEPLOYER).unwrap());
@@ -351,13 +350,10 @@ pub async fn get_chain_id_and_safe_nonce<M: Middleware>(safe: SafeSingleton<M>) 
 }
 
 /// Get native balance and hopr token balance for given addresses
-pub async fn get_native_and_token_balances<M>(
+pub async fn get_native_and_token_balances<M: Middleware>(
     hopr_token: HoprToken<M>,
     addresses: Vec<Address>,
-) -> Result<(Vec<U256>, Vec<U256>), MulticallError<M>>
-where
-    M: Middleware,
-{
+) -> Result<(Vec<U256>, Vec<U256>), MulticallError<M>> {
     let provider = hopr_token.client();
     let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS)).await?;
 
@@ -389,14 +385,11 @@ where
 /// Address_i receives amounts_i HOPR tokens.
 /// When there's not enough token in caller's balance, if the caller is
 /// a minter, mint the missing tokens. If not, returns error
-pub async fn transfer_or_mint_tokens<M>(
+pub async fn transfer_or_mint_tokens<M: Middleware>(
     hopr_token: HoprToken<M>,
     addresses: Vec<Address>,
     amounts: Vec<U256>,
-) -> Result<U256, HelperErrors>
-where
-    M: Middleware,
-{
+) -> Result<U256, HelperErrors> {
     let caller = hopr_token.client().default_sender().expect("client must have a sender");
     let provider = hopr_token.client();
     let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
@@ -525,13 +518,10 @@ pub async fn transfer_native_tokens<M: Middleware>(
 }
 
 /// Get registered safes for given nodes on the network registry
-pub async fn get_registered_safes_for_nodes_on_network_registry<M>(
+pub async fn get_registered_safes_for_nodes_on_network_registry<M: Middleware>(
     network_registry: HoprNetworkRegistry<M>,
     node_addresses: Vec<H160>,
-) -> Result<Vec<H160>, MulticallError<M>>
-where
-    M: Middleware,
-{
+) -> Result<Vec<H160>, MulticallError<M>> {
     let provider = network_registry.client();
     let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
         .await
@@ -557,14 +547,11 @@ where
 /// - If ndoes have been registered to the same safe, no op
 /// - If nodes have not been registered to any safe, register it
 /// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to true
-pub async fn register_safes_and_nodes_on_network_registry<M>(
+pub async fn register_safes_and_nodes_on_network_registry<M: Middleware>(
     network_registry: HoprNetworkRegistry<M>,
     safe_addresses: Vec<H160>,
     node_addresses: Vec<H160>,
-) -> Result<(usize, usize), HelperErrors>
-where
-    M: Middleware,
-{
+) -> Result<(usize, usize), HelperErrors> {
     assert_eq!(
         safe_addresses.len(),
         node_addresses.len(),
@@ -631,13 +618,10 @@ where
 /// It returns the number of removed nodes
 /// - If nodes have been registered to a safe, remove the node
 /// - If nodes have not been registered to any safe, no op
-pub async fn deregister_nodes_from_network_registry<M>(
+pub async fn deregister_nodes_from_network_registry<M: Middleware>(
     network_registry: HoprNetworkRegistry<M>,
     node_addresses: Vec<H160>,
-) -> Result<usize, HelperErrors>
-where
-    M: Middleware,
-{
+) -> Result<usize, HelperErrors> {
     // check registered safes of given node addresses
     let registered_safes =
         get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone())
@@ -667,14 +651,11 @@ where
 }
 
 /// Force-sync the eligibility to given values. This can only be called with a manager account
-pub async fn force_sync_safes_on_network_registry<M>(
+pub async fn force_sync_safes_on_network_registry<M: Middleware>(
     network_registry: HoprNetworkRegistry<M>,
     safe_addresses: Vec<H160>,
     eligibilities: Vec<bool>,
-) -> Result<(), HelperErrors>
-where
-    M: Middleware,
-{
+) -> Result<(), HelperErrors> {
     assert_eq!(
         safe_addresses.len(),
         eligibilities.len(),
@@ -836,7 +817,7 @@ pub fn prepare_safe_tx_from_owner_contract<M: Middleware>(
 /// - if node addresses are known, include nodes and safes to the network registry.
 ///
 /// Returns safe proxy address and module proxy address
-pub async fn deploy_safe_module_with_targets_and_nodes<M>(
+pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     hopr_node_stake_factory: HoprNodeStakeFactory<M>,
     hopr_token_address: Address,
     hopr_channels_address: Address,
@@ -846,10 +827,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M>(
     node_addresses: Option<Vec<Address>>,
     admins: Vec<Address>,
     threshold: U256,
-) -> Result<(SafeSingleton<M>, HoprNodeManagementModule<M>), HelperErrors>
-where
-    M: Middleware + 'static,
-{
+) -> Result<(SafeSingleton<M>, HoprNodeManagementModule<M>), HelperErrors> {
     let caller = hopr_node_stake_factory
         .client()
         .default_sender()
@@ -1019,13 +997,10 @@ where
 }
 
 /// Get registered safes for given nodes on the node-safe registry
-pub async fn get_registered_safes_for_nodes_on_node_safe_registry<M>(
+pub async fn get_registered_safes_for_nodes_on_node_safe_registry<M: Middleware>(
     node_safe_registry: HoprNodeSafeRegistry<M>,
     node_addresses: Vec<H160>,
-) -> Result<Vec<H160>, MulticallError<M>>
-where
-    M: Middleware,
-{
+) -> Result<Vec<H160>, MulticallError<M>> {
     let provider = node_safe_registry.client();
     let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
         .await
@@ -1050,15 +1025,12 @@ where
 /// - If nodes have been registered to a safe, remove the node
 /// - If nodes have not been registered to any safe, no op
 /// When deregsitering one node, also remove the node from the module
-pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M>(
+pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M: Middleware>(
     node_safe_registry: HoprNodeSafeRegistry<M>,
     node_addresses: Vec<H160>,
     module_addresses: Vec<H160>,
     owner_chain_key: ChainKeypair,
-) -> Result<u32, HelperErrors>
-where
-    M: Middleware,
-{
+) -> Result<u32, HelperErrors> {
     let provider = node_safe_registry.client();
     // check registered safes of given node addresses
     let registered_safes =
@@ -1120,16 +1092,12 @@ where
 }
 
 /// Include nodes to the module
-pub async fn include_nodes_to_module<M>(
+pub async fn include_nodes_to_module<M: Middleware>(
     safe: SafeSingleton<M>,
     node_addresses: Vec<H160>,
     module_address: H160,
     owner_chain_key: ChainKeypair,
-) -> Result<(), HelperErrors>
-where
-    M: Middleware,
-{
-    let provider = safe.client();
+) -> Result<(), HelperErrors> {
     // get chain id and nonce
     let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
 
@@ -1164,6 +1132,81 @@ where
     Ok(())
 }
 
+/// Migrate nodes to be able to run in a new network.
+// - scope the Channel contract of the new network to the module as target and set default permissions.
+// - scope the Announcement contract as target to the module
+// - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+pub async fn migrate_nodes<M: Middleware>(
+    safe: SafeSingleton<M>,
+    module_addresses: Address,
+    channels_address: Address,
+    token_address: Address,
+    announcement_address: Address,
+    allowance: U256,
+    owner_chain_key: ChainKeypair,
+) -> Result<(), HelperErrors> {
+    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
+
+    let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
+
+    // scope channels and tokens contract of the network
+    let default_target =
+        U256::from_str(format!("{:?}{}", channels_address, DEFAULT_CAPABILITY_PERMISSIONS).as_str()).unwrap();
+    debug!("default target {:?}", default_target);
+
+    multisend_txns.push(MultisendTransaction {
+        // build multisend tx payload
+        encoded_data: AddChannelsAndTokenTargetCall { default_target }.encode().into(),
+        tx_operation: SafeTxOperation::Call,
+        to: module_addresses,
+        value: U256::zero(),
+    });
+
+    // scope announcement contract of the new network
+    let announcement_target =
+        U256::from_str(format!("{:?}{}", announcement_address, DEFAULT_ANNOUNCEMENT_PERMISSIONS).as_str()).unwrap();
+
+    multisend_txns.push(MultisendTransaction {
+        // build multisend tx payload
+        encoded_data: ScopeTargetTokenCall {
+            default_target: announcement_target,
+        }
+        .encode()
+        .into(),
+        tx_operation: SafeTxOperation::Call,
+        to: module_addresses,
+        value: U256::zero(),
+    });
+
+    // approve token transfer by the new Channels contract
+    multisend_txns.push(MultisendTransaction {
+        // build multisend tx payload
+        encoded_data: ApproveCall {
+            spender: channels_address,
+            value: allowance,
+        }
+        .encode()
+        .into(),
+        tx_operation: SafeTxOperation::Call,
+        to: token_address,
+        value: U256::zero(),
+    });
+
+    // send safe transaction
+    send_multisend_safe_transaction_with_threshold_one(
+        safe,
+        owner_chain_key.clone(),
+        H160::from_str(SAFE_MULTISEND_ADDRESS).unwrap(),
+        multisend_txns,
+        chain_id,
+        safe_nonce,
+    )
+    .await
+    .unwrap();
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::vec;
@@ -1171,6 +1214,7 @@ mod tests {
     use crate::utils::{NEW_HOPR_NODE_STAKE_MODULE_TOPIC, NEW_HOPR_NODE_STAKE_SAFE_TOPIC};
 
     use super::*;
+    use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
     use chain_rpc::client::{create_rpc_client_to_anvil, native::SurfRequestor};
     use chain_types::ContractInstances;
     use ethers::abi::AbiDecode;
@@ -1917,5 +1961,117 @@ mod tests {
             let node_is_included = node_module.is_node(node_addr).call().await.unwrap();
             assert!(node_is_included, "node should be included");
         }
+    }
+
+    #[async_std::test]
+    async fn test_migrate_nodes_to_new_network() {
+        // set allowance for token transfer for the safe multiple times
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..2 {
+            node_addresses.push(Address::random().into());
+        }
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let self_address: H160 = contract_deployer.public().to_address().into();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // deploy safe suits
+        deploy_safe_suites(client.clone()).await.unwrap();
+
+        // deploy some new contracts for the new network
+        let new_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())
+            .unwrap()
+            .send()
+            .await
+            .unwrap();
+        let new_token = HoprToken::deploy(client.clone(), ()).unwrap().send().await.unwrap();
+        let new_channels = HoprChannels::deploy(
+            client.clone(),
+            ethers::abi::Token::Tuple(vec![
+                ethers::abi::Token::Address(new_token.address()),
+                ethers::abi::Token::Uint(1_u32.into()),
+                ethers::abi::Token::Address(new_safe_registry.address()),
+            ]),
+        )
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+        let new_announcements =
+            HoprAnnouncements::deploy(client.clone(), ethers::abi::Token::Address(new_safe_registry.address()))
+                .unwrap()
+                .send()
+                .await
+                .unwrap();
+        let new_network_registry = HoprNetworkRegistry::deploy(
+            client.clone(),
+            (
+                ethers::types::Address::from(instances.network_registry_proxy.address()),
+                self_address,
+                self_address,
+            ),
+        )
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+
+        let deployer_vec: Vec<H160> = vec![self_address];
+
+        // create a safe
+        let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
+            instances.stake_factory,
+            instances.token.address(),
+            instances.channels.address(),
+            instances.module_implementation.address(),
+            instances.announcements.address(),
+            U256::max_value(),
+            None,
+            deployer_vec.clone(),
+            U256::from(1),
+        )
+        .await
+        .unwrap();
+
+        // check new network is not included
+        let old_channels_inclusion = node_module
+            .try_get_target(instances.channels.address())
+            .call()
+            .await
+            .unwrap();
+        assert!(old_channels_inclusion.0, "old channel should be included");
+        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await.unwrap();
+        assert!(!new_channels_inclusion.0, "new channel should not be included");
+
+        // migrate nodes
+        migrate_nodes(
+            safe,
+            node_module.address(),
+            new_channels.address(),
+            new_token.address(),
+            new_announcements.address(),
+            U256::max_value(),
+            contract_deployer,
+        )
+        .await
+        .unwrap();
+
+        // check new network is not included
+        let old_channels_inclusion = node_module
+            .try_get_target(instances.channels.address())
+            .call()
+            .await
+            .unwrap();
+        assert!(old_channels_inclusion.0, "old channel should still be included");
+        let new_channels_inclusion = node_module.try_get_target(new_channels.address()).call().await.unwrap();
+        assert!(new_channels_inclusion.0, "new channel should now be included");
     }
 }

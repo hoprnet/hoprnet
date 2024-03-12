@@ -18,12 +18,18 @@
 //!     - use the new safe to include nodes to the module
 //!     - use manager wallet to deregister nodes from the network registry
 //!     - use maanger wallet to register nodes with new safes to the network regsitry
+//! - [SafeModuleSubcommands::Migrate] migrates a node to a different network.
+//! It performs the following steps:
+//!     - add the Channel contract of the new network to the module as target and set default permissions.
+//!     - add the Announcement contract as target to the module
+//!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+//!     - Use the manager wlalet to add nodes and Safes to the Network Registry contract of the new network.
 use crate::{
     environment_config::NetworkProviderArgs,
     identity::{IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
-        include_nodes_to_module, safe_singleton,
+        include_nodes_to_module, migrate_nodes, safe_singleton,
     },
     utils::{Cmd, HelperErrors},
 };
@@ -99,16 +105,45 @@ pub enum SafeModuleSubcommands {
     /// Migrate safe and module to a new network
     #[command(visible_alias = "mg")]
     Migrate {
-        // /// The name of the contract to upload selectors for.
-        // #[arg(required_unless_present = "all")]
-        // contract: Option<String>,
+        /// Network name, contracts config file root, and customized provider, if available
+        #[clap(flatten)]
+        network_provider: NetworkProviderArgs,
 
-        // /// Upload selectors for all contracts in the project.
-        // #[arg(long, required_unless_present = "contract")]
-        // all: bool,
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: Option<IdentityFileArgs>,
 
-        // #[command(flatten)]
-        // project_paths: ProjectPathsArgs,
+        /// node addresses
+        #[clap(
+             help = "Comma separated node Ethereum addresses",
+             long,
+             short = 'o',
+             default_value = None
+         )]
+        node_address: Option<String>,
+
+        /// safe address that the nodes move to
+        #[clap(help = "New managing safe to which all the nodes move", long, short = 's')]
+        safe_address: String,
+
+        /// module address that the nodes move to
+        #[clap(help = "New managing module to which all the nodes move", long, short = 'm')]
+        module_address: String,
+
+        /// Allowance of the channel contract to manage HOPR tokens on behalf of deployed safe
+        #[clap(
+            help = "Provide the allowance of the channel contract to manage HOPR tokens on behalf of deployed safe. Value in ether, e.g. 10",
+            long,
+            short = 'l',
+            value_parser = clap::value_parser!(f64),
+        )]
+        allowance: Option<f64>,
+
+        /// Access to the private key, of which the wallet either contains sufficient assets
+        /// as the source of funds or it can mint necessary tokens
+        /// This wallet is also the manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
     },
 
     /// Move nodes to one single safe and module pair
@@ -303,6 +338,68 @@ impl SafeModuleSubcommands {
 
         Ok(())
     }
+
+    /// Execute the command, which migrates nodes to a new network
+    /// Note that it does not register the node with the new safe on NodeSafeRegistry,
+    /// because it is an action that nodes need to do on-start.
+    pub async fn execute_safe_module_migration(
+        network_provider: NetworkProviderArgs,
+        local_identity: Option<IdentityFileArgs>,
+        node_address: Option<String>,
+        safe_address: String,
+        module_address: String,
+        allowance: Option<f64>,
+        private_key: PrivateKeyArgs,
+    ) -> Result<(), HelperErrors> {
+        // read all the node addresses
+        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = node_address {
+            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        if let Some(local_identity_arg) = local_identity {
+            node_eth_addresses.extend(local_identity_arg.to_addresses().unwrap().into_iter().map(H160::from));
+        }
+
+        // get allowance
+        let token_allowance = match allowance {
+            Some(allw) => U256::from(parse_units(allw, "ether").unwrap()),
+            None => U256::max_value(),
+        };
+
+        // parse safe and module addresses
+        let safe_addr = H160::from_str(&safe_address).unwrap();
+        let module_addr = H160::from_str(&module_address).unwrap();
+
+        // read private key
+        let signer_private_key = private_key.read()?;
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
+
+        // Create a Safe tx to Multisend contract,
+        // 1. scope the Channel contract of the new network to the module as target and set default permissions.
+        // 2. scope the Announcement contract as target to the module
+        // 3. approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+        migrate_nodes(
+            safe,
+            module_addr,
+            contract_addresses.addresses.channels.into(),
+            contract_addresses.addresses.token.into(),
+            contract_addresses.addresses.announcements.into(),
+            token_allowance,
+            signer_private_key,
+        )
+        .await
+        .unwrap();
+        info!("a new network has been included due to the migration");
+
+        // TODO: FIXME: action around network registry
+        // if !node_eth_addresses.is_empty() {}
+        Ok(())
+    }
 }
 
 impl Cmd for SafeModuleSubcommands {
@@ -356,7 +453,27 @@ impl Cmd for SafeModuleSubcommands {
                 .await
                 .unwrap();
             }
-            SafeModuleSubcommands::Migrate {} => {}
+            SafeModuleSubcommands::Migrate {
+                network_provider,
+                local_identity,
+                node_address,
+                safe_address,
+                module_address,
+                allowance,
+                private_key,
+            } => {
+                SafeModuleSubcommands::execute_safe_module_migration(
+                    network_provider,
+                    local_identity,
+                    node_address,
+                    safe_address,
+                    module_address,
+                    allowance,
+                    private_key,
+                )
+                .await
+                .unwrap();
+            }
         }
         Ok(())
     }
