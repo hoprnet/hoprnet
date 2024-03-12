@@ -26,7 +26,7 @@
 //!     - Use the manager wlalet to add nodes and Safes to the Network Registry contract of the new network.
 use crate::{
     environment_config::NetworkProviderArgs,
-    identity::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
         include_nodes_to_module, migrate_nodes, safe_singleton,

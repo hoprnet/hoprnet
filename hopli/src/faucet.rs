@@ -6,7 +6,7 @@
 
 use crate::{
     environment_config::NetworkProviderArgs,
-    identity::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{IdentityFileArgs, PrivateKeyArgs},
     methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };

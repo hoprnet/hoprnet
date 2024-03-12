@@ -12,7 +12,7 @@
 //! A manager account can set eligibility of staking accounts with `-a manager-deregsiter`
 use crate::{
     environment_config::NetworkProviderArgs,
-    identity::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
         register_safes_and_nodes_on_network_registry,
