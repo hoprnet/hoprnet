@@ -9,14 +9,12 @@ use async_lock::RwLock;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
-use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use tide::http::headers::HeaderValue;
 use tide::{
     http::{
-        headers::{HeaderName, AUTHORIZATION},
+        headers::{HeaderName, HeaderValue, AUTHORIZATION},
         mime, Mime,
     },
     security::{CorsMiddleware, Origin},
@@ -30,11 +28,12 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
-use crate::config::Auth;
 use hopr_lib::{
     errors::HoprLibError,
-    {Address, Balance, BalanceType, Hopr},
+    TransportOutput, {Address, Balance, BalanceType, Hopr},
 };
+
+use crate::config::Auth;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -592,7 +591,7 @@ mod alias {
         let aliases = req.state().aliases.clone();
 
         aliases.write().await.insert(args.alias, args.peer_id);
-        Ok(Response::builder(200)
+        Ok(Response::builder(201)
             .body(json!(PeerIdResponse { peer_id: args.peer_id }))
             .build())
     }
