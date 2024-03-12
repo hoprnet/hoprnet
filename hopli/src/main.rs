@@ -12,7 +12,6 @@ pub mod identity;
 pub mod key_pair;
 pub mod methods;
 pub mod network_registry;
-pub mod process;
 pub mod safe_module;
 pub mod utils;
 
