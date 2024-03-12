@@ -543,6 +543,7 @@ mod tests {
     use serial_test::serial;
     use std::{str::FromStr, sync::Arc, time::Duration};
     use tracing::debug;
+    use hopr_db_api::info::DomainSeparator;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [
@@ -593,7 +594,7 @@ mod tests {
 
         for index in 0..dbs.len() {
             dbs[index]
-                .update_channel_domain_separator(None, Hash::default())
+                .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
                 .await
                 .map_err(|e| crate::errors::ProtocolError::Logic(e.to_string()))?;
 

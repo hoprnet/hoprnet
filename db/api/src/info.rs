@@ -25,6 +25,10 @@ pub struct SafeInfo {
     pub module_address: Address,
 }
 
+pub enum DomainSeparator {
+    Ledger, SafeRegistry, Channel
+}
+
 #[async_trait]
 pub trait HoprDbInfoOperations {
     async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
@@ -41,7 +45,7 @@ pub trait HoprDbInfoOperations {
 
     async fn get_chain_data<'a>(&'a self, tx: OptTx<'a>) -> Result<OnChainData>;
 
-    async fn update_channel_domain_separator<'a>(&'a self, tx: OptTx<'a>, ds: Hash) -> Result<()>;
+    async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()>;
 
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
@@ -209,23 +213,31 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn update_channel_domain_separator<'a>(&'a self, tx: OptTx<'a>, ds: Hash) -> Result<()> {
+    async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    chain_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        channels_dst: Set(Some(ds.to_bytes().into())),
-                        ..Default::default()
-                    }
-                    .update(tx.as_ref())
-                    .await?;
+            .perform(|tx| Box::pin(async move {
+                let mut active_model = chain_info::ActiveModel {
+                    id: Set(SINGULAR_TABLE_FIXED_ID),
+                    ..Default::default()
+                };
 
-                    Ok::<(), DbError>(())
-                })
-            })
-            .await
+                match dst_type {
+                    DomainSeparator::Ledger => {
+                        active_model.ledger_dst = Set(Some(value.to_bytes().into()));
+                    },
+                    DomainSeparator::SafeRegistry => {
+                        active_model.safe_registry_dst = Set(Some(value.to_bytes().into()));
+                    }
+                    DomainSeparator::Channel => {
+                        active_model.channels_dst = Set(Some(value.to_bytes().into()));
+                    }
+                }
+
+                active_model.update(tx.as_ref()).await?;
+
+                Ok::<(), DbError>(())
+            })).await
     }
 
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {

@@ -128,7 +128,7 @@ impl HoprDb {
             .max_capacity(10_000)
             .build();
 
-        // Reset all ticket states to Untouched
+        // Reset all BeingAggregated ticket states to Untouched
         ticket::Entity::update_many()
             .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
             .col_expr(
