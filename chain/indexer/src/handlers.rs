@@ -27,6 +27,7 @@ use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
+use hopr_db_api::info::DomainSeparator;
 use hopr_db_api::tickets::TicketSelector;
 
 /// Event handling object for on-chain operations
@@ -379,24 +380,12 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    channels_dst: Set(Some(domain_separator_updated.domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db.set_domain_separator(Some(tx), DomainSeparator::Channel, domain_separator_updated.domain_separator.into()).await?;
 
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    ledger_dst: Set(Some(ledger_domain_separator_updated.ledger_domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db.set_domain_separator(Some(tx), DomainSeparator::Ledger, ledger_domain_separator_updated.ledger_domain_separator.into()).await?;
 
                 Ok(None)
             }
@@ -549,13 +538,7 @@ where
                 }
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    safe_registry_dst: Set(Some(domain_separator_updated.domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db.set_domain_separator(Some(tx), DomainSeparator::SafeRegistry, domain_separator_updated.domain_separator.into()).await?;
             }
         }
 
