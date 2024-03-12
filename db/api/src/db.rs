@@ -130,7 +130,7 @@ impl HoprDb {
 
         // Reset all ticket states to Untouched
         ticket::Entity::update_many()
-            .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::Untouched as u8))
+            .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
             .col_expr(
                 ticket::Column::State,
                 Expr::value(AcknowledgedTicketStatus::Untouched as u8),
