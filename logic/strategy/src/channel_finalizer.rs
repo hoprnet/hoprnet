@@ -1,7 +1,6 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_internal_types::prelude::*;

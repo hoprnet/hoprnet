@@ -1,7 +1,7 @@
 use chain_actions::errors::ChainActionsError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
+use hopr_db_api::errors::DbError;
 
 /// Enumerates all errors in this crate.
 #[derive(Debug, Error)]

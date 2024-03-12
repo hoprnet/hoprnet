@@ -6,7 +6,6 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
