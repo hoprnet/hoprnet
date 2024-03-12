@@ -1255,7 +1255,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
@@ -1321,7 +1321,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
@@ -1366,7 +1366,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let channel_closed_log = RawLog {
             topics: vec![
@@ -1447,7 +1447,7 @@ pub mod tests {
             3.into(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let channel_opened_log = RawLog {
             topics: vec![
@@ -1493,7 +1493,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let ticket_index = U256::from((1u128 << 48) - 1);
 
@@ -1537,7 +1537,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let timestamp = SystemTime::now();
         //let timestamp = U256::from((1u64 << 32) - 1);

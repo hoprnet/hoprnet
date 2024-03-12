@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -1173,6 +1173,7 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -1670,13 +1671,12 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
- "chain-db",
  "chain-types",
  "core-network",
  "core-protocol",
@@ -1701,7 +1701,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 

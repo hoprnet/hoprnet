@@ -2,7 +2,6 @@
 //!
 //! The [ActionQueue] acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::actions::Action;
 use chain_types::chain_events::ChainEventType;
@@ -22,14 +21,12 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{
-    ChannelAlreadyClosed, InvalidState, MissingDomainSeparator, Timeout, TransactionSubmissionFailed,
+    ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed,
 };
-use crate::errors::Result;
+use crate::errors::{ChainActionsError, Result};
 
 use async_std::task::spawn;
-use hopr_db_api::HoprDbAllOperations;
 use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::ticket_manager::TicketManager;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -46,7 +43,7 @@ lazy_static::lazy_static! {
 }
 
 /// Implements execution of transactions underlying each `Action`
-/// Each operation returns a transaction hash and may timeout.
+/// Each operation returns a transaction hash and may time out.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait TransactionExecutor {
@@ -300,22 +297,21 @@ where
 /// This queue awaits new Actions to arrive, translates them into Ethereum
 /// transactions via [TransactionExecutor] to execute them and await their confirmation
 /// by registering their corresponding expectations in [ActionState].
-pub struct ActionQueue<T, S, TxExec>
+pub struct ActionQueue<Db, S, TxExec>
 where
-    T: Send + Sync + 'static,
+    Db: HoprDbInfoOperations + HoprDbTicketOperations + Send + Sync,
     S: ActionState + Send + Sync,
     TxExec: TransactionExecutor + Send + Sync,
 {
-    ticket_mgr: T,
-    channel_dst: Hash,
+    db: Db,
     queue_send: Sender<(Action, ActionFinisher)>,
     queue_recv: Receiver<(Action, ActionFinisher)>,
     ctx: ExecutionContext<S, TxExec>,
 }
 
-impl<T, S, TxExec> ActionQueue<T, S, TxExec>
+impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
-    T: TicketManager + Clone + Send + Sync + 'static,
+    Db: HoprDbInfoOperations + HoprDbTicketOperations + Clone + Send + Sync + 'static,
     S: ActionState + Send + Sync + 'static,
     TxExec: TransactionExecutor + Send + Sync + 'static,
 {
@@ -323,11 +319,10 @@ where
     pub const ACTION_QUEUE_SIZE: usize = 2048;
 
     /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
-    pub fn new(action_state: S, ticket_mgr: T, tx_exec: TxExec, cfg: ActionQueueConfig, channel_dst: Hash) -> Self {
+    pub fn new(db: Db, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
         let (queue_send, queue_recv) = channel(Self::ACTION_QUEUE_SIZE);
         Self {
-            ticket_mgr,
-            channel_dst,
+            db,
             ctx: ExecutionContext {
                 action_state: Arc::new(action_state),
                 tx_exec: Arc::new(tx_exec),
@@ -349,14 +344,20 @@ where
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
+    ///
+    /// The method will panic if Channel Domain Separator is not yet populated in the DB.
     pub async fn action_loop(mut self) {
+        let channel_dst = self.db.get_chain_data(None).await
+            .map_err(ChainActionsError::from)
+            .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
+            .unwrap();
+
         while let Some((act, tx_finisher)) = self.queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
             let exec_context = self.ctx.clone();
-            let ticket_mgr_clone = self.ticket_mgr.clone();
-            let channel_dst = self.channel_dst;
+            let db_clone = self.db.clone();
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
@@ -375,7 +376,7 @@ where
                         if let Action::RedeemTicket(ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
 
-                            if let Err(e) = ticket_mgr_clone.update_ticket_state(&ack, AcknowledgedTicketStatus::Untouched) {
+                            if let Err(e) = db_clone.update_ticket_states((&ack).into(), AcknowledgedTicketStatus::Untouched).await {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }
                         }

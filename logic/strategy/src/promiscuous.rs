@@ -29,7 +29,6 @@ use tracing::{debug, error, info, warn};
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::Network;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -42,6 +41,10 @@ use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::Arc;
 use validator::Validate;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::errors::DbError;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::resolver::HoprDbResolverOperations;
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -160,11 +163,11 @@ pub struct PromiscuousStrategyConfig {
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy<Db, A, T>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbChannelOperations + HoprDbResolverOperations + Clone,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    db: Arc<RwLock<Db>>,
+    db: Db,
     network: Arc<Network<T>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
@@ -173,13 +176,13 @@ where
 
 impl<Db, A, T> PromiscuousStrategy<Db, A, T>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbChannelOperations + HoprDbResolverOperations + HoprDbInfoOperations + Clone,
     A: ChannelActions,
     T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     pub fn new(
         cfg: PromiscuousStrategyConfig,
-        db: Arc<RwLock<Db>>,
+        db: Db,
         network: Arc<Network<T>>,
         chain_actions: A,
     ) -> Self {
@@ -238,11 +241,9 @@ where
                 let k_clone = key;
                 match self
                     .db
-                    .read()
+                    .resolve_chain_key(&k_clone)
                     .await
-                    .get_chain_key(&k_clone)
-                    .await
-                    .and_then(|addr| addr.ok_or(utils_db::errors::DbError::NotFound))
+                    .and_then(|addr| addr.ok_or(DbError::MissingAccount))
                 {
                     Ok(addr) => Some((addr, q)),
                     Err(_) => {
@@ -263,9 +264,7 @@ where
 
         let outgoing_open_channels = self
             .db
-            .read()
-            .await
-            .get_outgoing_channels()
+            .get_channels_via(None, ChannelDirection::Outgoing, me_onchain)
             .await?
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)
@@ -296,7 +295,7 @@ where
                     tick_decision.add_to_close(*channel);
                 }
             } else if *quality >= self.cfg.network_quality_threshold {
-                // Try to open channel with this peer, because it is high-quality and we don't yet have a channel with it
+                // Try to open channel with this peer, because it is high-quality, and we don't yet have a channel with it
                 new_channel_candidates.push((*address, *quality));
             }
         }
@@ -368,7 +367,7 @@ where
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
-            let mut remaining_balance = self.db.read().await.get_hopr_balance().await?;
+            let mut remaining_balance = self.db.get_safe_balance(None).await?;
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             for (address, _) in new_channel_candidates {
@@ -494,6 +493,9 @@ mod tests {
     use hopr_platform::time::native::current_time;
     use lazy_static::lazy_static;
     use mockall::mock;
+    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
@@ -561,7 +563,7 @@ mod tests {
     }
 
     async fn mock_channel(
-        db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
+        db: HoprDb,
         dst: Address,
         balance: Balance,
     ) -> ChannelEntry {
@@ -573,11 +575,8 @@ mod tests {
             ChannelStatus::Open,
             U256::zero(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
-            .await
-            .unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
+
         channel
     }
 
@@ -610,23 +609,20 @@ mod tests {
         }
     }
 
-    async fn init_db(db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>, node_balance: Balance) {
-        let mut d = db.write().await;
-
-        d.set_hopr_balance(&node_balance).await.unwrap();
-        d.set_staking_safe_allowance(&node_balance, &Snapshot::default())
+    async fn init_db(db: HoprDb, node_balance: Balance) {
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move {
+                db.set_safe_balance(Some(tx), node_balance).await?;
+                db.set_safe_allowance(Some(tx), node_balance).await?;
+                for (chain_key, peer_id) in PEERS.iter() {
+                    db.insert_account(Some(tx), AccountEntry::new(OffchainPublicKey::try_from(*peer_id).unwrap(), *chain_key, AccountType::NotAnnounced)).await?;
+                }
+                Ok::<_, DbError>(())
+            }))
             .await
             .unwrap();
-
-        for (chain_key, peer_id) in PEERS.iter() {
-            d.link_chain_and_packet_keys(
-                chain_key,
-                &OffchainPublicKey::try_from(*peer_id).unwrap(),
-                &Snapshot::default(),
-            )
-            .await
-            .unwrap();
-        }
     }
 
     fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
@@ -658,10 +654,7 @@ mod tests {
     async fn test_promiscuous_strategy_tick_decisions() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            PEERS[0].0,
-        )));
+        let db = HoprDb::new_in_memory().await;
 
         let network = Arc::new(Network::new(
             PEERS[0].1,

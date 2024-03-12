@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
-use sea_query::SimpleExpr;
+use sea_query::{Expr, SimpleExpr};
 use tracing::{debug, instrument, trace};
 
 use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
@@ -79,6 +79,13 @@ pub struct TicketSelector {
     pub only_aggregated: bool,
 }
 
+impl TicketSelector {
+    /// If `false` is returned, the selector can fetch more than a single ticket.
+    pub fn is_unique(&self) -> bool {
+        self.index.is_some()
+    }
+}
+
 impl From<&AcknowledgedTicket> for TicketSelector {
     fn from(value: &AcknowledgedTicket) -> Self {
         Self {
@@ -126,20 +133,22 @@ impl From<TicketSelector> for SimpleExpr {
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
-    async fn get_ticket<'a>(
+    async fn get_tickets<'a>(
         &'a self,
         tx: OptTx<'a>,
         selector: TicketSelector,
         // To be removed with https://github.com/hoprnet/hoprnet/pull/6018
         chain_keypair: &ChainKeypair,
-    ) -> Result<Option<AcknowledgedTicket>>;
+    ) -> Result<Vec<AcknowledgedTicket>>;
 
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize>;
 
     async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
 
-    // Remove ChainKeypair once https://github.com/hoprnet/hoprnet/pull/6018 is merged
-    async fn update_ticket_states<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>>;
+    // TODO: join these two methods into a single one once https://github.com/hoprnet/hoprnet/pull/6018 is merge (ChainKeypair will not be needed)
+    async fn update_ticket_states_and_fetch<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>>;
+
+    async fn update_ticket_states(&self, selector: TicketSelector, new_state: AcknowledgedTicketStatus) -> Result<()>;
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
@@ -192,20 +201,20 @@ pub struct AllTicketStatistics {
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
-    async fn get_ticket<'a>(
+    async fn get_tickets<'a>(
         &'a self,
         tx: OptTx<'a>,
         selector: TicketSelector,
         chain_keypair: &ChainKeypair,
-    ) -> Result<Option<AcknowledgedTicket>> {
-        assert!(selector.index.is_some(), "ticket index must be specified in the selector to fetch a single ticket");
+    ) -> Result<Vec<AcknowledgedTicket>> {
 
         let channel_dst = self.get_chain_data(tx)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
 
-        let ticket = self
+        let ckp = chain_keypair.clone();
+        self
             .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
@@ -213,21 +222,15 @@ impl HoprDbTicketOperations for HoprDb {
                     Ok::<_, DbError>(
                         ticket::Entity::find()
                             .filter(SimpleExpr::from(selector))
-                            .one(tx.as_ref())
-                            .await?,
+                            .all(tx.as_ref())
+                            .await?
+                            .into_iter()
+                            .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
+                            .collect::<Result<Vec<_>>>()?
                     )
                 })
             })
-            .await?;
-
-        match ticket {
-            None => Ok(None),
-            Some(ticket_model) => Ok(Some(model_to_acknowledged_ticket(
-                &ticket_model,
-                channel_dst,
-                chain_keypair,
-            )?)),
-        }
+            .await
     }
 
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize> {
@@ -316,7 +319,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn update_ticket_states<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>> {
+    async fn update_ticket_states_and_fetch<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>> {
         let channel_dst = self.get_chain_data(None)
             .await?
             .channels_dst
@@ -357,6 +360,17 @@ impl HoprDbTicketOperations for HoprDb {
                 Err(e) => tracing::error!("failed open ticket db stream: {e}")
             }
         }))
+    }
+
+    async fn update_ticket_states(&self, selector: TicketSelector, new_state: AcknowledgedTicketStatus) -> Result<()> {
+        self.ticket_manager.with_write_locked_db(|tx| Box::pin(async move {
+            ticket::Entity::update_many()
+                .filter(SimpleExpr::from(selector))
+                .col_expr(ticket::Column::State, Expr::value(new_state as u8))
+                .exec(tx.as_ref())
+                .await?;
+            Ok::<_, DbError>(())
+        })).await
     }
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
@@ -434,6 +448,7 @@ impl HoprDbTicketOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
     async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> Result<AckResult> {
         let myself = self.clone();
+        let me_onchain = me.public().to_address();
 
         let result = self
             .begin_transaction()
@@ -466,7 +481,7 @@ impl HoprDbTicketOperations for HoprDb {
                             })?;
 
                             if myself
-                                .get_channel_from(Some(tx), unacknowledged.signer)
+                                .get_channel_by_id(Some(tx), generate_channel_id(&unacknowledged.signer, &me_onchain))
                                 .await?
                                 .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
                             {
@@ -587,6 +602,7 @@ impl HoprDbTicketOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> Result<TransportPacketWithChainData> {
+        let me_onchain = me.public().to_address();
         match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)
             .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct an incoming packet: {e}")))?
         {
@@ -651,7 +667,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                             let channel =
                                 myself
-                                    .get_channel_from(Some(tx), previous_hop_addr)
+                                    .get_channel_by_id(Some(tx), generate_channel_id(&previous_hop_addr, &me_onchain))
                                     .await?
                                     .ok_or_else(|| {
                                         crate::errors::DbError::LogicalError(format!(
@@ -852,18 +868,20 @@ impl HoprDb {
         Ok(ticket)
     }
 
-    /// Used only by non-SQLite code
-    #[allow(dead_code)]
-    async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
+    /// Used only by non-SQLite code and tests.
+    pub async fn upsert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
         self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
-                        ticket::ActiveModel::from(acknowledged_ticket)
-                            .insert(tx.as_ref())
-                            .await?,
-                    )
+                    let selector = TicketSelector::from(&acknowledged_ticket);
+                    let mut model = ticket::ActiveModel::from(acknowledged_ticket);
+
+                    if let Some(ticket) = ticket::Entity::find().filter(SimpleExpr::from(selector)).one(tx.as_ref()).await? {
+                        model.id = Set(ticket.id);
+                    }
+
+                    Ok::<_, DbError>(model.save(tx.as_ref()).await?, )
                 })
             })
             .await?;
@@ -928,7 +946,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let tickets = (0..count_tickets)
             .into_iter()
@@ -943,7 +961,7 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     for t in tickets_clone {
-                        db_clone.insert_ticket(Some(tx), t).await?;
+                        db_clone.upsert_ticket(Some(tx), t).await?;
                     }
                     Ok::<(), DbError>(())
                 })
@@ -971,13 +989,14 @@ mod tests {
         );
 
         let db_ticket = db
-            .get_ticket(
+            .get_tickets(
                 None,
                 (&ack_ticket).into(),
                 &ALICE,
             )
             .await
             .expect("should get ticket")
+            .first()
             .expect("ticket should exist");
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
@@ -1116,7 +1135,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_update_tickets_state() {
+    async fn test_update_tickets_states_and_fetch() {
         let db = HoprDb::new_in_memory().await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
 
@@ -1125,7 +1144,7 @@ mod tests {
         let mut selector: TicketSelector = (&channel).into();
         selector.index = Some(5);
 
-        let v: Vec<AcknowledgedTicket> = db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
+        let v: Vec<AcknowledgedTicket> = db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
             .expect("must create stream")
             .collect()
             .await;
@@ -1136,7 +1155,7 @@ mod tests {
         let mut selector: TicketSelector = (&channel).into();
         selector.state = Some(AcknowledgedTicketStatus::Untouched);
 
-        let v: Vec<AcknowledgedTicket> = db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
+        let v: Vec<AcknowledgedTicket> = db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
             .expect("must create stream")
             .collect()
             .await;
@@ -1144,6 +1163,25 @@ mod tests {
         assert_eq!(9, v.len(), "only specific tickets must have state set");
         assert!(v.iter().all(|t| t.ticket.index != 5), "only tickets with different state must update");
         assert!(v.iter().all(|t| t.status == AcknowledgedTicketStatus::BeingRedeemed), "tickets must have updated state");
+    }
+
+    #[async_std::test]
+    async fn test_update_tickets_states() {
+        let db = HoprDb::new_in_memory().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+
+        let channel = init_db_with_tickets(&db, 10).await.0;
+        let mut selector: TicketSelector = (&channel).into();
+        selector.state = Some(AcknowledgedTicketStatus::Untouched);
+
+        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed).await.unwrap();
+
+        let v: Vec<AcknowledgedTicket> = db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
+            .expect("must create stream")
+            .collect()
+            .await;
+
+        assert!(v.is_empty(), "must not update if already updated");
     }
 
     #[async_std::test]

@@ -433,14 +433,14 @@ mod tests {
         for current_addr in ADDRESSES.iter().skip(1) {
             // Open channel from last node to us
             let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
-            db.insert_channel(None, channel).await.unwrap();
+            db.upsert_channel(None, channel).await.unwrap();
 
             last_addr = *current_addr;
         }
 
         // Add a pending to close channel between 4 -> 0
         let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let mut cg = ChannelGraph::new(ADDRESSES[0]);
         cg.sync_channels(db.get_all_channels(None).await.expect("channels should be present"))

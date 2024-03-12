@@ -27,7 +27,7 @@ use crate::errors::{HoprChainError, Result};
 use async_std::task::sleep;
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use hopr_db_api::HoprDbAllOperations;
-use hopr_internal_types::prelude::generate_channel_id;
+use hopr_internal_types::prelude::{ChannelDirection, generate_channel_id};
 
 /// The default HTTP request engine
 ///
@@ -190,12 +190,12 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             })
     }
 
-    pub async fn channel_from(&self, src: &Address) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_from(None, *src).await?)
+    pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
+        Ok(self.db.get_channels_via(None, ChannelDirection::Outgoing, *src).await?)
     }
 
-    pub async fn channel_to(&self, dest: &Address) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_to(None, *dest).await?)
+    pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
+        Ok(self.db.get_channels_via(None, ChannelDirection::Incoming, *dest).await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {

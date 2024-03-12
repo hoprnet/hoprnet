@@ -51,6 +51,8 @@ pub trait HoprDbInfoOperations {
 
     async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
+    async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()>;
+
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>>;
 
     async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()>;
@@ -271,6 +273,24 @@ impl HoprDbInfoOperations for HoprDb {
                     }
                     .save(tx.as_ref())
                     .await?;
+                    Ok::<_, DbError>(())
+                })
+            })
+            .await
+    }
+
+    async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::ActiveModel {
+                        id: Set(SINGULAR_TABLE_FIXED_ID),
+                        network_registry_enabled: Set(enabled),
+                        ..Default::default()
+                    }
+                        .save(tx.as_ref())
+                        .await?;
                     Ok::<_, DbError>(())
                 })
             })

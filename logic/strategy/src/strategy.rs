@@ -17,10 +17,8 @@
 //! This can be controlled by the `finalize_channel_closure` parameter.
 //!
 //! For details on default parameters see [MultiStrategyConfig].
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::ChainActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::Network;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use hopr_internal_types::prelude::*;
@@ -40,6 +38,7 @@ use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
+use hopr_db_api::HoprDbAllOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -126,13 +125,13 @@ impl MultiStrategy {
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
     pub fn new<Db, T>(
         cfg: MultiStrategyConfig,
-        db: Arc<RwLock<Db>>,
+        db: Db,
         network: Arc<Network<T>>,
         chain_actions: ChainActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
+        Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
         T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();

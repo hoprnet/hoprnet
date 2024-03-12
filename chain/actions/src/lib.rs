@@ -85,12 +85,9 @@
 //! of one of the HOPR smart contracts deployed on-chain.
 //!
 //! See the [payload] module for details.
-use async_lock::RwLock;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_primitive_types::primitives::Address;
-use std::sync::Arc;
-use hopr_db_api::HoprDbAllOperations;
-use hopr_db_api::ticket_manager::TicketManager;
+use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::prelude::Keypair;
 
 use crate::action_queue::ActionSender;
 
@@ -105,23 +102,22 @@ pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Debug, Clone)]
-pub struct ChainActions<Db, T>
-where Db: HoprDbAllOperations + Clone + std::fmt::Debug, T: TicketManager + Clone + std::fmt::Debug {
-    me: Address,
+pub struct ChainActions<Db>
+where Db: Clone + std::fmt::Debug, {
+    me: ChainKeypair,
     db: Db,
-    ticket_manager: T,
     tx_sender: ActionSender,
 }
 
-impl<Db, T> ChainActions<Db, T>
-where Db: HoprDbAllOperations + Clone + std::fmt::Debug, T: TicketManager + Clone + std::fmt::Debug {
+impl<Db> ChainActions<Db>
+where Db: Clone + std::fmt::Debug, {
     ///! Creates new instance.
-    pub fn new(me: Address, db: Db, ticket_manager: T, tx_sender: ActionSender) -> Self {
-        Self { me, db, ticket_manager, tx_sender }
+    pub fn new(me: ChainKeypair, db: Db, tx_sender: ActionSender) -> Self {
+        Self { me, db, tx_sender }
     }
 
     ///! On-chain address of this node
     pub fn self_address(&self) -> Address {
-        self.me
+        self.me.public().to_address()
     }
 }

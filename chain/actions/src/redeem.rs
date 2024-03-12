@@ -21,25 +21,20 @@
 //!
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::ops::DerefMut;
-use std::sync::Arc;
 use futures::StreamExt;
 use tracing::{debug, error, info, warn};
 use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::ticket_manager::{TicketManager, TicketSelector};
-use utils_db::errors::DbError;
+use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
 
-use crate::action_queue::{ActionSender, PendingAction};
+use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    ChainActionsError::{NotAWinningTicket, WrongTicketState},
+    ChainActionsError::WrongTicketState,
     Result,
 };
 use crate::ChainActions;
@@ -75,13 +70,12 @@ pub trait TicketRedeemActions {
 }
 
 #[async_trait]
-impl<Db, T> TicketRedeemActions for ChainActions<Db, T>
+impl<Db> TicketRedeemActions for ChainActions<Db>
 where
-    Db: HoprDbChannelOperations + Clone + Send + Sync + std::fmt::Debug,
-    T: TicketManager + Clone + Send + Sync + std::fmt::Debug {
+    Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug, {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
-        let incoming_channels = self.db.read().await.get_incoming_channels().await?;
+        let incoming_channels = self.db.get_channels_via(None, ChannelDirection::Incoming, self.self_address()).await?;
         debug!(
             "starting to redeem all tickets in {} incoming channels to us.",
             incoming_channels.len()
@@ -115,8 +109,8 @@ where
         counterparty: &Address,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>> {
-        let ch = self.db.read().await.get_channel_from(counterparty).await?;
-        if let Some(channel) = ch {
+        let maybe_channel = self.db.get_channel_by_id(None, generate_channel_id(counterparty, &self.self_address())).await?;
+        if let Some(channel) = maybe_channel {
             self.redeem_tickets_in_channel(&channel, only_aggregated).await
         } else {
             Err(ChannelDoesNotExist)
@@ -136,7 +130,8 @@ where
         selector.only_aggregated = only_aggregated;
         selector.state = Some(AcknowledgedTicketStatus::Untouched);
 
-        let count_redeemable_tickets = self.ticket_manager.count_tickets(selector).await?;
+        let (count_redeemable_tickets, _) = self.db.get_tickets_value(None, selector).await?;
+
         info!(
             "there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed"
         );
@@ -146,17 +141,18 @@ where
             return Ok(vec![]);
         }
 
-        let mut redeem_stream = self.ticket_manager.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed).await?;
+        let mut redeem_stream = self.db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me).await?;
         let mut receivers: Vec<PendingAction> = vec![];
         while let Some(ack_ticket) = redeem_stream.next().await {
+            let ticket_id = ack_ticket.to_string();
             let action = self.tx_sender.send(Action::RedeemTicket(ack_ticket)).await;
             match action {
                 Ok(successful_tx) => {
                     receivers.push(successful_tx);
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to submit transaction that redeem {ack_ticket}: {e}",
+                    error!(
+                        "Failed to submit transaction that redeems {ticket_id}: {e}",
                     );
                 }
             }
@@ -175,15 +171,19 @@ where
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
-        if let Some(channel) = ch {
-            if ack_ticket.status == AcknowledgedTicketStatus::Untouched
-                && channel.channel_epoch == U256::from(ack_ticket.ticket.channel_epoch)
-            {
-                unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
-            } else {
-                Err(WrongTicketState(ack_ticket.to_string()))
-            }
+        if let Some(channel) = self.db.get_channel_by_id(None, ack_ticket.ticket.channel_id).await? {
+            let mut selector: TicketSelector = (&channel).into();
+            selector.state = Some(AcknowledgedTicketStatus::Untouched);
+            selector.index = Some(ack_ticket.ticket.index);
+
+                if let Some(ticket) = self.db.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
+                    .await?
+                    .next()
+                    .await {
+                    Ok(self.tx_sender.send(Action::RedeemTicket(ticket)).await?)
+                } else {
+                    Err(WrongTicketState(ack_ticket.to_string()))
+                }
         } else {
             Err(ChannelDoesNotExist)
         }
@@ -193,17 +193,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::chain_events::ChainEventType::TicketRedeemed;
     use chain_types::chain_events::SignificantChainEvent;
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::errors::DbError;
+    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
 
     use crate::action_queue::{ActionQueue, MockTransactionExecutor};
     use crate::action_state::MockActionState;
@@ -241,56 +240,45 @@ mod tests {
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
     }
 
-    fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
-        let mut ack_key = Vec::new();
-
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
-        ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
-        ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
-
-        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
-    }
-
-    async fn set_domain_separator(rdb: CurrentDbShim) {
-        let inner_db = DB::new(rdb);
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
-
-        db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
-            .await
-            .unwrap();
-    }
-
     async fn create_channel_with_ack_tickets(
-        rdb: CurrentDbShim,
+        db: HoprDb,
         ticket_count: usize,
         counterparty: &ChainKeypair,
         channel_epoch: U256,
     ) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
-        let mut inner_db = DB::new(rdb);
-        let mut input_tickets = Vec::new();
+        let ckp = counterparty.clone();
+        let db_clone = db.clone();
+        let channel = db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move {
+                db_clone.set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default()).await?;
 
-        for i in 0..ticket_count {
-            let ack_ticket = generate_random_ack_ticket(i as u32, counterparty, channel_epoch);
-            inner_db
-                .set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket)
-                .await
-                .unwrap();
-            input_tickets.push(ack_ticket);
-        }
-
-        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
-        let channel = ChannelEntry::new(
-            counterparty.public().to_address(),
-            ALICE.public().to_address(),
-            Balance::zero(BalanceType::HOPR),
-            U256::zero(),
-            ChannelStatus::Open,
-            channel_epoch,
-        );
-        db.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
+                let channel = ChannelEntry::new(
+                    ckp.public().to_address(),
+                    ALICE.public().to_address(),
+                    Balance::zero(BalanceType::HOPR),
+                    U256::zero(),
+                    ChannelStatus::Open,
+                    channel_epoch,
+                );
+                db_clone.upsert_channel(Some(tx), channel).await?;
+                Ok::<_, DbError>(channel)
+            }))
             .await
             .unwrap();
-        db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+
+        let ckp = counterparty.clone();
+        let input_tickets = db.begin_transaction_in_db(TargetDb::Tickets).await.unwrap()
+            .perform(|tx| Box::pin(async move {
+                let mut input_tickets = Vec::new();
+                for i in 0..ticket_count {
+                    let ack_ticket = generate_random_ack_ticket(i as u32, &ckp, channel_epoch);
+                    db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
+                    input_tickets.push(ack_ticket);
+                }
+                Ok::<_, DbError>(input_tickets)
+            }))
             .await
             .unwrap();
 
@@ -303,21 +291,13 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let rdb = CurrentDbShim::new_in_memory().await;
+        let db = HoprDb::new_in_memory().await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
         let (channel_from_charlie, charlie_tickets) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
-
-        // ticket redemption requires a domain separator
-        set_domain_separator(rdb.clone()).await;
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -376,7 +356,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -394,19 +374,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db
-            .read()
-            .await
-            .get_acknowledged_tickets(Some(channel_from_bob))
-            .await
-            .unwrap();
+        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
 
-        let db_acks_charlie = db
-            .read()
-            .await
-            .get_acknowledged_tickets(Some(channel_from_charlie))
-            .await
-            .unwrap();
+        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into(), &ALICE).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -428,21 +398,13 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let rdb = CurrentDbShim::new_in_memory().await;
+        let db = HoprDb::new_in_memory().await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
         let (channel_from_charlie, _) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
-
-        // ticket redemption requires a domain separator
-        set_domain_separator(rdb.clone()).await;
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, U256::from(4u32)).await;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -476,7 +438,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -494,19 +456,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db
-            .read()
-            .await
-            .get_acknowledged_tickets(Some(channel_from_bob))
-            .await
-            .unwrap();
+        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
 
-        let db_acks_charlie = db
-            .read()
-            .await
-            .get_acknowledged_tickets(Some(channel_from_charlie))
-            .await
-            .unwrap();
+        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into(), &ALICE).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -528,26 +480,22 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
-        let rdb = CurrentDbShim::new_in_memory().await;
+        let db = HoprDb::new_in_memory().await;
 
         let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB, U256::from(4u32)).await;
-
-        // ticket redemption requires a domain separator
-        set_domain_separator(rdb.clone()).await;
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
         // Make the first ticket unredeemable
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
-        db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
+        let mut selector: TicketSelector = (&tickets[0]).into();
+        selector.state = None;
+        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated).await.unwrap();
 
         // Make the second ticket unredeemable
         tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
-        db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();
+        let mut selector: TicketSelector = (&tickets[1]).into();
+        selector.state = None;
+        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed).await.unwrap();
 
         // Expect only the redeemable tickets get redeemed
         let tickets_clone = tickets.clone();
@@ -579,7 +527,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -614,33 +562,18 @@ mod tests {
 
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
-        let rdb = CurrentDbShim::new_in_memory().await;
+        let db = HoprDb::new_in_memory().await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        // Make the first ticket from the previous epoch
-        let (_, tickets_from_previous_epoch) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_from_previous_epoch_count, &BOB, U256::from(3u32))
-                .await;
-        // remaining tickets are from the current epoch
-        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
-            rdb.clone(),
-            ticket_count - ticket_from_previous_epoch_count,
-            &BOB,
-            U256::from(4u32),
-        )
-        .await;
+        // Create 4 tickets in Epoch
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
-        // ticket redemption requires a domain separator
-        set_domain_separator(rdb.clone()).await;
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
-
-        // Expect only the redeemable tickets get redeemed
-        let mut tickets = tickets_from_previous_epoch.clone();
-        tickets.append(&mut tickets_from_current_epoch);
+        // Update the first 2 to be in Epoch 3
+        tickets[0].ticket.channel_epoch = 3;
+        db.upsert_ticket(None, tickets[0].clone()).await.unwrap();
+        tickets[1].ticket.channel_epoch = 3;
+        db.upsert_ticket(None, tickets[1].clone()).await.unwrap();
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
@@ -675,7 +608,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -698,32 +631,18 @@ mod tests {
 
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
-        let rdb = CurrentDbShim::new_in_memory().await;
+        let db = HoprDb::new_in_memory().await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        // Make the first few tickets from the next epoch
-        let (_, tickets_from_next_epoch) =
-            create_channel_with_ack_tickets(rdb.clone(), ticket_from_next_epoch_count, &BOB, U256::from(5u32)).await;
-        // remaining tickets are from the current epoch
-        let (channel_from_bob, mut tickets_from_current_epoch) = create_channel_with_ack_tickets(
-            rdb.clone(),
-            ticket_count - ticket_from_next_epoch_count,
-            &BOB,
-            U256::from(4u32),
-        )
-        .await;
+        // Create 4 tickets in Epoch
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
 
-        // ticket redemption requires a domain separator
-        set_domain_separator(rdb.clone()).await;
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(rdb.clone()),
-            ALICE.public().to_address(),
-        )));
-
-        // Expect only the redeemable tickets get redeemed
-        let mut tickets = tickets_from_next_epoch.clone();
-        tickets.append(&mut tickets_from_current_epoch);
+        // Update the first 2 to be in Epoch 5
+        tickets[0].ticket.channel_epoch = 4;
+        db.upsert_ticket(None, tickets[0].clone()).await.unwrap();
+        tickets[1].ticket.channel_epoch = 4;
+        db.upsert_ticket(None, tickets[1].clone()).await.unwrap();
 
         let tickets_clone = tickets.clone();
         let mut tx_exec = MockTransactionExecutor::new();
@@ -758,7 +677,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

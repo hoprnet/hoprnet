@@ -636,14 +636,14 @@ mod tests {
                 );
 
                 dbs[index]
-                    .insert_channel(None, channel.unwrap())
+                    .upsert_channel(None, channel.unwrap())
                     .await
                     .map_err(|e| crate::errors::ProtocolError::Logic(e.to_string()))?;
             }
 
             if index > 0 {
                 dbs[index]
-                    .insert_channel(None, previous_channel.unwrap())
+                    .upsert_channel(None, previous_channel.unwrap())
                     .await
                     .map_err(|e| crate::errors::ProtocolError::Logic(e.to_string()))?;
             }

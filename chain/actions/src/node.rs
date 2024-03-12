@@ -11,7 +11,6 @@
 //! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_crypto_types::prelude::Keypair;
@@ -20,10 +19,6 @@ use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
 use hopr_db_api::accounts::HoprDbAccountOperations;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::HoprDbAllOperations;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::ticket_manager::TicketManager;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
@@ -47,10 +42,8 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db, T> NodeActions for ChainActions<Db, T>
-where
-    Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
-    T: TicketManager + Clone + Send + Sync + std::fmt::Debug {
+impl<Db> NodeActions for ChainActions<Db>
+where Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
@@ -67,7 +60,7 @@ where
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data =
-            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.me, offchain_key)))?;
+            AnnouncementData::new(multiaddrs[0].clone(), Some(KeyBinding::new(self.self_address(), offchain_key)))?;
 
         if !self
             .db
@@ -102,27 +95,25 @@ mod tests {
     use crate::errors::ChainActionsError;
     use crate::node::NodeActions;
     use crate::ChainActions;
-    use async_lock::RwLock;
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::OffchainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::account::AccountType;
-    use hopr_internal_types::prelude::AccountEntry;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
-    use std::sync::Arc;
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
+    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
 
     lazy_static::lazy_static! {
-        static ref ALICE: Address = hex!("e1fe50e5046d5c05cc89872e244f045bbcdad742").into();
-        static ref BOB: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
+        static ref BOB: Address = BOB_KP.public().to_address();
         static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).unwrap();
     }
 
@@ -133,10 +124,8 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
 
         let ma = announce_multiaddr.clone();
         let pubkey_clone = ALICE_OFFCHAIN.public().clone();
@@ -174,7 +163,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE_KP.clone(), db.clone(), tx_sender.clone());
         let tx_res = actions
             .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
@@ -196,26 +185,17 @@ mod tests {
 
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
 
-        db.write()
-            .await
-            .update_account_and_snapshot(
-                &AccountEntry::new(
-                    *ALICE_OFFCHAIN.public(),
-                    *ALICE,
-                    AccountType::Announced {
-                        multiaddr: announce_multiaddr.clone(),
-                        updated_block: 0,
-                    },
-                ),
-                &Snapshot::default(),
-            )
-            .await
-            .unwrap();
+        db.insert_account(None, AccountEntry::new(
+            *ALICE_OFFCHAIN.public(),
+            *ALICE,
+            AccountType::Announced {
+                multiaddr: announce_multiaddr.clone(),
+                updated_block: 0,
+            },
+        )).await.unwrap();
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -225,7 +205,7 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE_KP.clone(), db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
@@ -241,10 +221,8 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -262,7 +240,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE_KP.clone(), db.clone(), tx_sender.clone());
 
         let tx_res = actions
             .withdraw(*BOB, stake)
@@ -286,17 +264,16 @@ mod tests {
     async fn test_should_not_withdraw_zero_amount() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(ALICE_KP.clone(), db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

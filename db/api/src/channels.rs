@@ -4,8 +4,8 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::Address;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use hopr_primitive_types::prelude::{Address, ToHex};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
@@ -15,13 +15,12 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 pub trait HoprDbChannelOperations {
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
 
-    async fn get_channel_to<'a>(&'a self, tx: OptTx<'a>, destination: Address) -> Result<Option<ChannelEntry>>;
-
-    async fn get_channel_from<'a>(&'a self, tx: OptTx<'a>, source: Address) -> Result<Option<ChannelEntry>>;
+    /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
+    async fn get_channels_via<'a>(&'a self, tx: OptTx<'a>, direction: ChannelDirection, target: Address) -> Result<Vec<ChannelEntry>>;
 
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    async fn insert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
+    async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 }
 
 #[async_trait]
@@ -47,42 +46,22 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn get_channel_to<'a>(&'a self, tx: OptTx<'a>, destination: Address) -> Result<Option<ChannelEntry>> {
+    async fn get_channels_via<'a>(&'a self, tx: OptTx<'a>, direction: ChannelDirection, target: Address) -> Result<Vec<ChannelEntry>> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
-                        if let Some(model) = Channel::find()
-                            .filter(channel::Column::Destination.eq(destination.to_string()))
-                            .one(tx.as_ref())
+                        Channel::find()
+                            .filter(match direction {
+                                ChannelDirection::Incoming => channel::Column::Destination.eq(target.to_string()),
+                                ChannelDirection::Outgoing => channel::Column::Source.eq(target.to_string()),
+                            })
+                            .all(tx.as_ref())
                             .await?
-                        {
-                            Some(model.try_into()?)
-                        } else {
-                            None
-                        },
-                    )
-                })
-            })
-            .await
-    }
-
-    async fn get_channel_from<'a>(&'a self, tx: OptTx<'a>, source: Address) -> Result<Option<ChannelEntry>> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbError>(
-                        if let Some(model) = Channel::find()
-                            .filter(channel::Column::Source.eq(source.to_string()))
-                            .one(tx.as_ref())
-                            .await?
-                        {
-                            Some(model.try_into()?)
-                        } else {
-                            None
-                        },
+                            .into_iter()
+                            .map(|x| ChannelEntry::try_from(x).map_err(DbError::from))
+                            .collect::<Result<Vec<_>>>()?
                     )
                 })
             })
@@ -106,14 +85,20 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn insert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
+    async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
         self.nest_transaction(tx)
             .await?
-            .perform(|tx| {
-                Box::pin(
-                    async move { Ok::<_, DbError>(channel::ActiveModel::from(channel_entry).save(tx.as_ref()).await?) },
-                )
-            })
+            .perform(|tx| Box::pin(async move {
+                let mut model = channel::ActiveModel::from(channel_entry);
+                if let Some(channel) = channel::Entity::find()
+                    .filter(channel::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                    .one(tx.as_ref())
+                    .await? {
+                    model.id = Set(channel.id);
+                }
+
+                Ok::<_, DbError>(model.save(tx.as_ref()).await?)
+            }))
             .await?;
         Ok(())
     }
@@ -140,7 +125,7 @@ mod tests {
             0_u32.into(),
         );
 
-        db.insert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
             .get_channel_by_id(None, ce.get_id())
             .await
@@ -177,7 +162,7 @@ mod tests {
             0_u32.into(),
         );
 
-        db.insert_channel(None, ce).await.expect("must insert channel");
+        db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
             .get_channel_to(None, Address::default())
             .await
