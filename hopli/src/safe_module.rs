@@ -21,7 +21,10 @@
 use crate::{
     environment_config::NetworkProviderArgs,
     identity::{IdentityFileArgs, PrivateKeyArgs},
-    methods::{deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry},
+    methods::{
+        deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
+        include_nodes_to_module, safe_singleton,
+    },
     utils::{Cmd, HelperErrors},
 };
 use bindings::{hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory};
@@ -31,6 +34,8 @@ use ethers::{
     utils::parse_units,
 };
 use hopr_crypto_types::keypairs::Keypair;
+use log::info;
+use safe_singleton::SafeSingleton;
 use std::str::FromStr;
 
 /// CLI arguments for `hopli safe-module`
@@ -126,13 +131,17 @@ pub enum SafeModuleSubcommands {
          )]
         node_address: Option<String>,
 
+        /// old module addresses
+        #[clap(help = "Comma separated old module addresses", long, short = 'u')]
+        old_module_address: String,
+
         /// safe address that the nodes move to
-        #[clap(help = "New managing safe to which all the nodes move", long, short)]
-        safe_address: String,
+        #[clap(help = "New managing safe to which all the nodes move", long, short = 's')]
+        new_safe_address: String,
 
         /// module address that the nodes move to
-        #[clap(help = "New managing module to which all the nodes move", long, short)]
-        module_address: String,
+        #[clap(help = "New managing module to which all the nodes move", long, short = 'm')]
+        new_module_address: String,
 
         /// Access to the private key, of which the wallet either contains sufficient assets
         /// as the source of funds or it can mint necessary tokens
@@ -220,6 +229,9 @@ impl SafeModuleSubcommands {
 
         println!("safe {:?}", safe.address());
         println!("node_module {:?}", node_module.address());
+
+        // TODO: FIXME: action around network registry
+
         Ok(())
     }
 
@@ -230,8 +242,9 @@ impl SafeModuleSubcommands {
         network_provider: NetworkProviderArgs,
         local_identity: Option<IdentityFileArgs>,
         node_address: Option<String>,
-        safe_address: String,
-        module_address: String,
+        old_module_address: String,
+        new_safe_address: String,
+        new_module_address: String,
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
@@ -245,8 +258,12 @@ impl SafeModuleSubcommands {
         }
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&safe_address).unwrap();
-        let module_addr = H160::from_str(&module_address).unwrap();
+        let safe_addr = H160::from_str(&new_safe_address).unwrap();
+        let module_addr = H160::from_str(&new_module_address).unwrap();
+        let old_module_addr: Vec<H160> = old_module_address
+            .split(',')
+            .map(|addr| H160::from_str(addr).unwrap())
+            .collect();
 
         // read private key
         let signer_private_key = private_key.read()?;
@@ -254,26 +271,35 @@ impl SafeModuleSubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        /// 1. Deregister the old node-safe from node-safe registry
-        /// 2. Remove nodes from the old module
-        /// 3. Include node to the new module
-        /// 4. Remove node from network registry
-        /// 5. Include node to network registry
+        // 1. Deregister the old node-safe from node-safe registry
+        // 2. Remove nodes from the old module
+        // 3. Include node to the new module
+        // 4. Remove node from network registry
+        // 5. Include node to network registry
         let hopr_node_safe_registry =
             HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry, rpc_provider.clone());
+        let safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
 
         if !node_eth_addresses.is_empty() {
             // first deregister nodes from their old safe
-            deregister_nodes_from_node_safe_registry(
+            deregister_nodes_from_node_safe_registry_and_remove_from_module(
                 hopr_node_safe_registry.clone(),
                 node_eth_addresses.clone(),
+                old_module_addr,
                 signer_private_key.clone(),
             )
             .await
             .unwrap();
+
+            info!("Nodes are deregistered from old modules");
+            // then include nodes to module
+            include_nodes_to_module(safe, node_eth_addresses, module_addr, signer_private_key)
+                .await
+                .unwrap();
+            info!("Nodes are included to the new module");
         };
 
-        // move all the nodes to the
+        // TODO: FIXME: action around network registry
 
         Ok(())
     }
@@ -313,16 +339,18 @@ impl Cmd for SafeModuleSubcommands {
                 network_provider,
                 local_identity,
                 node_address,
-                safe_address,
-                module_address,
+                old_module_address,
+                new_safe_address,
+                new_module_address,
                 private_key,
             } => {
                 SafeModuleSubcommands::execute_safe_module_moving(
                     network_provider,
                     local_identity,
                     node_address,
-                    safe_address,
-                    module_address,
+                    old_module_address,
+                    new_safe_address,
+                    new_module_address,
                     private_key,
                 )
                 .await

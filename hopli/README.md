@@ -182,28 +182,14 @@ hopli migrate-safe-module --network anvil-localhost \
 #### Move: move registered nodes to a new pair of safe and module
 For each node, if the node has been registered to the NodeSafeRegistry, deregister itself and register it to the new pair of safe and module.
 
-
 ```
 DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli safe-module move  \
+hopli safe-module safe-module move  \
     --network anvil-localhost \
     --contracts-root "../ethereum/contracts"  \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --old-module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+    --new-safe-address 0xce66d19a86600f3c6eb61edd6c431ded5cc92b21 \
+    --new-module-address 0x3086c20265cf742b169b05cd0eae1941455e4e9f \
+    --node-address 0x93a50B0fFF7b4ED36A3C6445e280E72AC2AEFc51,0x58033D3074D001a32bF379801eaf8969817fFfCf,0xeEDaab91158928647a9270Fe290897eBB1230250 \
     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
-
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
-If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
-
-```
-PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli sync-network-registry --network anvil-localhost \
-    --contracts-root "../ethereum/contracts" \
-    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
-    --sync-type forced-sync \
-    --eligibility true
-``` 

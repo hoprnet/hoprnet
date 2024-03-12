@@ -5,7 +5,7 @@ use crate::utils::{
 };
 use bindings::{
     hopr_network_registry::HoprNetworkRegistry,
-    hopr_node_management_module::{HoprNodeManagementModule, IncludeNodeCall, ScopeTargetTokenCall},
+    hopr_node_management_module::{HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall},
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, HoprNodeSafeRegistry},
     hopr_node_stake_factory::HoprNodeStakeFactory,
     hopr_token::{ApproveCall, HoprToken},
@@ -1053,6 +1053,7 @@ where
 pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M>(
     node_safe_registry: HoprNodeSafeRegistry<M>,
     node_addresses: Vec<H160>,
+    module_addresses: Vec<H160>,
     owner_chain_key: ChainKeypair,
 ) -> Result<u32, HelperErrors>
 where
@@ -1071,24 +1072,42 @@ where
         if registered_safe.ne(&H160::zero()) {
             // connect to safe
             let safe = SafeSingleton::new(registered_safe.to_owned(), provider.clone());
-            // remove the node
-            let tx_payload = DeregisterNodeBySafeCall {
-                node_addr: node_addresses[i],
-            }
-            .encode();
             // update counter
             nodes_to_remove_counter += 1;
             // get chain id and nonce
             let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
 
+            // for each safe, prepare a multisend transaction to dergister node from safe and remove node from module
+            let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
+            multisend_txns.push(MultisendTransaction {
+                // build multisend tx payload
+                encoded_data: DeregisterNodeBySafeCall {
+                    node_addr: node_addresses[i],
+                }
+                .encode()
+                .into(),
+                tx_operation: SafeTxOperation::Call,
+                to: node_safe_registry.address(),
+                value: U256::zero(),
+            });
+            multisend_txns.push(MultisendTransaction {
+                // build multisend tx payload
+                encoded_data: RemoveNodeCall {
+                    node_address: node_addresses[i],
+                }
+                .encode()
+                .into(),
+                tx_operation: SafeTxOperation::Call,
+                to: module_addresses[i],
+                value: U256::zero(),
+            });
+
             // send safe transaction
-            send_safe_transaction_with_threshold_one(
+            send_multisend_safe_transaction_with_threshold_one(
                 safe,
                 owner_chain_key.clone(),
-                node_safe_registry.address(),
-                tx_payload,
-                SafeTxOperation::Call,
-                U256::zero(),
+                H160::from_str(SAFE_MULTISEND_ADDRESS).unwrap(),
+                multisend_txns,
                 chain_id,
                 safe_nonce,
             )
@@ -1098,6 +1117,51 @@ where
     }
 
     Ok(nodes_to_remove_counter)
+}
+
+/// Include nodes to the module
+pub async fn include_nodes_to_module<M>(
+    safe: SafeSingleton<M>,
+    node_addresses: Vec<H160>,
+    module_address: H160,
+    owner_chain_key: ChainKeypair,
+) -> Result<(), HelperErrors>
+where
+    M: Middleware,
+{
+    let provider = safe.client();
+    // get chain id and nonce
+    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
+
+    // prepare a multisend transaction to include each node to the  module
+    let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
+    for node_address in node_addresses {
+        let node_target = U256::from_str(format!("{:?}{}", node_address, DEFAULT_NODE_PERMISSIONS).as_str()).unwrap();
+        multisend_txns.push(MultisendTransaction {
+            encoded_data: IncludeNodeCall {
+                node_default_target: node_target,
+            }
+            .encode()
+            .into(),
+            tx_operation: SafeTxOperation::Call,
+            to: module_address.clone(),
+            value: U256::zero(),
+        });
+    }
+
+    // send safe transaction
+    send_multisend_safe_transaction_with_threshold_one(
+        safe,
+        owner_chain_key.clone(),
+        H160::from_str(SAFE_MULTISEND_ADDRESS).unwrap(),
+        multisend_txns,
+        chain_id,
+        safe_nonce,
+    )
+    .await
+    .unwrap();
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1734,7 +1798,7 @@ mod tests {
         let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
 
         // create a safe
-        let (safe, _node_module) = deploy_safe_module_with_targets_and_nodes(
+        let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
             instances.token.address(),
             instances.channels.address(),
@@ -1768,9 +1832,10 @@ mod tests {
         assert_eq!(get_registered_safe[0], safe.address(), "registered safe is wrong");
 
         // deregister the node from safe
-        deregister_nodes_from_node_safe_registry(
+        deregister_nodes_from_node_safe_registry_and_remove_from_module(
             instances.safe_registry.clone(),
             deployer_vec.clone(),
+            vec![node_module.address()],
             contract_deployer.clone(),
         )
         .await
@@ -1784,5 +1849,73 @@ mod tests {
 
         assert_eq!(get_registered_safe.len(), 1, "cannot read registered safe");
         assert_eq!(get_registered_safe[0], H160::zero(), "node is still registered");
+
+        // node is removed
+        let is_removed = node_module
+            .is_node(contract_deployer.public().to_address().into())
+            .call()
+            .await
+            .unwrap();
+        assert!(!is_removed, "node is not removed");
+    }
+
+    #[async_std::test]
+    async fn test_include_nodes_to_module() {
+        // set allowance for token transfer for the safe multiple times
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
+        for _ in 0..2 {
+            node_addresses.push(Address::random().into());
+        }
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // deploy safe suits
+        deploy_safe_suites(client.clone()).await.unwrap();
+
+        let deployer_vec: Vec<H160> = vec![contract_deployer.public().to_address().into()];
+
+        // create a safe
+        let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
+            instances.stake_factory,
+            instances.token.address(),
+            instances.channels.address(),
+            instances.module_implementation.address(),
+            instances.announcements.address(),
+            U256::max_value(),
+            None,
+            deployer_vec.clone(),
+            U256::from(1),
+        )
+        .await
+        .unwrap();
+
+        // check ndoes are not included
+        for node_addr in node_addresses.clone() {
+            // node is removed
+            let node_is_not_included = node_module.is_node(node_addr).call().await.unwrap();
+            assert!(!node_is_not_included, "node should not be included");
+        }
+
+        // include nodes to safe
+        include_nodes_to_module(safe, node_addresses.clone(), node_module.address(), contract_deployer)
+            .await
+            .unwrap();
+
+        // check ndoes are included
+        // check ndoes are not included
+        for node_addr in node_addresses {
+            // node is removed
+            let node_is_included = node_module.is_node(node_addr).call().await.unwrap();
+            assert!(node_is_included, "node should be included");
+        }
     }
 }

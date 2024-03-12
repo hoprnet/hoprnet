@@ -3,7 +3,6 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::migrate_safe_module::MigrateSafeModuleArgs;
-use crate::move_node_to_safe_module::MoveNodeToSafeModuleArgs;
 use crate::network_registry::NetworkRegistryArgs;
 use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
@@ -14,7 +13,6 @@ pub mod identity;
 pub mod key_pair;
 pub mod methods;
 pub mod migrate_safe_module;
-pub mod move_node_to_safe_module;
 pub mod network_registry;
 pub mod process;
 pub mod safe_module;
@@ -63,11 +61,6 @@ enum Commands {
         about = "Migrate an exising set of node(d) with safe and module to a different network, with default permissions. It requires access to a manager account."
     )]
     MigrateSafeModule(MigrateSafeModuleArgs),
-
-    /// Move nodes that are associated to an old safe to a new safe.
-    /// It requires a manager account to perform this action.
-    #[clap(about = "Move a registered node to a new safe and module pair. It requires access to a manager account.")]
-    MoveNodeToSafeModule(MoveNodeToSafeModuleArgs),
 }
 
 #[async_std::main]
@@ -88,9 +81,6 @@ async fn main() -> Result<(), HelperErrors> {
             command.async_run().await?;
         }
         Commands::MigrateSafeModule(opt) => {
-            opt.run()?;
-        }
-        Commands::MoveNodeToSafeModule(opt) => {
             opt.run()?;
         }
     }
