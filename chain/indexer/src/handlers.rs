@@ -27,6 +27,7 @@ use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
+use hopr_db_api::tickets::TicketSelector;
 
 /// Event handling object for on-chain operations
 ///
@@ -204,10 +205,7 @@ where
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_entry.destination == self.chain_key.public().to_address() {
                         self.db
-                            .mark_tickets_neglected_in_epoch(
-                                channel_entry.get_id(),
-                                channel_entry.channel_epoch.as_u32(),
-                            )
+                            .mark_tickets_neglected((&channel_entry).into())
                             .await?;
                     }
 
@@ -250,7 +248,13 @@ where
                         || destination == self.chain_key.public().to_address()
                     {
                         self.db
-                            .mark_tickets_neglected_in_epoch(channel.channel_id.parse()?, current_epoch.as_u32())
+                            .mark_tickets_neglected(TicketSelector {
+                                channel_id,
+                                epoch: current_epoch,
+                                index: None,
+                                state: None,
+                                only_aggregated: false,
+                            })
                             .await?;
 
                         self.db.invalidate_cached_ticket_index(&channel_id).await;
@@ -322,7 +326,7 @@ where
                                     &self.chain_key,
                                 )?;
 
-                                self.db.mark_ticket_redeemed(&ack_ticket).await?;
+                                self.db.mark_tickets_redeemed((&ack_ticket).into()).await?;
                                 info!("{ack_ticket} has been marked as redeemed");
                                 Some(ack_ticket)
                             }
