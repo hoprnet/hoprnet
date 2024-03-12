@@ -224,7 +224,7 @@ impl SafeModuleSubcommands {
         };
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
@@ -301,7 +301,7 @@ impl SafeModuleSubcommands {
             .collect();
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
@@ -372,7 +372,7 @@ impl SafeModuleSubcommands {
         let module_addr = H160::from_str(&module_address).unwrap();
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;

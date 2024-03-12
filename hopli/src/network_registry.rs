@@ -133,7 +133,7 @@ impl NetworkRegistryArgs {
         }
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
@@ -185,7 +185,7 @@ impl NetworkRegistryArgs {
         );
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
@@ -231,7 +231,7 @@ impl NetworkRegistryArgs {
         );
 
         // read private key
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;

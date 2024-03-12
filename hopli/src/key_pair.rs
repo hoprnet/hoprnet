@@ -111,19 +111,20 @@ pub struct PrivateKeyArgs {
 
 impl PrivateKeyArgs {
     /// Read the private key and return an address string
-    pub fn read(self) -> Result<ChainKeypair, HelperErrors> {
-        let private_key = if let Some(pk) = self.private_key {
+    pub fn read(self, arg_name: Option<&str>) -> Result<ChainKeypair, HelperErrors> {
+        let pri_key = if let Some(pk) = self.private_key {
             info!("reading private key from cli");
             pk
         } else {
             info!("reading private key from env PRIVATE_KEY");
-            env::var("PRIVATE_KEY").map_err(HelperErrors::UnableToReadPrivateKey)?
+            let env_var_name = arg_name.unwrap_or("PRIVATE_KEY");
+            env::var(env_var_name).map_err(HelperErrors::UnableToReadPrivateKey)?
         };
 
         // TODO:
         info!("To validate the private key");
 
-        Ok(ChainKeypair::from_secret(hex::decode(&private_key).unwrap().as_slice()).unwrap())
+        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
     }
 }
 
@@ -291,6 +292,7 @@ mod tests {
     use tempfile::tempdir;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    const SPECIAL_ENV_KEY: &str = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
 
     #[test]
     fn create_identities_from_directory_with_id_files() {
@@ -495,9 +497,21 @@ mod tests {
             private_key: Some(DUMMY_PRIVATE_KEY.into()),
         };
 
+        // when a special env is set but no cli arg, it returns the special env value
+        env::set_var("MANAGER_PK", SPECIAL_ENV_KEY);
+        if let Ok(kp_0) = pk_args_none.clone().read(Some("MANAGER_PK")) {
+            assert_eq!(
+                SPECIAL_ENV_KEY,
+                hex::encode(kp_0.secret().as_ref()),
+                "read a wrong private key from env with a special name"
+            );
+        } else {
+            panic!("cannot read private key from env when no cli arg is provied");
+        }
+
         // when env is set but no cli arg, it returns the env value
         env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
-        if let Ok(kp_1) = pk_args_none.clone().read() {
+        if let Ok(kp_1) = pk_args_none.clone().read(None) {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_1.secret().as_ref()),
@@ -509,7 +523,7 @@ mod tests {
 
         // when both env and cli args are set, it still uses cli
         env::set_var("PRIVATE_KEY", "0123");
-        if let Ok(kp_2) = pk_args_some.clone().read() {
+        if let Ok(kp_2) = pk_args_some.clone().read(None) {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_2.secret().as_ref()),
@@ -521,10 +535,10 @@ mod tests {
 
         // when no env and no cli arg, it returns error
         env::remove_var("PRIVATE_KEY");
-        assert!(pk_args_none.read().is_err());
+        assert!(pk_args_none.read(None).is_err());
 
         // when no env is supplied, but private key is supplied
-        if let Ok(kp_3) = pk_args_some.read() {
+        if let Ok(kp_3) = pk_args_some.read(None) {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_3.secret().as_ref()),

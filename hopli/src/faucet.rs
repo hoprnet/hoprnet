@@ -88,7 +88,7 @@ impl FaucetArgs {
         info!("All the addresses: {:?}", eth_addresses_all);
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        let signer_private_key = private_key.read()?;
+        let signer_private_key = private_key.read(None)?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
