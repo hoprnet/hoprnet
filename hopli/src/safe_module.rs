@@ -21,10 +21,10 @@
 use crate::{
     environment_config::NetworkProviderArgs,
     identity::{IdentityFileArgs, PrivateKeyArgs},
-    methods::deploy_safe_module_with_targets_and_nodes,
+    methods::{deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry},
     utils::{Cmd, HelperErrors},
 };
-use bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
+use bindings::{hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory};
 use clap::{builder::RangedU64ValueParser, Parser};
 use ethers::{
     types::{H160, U256},
@@ -109,12 +109,36 @@ pub enum SafeModuleSubcommands {
     /// Move nodes to one single safe and module pair
     #[command(visible_alias = "mv")]
     Move {
-        // /// The name of the contract to list selectors for.
-        // #[arg(help = "The name of the contract to list selectors for.")]
-        // contract: Option<String>,
+        /// Network name, contracts config file root, and customized provider, if available
+        #[clap(flatten)]
+        network_provider: NetworkProviderArgs,
 
-        // #[command(flatten)]
-        // project_paths: ProjectPathsArgs,
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: Option<IdentityFileArgs>,
+
+        /// node addresses
+        #[clap(
+             help = "Comma separated node Ethereum addresses",
+             long,
+             short = 'o',
+             default_value = None
+         )]
+        node_address: Option<String>,
+
+        /// safe address that the nodes move to
+        #[clap(help = "New managing safe to which all the nodes move", long, short)]
+        safe_address: String,
+
+        /// module address that the nodes move to
+        #[clap(help = "New managing module to which all the nodes move", long, short)]
+        module_address: String,
+
+        /// Access to the private key, of which the wallet either contains sufficient assets
+        /// as the source of funds or it can mint necessary tokens
+        /// This wallet is also the manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
     },
 }
 
@@ -198,6 +222,61 @@ impl SafeModuleSubcommands {
         println!("node_module {:?}", node_module.address());
         Ok(())
     }
+
+    /// Execute the command, which moves nodes to a new managing safe and module pair
+    /// Note that it does not register the node with the new safe on NodeSafeRegistry,
+    /// because it is an action that nodes need to do on-start.
+    pub async fn execute_safe_module_moving(
+        network_provider: NetworkProviderArgs,
+        local_identity: Option<IdentityFileArgs>,
+        node_address: Option<String>,
+        safe_address: String,
+        module_address: String,
+        private_key: PrivateKeyArgs,
+    ) -> Result<(), HelperErrors> {
+        // read all the node addresses
+        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = node_address {
+            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        if let Some(local_identity_arg) = local_identity {
+            node_eth_addresses.extend(local_identity_arg.to_addresses().unwrap().into_iter().map(H160::from));
+        }
+
+        // parse safe and module addresses
+        let safe_addr = H160::from_str(&safe_address).unwrap();
+        let module_addr = H160::from_str(&module_address).unwrap();
+
+        // read private key
+        let signer_private_key = private_key.read()?;
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        /// 1. Deregister the old node-safe from node-safe registry
+        /// 2. Remove nodes from the old module
+        /// 3. Include node to the new module
+        /// 4. Remove node from network registry
+        /// 5. Include node to network registry
+        let hopr_node_safe_registry =
+            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry, rpc_provider.clone());
+
+        if !node_eth_addresses.is_empty() {
+            // first deregister nodes from their old safe
+            deregister_nodes_from_node_safe_registry(
+                hopr_node_safe_registry.clone(),
+                node_eth_addresses.clone(),
+                signer_private_key.clone(),
+            )
+            .await
+            .unwrap();
+        };
+
+        // move all the nodes to the
+
+        Ok(())
+    }
 }
 
 impl Cmd for SafeModuleSubcommands {
@@ -230,7 +309,25 @@ impl Cmd for SafeModuleSubcommands {
                 .await
                 .unwrap();
             }
-            SafeModuleSubcommands::Move {} => {}
+            SafeModuleSubcommands::Move {
+                network_provider,
+                local_identity,
+                node_address,
+                safe_address,
+                module_address,
+                private_key,
+            } => {
+                SafeModuleSubcommands::execute_safe_module_moving(
+                    network_provider,
+                    local_identity,
+                    node_address,
+                    safe_address,
+                    module_address,
+                    private_key,
+                )
+                .await
+                .unwrap();
+            }
             SafeModuleSubcommands::Migrate {} => {}
         }
         Ok(())

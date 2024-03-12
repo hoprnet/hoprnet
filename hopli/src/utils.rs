@@ -97,6 +97,10 @@ pub enum HelperErrors {
     #[error("multicall Error: {0}")]
     MulticallError(String),
 
+    /// Fail to make a multisend call
+    #[error("internal transaction failure in multisend")]
+    MultiSendError,
+
     /// Txn caller does not have the minter role
     #[error("caller does not have the privilege to mint tokens")]
     NotAMinter,
@@ -164,8 +168,14 @@ pub const DEFAULT_NODE_PERMISSIONS: &str = "010303000000000000000000";
 pub const SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS: &str = "2a15DE4410d4c8af0A7b6c12803120f43C42B820";
 pub const SAFE_SAFE_ADDRESS: &str = "41675C099F32341bf84BFc5382aF534df5C7461a";
 pub const SAFE_SAFEPROXYFACTORY_ADDRESS: &str = "4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67";
+pub const SAFE_MULTISEND_ADDRESS: &str = "38869bf66a61cF6bDB996A6aE40D5853Fd43B526";
 
 pub const NEW_HOPR_NODE_STAKE_MODULE_TOPIC: &str = "0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206";
 pub const NEW_HOPR_NODE_STAKE_SAFE_TOPIC: &str = "0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386";
 
 pub const SENTINEL_OWNERS: &str = "0x0000000000000000000000000000000000000001";
+
+pub const SAFE_TX_TYPEHASH: &str = "bb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8";
+pub const DOMAIN_SEPARATOR_TYPEHASH: &str = "47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218";
+
+pub const SAFE_EXECUTION_SUCCESS: &str = "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e";

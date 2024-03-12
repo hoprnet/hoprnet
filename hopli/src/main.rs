@@ -50,16 +50,6 @@ enum Commands {
     )]
     NetworkRegistry(NetworkRegistryArgs),
 
-    // /// Perform all the necessary steps before staring hopd.
-    // /// - Create a Safe proxy instance and a node management instance. Include nodes to module
-    // /// - Configure default permissions (for HOPR- Token, Channels, and Announcement contracts)
-    // /// - Approve token transfer for the Safe proxy
-    // /// - Fund Safe with tokens and fund nodes with xDAI
-    // /// - Use the manager account to include the created Safe and provided node address to the Network Registry contract.
-    // #[clap(
-    //     about = "Create a safe proxy instance and a node management module instance, include nodes to the created module, configure default permissions, fund, register it to the Network Registry. It requires access to a manager account."
-    // )]
-    // CreateSafeModule(CreateSafeModuleArgs),
     /// Commands around safe module
     #[command(visible_alias = "se")]
     SafeModule {
