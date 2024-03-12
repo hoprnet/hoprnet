@@ -23,7 +23,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb};
+use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
@@ -77,9 +77,9 @@ pub trait HoprDbTicketOperations {
 
     // async fn get_ticket_stats(channel_id: &Hash, epoch: u32);
 
-    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_ticket_redeemed(&self, ticket: &AcknowledgedTicket) -> Result<()>;
 
-    async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()>;
+    async fn mark_tickets_neglected_in_epoch(&self, channel_id: Hash, epoch: u32) -> Result<()>;
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
@@ -144,12 +144,14 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(ticket::Entity::find()
-                        .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
-                        .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
-                        .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().to_vec()))
-                        .one(tx.as_ref())
-                        .await?)
+                    Ok::<_, DbError>(
+                        ticket::Entity::find()
+                            .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
+                            .filter(ticket::Column::ChannelEpoch.eq(U256::from(epoch).to_be_bytes().to_vec()))
+                            .filter(ticket::Column::Index.eq(ticket_index.to_be_bytes().to_vec()))
+                            .one(tx.as_ref())
+                            .await?,
+                    )
                 })
             })
             .await?;
@@ -164,17 +166,14 @@ impl HoprDbTicketOperations for HoprDb {
         }
     }
 
-    async fn mark_ticket_redeemed<'a>(&'a self, tx: OptTx<'a>, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn mark_ticket_redeemed(&self, ticket: &AcknowledgedTicket) -> Result<()> {
         let channel_id = ticket.ticket.channel_id;
         let epoch: U256 = ticket.ticket.channel_epoch.into();
         let index = ticket.ticket.index;
         let ticket_value = ticket.ticket.amount.amount();
 
-        let _guard = self.ticket_table_mutex.lock().await;
-        self
-            .nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     // Delete the ticket first
                     let deleted = ticket::Entity::delete_many()
@@ -210,13 +209,9 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn mark_tickets_neglected_in_epoch<'a>(&'a self, tx: OptTx<'a>, channel_id: Hash, epoch: u32) -> Result<()> {
-        let myself = self.clone();
-
-        self
-            .nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
+    async fn mark_tickets_neglected_in_epoch(&self, channel_id: Hash, epoch: u32) -> Result<()> {
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     // Obtain the amount of neglected tickets and their value
                     let (neglectable_count, neglectable_value) = ticket::Entity::find()
@@ -230,8 +225,6 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?;
 
                     if neglectable_count > 0 {
-                        let _guard = myself.ticket_table_mutex.lock().await;
-
                         // Delete the neglectable tickets first
                         let deleted = ticket::Entity::delete_many()
                             .filter(ticket::Column::ChannelId.eq(channel_id.to_hex()))
@@ -336,8 +329,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await?;
 
         if let AckResult::RelayerWinning(ack_ticket) = &result {
-            let _guard = self.ticket_table_mutex.lock().await;
-            self.insert_ticket(None, ack_ticket.clone()).await?;
+            self.ticket_manager.insert_ticket(ack_ticket.clone())?;
         }
 
         Ok(result)
@@ -603,8 +595,7 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
-        self
-            .nest_transaction_in_db(tx, TargetDb::Tickets)
+        self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -747,11 +738,19 @@ impl HoprDb {
         Ok(ticket)
     }
 
+    /// Used only by non-SQLite code
+    #[allow(dead_code)]
     async fn insert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
         self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
-                Box::pin(async move { Ok::<_, DbError>(ticket::ActiveModel::from(acknowledged_ticket).insert(tx.as_ref()).await?) })
+                Box::pin(async move {
+                    Ok::<_, DbError>(
+                        ticket::ActiveModel::from(acknowledged_ticket)
+                            .insert(tx.as_ref())
+                            .await?,
+                    )
+                })
             })
             .await?;
         Ok(())
@@ -898,10 +897,10 @@ mod tests {
         db.begin_transaction_in_db(TargetDb::Tickets)
             .await
             .unwrap()
-            .perform(|tx| {
+            .perform(|_tx| {
                 Box::pin(async move {
                     for i in 0..TO_REDEEM as usize {
-                        db_clone.mark_ticket_redeemed(Some(tx), &tickets[i]).await?;
+                        db_clone.mark_ticket_redeemed(&tickets[i]).await?;
                     }
                     Ok::<(), DbError>(())
                 })
@@ -937,8 +936,8 @@ mod tests {
 
         let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
-        db.mark_ticket_redeemed(None, &ticket).await.expect("must not fail");
-        db.mark_ticket_redeemed(None, &ticket)
+        db.mark_ticket_redeemed(&ticket).await.expect("must not fail");
+        db.mark_ticket_redeemed(&ticket)
             .await
             .expect_err("marking as redeemed again must fail");
     }
@@ -967,7 +966,7 @@ mod tests {
             "there must be 0 redeemed value"
         );
 
-        db.mark_tickets_neglected_in_epoch(None, channel.get_id(), channel.channel_epoch.as_u32())
+        db.mark_tickets_neglected_in_epoch(channel.get_id(), channel.channel_epoch.as_u32())
             .await
             .expect("should mark as neglected");
 
@@ -987,6 +986,24 @@ mod tests {
             stats.neglected_value,
             "there must be a neglected value"
         );
+    }
+
+    #[async_std::test]
+    async fn test_cache_can_be_cloned_but_referencing_the_original_cache_storage() {
+        let cache: moka::future::Cache<i64, i64> = moka::future::Cache::new(5);
+
+        assert_eq!(cache.weighted_size(), 0);
+
+        cache.insert(1, 1).await;
+        cache.insert(2, 2).await;
+
+        let clone = cache.clone();
+
+        cache.remove(&1).await;
+        cache.remove(&2).await;
+
+        assert_eq!(cache.get(&1).await, None);
+        assert_eq!(cache.get(&1).await, clone.get(&1).await);
     }
 
     // TODO: think about incorporating these tests

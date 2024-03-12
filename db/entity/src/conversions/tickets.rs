@@ -30,14 +30,9 @@ pub fn model_to_acknowledged_ticket(
 
     let signer = ticket.recover_signer(&domain_separator)?.to_address();
 
-    let mut ticket = AcknowledgedTicket::new(
-        ticket,
-        response,
-        signer,
-        chain_keypair,
-        &domain_separator,
-    )?;
-    ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8).map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
+    let mut ticket = AcknowledgedTicket::new(ticket, response, signer, chain_keypair, &domain_separator)?;
+    ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8)
+        .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
 
     Ok(ticket)
 }

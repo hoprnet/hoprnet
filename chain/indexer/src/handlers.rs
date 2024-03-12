@@ -205,7 +205,6 @@ where
                     if channel_entry.destination == self.chain_key.public().to_address() {
                         self.db
                             .mark_tickets_neglected_in_epoch(
-                                Some(tx),
                                 channel_entry.get_id(),
                                 channel_entry.channel_epoch.as_u32(),
                             )
@@ -251,11 +250,7 @@ where
                         || destination == self.chain_key.public().to_address()
                     {
                         self.db
-                            .mark_tickets_neglected_in_epoch(
-                                Some(tx),
-                                channel.channel_id.parse()?,
-                                current_epoch.as_u32(),
-                            )
+                            .mark_tickets_neglected_in_epoch(channel.channel_id.parse()?, current_epoch.as_u32())
                             .await?;
 
                         self.db.invalidate_cached_ticket_index(&channel_id).await;
@@ -327,7 +322,7 @@ where
                                     &self.chain_key,
                                 )?;
 
-                                self.db.mark_ticket_redeemed(Some(tx), &ack_ticket).await?;
+                                self.db.mark_ticket_redeemed(&ack_ticket).await?;
                                 info!("{ack_ticket} has been marked as redeemed");
                                 Some(ack_ticket)
                             }

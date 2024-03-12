@@ -102,7 +102,7 @@ pub enum TargetDb {
     #[default]
     Index,
     Tickets,
-    Peers
+    Peers,
 }
 
 #[async_trait]
@@ -151,7 +151,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
         match target_db {
             TargetDb::Index => &self.db,
             TargetDb::Tickets => &self.tickets_db,
-            TargetDb::Peers => &self.peers_db
+            TargetDb::Peers => &self.peers_db,
         }
     }
 
@@ -159,8 +159,14 @@ impl HoprDbGeneralModelOperations for HoprDb {
         match target_db {
             TargetDb::Index => Ok(OpenTransaction(self.db.begin_with_config(None, None).await?, target_db)),
             // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
-            TargetDb::Tickets => Ok(OpenTransaction(self.tickets_db.begin_with_config(None, None).await?, target_db)),
-            TargetDb::Peers => Ok(OpenTransaction(self.peers_db.begin_with_config(None, None).await?, target_db)),
+            TargetDb::Tickets => Ok(OpenTransaction(
+                self.tickets_db.begin_with_config(None, None).await?,
+                target_db,
+            )),
+            TargetDb::Peers => Ok(OpenTransaction(
+                self.peers_db.begin_with_config(None, None).await?,
+                target_db,
+            )),
         }
     }
 }

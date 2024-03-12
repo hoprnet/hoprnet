@@ -74,13 +74,15 @@ impl HoprDbInfoOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(node_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        safe_balance: Set(new_balance.amount().to_be_bytes().into()),
-                        ..Default::default()
-                    }
-                    .update(tx.as_ref())
-                    .await?)
+                    Ok::<_, DbError>(
+                        node_info::ActiveModel {
+                            id: Set(SINGULAR_TABLE_FIXED_ID),
+                            safe_balance: Set(new_balance.amount().to_be_bytes().into()),
+                            ..Default::default()
+                        }
+                        .update(tx.as_ref())
+                        .await?,
+                    )
                 })
             })
             .await?;

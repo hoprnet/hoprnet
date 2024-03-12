@@ -1,21 +1,22 @@
 use std::sync::Arc;
 
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
+use hopr_db_entity::ticket;
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
+use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_primitive_types::primitives::Balance;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use sea_query::Expr;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
-use sea_query::Expr;
 use tracing::log::LevelFilter;
-use hopr_db_entity::ticket;
-use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 
+use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
@@ -43,7 +44,7 @@ pub struct HoprDb {
     pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-    pub(crate) ticket_table_mutex: Arc<async_lock::Mutex<()>>,
+    pub(crate) ticket_manager: Arc<TicketManager>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -69,23 +70,17 @@ impl HoprDb {
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms
 
-        let index = SqlitePool::connect_with(
-            cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME))
-        )
-        .await
-        .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
+        let index = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_INDEX_FILE_NAME)))
+            .await
+            .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let peers = SqlitePool::connect_with(
-            cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME))
-        )
-        .await
-        .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
+        let peers = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_PEERS_FILE_NAME)))
+            .await
+            .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        let tickets = SqlitePool::connect_with(
-            cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME))
-        )
-        .await
-        .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
+        let tickets = SqlitePool::connect_with(cfg_template.clone().filename(dir.join(SQL_DB_TICKETS_FILE_NAME)))
+            .await
+            .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
         Self::new_sqlx_sqlite(index, peers, tickets).await
     }
@@ -136,19 +131,22 @@ impl HoprDb {
         // Reset all ticket states to Untouched
         ticket::Entity::update_many()
             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::Untouched as u8))
-            .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::Untouched as u8))
+            .col_expr(
+                ticket::Column::State,
+                Expr::value(AcknowledgedTicketStatus::Untouched as u8),
+            )
             .exec(&tickets_db)
             .await
             .expect("must reset ticket state on init");
 
         Self {
             db: index_db,
-            tickets_db,
             peers_db,
             unacked_tickets,
             unrealized_value,
             ticket_index,
-            ticket_table_mutex: Arc::new(async_lock::Mutex::new(())),
+            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone())),
+            tickets_db,
         }
     }
 }
@@ -159,15 +157,21 @@ impl HoprDbAllOperations for HoprDb {}
 mod tests {
     use crate::db::HoprDb;
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use migration::{Migrator, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+    use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 
     #[async_std::test]
     async fn test_basic_db_init() {
         let db = HoprDb::new_in_memory().await;
 
         // TODO: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
-        MigratorIndex::status(db.conn(TargetDb::Index)).await.expect("status must be ok");
-        MigratorTickets::status(db.conn(TargetDb::Tickets)).await.expect("status must be ok");
-        MigratorPeers::status(db.conn(TargetDb::Peers)).await.expect("status must be ok");
+        MigratorIndex::status(db.conn(TargetDb::Index))
+            .await
+            .expect("status must be ok");
+        MigratorTickets::status(db.conn(TargetDb::Tickets))
+            .await
+            .expect("status must be ok");
+        MigratorPeers::status(db.conn(TargetDb::Peers))
+            .await
+            .expect("status must be ok");
     }
 }
