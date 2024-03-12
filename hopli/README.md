@@ -39,19 +39,17 @@ Private key to signer wallet can be passed either as an env variable `PRIVATE_KE
 ### Create/Read identities
 To create or read identities, a [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
 ```
-hopli identity \
-  --action create \
+hopli identity create \
   --identity-directory "./test" \
-  --identity-prefix node_ \
-  --number 3 \
+  --identity-prefix nodes_ \
+  --number 2 \
   --password-path "./test/pwd"
 ```
 
 Read ethereum addresses from identities
 
 ```
-hopli identity \
-  --action read \
+hopli identity read \
   --identity-directory "./test" \
   --identity-prefix node_ \
   --password-path "./test/pwd"

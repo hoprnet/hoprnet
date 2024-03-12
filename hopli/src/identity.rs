@@ -23,25 +23,105 @@ use std::{
     str::FromStr,
 };
 
-/// An enum representing different actions around `hopli identiy`
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
-pub enum IdentityActionType {
-    /// Create a new identity file
-    Create,
+/// CLI arguments for `hopli identity`
+#[derive(Clone, Debug, Parser)]
+pub enum IdentitySubcommands {
+    /// Create safe and module proxy if nothing exists
+    #[command(visible_alias = "cr")]
+    Create {
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
 
-    /// Read an existing identity file
-    Read,
+        /// Number of identities to be generated
+        #[clap(
+            help = "Number of identities to be generated, e.g. 1",
+            long,
+            short,
+            value_parser = RangedU64ValueParser::<u32>::new().range(1..),
+            default_value_t = 1
+        )]
+        number: u32,
+    },
+
+    /// Migrate safe and module to a new network
+    #[command(visible_alias = "rd")]
+    Read {
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+    },
 }
 
-impl FromStr for IdentityActionType {
-    type Err = String;
+impl IdentitySubcommands {
+    /// Execute the command to create identities
+    fn execute_identity_creation_loop(local_identity: IdentityFileArgs, number: u32) -> Result<(), HelperErrors> {
+        // check if password is provided
+        let pwd = local_identity.clone().password.read()?;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "c" | "create" => Ok(IdentityActionType::Create),
-            "r" | "read" => Ok(IdentityActionType::Read),
-            _ => Err(format!("Unknown identity action: {s}")),
+        let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
+
+        let local_id = local_identity
+            .identity_from_directory
+            .ok_or(HelperErrors::MissingIdentityDirectory)
+            .unwrap();
+
+        let id_dir = local_id.identity_directory.unwrap();
+        for index in 0..=number - 1 {
+            // build file name
+            let file_prefix = local_id
+                .identity_prefix
+                .as_ref()
+                .map(|provided_name| provided_name.to_owned() + &index.to_string());
+
+            let (id_filename, identity) =
+                create_identity(&id_dir, &pwd, &file_prefix).map_err(|_| HelperErrors::UnableToCreateIdentity)?;
+            node_identities.insert(id_filename, identity);
         }
+
+        info!("Identities: {:?}", node_identities);
+        Ok(())
+    }
+
+    /// Execute the command to read identities
+    fn execute_identity_read_loop(local_identity: IdentityFileArgs) -> Result<(), HelperErrors> {
+        // check if password is provided
+        let pwd = local_identity.clone().password.read()?;
+
+        // read ids
+        let files = local_identity.get_files();
+        debug!("Identities read {:?}", files.len());
+
+        let node_identities: HashMap<String, HoprKeys> =
+            read_identities(files, &pwd).map_err(|_| HelperErrors::UnableToReadIdentity)?;
+
+        let node_addresses: Vec<Address> = node_identities
+            .values()
+            .into_iter()
+            .map(|n| n.chain_key.public().to_address())
+            .collect();
+
+        info!("Identities: {:?}", node_identities);
+        println!("Identity addresses: {:?}", node_addresses);
+        Ok(())
+    }
+}
+
+impl Cmd for IdentitySubcommands {
+    /// Run the execute_identity_creation_loop function
+    fn run(self) -> Result<(), HelperErrors> {
+        match self {
+            IdentitySubcommands::Create { local_identity, number } => {
+                IdentitySubcommands::execute_identity_creation_loop(local_identity, number)
+            }
+            IdentitySubcommands::Read { local_identity } => {
+                IdentitySubcommands::execute_identity_read_loop(local_identity)
+            }
+        }
+    }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        Ok(())
     }
 }
 
@@ -232,99 +312,6 @@ impl IdentityFileArgs {
         } else {
             Ok(Vec::<Address>::new())
         }
-    }
-}
-
-/// CLI arguments for `hopli identity`
-#[derive(Parser, Clone, Debug)]
-pub struct IdentityArgs {
-    /// Possible actions around identity files
-    #[clap(
-        value_enum,
-        long,
-        short,
-        help_heading = "Identity action",
-        help = "Action with identity `create` or `read`"
-    )]
-    pub action: IdentityActionType,
-
-    /// Arguments to locate one or multiple identity file(s)
-    #[clap(help = "Action with identity `create` or `read`", flatten)]
-    pub local_identity: IdentityFileArgs,
-
-    /// Number of identities to be generated
-    #[clap(
-        help = "Number of identities to be generated, e.g. 1",
-        long,
-        short,
-        value_parser = RangedU64ValueParser::<u32>::new().range(1..),
-        default_value_t = 1
-    )]
-    pub number: u32,
-}
-
-impl IdentityArgs {
-    /// Execute the command with given parameters
-    fn execute_identity_creation_loop(self) -> Result<(), HelperErrors> {
-        let IdentityArgs {
-            action,
-            local_identity,
-            number,
-        } = self;
-
-        // check if password is provided
-        let pwd = match local_identity.clone().password.read() {
-            Ok(read_pwd) => read_pwd,
-            Err(e) => return Err(e),
-        };
-
-        let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
-
-        match action {
-            IdentityActionType::Create => {
-                if local_identity.identity_from_directory.is_none() {
-                    error!("Does not support file. Must provide an identity-directory");
-                    return Err(HelperErrors::MissingIdentityDirectory);
-                }
-                let local_id = local_identity.identity_from_directory.unwrap();
-                let id_dir = local_id.identity_directory.unwrap();
-                for index in 0..=number - 1 {
-                    // build file name
-                    let file_prefix = local_id
-                        .identity_prefix
-                        .as_ref()
-                        .map(|provided_name| provided_name.to_owned() + &index.to_string());
-
-                    match create_identity(&id_dir, &pwd, &file_prefix) {
-                        Ok((id_filename, identity)) => _ = node_identities.insert(id_filename, identity),
-                        Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
-                    }
-                }
-            }
-            IdentityActionType::Read => {
-                // read ids
-                let files = local_identity.get_files();
-                debug!("Identities read {:?}", files.len());
-                match read_identities(files, &pwd) {
-                    Ok(identities) => node_identities = identities,
-                    Err(_) => return Err(HelperErrors::UnableToReadIdentity),
-                }
-            }
-        }
-
-        info!("Identities: {:?}", node_identities);
-        Ok(())
-    }
-}
-
-impl Cmd for IdentityArgs {
-    /// Run the execute_identity_creation_loop function
-    fn run(self) -> Result<(), HelperErrors> {
-        self.execute_identity_creation_loop()
-    }
-
-    async fn async_run(self) -> Result<(), HelperErrors> {
-        Ok(())
     }
 }
 

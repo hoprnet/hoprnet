@@ -1,7 +1,7 @@
 //! `hopli` is a collection of commands to help with identity creation, funding, registration, etc. for HOPR nodes
 
 use crate::faucet::FaucetArgs;
-use crate::identity::IdentityArgs;
+use crate::identity::IdentitySubcommands;
 use crate::network_registry::NetworkRegistryArgs;
 use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
@@ -31,9 +31,12 @@ struct Cli {
     about = "Helper to create node identities, fund nodes, etc."
 )]
 enum Commands {
-    /// Create or read the node's identity file(s)
-    #[clap(about = "Create and store identity files")]
-    Identity(IdentityArgs),
+    /// Commands around identity
+    #[command(visible_alias = "id")]
+    Identity {
+        #[command(subcommand)]
+        command: IdentitySubcommands,
+    },
 
     /// Fund given address and/or addressed derived from identity files native tokens or HOPR tokens
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
@@ -58,8 +61,8 @@ async fn main() -> Result<(), HelperErrors> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Identity(opt) => {
-            opt.run()?;
+        Commands::Identity { command } => {
+            command.run()?;
         }
         Commands::Faucet(opt) => {
             opt.async_run().await?;
