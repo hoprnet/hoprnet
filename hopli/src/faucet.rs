@@ -3,7 +3,13 @@
 //!
 //! Despite HOPR contracts are mainly deployed on Gnosis chain,
 //! HOPR token contract addresses vary on the network.
-
+//!
+//! Attention! Do not use this function to distribute large amount of tokens
+///
+/// Note that to save gas in batch funding, multicall is used to facilitate token distribution, via `transferFrom`
+/// To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
+/// to be transferred. As it's a separate function, there is a window between granting the allowance and executing
+/// the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},

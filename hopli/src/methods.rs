@@ -385,6 +385,13 @@ pub async fn get_native_and_token_balances<M: Middleware>(
 /// Address_i receives amounts_i HOPR tokens.
 /// When there's not enough token in caller's balance, if the caller is
 /// a minter, mint the missing tokens. If not, returns error
+///
+/// Attention! Do not use this function to distribute large amount of tokens
+///
+/// Note that to save gas in batch funding, we use multicall to facilitate token distribution via `transferFrom`
+/// To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
+/// to be transferred. As it's a separate function, there is a window between granting the allowance and executing
+/// the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
 pub async fn transfer_or_mint_tokens<M: Middleware>(
     hopr_token: HoprToken<M>,
     addresses: Vec<Address>,
