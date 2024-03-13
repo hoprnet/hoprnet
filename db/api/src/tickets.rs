@@ -614,6 +614,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await?;
 
+                    // TODO: is this necessary for an incoming channel?
                     // self.db
                     //     .write()
                     //     .await
