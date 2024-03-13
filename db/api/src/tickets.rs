@@ -391,6 +391,19 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    // verify that no aggregation is in progress in the channel
+                    if ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .one(tx.as_ref())
+                        .await?
+                        .is_some()
+                    {
+                        return Ok(vec![]);
+                    }
+
                     // find the index of the last ticket being redeemed
                     let idx_of_last_being_redeemed = ticket::Entity::find()
                         .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
@@ -416,16 +429,13 @@ impl HoprDbTicketOperations for HoprDb {
                         .collect::<Result<Vec<AcknowledgedTicket>>>()
                 })
             })
-            .await;
+            .await?;
 
-        match tickets {
-            Ok(tickets) => Ok(tickets
-                .into_iter()
-                .fold((0, Balance::zero(BalanceType::HOPR)), |acc, ack_tkt| {
-                    (acc.0 + 1, acc.1.add(ack_tkt.ticket.amount))
-                })),
-            Err(_) => Ok((0, Balance::zero(BalanceType::HOPR))),
-        }
+        Ok(tickets
+            .into_iter()
+            .fold((0, Balance::zero(BalanceType::HOPR)), |acc, ack_tkt| {
+                (acc.0 + 1, acc.1.add(ack_tkt.ticket.amount))
+            }))
     }
 
     async fn prepare_aggregation_in_channel(
@@ -483,6 +493,22 @@ impl HoprDbTicketOperations for HoprDb {
             .ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
+                    // verify that no aggregation is in progress in the channel
+                    if ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .one(tx.as_ref())
+                        .await?
+                        .is_some()
+                    {
+                        return Err(DbError::LogicalError(format!(
+                            "channel '{}' is already being aggregated",
+                            channel_entry.get_id()
+                        )));
+                    }
+
                     // find the index of the last ticket being redeemed
                     let idx_of_last_being_redeemed = ticket::Entity::find()
                         .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
