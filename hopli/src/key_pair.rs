@@ -14,13 +14,12 @@ use clap::{Parser, ValueHint};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
-use log::{debug, error, info, warn};
 use std::{
     collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
 };
-use tracing::{error, warn};
+use tracing::{debug, error, info, warn};
 
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -74,11 +73,12 @@ pub fn read_identities(files: Vec<PathBuf>, password: &str) -> Result<HashMap<St
     Ok(results)
 }
 
+/// encrypt HoprKeys with a new password to an identity file
 pub fn update_identity_password(
     keys: HoprKeys,
     path: &Path,
     password: &str,
-) -> Result<Option<(String, HoprKeys)>, HelperErrors> {
+) -> Result<(String, HoprKeys), HelperErrors> {
     let file_path = path
         .to_str()
         .ok_or(HelperErrors::IncorrectFilename(path.to_string_lossy().to_string()))?;
@@ -87,7 +87,7 @@ pub fn update_identity_password(
         // insert remove actual file with name `file_path`
         fs::remove_file(file_path).map_err(|_err| HelperErrors::UnableToUpdateIdentityPassword)?;
         keys.write_eth_keystore(file_path, password)?;
-        Ok(Some((String::from(file_path), keys)))
+        Ok((String::from(file_path), keys))
     } else {
         warn!(
             "Could not update keystore file at {}. {}",
@@ -388,7 +388,59 @@ mod tests {
             Ok(_) => assert!(true),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
+    }
+
+    #[test]
+    fn read_identity_from_path() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
+        let pwd = "password";
+        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
+
+        // created and the read id is identical
+        let files = get_files(path, &None);
+        assert_eq!(files.len(), 1, "must have one identity file");
+
+        let read_id = read_identity(files[0].as_path(), &pwd).unwrap();
+        assert_eq!(
+            read_id.1.chain_key.public().0.to_address(),
+            created_id.chain_key.public().0.to_address()
+        );
+    }
+
+    #[test]
+    fn update_identity_password_at_path() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
+        let pwd = "password";
+        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
+
+        // created and the read id is identical
+        let files = get_files(path, &None);
+        assert_eq!(files.len(), 1, "must have one identity file");
+        let address = created_id.chain_key.public().0.to_address();
+
+        let new_pwd = "supersecured";
+        let (_, returned_key) = update_identity_password(created_id, &files[0].as_path(), new_pwd).unwrap();
+
+        // check the returned value
+        assert_eq!(
+            returned_key.chain_key.public().0.to_address(),
+            address,
+            "returned keys are identical"
+        );
+
+        // check the read value
+        let (_, read_id) = read_identity(files[0].as_path(), &new_pwd).unwrap();
+        assert_eq!(
+            read_id.chain_key.public().0.to_address(),
+            address,
+            "cannot use the new password to read files"
+        );
     }
 
     #[test]
@@ -412,8 +464,6 @@ mod tests {
         // print the read id
         debug!("Debug {:#?}", read_id);
         debug!("Display {}", read_id.values().next().unwrap());
-
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -430,7 +480,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -458,7 +507,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -474,7 +522,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -490,7 +537,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -507,7 +553,6 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -542,16 +587,6 @@ mod tests {
                 .to_string(),
             alice_address
         );
-
-        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
-    }
-
-    fn remove_json_keystore(path: &str) -> Result<(), HelperErrors> {
-        debug!("remove_json_keystore {:?}", path);
-        match fs::remove_dir_all(path) {
-            Ok(_) => Ok(()),
-            _ => Err(HelperErrors::UnableToDeleteIdentity),
-        }
     }
 
     fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {

@@ -231,51 +231,23 @@ impl NetworkProviderArgs {
         chain_key: &ChainKeypair,
     ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
     {
-        // default values
-        let default_rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
-        let default_rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
-
-        // Build default JSON RPC client
-        let default_rpc_client = JsonRpcClient::new(
-            &self.get_default_provider_url()?,
-            DefaultHttpPostRequestor::new(default_rpc_http_config.clone()),
-            default_rpc_http_retry_policy.clone(),
+        let default_provider_url = &self.get_default_provider_url()?;
+        let rpc_provider_url = self.provider_url.as_ref().unwrap_or(default_provider_url);
+        // Build JSON RPC client
+        let rpc_client = JsonRpcClient::new(
+            rpc_provider_url,
+            DefaultHttpPostRequestor::new(chain_rpc::client::native::HttpPostRequestorConfig::default()),
+            SimpleJsonRpcRetryPolicy::default(),
         );
         // Build default JSON RPC provider
-        let default_provider =
-            Provider::new(default_rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
+        let provider = Provider::new(rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
 
-        // validate that the rpc client connects to the expected chain
-        let chain_id = default_provider.get_chainid().await.map_err(RpcError::ProviderError)?;
+        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
 
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(chain_id.as_u64());
 
-        // if a customized provider is given
-        if let Some(customized_provider_url) = &self.provider_url {
-            // check if the provided url matches with the network
-            let customized_rpc_client = JsonRpcClient::new(
-                customized_provider_url,
-                DefaultHttpPostRequestor::new(default_rpc_http_config),
-                default_rpc_http_retry_policy,
-            );
-            // Build default JSON RPC provider
-            let customized_proivder =
-                Provider::new(customized_rpc_client).interval(RpcOperationsConfig::default().tx_polling_interval);
-
-            let customized_chain_id = customized_proivder
-                .get_chainid()
-                .await
-                .map_err(RpcError::ProviderError)?;
-            if customized_chain_id.eq(&chain_id) {
-                return Ok(Arc::new(
-                    customized_proivder
-                        .with_signer(wallet)
-                        .nonce_manager(chain_key.public().to_address().into()),
-                ));
-            }
-        }
         Ok(Arc::new(
-            default_provider
+            provider
                 .with_signer(wallet)
                 .nonce_manager(chain_key.public().to_address().into()),
         ))
@@ -329,7 +301,7 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 mod tests {
     use super::*;
 
-    fn create_anvil_at_default_port(port_number: Option<u16>) -> ethers::utils::AnvilInstance {
+    fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
         let output = std::process::Command::new(env!("CARGO"))
             .arg("locate-project")
             .arg("--workspace")
@@ -342,8 +314,13 @@ mod tests {
 
         let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
 
-        if port_number.is_some() {
-            anvil = anvil.port(8545u16)
+        if !default {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let random_port = listener.local_addr().unwrap().port();
+            anvil = anvil.port(random_port);
+            anvil = anvil.chain_id(random_port);
+        } else {
+            anvil = anvil.port(8545u16);
         }
         anvil.spawn()
     }
@@ -407,7 +384,7 @@ mod tests {
 
     #[async_std::test]
     async fn use_default_rpc_url_for_anvil_when_no_provide_is_given() {
-        let anvil = create_anvil_at_default_port(Some(8545));
+        let anvil = create_anvil_at_port(true);
 
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
@@ -427,7 +404,7 @@ mod tests {
         let chain_key = ChainKeypair::random();
 
         // launch local anvil instance
-        let anvil = create_anvil_at_default_port(None);
+        let anvil = create_anvil_at_port(false);
 
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),

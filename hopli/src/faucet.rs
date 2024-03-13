@@ -23,8 +23,8 @@ use ethers::{
     utils::parse_units,
 };
 // use ethers::types::Address;
-use log::info;
 use std::{ops::Sub, str::FromStr};
+use tracing::info;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]

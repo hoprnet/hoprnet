@@ -21,7 +21,6 @@ hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-log = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
 chain-types = { workspace = true }
@@ -31,4 +30,5 @@ bindings = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-env_logger = { workspace = true }
+hopr-crypto-random = { workspace = true }
+env_logger = "0.10"

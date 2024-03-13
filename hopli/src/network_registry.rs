@@ -23,8 +23,8 @@ use crate::{
 use bindings::hopr_network_registry::HoprNetworkRegistry;
 use clap::Parser;
 use ethers::types::H160;
-use log::info;
 use std::str::FromStr;
+use tracing::info;
 
 /// CLI arguments for `hopli network-registry`
 #[derive(Clone, Debug, Parser)]

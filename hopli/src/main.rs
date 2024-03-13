@@ -6,6 +6,7 @@ use crate::network_registry::NetworkRegistrySubcommands;
 use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
+use tracing_subscriber::layer::SubscriberExt;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;

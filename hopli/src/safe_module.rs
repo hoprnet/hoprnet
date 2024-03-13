@@ -45,9 +45,9 @@ use ethers::{
     utils::parse_units,
 };
 use hopr_crypto_types::keypairs::Keypair;
-use log::info;
 use safe_singleton::SafeSingleton;
 use std::str::FromStr;
+use tracing::info;
 
 /// CLI arguments for `hopli safe-module`
 #[derive(Clone, Debug, Parser)]

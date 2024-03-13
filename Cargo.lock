@@ -3395,6 +3395,7 @@ dependencies = [
  "ethers",
  "hex",
  "hex-literal",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",

@@ -27,9 +27,9 @@ use ethers::{
 };
 use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use log::{debug, info};
 use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
+use tracing::{debug, info};
 
 abigen!(
     SafeSingleton,
@@ -1253,7 +1253,12 @@ mod tests {
     use ethers::abi::AbiDecode;
     use ethers::types::TransactionRequest;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_primitive_types::primitives::Address;
+    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+
+    fn get_random_address_for_testing() -> Address {
+        // Creates a random Ethereum address, only used for testing
+        Address::new(&hopr_crypto_random::random_bytes::<{ Address::SIZE }>())
+    }
 
     async fn deploy_safe_suites<M: Middleware>(provider: Arc<M>) -> Result<(), ContractError<M>> {
         // Check if safe suite has been deployed. If so, skip this step
@@ -1379,7 +1384,7 @@ mod tests {
     async fn test_transfer_or_mint_tokens_in_anvil_with_multicall() {
         let mut addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
-            addresses.push(Address::random().into());
+            addresses.push(get_random_address_for_testing().into());
         }
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
@@ -1445,7 +1450,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() {
-        let addresses: Vec<ethers::types::Address> = vec![Address::random().into()];
+        let addresses: Vec<ethers::types::Address> = vec![get_random_address_for_testing().into()];
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
@@ -1551,7 +1556,7 @@ mod tests {
     async fn test_transfer_native_tokens_in_anvil_with_multicall() {
         let mut addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
-            addresses.push(Address::random().into());
+            addresses.push(get_random_address_for_testing().into());
         }
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
@@ -1594,8 +1599,8 @@ mod tests {
         let mut safe_addresses: Vec<ethers::types::Address> = Vec::new();
         let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..4 {
-            safe_addresses.push(Address::random().into());
-            node_addresses.push(Address::random().into());
+            safe_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing().into());
         }
 
         // launch local anvil instance
@@ -1691,7 +1696,7 @@ mod tests {
         // prepare some input data
         let mut admin_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..2 {
-            admin_addresses.push(Address::random().into());
+            admin_addresses.push(get_random_address_for_testing().into());
         }
 
         // launch local anvil instance
@@ -1792,11 +1797,11 @@ mod tests {
         // prepare some input data
         let mut admin_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..2 {
-            admin_addresses.push(Address::random().into());
+            admin_addresses.push(get_random_address_for_testing().into());
         }
         let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(Address::random().into());
+            node_addresses.push(get_random_address_for_testing().into());
         }
 
         // launch local anvil instance
@@ -2047,7 +2052,7 @@ mod tests {
 
         let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(Address::random().into());
+            node_addresses.push(get_random_address_for_testing().into());
         }
 
         // launch local anvil instance
@@ -2107,7 +2112,7 @@ mod tests {
 
         let mut node_addresses: Vec<ethers::types::Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(Address::random().into());
+            node_addresses.push(get_random_address_for_testing().into());
         }
 
         // launch local anvil instance

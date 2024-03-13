@@ -4,7 +4,7 @@ use clap::{builder::RangedU64ValueParser, Parser};
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
-use log::{debug, info};
+use tracing::{debug, info};
 
 use crate::key_pair::{create_identity, read_identities, IdentityFileArgs};
 use crate::utils::{Cmd, HelperErrors};
@@ -88,7 +88,7 @@ impl IdentitySubcommands {
             .collect();
 
         info!("Identities: {:?}", node_identities);
-        println!("Identity addresses: {:?}", node_addresses);
+        info!("Identity addresses: {:?}", node_addresses);
         Ok(())
     }
 }
