@@ -1,5 +1,5 @@
 use async_stream::stream;
-use libp2p_identity::PeerId;
+use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
@@ -158,7 +158,11 @@ pub trait HoprDbTicketOperations {
 
     async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
 
-    async fn can_aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<(u32, Balance)>;
+    async fn calculate_aggregatable_tickets_in_channel(
+        &self,
+        channel: &Hash,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<(u32, Balance)>;
 
     async fn prepare_aggregation_in_channel(
         &self,
@@ -339,8 +343,89 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn can_aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<(u32, Balance)> {
-        Ok((0, Balance::zero(BalanceType::HOPR)))
+    async fn calculate_aggregatable_tickets_in_channel(
+        &self,
+        channel: &Hash,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<(u32, Balance)> {
+        let myself = self.clone();
+        let chain_keypair = chain_keypair.clone();
+
+        let channel = *channel;
+
+        let (channel_entry, ds) =
+            self.nest_transaction_in_db(None, TargetDb::Index)
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let entry = myself
+                            .get_channel_by_id(Some(tx), channel.clone())
+                            .await?
+                            .ok_or(DbError::ChannelNotFound(channel))?;
+
+                        if entry.status != ChannelStatus::Open {
+                            return Err(DbError::LogicalError(format!("channel '{channel}' not open")));
+                        }
+
+                        // TODO: this should not be needed, because there are no tickets
+                        // for channels not associated with us?
+                        // // Perform sanity checks on the arguments
+                        // assert_eq!(
+                        //     ChannelDirection::Incoming,
+                        //     channel.direction(&self.me).expect("must be own channel"),
+                        //     "aggregation request can happen on incoming channels only"
+                        // );
+
+                        let domain_separator =
+                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("domain separator missing".into())
+                            })?;
+
+                        Ok((entry, domain_separator))
+                    })
+                })
+                .await?;
+
+        let tickets = self
+            .nest_transaction_in_db(None, TargetDb::Index)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    // find the index of the last ticket being redeemed
+                    let idx_of_last_being_redeemed = ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed as u8))
+                        .order_by_desc(hopr_db_entity::ticket::Column::Index)
+                        .one(tx.as_ref())
+                        .await?
+                        .map(|m| m.id)
+                        .unwrap_or(i32::MIN); // go from the lowest possible index of none is found
+
+                    // get the list of all tickets to be aggregated
+                    let to_be_aggregated = ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .all(tx.as_ref())
+                        .await?;
+
+                    to_be_aggregated
+                        .into_iter()
+                        .map(|m| model_to_acknowledged_ticket(&m, ds, &chain_keypair).map_err(DbError::from))
+                        .collect::<Result<Vec<AcknowledgedTicket>>>()
+                })
+            })
+            .await;
+
+        match tickets {
+            Ok(tickets) => Ok(tickets
+                .into_iter()
+                .fold((0, Balance::zero(BalanceType::HOPR)), |acc, ack_tkt| {
+                    (acc.0 + 1, acc.1.add(ack_tkt.ticket.amount))
+                })),
+            Err(_) => Ok((0, Balance::zero(BalanceType::HOPR))),
+        }
     }
 
     async fn prepare_aggregation_in_channel(
