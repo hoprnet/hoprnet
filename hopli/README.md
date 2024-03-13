@@ -148,6 +148,7 @@ Express create a safe and a module instances, and
 - approve token transfer to be done for the safe by channels contracts
 - if node addresses are known, include nodes to the module by the safe
 - set desired threshold
+- if no `admin-address` is provided, the only admin will be the caller (wallet of the `private-key`)
 
 
 ```
@@ -155,9 +156,11 @@ hopli safe-module create \
     --network anvil-localhost \
     --contracts-root "../ethereum/contracts" \
     --identity-directory "./test" \
+    --password-path "./test/pwd" \
     --admin-address 0x47f2710069F01672D01095cA252018eBf08bF85e,0x0D07Eb66Deb54D48D004765E13DcC028cf56592b \
-    --password-path "/test/.pwd" \
     --allowance 10.5 \
+    --hopr-amount 10 \
+    --native-amount 0.1 \
     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 
 ```
 

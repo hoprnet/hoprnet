@@ -24,11 +24,8 @@ use ethers::{
     types::{Address, Bytes, Eip1559TransactionRequest, H160, H256, U256},
     utils::{get_create2_address, keccak256},
 };
-// use hex::FromHex;
 use hex_literal::hex;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-// use hopr_primitive_types::traits::BinarySerializable;
-// use hopr_primitive_types::traits::{BinarySerializable, ToHex};
 use log::{debug, info};
 use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
@@ -392,6 +389,9 @@ pub async fn get_native_and_token_balances<M: Middleware>(
 /// To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
 /// to be transferred. As it's a separate function, there is a window between granting the allowance and executing
 /// the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
+///
+/// TODO: To mitigate this risk, create a MulticallErc777Recipient contract to enable receiption of tokens
+/// on the multicall contract and purposely re-entrance with forwarded payload
 pub async fn transfer_or_mint_tokens<M: Middleware>(
     hopr_token: HoprToken<M>,
     addresses: Vec<Address>,
@@ -409,6 +409,12 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
         amounts.len(),
         "addresses and amounts are of different lengths in transfer_or_mint_tokens"
     );
+
+    // early return if no recipient is provided
+    if addresses.is_empty() {
+        return Ok(U256::zero());
+    }
+
     // calculate the sum of tokens to be sent
     let total = amounts.iter().fold(U256::zero(), |acc, cur| acc.add(cur));
     info!("total amount of HOPR tokens to be transferred {:?}", total.to_string());
@@ -451,29 +457,43 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
         }
     }
 
-    // approve the multicall to be able to transfer from caller's wallet
-    hopr_token
-        .approve(MULTICALL_ADDRESS, total)
-        .send()
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+    // when there are multiple recipients, use multicall; when single recipient, direct transfer
+    if addresses.len() == 1 {
+        // direct transfer
+        hopr_token
+            .transfer(addresses[0], amounts[0])
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    } else {
+        // use multicall
+        // TODO: introduce a new ERC777Recipient contract and batch the following separated steps into one, to mitigate the attack vector
+        // approve the multicall to be able to transfer from caller's wallet
+        hopr_token
+            .approve(MULTICALL_ADDRESS, total)
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
 
-    // transfer token to multicall contract and transfer to multiple recipients
-    for (i, address) in addresses.iter().enumerate() {
-        // skip transferring zero amount of tokens
-        if amounts[i].gt(&U256::zero()) {
-            multicall.add_call(
-                hopr_token
-                    .method::<_, bool>("transferFrom", (caller.clone(), address.clone(), amounts[i]))
-                    .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
-                false,
-            );
+        // transfer token to multicall contract and transfer to multiple recipients
+        for (i, address) in addresses.iter().enumerate() {
+            // skip transferring zero amount of tokens
+            if amounts[i].gt(&U256::zero()) {
+                multicall.add_call(
+                    hopr_token
+                        .method::<_, bool>("transferFrom", (caller.clone(), address.clone(), amounts[i]))
+                        .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
+                    false,
+                );
+            }
         }
-    }
 
-    multicall.send().await.unwrap().await.unwrap();
+        multicall.send().await.unwrap().await.unwrap();
+    }
 
     Ok(total)
 }
@@ -508,7 +528,7 @@ pub async fn transfer_native_tokens<M: Middleware>(
             call_data: Bytes::default(),
         })
         .collect();
-    // transfer native tokens to multicall contract and transfer to multiple recipients
+    // send native tokens to multicall contract along with the multicall transaction that transfers funds to multiple recipients
     let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
     tx.set_to(MULTICALL_ADDRESS);
     tx.set_data(Aggregate3ValueCall { calls: call3values }.encode().into());
@@ -1413,6 +1433,110 @@ mod tests {
         assert_eq!(
             total_transferred_amount,
             U256::from(10),
+            "amount transferred does not equal to the desired amount"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() {
+        let addresses: Vec<ethers::types::Address> = vec![Address::random().into()];
+        let desired_amount = vec![U256::from(42)];
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        // deploy hopr contracts
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+        // grant deployer token minter role
+        let encoded_minter_role: [u8; 32] = keccak256(b"MINTER_ROLE");
+        instances
+            .token
+            .grant_role(
+                encoded_minter_role.clone(),
+                contract_deployer.public().to_address().into(),
+            )
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+        // test the deployer has minter role now
+        let check_minter_role = instances
+            .token
+            .has_role(
+                encoded_minter_role.clone(),
+                contract_deployer.public().to_address().into(),
+            )
+            .call()
+            .await
+            .unwrap();
+        assert!(check_minter_role, "deployer does not have minter role yet");
+
+        // transfer or mint tokens to addresses
+        let total_transferred_amount =
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
+                .await
+                .unwrap();
+
+        // get native and token balances
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
+            .await
+            .unwrap();
+        assert_eq!(native_balance.len(), 1, "invalid native balance lens");
+        assert_eq!(token_balance.len(), 1, "invalid token balance lens");
+        for (i, amount) in desired_amount.iter().enumerate() {
+            assert_eq!(token_balance[i].as_u64(), amount.as_u64(), "token balance unmatch");
+        }
+
+        assert_eq!(
+            total_transferred_amount, desired_amount[0],
+            "amount transferred does not equal to the desired amount"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_transfer_or_mint_tokens_in_anvil_without_recipient() {
+        let addresses: Vec<ethers::types::Address> = Vec::new();
+        let desired_amount: Vec<U256> = Vec::new();
+
+        // launch local anvil instance
+        let anvil = chain_types::utils::create_anvil(None);
+        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        // deploy hopr contracts
+        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+            .await
+            .expect("failed to deploy");
+
+        // deploy multicall contract
+        deploy_multicall3_for_testing(client.clone()).await.unwrap();
+
+        // transfer or mint tokens to addresses
+        let total_transferred_amount =
+            transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone())
+                .await
+                .unwrap();
+
+        // get native and token balances
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone().into())
+            .await
+            .unwrap();
+        assert_eq!(native_balance.len(), 0, "invalid native balance lens");
+        assert_eq!(token_balance.len(), 0, "invalid token balance lens");
+        // for (i, amount) in desired_amount.iter().enumerate() {
+        //     assert_eq!(token_balance[i].as_u64(), amount.as_u64(), "token balance unmatch");
+        // }
+
+        assert_eq!(
+            total_transferred_amount,
+            U256::from(0),
             "amount transferred does not equal to the desired amount"
         );
     }

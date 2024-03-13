@@ -165,7 +165,7 @@ impl PasswordArgs {
 #[derive(Debug, Clone, Parser, Default)]
 pub struct IdentityFromDirectoryArgs {
     /// Directory to all the identity files
-    #[arg(
+    #[clap(
         help = "Path to the directory that stores identity files",
         long,
         short = 'd',
@@ -175,7 +175,7 @@ pub struct IdentityFromDirectoryArgs {
     pub identity_directory: Option<String>,
 
     /// Prefix of identity files. Only identity files with the provided are decrypted with the password
-    #[arg(
+    #[clap(
         help = "Only use identity files with prefix",
         long,
         short = 'x',
@@ -225,7 +225,7 @@ pub struct IdentityFileArgs {
     pub identity_from_directory: Option<IdentityFromDirectoryArgs>,
 
     /// Path to one identity file
-    #[arg(
+    #[clap(
         short,
         long,
         help = "The path to an identity file",
@@ -295,6 +295,7 @@ mod tests {
 
     #[test]
     fn create_identities_from_directory_with_id_files() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -303,11 +304,12 @@ mod tests {
             Ok(_) => assert!(true),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_identities_from_directory_with_id_files() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -324,14 +326,15 @@ mod tests {
         );
 
         // print the read id
-        println!("Debug {:#?}", read_id);
-        println!("Display {}", read_id.values().next().unwrap());
+        debug!("Debug {:#?}", read_id);
+        debug!("Display {}", read_id.values().next().unwrap());
 
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_identities_from_directory_with_id_files_but_wrong_password() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -343,7 +346,7 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
@@ -360,6 +363,7 @@ mod tests {
 
     #[test]
     fn read_identities_from_tmp_folder() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -370,11 +374,12 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_identities_from_tmp_folder_with_prefix() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -385,11 +390,12 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_identities_from_tmp_folder_no_match() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -400,11 +406,12 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_identities_from_tmp_folder_with_wrong_prefix() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -416,11 +423,12 @@ mod tests {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     #[test]
     fn read_complete_identities_from_tmp_folder() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir().unwrap();
 
         let path = tmp.path().to_str().unwrap();
@@ -451,11 +459,11 @@ mod tests {
             alice_address
         );
 
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path).map_err(|err| error!("{:?}", err)).ok();
     }
 
     fn remove_json_keystore(path: &str) -> Result<(), HelperErrors> {
-        println!("remove_json_keystore {:?}", path);
+        debug!("remove_json_keystore {:?}", path);
         match fs::remove_dir_all(path) {
             Ok(_) => Ok(()),
             _ => Err(HelperErrors::UnableToDeleteIdentity),

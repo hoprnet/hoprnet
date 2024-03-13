@@ -29,11 +29,13 @@ use crate::{
     key_pair::{IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
-        include_nodes_to_module, migrate_nodes, safe_singleton,
+        include_nodes_to_module, migrate_nodes, safe_singleton, transfer_native_tokens, transfer_or_mint_tokens,
     },
     utils::{Cmd, HelperErrors},
 };
-use bindings::{hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory};
+use bindings::{
+    hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
+};
 use clap::{builder::RangedU64ValueParser, Parser};
 use ethers::{
     types::{H160, U256},
@@ -51,12 +53,12 @@ pub enum SafeModuleSubcommands {
     #[command(visible_alias = "cr")]
     Create {
         /// Network name, contracts config file root, and customized provider, if available
-        #[clap(flatten)]
+        #[command(flatten)]
         network_provider: NetworkProviderArgs,
 
         /// Arguments to locate identity file(s) of HOPR node(s)
         #[command(flatten)]
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
 
         /// node addresses
         #[clap(
@@ -95,6 +97,24 @@ pub enum SafeModuleSubcommands {
         )]
         allowance: Option<f64>,
 
+        /// The amount of HOPR tokens (in floating number) to be funded to the new safe
+        #[clap(
+            help = "Hopr amount in ether, e.g. 10",
+            long,
+            short = 'm',
+            value_parser = clap::value_parser!(f64),
+        )]
+        hopr_amount: Option<f64>,
+
+        /// The amount of native tokens (in floating number) to be funded per node
+        #[clap(
+            help = "Native token amount in ether, e.g. 1",
+            long,
+            short = 'g',
+            value_parser = clap::value_parser!(f64),
+        )]
+        native_amount: Option<f64>,
+
         /// Access to the private key, of which the wallet either contains sufficient assets
         /// as the source of funds or it can mint necessary tokens
         /// This wallet is also the manager of Network Registry contract
@@ -106,12 +126,12 @@ pub enum SafeModuleSubcommands {
     #[command(visible_alias = "mg")]
     Migrate {
         /// Network name, contracts config file root, and customized provider, if available
-        #[clap(flatten)]
+        #[command(flatten)]
         network_provider: NetworkProviderArgs,
 
         /// Arguments to locate identity file(s) of HOPR node(s)
         #[command(flatten)]
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
 
         /// node addresses
         #[clap(
@@ -150,12 +170,12 @@ pub enum SafeModuleSubcommands {
     #[command(visible_alias = "mv")]
     Move {
         /// Network name, contracts config file root, and customized provider, if available
-        #[clap(flatten)]
+        #[command(flatten)]
         network_provider: NetworkProviderArgs,
 
         /// Arguments to locate identity file(s) of HOPR node(s)
         #[command(flatten)]
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
 
         /// node addresses
         #[clap(
@@ -193,13 +213,17 @@ impl SafeModuleSubcommands {
     /// 1. Create a safe instance and a node management module instance:
     /// 2. Set default permissions for the module
     /// 3. Include node as a member with restricted permission on sending assets
+    /// 4. transfer some HOPR token to the new safe (directly)
+    /// 5. transfer some native tokens to nodes
     pub async fn execute_safe_module_creation(
         network_provider: NetworkProviderArgs,
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
         node_address: Option<String>,
         admin_address: Option<String>,
         threshold: u32,
         allowance: Option<f64>,
+        hopr_amount: Option<f64>,
+        native_amount: Option<f64>,
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
@@ -208,13 +232,12 @@ impl SafeModuleSubcommands {
             node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        if let Some(local_identity_arg) = local_identity {
-            node_eth_addresses.extend(local_identity_arg.to_addresses().unwrap().into_iter().map(H160::from));
-        }
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+
         let node_addresses = if node_eth_addresses.is_empty() {
             None
         } else {
-            Some(node_eth_addresses)
+            Some(node_eth_addresses.clone())
         };
 
         // get allowance
@@ -265,6 +288,20 @@ impl SafeModuleSubcommands {
         println!("safe {:?}", safe.address());
         println!("node_module {:?}", node_module.address());
 
+        // direct transfer of some HOPR tokens to the safe
+        if let Some(hopr_amount_for_safe) = hopr_amount {
+            let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
+            let hopr_to_be_transferred = U256::from(parse_units(hopr_amount_for_safe, "ether").unwrap());
+            transfer_or_mint_tokens(hopr_token, vec![safe.address()], vec![hopr_to_be_transferred]).await?;
+        }
+
+        // distribute some native tokens to the nodes
+        if let Some(native_amount_for_node) = native_amount {
+            let native_to_be_transferred = U256::from(parse_units(native_amount_for_node, "ether").unwrap());
+            let native_amounts = vec![native_to_be_transferred; node_eth_addresses.len()];
+            transfer_native_tokens(rpc_provider.clone(), node_eth_addresses, native_amounts).await?;
+        }
+
         // TODO: FIXME: action around network registry
 
         Ok(())
@@ -275,7 +312,7 @@ impl SafeModuleSubcommands {
     /// because it is an action that nodes need to do on-start.
     pub async fn execute_safe_module_moving(
         network_provider: NetworkProviderArgs,
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
         node_address: Option<String>,
         old_module_address: String,
         new_safe_address: String,
@@ -288,9 +325,7 @@ impl SafeModuleSubcommands {
             node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        if let Some(local_identity_arg) = local_identity {
-            node_eth_addresses.extend(local_identity_arg.to_addresses().unwrap().into_iter().map(H160::from));
-        }
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
 
         // parse safe and module addresses
         let safe_addr = H160::from_str(&new_safe_address).unwrap();
@@ -344,7 +379,7 @@ impl SafeModuleSubcommands {
     /// because it is an action that nodes need to do on-start.
     pub async fn execute_safe_module_migration(
         network_provider: NetworkProviderArgs,
-        local_identity: Option<IdentityFileArgs>,
+        local_identity: IdentityFileArgs,
         node_address: Option<String>,
         safe_address: String,
         module_address: String,
@@ -357,9 +392,7 @@ impl SafeModuleSubcommands {
             node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        if let Some(local_identity_arg) = local_identity {
-            node_eth_addresses.extend(local_identity_arg.to_addresses().unwrap().into_iter().map(H160::from));
-        }
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
 
         // get allowance
         let token_allowance = match allowance {
@@ -418,6 +451,8 @@ impl Cmd for SafeModuleSubcommands {
                 admin_address,
                 threshold,
                 allowance,
+                hopr_amount,
+                native_amount,
                 private_key,
             } => {
                 SafeModuleSubcommands::execute_safe_module_creation(
@@ -427,6 +462,8 @@ impl Cmd for SafeModuleSubcommands {
                     admin_address,
                     threshold,
                     allowance,
+                    hopr_amount,
+                    native_amount,
                     private_key,
                 )
                 .await
