@@ -247,13 +247,7 @@ where
                         || destination == self.chain_key.public().to_address()
                     {
                         self.db
-                            .mark_tickets_neglected(TicketSelector {
-                                channel_id,
-                                epoch: current_epoch,
-                                index: None,
-                                state: None,
-                                only_aggregated: false,
-                            })
+                            .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
                             .await?;
 
                         self.db.invalidate_cached_ticket_index(&channel_id).await;

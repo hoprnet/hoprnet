@@ -130,9 +130,9 @@ where
     ) -> Result<Vec<PendingAction>> {
         let channel_id = channel.get_id();
 
-        let mut selector: TicketSelector = channel.into();
-        selector.only_aggregated = only_aggregated;
-        selector.state = Some(AcknowledgedTicketStatus::Untouched);
+        let selector = TicketSelector::from(channel)
+            .with_aggregated_only(only_aggregated)
+            .with_state(AcknowledgedTicketStatus::Untouched);
 
         let (count_redeemable_tickets, _) = self.db.get_tickets_value(None, selector).await?;
 
@@ -176,9 +176,9 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         if let Some(channel) = self.db.get_channel_by_id(None, ack_ticket.ticket.channel_id).await? {
-            let mut selector: TicketSelector = (&channel).into();
-            selector.state = Some(AcknowledgedTicketStatus::Untouched);
-            selector.index = Some(ack_ticket.ticket.index);
+            let selector = TicketSelector::from(&channel)
+                .with_index(ack_ticket.ticket.index)
+                .with_state(AcknowledgedTicketStatus::Untouched);
 
             if let Some(ticket) = self
                 .db
@@ -504,16 +504,14 @@ mod tests {
 
         // Make the first ticket unredeemable
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
-        let mut selector: TicketSelector = (&tickets[0]).into();
-        selector.state = None;
+        let selector = TicketSelector::from(&tickets[0]).with_no_state();
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated)
             .await
             .unwrap();
 
         // Make the second ticket unredeemable
         tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
-        let mut selector: TicketSelector = (&tickets[1]).into();
-        selector.state = None;
+        let selector = TicketSelector::from(&tickets[1]).with_no_state();
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await
             .unwrap();

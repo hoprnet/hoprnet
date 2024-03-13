@@ -80,9 +80,39 @@ pub struct TicketSelector {
 }
 
 impl TicketSelector {
+    pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
+        Self {
+            channel_id,
+            epoch: epoch.into(),
+            index: None,
+            state: None,
+            only_aggregated: false,
+        }
+    }
+
     /// If `false` is returned, the selector can fetch more than a single ticket.
     pub fn is_unique(&self) -> bool {
         self.index.is_some()
+    }
+
+    pub fn with_index(mut self, index: u64) -> Self {
+        self.index = Some(index);
+        self
+    }
+
+    pub fn with_state(mut self, state: AcknowledgedTicketStatus) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn with_no_state(mut self) -> Self {
+        self.state = None;
+        self
+    }
+
+    pub fn with_aggregated_only(mut self, only_aggregated: bool) -> Self {
+        self.only_aggregated = only_aggregated;
+        self
     }
 }
 
@@ -1153,8 +1183,7 @@ mod tests {
 
         let channel = init_db_with_tickets(&db, 10).await.0;
 
-        let mut selector: TicketSelector = (&channel).into();
-        selector.index = Some(5);
+        let selector = TicketSelector::from(&channel).with_index(5);
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
@@ -1170,8 +1199,8 @@ mod tests {
             "status must be set"
         );
 
-        let mut selector: TicketSelector = (&channel).into();
-        selector.state = Some(AcknowledgedTicketStatus::Untouched);
+        let selector = TicketSelector::from(&channel)
+            .with_state(AcknowledgedTicketStatus::Untouched);
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
@@ -1199,8 +1228,8 @@ mod tests {
             .unwrap();
 
         let channel = init_db_with_tickets(&db, 10).await.0;
-        let mut selector: TicketSelector = (&channel).into();
-        selector.state = Some(AcknowledgedTicketStatus::Untouched);
+        let selector = TicketSelector::from(&channel)
+            .with_state(AcknowledgedTicketStatus::Untouched);
 
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await

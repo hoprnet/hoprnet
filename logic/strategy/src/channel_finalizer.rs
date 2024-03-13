@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use validator::Validate;
+use hopr_db_api::channels::HoprDbChannelOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -43,28 +44,28 @@ pub struct ClosureFinalizerStrategyConfig {
 /// which have elapsed the grace period.
 pub struct ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
-    db: Arc<RwLock<Db>>,
+    db: Db,
     cfg: ClosureFinalizerStrategyConfig,
     chain_actions: A,
 }
 
 impl<Db, A> ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
     /// Constructs the strategy.
-    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Arc<RwLock<Db>>, chain_actions: A) -> Self {
+    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Db, chain_actions: A) -> Self {
         Self { db, chain_actions, cfg }
     }
 }
 
 impl<Db, A> Display for ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -75,13 +76,13 @@ where
 #[async_trait]
 impl<Db, A> SingularStrategy for ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
+        let outgoing_channels = self.db.get_channels_via(None, ChannelDirection::Incoming, me).await?;
 
         let to_close = outgoing_channels
             .iter()

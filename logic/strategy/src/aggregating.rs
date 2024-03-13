@@ -51,7 +51,7 @@ use crate::{strategy::SingularStrategy, Strategy};
 
 use async_std::task::spawn;
 use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -323,6 +323,9 @@ where
             info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
             let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
+
+            let selector = TicketSelector::from(channel)
+                .with_state(AcknowledgedTicketStatus::Untouched);
 
             let mut aggregatable_tickets = 0;
 
