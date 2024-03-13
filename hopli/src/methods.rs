@@ -249,6 +249,7 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<M: Middleware>(
 }
 
 /// Send one transaction via safe
+#[allow(clippy::too_many_arguments)]
 pub async fn send_safe_transaction_with_threshold_one<M: Middleware>(
     safe: SafeSingleton<M>,
     signer_key: ChainKeypair,
@@ -849,6 +850,7 @@ pub fn prepare_safe_tx_from_owner_contract<M: Middleware>(
 /// - if node addresses are known, include nodes and safes to the network registry.
 ///
 /// Returns safe proxy address and module proxy address
+#[allow(clippy::too_many_arguments)]
 pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     hopr_node_stake_factory: HoprNodeStakeFactory<M>,
     hopr_token_address: Address,

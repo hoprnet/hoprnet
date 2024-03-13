@@ -230,6 +230,7 @@ impl SafeModuleSubcommands {
     /// 3. Include node as a member with restricted permission on sending assets
     /// 4. transfer some HOPR token to the new safe (directly)
     /// 5. transfer some native tokens to nodes
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_safe_module_creation(
         network_provider: NetworkProviderArgs,
         local_identity: IdentityFileArgs,
@@ -363,6 +364,7 @@ impl SafeModuleSubcommands {
     /// Execute the command, which moves nodes to a new managing safe and module pair
     /// Note that it does not register the node with the new safe on NodeSafeRegistry,
     /// because it is an action that nodes need to do on-start.
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_safe_module_moving(
         network_provider: NetworkProviderArgs,
         local_identity: IdentityFileArgs,
@@ -464,6 +466,7 @@ impl SafeModuleSubcommands {
     /// Execute the command, which migrates nodes to a new network
     /// Note that it does not register the node with the new safe on NodeSafeRegistry,
     /// because it is an action that nodes need to do on-start.
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_safe_module_migration(
         network_provider: NetworkProviderArgs,
         local_identity: IdentityFileArgs,
