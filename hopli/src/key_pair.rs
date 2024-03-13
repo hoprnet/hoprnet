@@ -234,7 +234,6 @@ impl IdentityFromDirectoryArgs {
             identity_prefix,
         } = self;
         let id_dir = identity_directory.unwrap();
-
         debug!(target: "identity_reader_from_directory", "Reading dir {}", &id_dir);
 
         // early return if failed in reading identity directory
@@ -244,10 +243,9 @@ impl IdentityFromDirectoryArgs {
         // 2) the provided idetity_prefix
         let files: Vec<PathBuf> = directory
             .into_iter() // read all the files from the directory
-            .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-            .map(|r| r.unwrap().path()) // Read all the files from the given directory
-            .filter(|r| r.is_file()) // Filter out folders
-            .filter(|r| r.to_str().unwrap().contains("id")) // file name should contain "id"
+            .filter_map(|r| r.ok())
+            .map(|r| r.path()) // Read all the files from the given directory
+            .filter(|r| r.is_file() && r.to_str().unwrap().contains("id")) // Filter out folders
             .filter(|r| match &identity_prefix {
                 Some(id_prf) => r.file_stem().unwrap().to_str().unwrap().starts_with(id_prf.as_str()),
                 _ => true,
