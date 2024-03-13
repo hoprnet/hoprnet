@@ -98,13 +98,12 @@ pub fn create_identity(
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PrivateKeyArgs {
-    /// Either provide a private key as argument or as an environment variable `PRIVATE_KEY`
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
     #[clap(
         long,
         short = 'k',
         help = "Private key to unlock the account that broadcasts the transaction",
-        name = "private_key",
-        value_name = "PRIVATE_KEY"
+        name = "private_key"
     )]
     pub private_key: Option<String>,
 }

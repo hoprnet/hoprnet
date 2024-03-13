@@ -2,7 +2,7 @@
 
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentitySubcommands;
-use crate::network_registry::NetworkRegistryArgs;
+use crate::network_registry::NetworkRegistrySubcommands;
 use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
@@ -42,14 +42,15 @@ enum Commands {
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
 
-    /// Use a manager account to registry some nodes Ethereum address with its staking account address onto the network registry contract
-    #[clap(
-        about = "Registry some nodes Ethereum address with its staking account address onto the network registry contract. It requires a manager account to perform this action."
-    )]
-    NetworkRegistry(NetworkRegistryArgs),
+    /// Commands around network registry.
+    #[command(visible_alias = "nr")]
+    NetworkRegistry {
+        #[command(subcommand)]
+        command: NetworkRegistrySubcommands,
+    },
 
     /// Commands around safe module
-    #[command(visible_alias = "se")]
+    #[command(visible_alias = "sm")]
     SafeModule {
         #[command(subcommand)]
         command: SafeModuleSubcommands,
@@ -67,8 +68,8 @@ async fn main() -> Result<(), HelperErrors> {
         Commands::Faucet(opt) => {
             opt.async_run().await?;
         }
-        Commands::NetworkRegistry(opt) => {
-            opt.async_run().await?;
+        Commands::NetworkRegistry { command } => {
+            command.async_run().await?;
         }
         Commands::SafeModule { command } => {
             command.async_run().await?;
