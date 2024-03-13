@@ -23,6 +23,8 @@ pub trait HoprDbAccountOperations {
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry>;
+
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()>;
@@ -95,11 +97,31 @@ impl HoprDbAccountOperations for HoprDb {
                         .await?
                         .pop();
 
-                    Ok::<Option<AccountEntry>, DbError>(if let Some((account, announcements)) = maybe_model {
+                    Ok::<_, DbError>(if let Some((account, announcements)) = maybe_model {
                         Some(model_to_account_entry(account, announcements)?)
                     } else {
                         None
                     })
+                })
+            })
+            .await
+    }
+
+    async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let (account, announcements) = Account::find()
+                        .find_with_related(Announcement)
+                        .filter(account::Column::IsSelf.eq(true))
+                        .order_by_desc(announcement::Column::AtBlock)
+                        .all(tx.as_ref())
+                        .await?
+                        .pop()
+                        .ok_or(MissingAccount)?;
+
+                    Ok::<_, DbError>(model_to_account_entry(account, announcements)?)
                 })
             })
             .await
@@ -129,13 +151,19 @@ impl HoprDbAccountOperations for HoprDb {
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
+        let myself = self.clone();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    if account.is_self && myself.get_self_account(Some(tx)).await.is_ok() {
+                        return Err(DbError::LogicalError("cannot insert multiple self-accounts".into()))
+                    }
+
                     let new_account = account::ActiveModel {
                         chain_key: Set(account.chain_addr.to_hex()),
                         packet_key: Set(account.public_key.to_hex()),
+                        is_self: Set(account.is_self),
                         ..Default::default()
                     }
                     .insert(tx.as_ref())
@@ -402,6 +430,22 @@ mod tests {
         assert_eq!(Some(maddr), acc.get_multiaddr(), "multiaddress must match");
         assert_eq!(Some(block), acc.updated_at());
         assert_eq!(acc, db_acc);
+    }
+
+    #[async_std::test]
+    async fn test_should_not_insert_multiple_self_accounts() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self())
+            .await
+            .unwrap();
+
+        assert!(db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self())
+            .await
+            .is_err(), "should fail inserting multiple self accounts");
     }
 
     #[async_std::test]

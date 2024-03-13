@@ -789,10 +789,9 @@ impl Hopr {
                 AccountEntry {
                     public_key: *self.me.public(),
                     chain_addr: self.chain_api.me_onchain(),
-                    entry_type: AccountType::Announced {
-                        multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
-                        updated_block: 1,
-                    },
+                    is_self: true,
+                    // Will be set once we announce ourselves and Indexer processes the announcement
+                    entry_type: AccountType::NotAnnounced
                 },
             )
             .await?;

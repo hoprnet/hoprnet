@@ -146,7 +146,6 @@ impl MultiStrategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
                     sub_cfg.clone(),
                     db.clone(),
-                    network.clone(),
                     chain_actions.clone(),
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(

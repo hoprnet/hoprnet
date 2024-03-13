@@ -43,7 +43,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Sub;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use validator::Validate;
 use hopr_db_api::HoprDbAllOperations;
 use hopr_db_api::peers::{HoprDbPeersOperations, PeerSelector};
@@ -172,6 +172,7 @@ where
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
+    self_account: OnceLock<AccountEntry>,
 }
 
 impl<Db, A> PromiscuousStrategy<Db, A>
@@ -185,6 +186,7 @@ where
             chain_actions,
             sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
+            self_account: OnceLock::new(),
         }
     }
 
@@ -253,9 +255,12 @@ where
         let mut tick_decision = ChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
 
+        // TODO: cache this
+        let me_onchain = self.db.get_self_account(None).await?;
+
         let outgoing_open_channels = self
             .db
-            .get_channels_via(None, ChannelDirection::Outgoing, me_onchain)
+            .get_channels_via(None, ChannelDirection::Outgoing, me_onchain.chain_addr)
             .await?
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)
