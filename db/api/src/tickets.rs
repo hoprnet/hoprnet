@@ -9,9 +9,7 @@ use std::time::SystemTime;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set, Value,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set, Value};
 use sea_query::{Expr, SimpleExpr};
 use tracing::{debug, instrument, trace};
 
@@ -159,6 +157,8 @@ pub trait HoprDbTicketOperations {
     async fn invalidate_cached_ticket_index(&self, channel_id: &Hash);
 
     async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
+
+    async fn can_aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<(u32, Balance)>;
 
     async fn prepare_aggregation_in_channel(
         &self,
@@ -337,6 +337,10 @@ impl HoprDbTicketOperations for HoprDb {
                 })
             })
             .await
+    }
+
+    async fn can_aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<(u32, Balance)> {
+        Ok((0, Balance::zero(BalanceType::HOPR)))
     }
 
     async fn prepare_aggregation_in_channel(
