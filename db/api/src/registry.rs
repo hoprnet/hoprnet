@@ -136,6 +136,8 @@ impl HoprDbRegistryOperations for HoprDb {
 mod tests {
     use crate::db::HoprDb;
     use crate::registry::HoprDbRegistryOperations;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::prelude::Address;
     use lazy_static::lazy_static;
 
@@ -146,7 +148,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_registry_db() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert!(!db
             .is_allowed_in_network_registry(None, *ADDR_1)
@@ -212,7 +214,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_eligiblity_db() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
         assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));

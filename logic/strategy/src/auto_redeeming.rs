@@ -6,6 +6,7 @@
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -50,26 +51,26 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> {
+pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprDbTicketOperations> {
     chain_actions: A,
-    db: Arc<RwLock<Db>>,
+    db: Db,
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> Debug for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Debug for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Display for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<A, Db> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Arc<RwLock<Db>>, chain_actions: A) -> Self {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> AutoRedeemingStrategy<A, Db> {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Db, chain_actions: A) -> Self {
         Self { cfg, db, chain_actions }
     }
 }
@@ -78,7 +79,7 @@ impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> AutoRedeemingStrateg
 impl<A, Db> SingularStrategy for AutoRedeemingStrategy<A, Db>
 where
     A: TicketRedeemActions + Send + Sync,
-    Db: HoprCoreEthereumDbActions + Send + Sync,
+    Db: HoprDbTicketOperations + Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
@@ -114,9 +115,7 @@ where
 
             let mut ack_ticket_in_db = self
                 .db
-                .read()
-                .await
-                .get_acknowledged_tickets(Some(*channel))
+                .get_tickets(None, channel.into())
                 .await?
                 .into_iter()
                 .filter(|t| {

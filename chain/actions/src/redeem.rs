@@ -147,7 +147,7 @@ where
 
         let mut redeem_stream = self
             .db
-            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
+            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await?;
         let mut receivers: Vec<PendingAction> = vec![];
         while let Some(ack_ticket) = redeem_stream.next().await {
@@ -182,7 +182,7 @@ where
 
             if let Some(ticket) = self
                 .db
-                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &self.me)
+                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
                 .await?
                 .next()
                 .await
@@ -308,7 +308,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
@@ -391,12 +391,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
+        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db
-            .get_tickets(None, (&channel_from_charlie).into(), &ALICE)
-            .await
-            .unwrap();
+        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -418,7 +415,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         // all the tickets can be redeemed, coz they are issued with the same epoch as channel
         let (channel_from_bob, bob_tickets) =
@@ -476,12 +473,9 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into(), &ALICE).await.unwrap();
+        let db_acks_bob = db.get_tickets(None, (&channel_from_bob).into()).await.unwrap();
 
-        let db_acks_charlie = db
-            .get_tickets(None, (&channel_from_charlie).into(), &ALICE)
-            .await
-            .unwrap();
+        let db_acks_charlie = db.get_tickets(None, (&channel_from_charlie).into()).await.unwrap();
 
         assert!(
             db_acks_bob
@@ -503,7 +497,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         let (channel_from_bob, mut tickets) =
             create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, U256::from(4u32)).await;
@@ -589,7 +583,7 @@ mod tests {
 
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
@@ -658,7 +652,7 @@ mod tests {
 
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch

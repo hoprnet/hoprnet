@@ -338,7 +338,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_insert_account_announcement() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
@@ -406,7 +406,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -422,7 +422,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_allow_duplicate_announcement_per_different_accounts() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
@@ -471,7 +471,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_delete_account() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         db.insert_account(
@@ -499,7 +499,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_fail_to_delete_nonexistent_account() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -512,7 +512,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_delete_announcements() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let mut entry = AccountEntry::new(
@@ -537,7 +537,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_fail_to_delete_nonexistent_account_announcements() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -550,7 +550,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_translate_key() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
@@ -604,7 +604,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_accounts() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let chain_2 = ChainKeypair::random().public().to_address();

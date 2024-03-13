@@ -50,6 +50,8 @@ use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::{strategy::SingularStrategy, Strategy};
 
 use async_std::task::spawn;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -113,10 +115,10 @@ pub struct AggregatingStrategyConfig {
 /// was successful.
 pub struct AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbTicketOperations + Clone,
     A: TicketRedeemActions + Clone,
 {
-    db: Arc<RwLock<Db>>,
+    db: Db,
     chain_actions: A,
     ticket_aggregator: Arc<Mutex<TicketAggregationActions<T, U>>>,
     cfg: AggregatingStrategyConfig,
@@ -124,7 +126,7 @@ where
 
 impl<Db, T, U, A> Debug for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbTicketOperations + Clone,
     A: TicketRedeemActions + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -134,7 +136,7 @@ where
 
 impl<Db, T, U, A> Display for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbTicketOperations + Clone,
     A: TicketRedeemActions + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -144,12 +146,12 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbTicketOperations + Clone,
     A: TicketRedeemActions + Clone,
 {
     pub fn new(
         cfg: AggregatingStrategyConfig,
-        db: Arc<RwLock<Db>>,
+        db: Db,
         chain_actions: A,
         ticket_aggregator: TicketAggregationActions<T, U>,
     ) -> Self {
@@ -164,7 +166,7 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
@@ -172,8 +174,6 @@ where
         // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn
         let tickets_to_agg = self
             .db
-            .write()
-            .await
             .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;
 
@@ -228,7 +228,7 @@ where
 #[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbTicketOperations + HoprDbChannelOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + Sync + 'static,
     T: Send + Sync,
     U: Send + Sync,
@@ -236,7 +236,7 @@ where
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 
-        let channel = match self.db.read().await.get_channel(&channel_id).await? {
+        let channel = match self.db.get_channel_by_id(None, channel_id).await? {
             Some(channel) => channel,
             None => {
                 error!("encountered {ack} in a non-existing channel!");
@@ -244,7 +244,7 @@ where
             }
         };
 
-        let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(channel)).await?;
+        let ack_tickets_in_db = self.db.get_tickets(None, (&channel).into()).await?;
 
         let mut aggregatable_tickets = 0;
         let mut unredeemed_value = Balance::zero(BalanceType::HOPR);
@@ -359,7 +359,6 @@ mod tests {
     use async_trait::async_trait;
     use chain_actions::action_queue::PendingAction;
     use chain_actions::redeem::TicketRedeemActions;
-    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
     };
@@ -375,7 +374,6 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
-    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![

@@ -355,6 +355,8 @@ impl HoprDbInfoOperations for HoprDb {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     use crate::db::HoprDb;
@@ -367,7 +369,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_get_balance() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert_eq!(
             BalanceType::HOPR.zero(),
@@ -387,7 +389,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_get_allowance() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert_eq!(
             BalanceType::HOPR.zero(),
@@ -407,7 +409,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_get_safe_info() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert_eq!(None, db.get_safe_info(None).await.unwrap());
 
@@ -423,7 +425,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_last_indexed_block() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert_eq!(0, db.get_chain_data(None).await.unwrap().last_indexed_block);
 
@@ -435,7 +437,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_get_global_setting() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let key = "test";
         let value = hex!("deadbeef");

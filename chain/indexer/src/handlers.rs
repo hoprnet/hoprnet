@@ -723,7 +723,7 @@ pub mod tests {
     }
 
     async fn create_db() -> HoprDb {
-        HoprDb::new_in_memory().await
+        HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {

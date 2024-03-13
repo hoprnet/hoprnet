@@ -252,7 +252,7 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -329,7 +329,7 @@ mod tests {
 
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -376,7 +376,7 @@ mod tests {
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -420,7 +420,7 @@ mod tests {
     async fn test_open_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -476,7 +476,7 @@ mod tests {
 
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -522,7 +522,7 @@ mod tests {
 
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -570,7 +570,7 @@ mod tests {
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -644,7 +644,7 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -690,7 +690,7 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -745,7 +745,7 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -791,7 +791,7 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -840,7 +840,7 @@ mod tests {
 
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -960,7 +960,7 @@ mod tests {
 
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1042,7 +1042,7 @@ mod tests {
             U256::zero(),
         );
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1091,7 +1091,7 @@ mod tests {
     async fn test_should_not_close_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -1141,7 +1141,7 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
         db.begin_transaction()
             .await

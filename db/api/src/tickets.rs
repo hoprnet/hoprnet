@@ -134,24 +134,16 @@ impl From<TicketSelector> for SimpleExpr {
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
-    async fn get_tickets<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        selector: TicketSelector,
-        // To be removed with https://github.com/hoprnet/hoprnet/pull/6018
-        chain_keypair: &ChainKeypair,
-    ) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize>;
 
     async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
 
-    // TODO: join these two methods into a single one once https://github.com/hoprnet/hoprnet/pull/6018 is merge (ChainKeypair will not be needed)
     async fn update_ticket_states_and_fetch<'a>(
         &'a self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-        chain_keypair: &'a ChainKeypair,
     ) -> Result<BoxStream<'a, AcknowledgedTicket>>;
 
     async fn update_ticket_states(&self, selector: TicketSelector, new_state: AcknowledgedTicketStatus) -> Result<()>;
@@ -207,19 +199,14 @@ pub struct AllTicketStatistics {
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
-    async fn get_tickets<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        selector: TicketSelector,
-        chain_keypair: &ChainKeypair,
-    ) -> Result<Vec<AcknowledgedTicket>> {
+    async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
         let channel_dst = self
             .get_chain_data(tx)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
 
-        let ckp = chain_keypair.clone();
+        let ckp = self.chain_key.clone();
         self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
@@ -329,7 +316,6 @@ impl HoprDbTicketOperations for HoprDb {
         &'a self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-        chain_keypair: &'a ChainKeypair,
     ) -> Result<BoxStream<'a, AcknowledgedTicket>> {
         let channel_dst = self
             .get_chain_data(None)
@@ -357,7 +343,7 @@ impl HoprDbTicketOperations for HoprDb {
                             }
                         }
 
-                        match model_to_acknowledged_ticket(&ticket, channel_dst, &chain_keypair) {
+                        match model_to_acknowledged_ticket(&ticket, channel_dst, &self.chain_key) {
                             Ok(mut ticket) => {
                                 // Update the state manually, since we do not want to re-fetch the model after the update
                                 ticket.status = new_state;
@@ -996,7 +982,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_insert_get_ticket() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await
             .unwrap();
@@ -1012,10 +998,11 @@ mod tests {
         );
 
         let db_ticket = db
-            .get_tickets(None, (&ack_ticket).into(), &ALICE)
+            .get_tickets(None, (&ack_ticket).into())
             .await
             .expect("should get ticket")
             .first()
+            .cloned()
             .expect("ticket should exist");
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
@@ -1023,7 +1010,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_redeemed() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         const COUNT_TICKETS: u64 = 10;
 
         let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await;
@@ -1086,7 +1073,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_redeem_should_not_mark_redeem_twice() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
@@ -1099,7 +1086,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_redeem_should_redeem_all_tickets() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         let count_tickets = 10;
         let channel = init_db_with_tickets(&db, count_tickets).await.0;
@@ -1113,7 +1100,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_mark_tickets_neglected() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         const COUNT_TICKETS: u64 = 10;
 
         let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await;
@@ -1159,7 +1146,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_update_tickets_states_and_fetch() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await
             .unwrap();
@@ -1170,7 +1157,7 @@ mod tests {
         selector.index = Some(5);
 
         let v: Vec<AcknowledgedTicket> = db
-            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE)
+            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await
             .expect("must create stream")
             .collect()
@@ -1187,7 +1174,7 @@ mod tests {
         selector.state = Some(AcknowledgedTicketStatus::Untouched);
 
         let v: Vec<AcknowledgedTicket> = db
-            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE)
+            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await
             .expect("must create stream")
             .collect()
@@ -1206,7 +1193,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_update_tickets_states() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await
             .unwrap();
@@ -1220,7 +1207,7 @@ mod tests {
             .unwrap();
 
         let v: Vec<AcknowledgedTicket> = db
-            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE)
+            .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await
             .expect("must create stream")
             .collect()

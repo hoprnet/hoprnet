@@ -186,7 +186,7 @@ async fn start_node_chain_logic(
         chain_key.public().to_address(),
     )));
 
-    let new_db = HoprDb::new_in_memory().await;
+    let new_db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(

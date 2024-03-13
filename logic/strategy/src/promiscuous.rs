@@ -165,10 +165,8 @@ pub struct PromiscuousStrategy<Db, A, T>
 where
     Db: HoprDbChannelOperations + HoprDbResolverOperations + Clone,
     A: ChannelActions,
-    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     db: Db,
-    network: Arc<Network<T>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
@@ -183,7 +181,6 @@ where
     pub fn new(cfg: PromiscuousStrategyConfig, db: Db, network: Arc<Network<T>>, chain_actions: A) -> Self {
         Self {
             db,
-            network,
             chain_actions,
             sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
@@ -655,13 +652,13 @@ mod tests {
     async fn test_promiscuous_strategy_tick_decisions() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let network = Arc::new(Network::new(
             PEERS[0].1,
             vec![],
             NetworkConfig::default(),
-            hopr_db_api::db::HoprDb::new_in_memory().await,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         ));
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];

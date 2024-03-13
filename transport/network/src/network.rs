@@ -420,7 +420,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
@@ -441,7 +441,12 @@ mod tests {
     async fn basic_network(my_id: &PeerId) -> Network<hopr_db_api::db::HoprDb> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(*my_id, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await)
+        Network::new(
+            *my_id,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        )
     }
 
     #[test]
@@ -766,7 +771,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -787,7 +797,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -814,7 +829,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -841,7 +861,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory().await,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();

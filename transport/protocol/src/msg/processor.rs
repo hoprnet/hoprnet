@@ -586,7 +586,7 @@ mod tests {
     }
 
     async fn create_dbs(amount: usize) -> Vec<HoprDb> {
-        futures::future::join_all((0..amount).map(|_| HoprDb::new_in_memory())).await
+        futures::future::join_all((0..amount).map(|_| HoprDb::new_in_memory(ChainKeypair::random()))).await
     }
 
     async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> crate::errors::Result<()> {

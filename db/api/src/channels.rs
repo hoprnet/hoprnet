@@ -121,13 +121,15 @@ impl HoprDbChannelOperations for HoprDb {
 mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::channels::ChannelStatus;
-    use hopr_internal_types::prelude::ChannelEntry;
+    use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     #[async_std::test]
     async fn test_insert_get() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let ce = ChannelEntry::new(
             Address::default(),
@@ -150,19 +152,21 @@ mod tests {
 
     #[async_std::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let from_db = db
-            .get_channel_to(None, Address::default())
+            .get_channels_via(None, ChannelDirection::Incoming, Address::default())
             .await
-            .expect("db should not fail");
+            .expect("db should not fail")
+            .first()
+            .cloned();
 
         assert_eq!(None, from_db, "should return None");
     }
 
     #[async_std::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let expected_destination = Address::default();
 
@@ -177,9 +181,11 @@ mod tests {
 
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
-            .get_channel_to(None, Address::default())
+            .get_channels_via(None, ChannelDirection::Incoming, Address::default())
             .await
-            .expect("db should not fail");
+            .expect("db should not fail")
+            .first()
+            .cloned();
 
         assert_eq!(Some(ce), from_db, "should return a valid channel");
     }
