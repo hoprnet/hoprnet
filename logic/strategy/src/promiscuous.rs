@@ -31,7 +31,7 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use core_network::network::Network;
 use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use hopr_crypto_random::OsRng;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::errors::DbError;
@@ -46,7 +46,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use validator::Validate;
 use hopr_db_api::HoprDbAllOperations;
-use hopr_db_api::peers::HoprDbPeersOperations;
+use hopr_db_api::peers::{HoprDbPeersOperations, PeerSelector};
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -163,7 +163,7 @@ pub struct PromiscuousStrategyConfig {
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy<Db, A, T>
+pub struct PromiscuousStrategy<Db, A>
 where
     Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
@@ -205,52 +205,48 @@ where
         }
     }
 
-    async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        self.db.
+    async fn get_peers_with_quality(&self) -> Result<HashMap<Address, f64>> {
+        Ok(
+            self.db.get_network_peers(PeerSelector::default(), false)
+                .await?
+                .filter_map(|status| async move {
+                    // Check if peer reports any version
+                    if let Some(version) = status
+                        .peer_version
+                        .clone()
+                        .and_then(|v| semver::Version::from_str(&v).ok())
+                    {
+                        // Check if the reported version matches the version semver expression
+                        if self.cfg.minimum_peer_version.matches(&version) {
+                            if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
+                                // Resolve peer's chain key and average quality
+                                if let Some(addr) = self
+                                        .db
+                                        .resolve_chain_key(&offchain_key)
+                                        .await
+                                        .and_then(|addr| addr.ok_or(DbError::MissingAccount)) {
+                                    Some((addr, status.get_average_quality()))
+                                } else {
+                                    error!("could not find on-chain address for {k_clone}");
+                                    None
+                                }
+                            } else {
+                                error!("encountered invalid peer id: {}", status.id);
+                                None
+                            }
+                        } else {
+                            debug!("version of peer {} reports non-matching version {version}", status.id);
+                            None
+                        }
+                    } else {
+                        error!("cannot get version for peer id: {}", status.id);
+                        None
+                    }
+                })
+                .collect()
+                .await
+        )
 
-        self.network
-            .peer_filter(|status| async move {
-                match status
-                    .peer_version
-                    .clone()
-                    .and_then(|v| semver::Version::from_str(&v).ok())
-                {
-                    Some(v) => self.cfg.minimum_peer_version.matches(&v).then_some(status),
-                    None => {
-                        debug!("peer {} has invalid or missing version info", status.id);
-                        None
-                    }
-                }
-            })
-            .await
-            .unwrap_or(vec![])
-            .into_iter()
-            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
-                Ok(offchain_key) => Some((offchain_key, status.get_average_quality())),
-                Err(_) => {
-                    error!("encountered invalid peer id: {}", status.id);
-                    None
-                }
-            })
-            .map(|(key, q)| async move {
-                let k_clone = key;
-                match self
-                    .db
-                    .resolve_chain_key(&k_clone)
-                    .await
-                    .and_then(|addr| addr.ok_or(DbError::MissingAccount))
-                {
-                    Ok(addr) => Some((addr, q)),
-                    Err(_) => {
-                        error!("could not find on-chain address for {k_clone}");
-                        None
-                    }
-                }
-            })
-            .collect::<FuturesUnordered<_>>()
-            .filter_map(futures::future::ready)
-            .collect::<HashMap<_, _>>()
-            .await
     }
 
     async fn collect_tick_decision(&self) -> Result<ChannelDecision> {
@@ -267,7 +263,7 @@ where
         debug!("tracking {} open outgoing channels", outgoing_open_channels.len());
 
         // Check if we have enough network size samples before proceeding quality-based evaluation
-        let peers_with_quality = self.get_peers_with_quality().await;
+        let peers_with_quality = self.get_peers_with_quality().await?;
         let current_average_network_size =
             match self.sample_size_and_evaluate_avg(peers_with_quality.len() as u32).await {
                 Some(avg) => avg,
@@ -388,22 +384,20 @@ where
     }
 }
 
-impl<Db, A, T> Debug for PromiscuousStrategy<Db, A, T>
+impl<Db, A> Debug for PromiscuousStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
-    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Promiscuous(self.cfg.clone()))
     }
 }
 
-impl<Db, A, T> Display for PromiscuousStrategy<Db, A, T>
+impl<Db, A> Display for PromiscuousStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone,
+    Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
-    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Promiscuous(self.cfg.clone()))
@@ -411,11 +405,10 @@ where
 }
 
 #[async_trait]
-impl<Db, A, T> SingularStrategy for PromiscuousStrategy<Db, A, T>
+impl<Db, A> SingularStrategy for PromiscuousStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbAllOperations + Clone + Send + Sync,
     A: ChannelActions + Send + Sync,
-    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
@@ -474,11 +467,10 @@ where
 mod tests {
     use super::*;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use core_network::{
-        network::{NetworkConfig, PeerOrigin},
+        network::PeerOrigin,
         PeerId,
     };
     use futures::{future::ok, FutureExt};
@@ -488,10 +480,8 @@ mod tests {
     use hopr_db_api::accounts::HoprDbAccountOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::HoprDbGeneralModelOperations;
-    use hopr_platform::time::native::current_time;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
         static ref PEERS: [(Address, PeerId); 10] = [
@@ -571,32 +561,21 @@ mod tests {
         channel
     }
 
-    async fn prepare_network<T>(network: Arc<Network<T>>, qualities: Vec<f64>)
-    where
-        T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    async fn prepare_network(db: HoprDb, qualities: Vec<f64>)
     {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
-        let net = network;
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
-            net.add(peer, PeerOrigin::Initialization, vec![]).await.unwrap();
+            db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.0, 10).await.unwrap();
 
-            while net.get(peer).await.unwrap().unwrap().get_average_quality() < quality {
-                net.update(
-                    peer,
-                    Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                    Some("2.0.0".into()),
-                )
-                .await
-                .expect("no errors should occur");
+            let mut status = db.get_network_peer(peer).await.unwrap().unwrap();
+            status.peer_version = Some("2.0.0".into());
+            while status.get_average_quality() < quality {
+                status.update_quality(quality);
             }
-            debug!(
-                "peer {peer} ({}) has avg quality: {}",
-                PEERS[i + 1].0,
-                net.get(peer).await.unwrap().unwrap().get_average_quality()
-            );
+            db.update_network_peer(status).await.unwrap();
         }
     }
 
@@ -657,33 +636,21 @@ mod tests {
 
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        let network = Arc::new(Network::new(
-            PEERS[0].1,
-            vec![],
-            NetworkConfig::default(),
-            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
-        ));
-
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
         let balance = Balance::new_from_str("100000000000000000000", BalanceType::HOPR);
 
         init_db(db.clone(), balance).await;
-        prepare_network(network.clone(), qualities_that_alice_sees).await;
+        prepare_network(db.clone(), qualities_that_alice_sees).await;
 
         mock_channel(db.clone(), PEERS[1].0, balance).await;
         mock_channel(db.clone(), PEERS[2].0, balance).await;
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         // Peer 10 has an old node version
-        network
-            .update(
-                &PEERS[9].1,
-                Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                Some("1.92.0".into()),
-            )
-            .await
-            .expect("no errors should occur");
+        let mut status_10 = db.get_network_peer(&PEERS[9].1).await.unwrap().unwrap();
+        status_10.peer_version = Some("1.92.0".into());
+        db.update_network_peer(status_10).await.unwrap();
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels
@@ -713,7 +680,7 @@ mod tests {
             .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
-        let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, network, actions);
+        let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
 
         for _ in 0..strat_cfg.min_network_size_samples - 1 {
             strat
