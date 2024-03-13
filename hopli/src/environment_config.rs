@@ -312,7 +312,7 @@ mod tests {
         let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
         let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
 
-        let mut anvil = ethers::utils::Anvil::new().path(workspace_dir.join(".foundry/bin/anvil"));
+        let mut anvil = ethers::utils::Anvil::new();
 
         if !default {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
