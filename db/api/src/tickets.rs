@@ -387,7 +387,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .await?;
 
         let tickets = self
-            .nest_transaction_in_db(None, TargetDb::Index)
+            .nest_transaction_in_db(None, TargetDb::Tickets)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
