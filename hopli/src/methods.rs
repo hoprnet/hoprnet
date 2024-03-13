@@ -107,7 +107,7 @@ impl MultisendTransaction {
     fn build_multisend_tx(transactions: Vec<MultisendTransaction>) -> Vec<u8> {
         let mut payload: Vec<u8> = Vec::new();
         for transaction in transactions {
-            payload = vec![payload, transaction.encode_packed()].concat();
+            payload = [payload, transaction.encode_packed()].concat();
         }
         debug!("payload {:?}", hex::encode(&payload));
         payload
@@ -161,7 +161,7 @@ fn get_safe_transaction_hash(
     .unwrap();
 
     let transaction_hash = keccak256(encoded_transaction_data);
-    debug!("transaction_hash {:?}", hex::encode(&transaction_hash));
+    debug!("transaction_hash {:?}", hex::encode(transaction_hash));
     transaction_hash
 }
 
@@ -212,7 +212,7 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<M: Middleware>(
 
     // sign the transaction
     let signature = wallet.sign_hash(transaction_hash.into()).unwrap();
-    debug!("signature {:?}", hex::encode(&signature.to_vec()));
+    debug!("signature {:?}", hex::encode(signature.to_vec()));
 
     // execute the transaction
     let tx = safe
@@ -275,7 +275,7 @@ pub async fn send_safe_transaction_with_threshold_one<M: Middleware>(
 
     // sign the transaction
     let signature = wallet.sign_hash(transaction_hash.into()).unwrap();
-    debug!("signature {:?}", hex::encode(&signature.to_vec()));
+    debug!("signature {:?}", hex::encode(signature.to_vec()));
 
     // execute the transaction
     let tx = safe
@@ -485,7 +485,7 @@ pub async fn transfer_or_mint_tokens<M: Middleware>(
             if amounts[i].gt(&U256::zero()) {
                 multicall.add_call(
                     hopr_token
-                        .method::<_, bool>("transferFrom", (caller.clone(), address.clone(), amounts[i]))
+                        .method::<_, bool>("transferFrom", (caller, *address, amounts[i]))
                         .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
                     false,
                 );
@@ -522,9 +522,9 @@ pub async fn transfer_native_tokens<M: Middleware>(
         .iter()
         .enumerate()
         .map(|(i, addr)| Call3Value {
-            target: addr.clone(),
+            target: *addr,
             allow_failure: false,
-            value: amounts[i].into(),
+            value: amounts[i],
             call_data: Bytes::default(),
         })
         .collect();
@@ -756,7 +756,7 @@ pub fn predict_safe_address(
     .encode();
 
     let safe_salt = get_salt_from_salt_nonce(initializer, U256::from(nonce));
-    debug!("safe_salt {:?}", hex::encode(safe_salt.clone()));
+    debug!("safe_salt {:?}", hex::encode(safe_salt));
 
     let predict_safe_addr = deploy_proxy(safe_singleton, safe_salt, safe_factory);
     debug!("predict_safe_addr {:?}", hex::encode(predict_safe_addr));
@@ -771,7 +771,7 @@ fn get_salt_from_salt_nonce(initializer: Vec<u8>, salt_nonce: U256) -> [u8; 32] 
     keccak256(
         ethers::abi::encode_packed(&[
             ethers::abi::Token::Bytes(hashed_initializer.into()),
-            ethers::abi::Token::Uint(salt_nonce.into()),
+            ethers::abi::Token::Uint(salt_nonce),
         ])
         .unwrap(),
     )
@@ -922,8 +922,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     );
     info!("predicted safe address {:?}", safe_address);
 
-    let deployed_module = HoprNodeManagementModule::new(module_address.clone(), provider.clone());
-    let deployed_safe = SafeSingleton::new(safe_address.clone(), provider.clone());
+    let deployed_module = HoprNodeManagementModule::new(module_address, provider.clone());
+    let deployed_safe = SafeSingleton::new(safe_address, provider.clone());
 
     // Use multicall to deploy a safe proxy instance and a module proxy instance with multicall as an owner
     multicall.add_call(
@@ -954,8 +954,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     multicall = prepare_safe_tx_from_owner_contract(
         multicall.clone(),
         deployed_safe.clone(),
-        module_address.clone(),
-        caller.clone(),
+        module_address,
+        caller,
         scope_announcement_tx_payload,
     )
     .unwrap();
@@ -972,7 +972,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         multicall.clone(),
         deployed_safe.clone(),
         hopr_token_address,
-        caller.clone(),
+        caller,
         approve_tx_payload,
     )
     .unwrap();
@@ -989,8 +989,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
             multicall = prepare_safe_tx_from_owner_contract(
                 multicall.clone(),
                 deployed_safe.clone(),
-                module_address.clone(),
-                caller.clone(),
+                module_address,
+                caller,
                 include_node_tx_payload,
             )
             .unwrap();
@@ -1011,8 +1011,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     multicall = prepare_safe_tx_from_owner_contract(
         multicall.clone(),
         deployed_safe.clone(),
-        safe_address.clone(),
-        caller.clone(),
+        safe_address,
+        caller,
         remove_owner_tx_payload,
     )
     .unwrap();
@@ -1077,29 +1077,30 @@ pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M: 
             let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
 
             // for each safe, prepare a multisend transaction to dergister node from safe and remove node from module
-            let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
-            multisend_txns.push(MultisendTransaction {
-                // build multisend tx payload
-                encoded_data: DeregisterNodeBySafeCall {
-                    node_addr: node_addresses[i],
-                }
-                .encode()
-                .into(),
-                tx_operation: SafeTxOperation::Call,
-                to: node_safe_registry.address(),
-                value: U256::zero(),
-            });
-            multisend_txns.push(MultisendTransaction {
-                // build multisend tx payload
-                encoded_data: RemoveNodeCall {
-                    node_address: node_addresses[i],
-                }
-                .encode()
-                .into(),
-                tx_operation: SafeTxOperation::Call,
-                to: module_addresses[i],
-                value: U256::zero(),
-            });
+            let multisend_txns: Vec<MultisendTransaction> = vec![
+                MultisendTransaction {
+                    // build multisend tx payload
+                    encoded_data: DeregisterNodeBySafeCall {
+                        node_addr: node_addresses[i],
+                    }
+                    .encode()
+                    .into(),
+                    tx_operation: SafeTxOperation::Call,
+                    to: node_safe_registry.address(),
+                    value: U256::zero(),
+                },
+                MultisendTransaction {
+                    // build multisend tx payload
+                    encoded_data: RemoveNodeCall {
+                        node_address: node_addresses[i],
+                    }
+                    .encode()
+                    .into(),
+                    tx_operation: SafeTxOperation::Call,
+                    to: module_addresses[i],
+                    value: U256::zero(),
+                },
+            ];
 
             // send safe transaction
             send_multisend_safe_transaction_with_threshold_one(
@@ -1139,7 +1140,7 @@ pub async fn include_nodes_to_module<M: Middleware>(
             .encode()
             .into(),
             tx_operation: SafeTxOperation::Call,
-            to: module_address.clone(),
+            to: module_address,
             value: U256::zero(),
         });
     }

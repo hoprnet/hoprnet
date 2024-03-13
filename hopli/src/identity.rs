@@ -84,7 +84,6 @@ impl IdentitySubcommands {
 
         let node_addresses: Vec<Address> = node_identities
             .values()
-            .into_iter()
             .map(|n| n.chain_key.public().to_address())
             .collect();
 
