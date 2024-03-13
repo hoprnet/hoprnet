@@ -324,8 +324,7 @@ where
 
             let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
 
-            let selector = TicketSelector::from(channel)
-                .with_state(AcknowledgedTicketStatus::Untouched);
+            let selector = TicketSelector::from(channel).with_state(AcknowledgedTicketStatus::Untouched);
 
             let mut aggregatable_tickets = 0;
 

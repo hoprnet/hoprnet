@@ -1199,8 +1199,7 @@ mod tests {
             "status must be set"
         );
 
-        let selector = TicketSelector::from(&channel)
-            .with_state(AcknowledgedTicketStatus::Untouched);
+        let selector = TicketSelector::from(&channel).with_state(AcknowledgedTicketStatus::Untouched);
 
         let v: Vec<AcknowledgedTicket> = db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
@@ -1228,8 +1227,7 @@ mod tests {
             .unwrap();
 
         let channel = init_db_with_tickets(&db, 10).await.0;
-        let selector = TicketSelector::from(&channel)
-            .with_state(AcknowledgedTicketStatus::Untouched);
+        let selector = TicketSelector::from(&channel).with_state(AcknowledgedTicketStatus::Untouched);
 
         db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await

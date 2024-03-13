@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use validator::Validate;
-use hopr_db_api::channels::HoprDbChannelOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
