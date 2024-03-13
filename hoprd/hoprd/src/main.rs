@@ -51,7 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .tracing()
             .with_exporter(
                 opentelemetry_otlp::new_exporter()
-                    .http()
+                    .tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                     .with_timeout(std::time::Duration::from_secs(5))
                     .with_endpoint(telemetry_url),
             )
