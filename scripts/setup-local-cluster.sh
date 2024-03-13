@@ -189,8 +189,7 @@ function generate_local_identities() {
   find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id"  -exec rm {} \; || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
-    hopli identity \
-    --action create \
+    hopli identity create \
     --identity-directory "${tmp_dir}" \
     --identity-prefix "${node_prefix}_" \
     --number "${cluster_size}"
@@ -205,20 +204,21 @@ function create_local_safes() {
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
-    # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
+    # store the returned `safe <safe_address> \n node_module <module_address>` to `safe_i.log` for each id
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${password}" \
       PRIVATE_KEY="${deployer_private_key}" \
-      DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
-      hopli create-safe-module \
+      MANAGER_PRIVATE_KEY="${deployer_private_key}" \
+      hopli safe-module create \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
+        --hopr-amount 1000 --native-amount 1 \
         --contracts-root "./ethereum/contracts" > "${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
-    grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
+    grep -oE "(.*)" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
     rm "${id_file%.id}.safe.log"
   done
 }
@@ -231,22 +231,23 @@ function create_local_safe_for_multi_nodes() {
   mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create one safe for all the nodes
-  # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `${node_prefix}_all_nodes.safe.log`
+  # store the returned `safe <safe_address> \n node_module <module_address>` to `${node_prefix}_all_nodes.safe.log`
   # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
   env \
     ETHERSCAN_API_KEY="" \
     IDENTITY_PASSWORD="${password}" \
     PRIVATE_KEY="${deployer_private_key}" \
-    DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
-    hopli create-safe-module \
+    MANAGER_PRIVATE_KEY="${deployer_private_key}" \
+    hopli safe-module create \
       --network anvil-localhost \
       --identity-directory "${tmp_dir}" \
       --identity-prefix "${node_prefix}" \
+      --hopr-amount 1000 --native-amount 1 \
       --contracts-root "./ethereum/contracts" > "${node_prefix}_all_nodes.safe.log"
 
   # store safe arguments in separate file for later use (as in `create_local_safes` function)
   for id_file in ${id_files[@]}; do
-    grep -oE "\--safeAddress.*--moduleAddress.*" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
+    grep -oE "(.*)" "${node_prefix}_all_nodes.safe.log" > "${id_file%.id}.safe.args"
   done
   rm "${node_prefix}_all_nodes.safe.log"
 }

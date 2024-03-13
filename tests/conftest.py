@@ -304,7 +304,7 @@ async def swarm7(request):
     safe_custom_env: dict = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
-        "DEPLOYER_PRIVATE_KEY": private_key,
+        "MANAGER_PRIVATE_KEY": private_key,
         "PRIVATE_KEY": private_key,
         "PATH": os.environ["PATH"],
     }

@@ -149,8 +149,7 @@ create-local-identity: id_count=1
 create-local-identity: ## run HOPRd from local repo
 	if [ ! -f "${id_dir}${id_prefix}0.id" ]; then \
 		ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" \
-		hopli identity \
-		--action create \
+		hopli identity create \
 		--identity-directory "${id_dir}" \
 		--identity-prefix "${id_prefix}" \
 		--number ${id_count}; \
@@ -194,24 +193,26 @@ fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
-		--identity-directory "${id_dir}" \
-		--contracts-root "./ethereum/contracts"
+		--identity-directory "${id_dir}"
 
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local
 create-safe-module-all: id_prefix=
 create-safe-module-all: ## create a safe and a module and add all the nodes from local identities to the module
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli create-safe-module \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli safe-module create \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
-		--contracts-root "./ethereum/contracts"
+		--hopr-amount 1000 --native-amount 1 \
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: create-safe-module
 create-safe-module: id_password=local
@@ -219,12 +220,13 @@ create-safe-module: id_path=/tmp/local-alice.id
 create-safe-module: hopr_amount=10
 create-safe-module: native_amount=1
 create-safe-module: ## create a safe and a module, and add a node to the module
-	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli create-safe-module \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli safe-module create \
 		--network anvil-localhost \
+		--contracts-root "./ethereum/contracts" \
 		--identity-from-path "${id_path}" \
 		--hopr-amount ${hopr_amount} --native-amount ${native_amount} \
-		--contracts-root "./ethereum/contracts"
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: deploy-safe-module
 deploy-safe-module: id_password=local
@@ -235,10 +237,11 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY="${PRIVATE_KEY}" \
-		hopli create-safe-module \
+		hopli safe-module create \
 		--network "${network}" \
 		--identity-from-path "${id_path}" \
-		--contracts-root "./ethereum/contracts"
+		--contracts-root "./ethereum/contracts" \
+		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
