@@ -1,9 +1,9 @@
+use async_stream::stream;
 use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::SystemTime;
-use async_stream::stream;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -23,11 +23,11 @@ use hopr_primitive_types::prelude::*;
 
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
+use crate::errors::DbError::LogicalError;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
-use crate::errors::DbError::LogicalError;
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
@@ -105,7 +105,8 @@ impl From<&ChannelEntry> for TicketSelector {
 
 impl From<TicketSelector> for SimpleExpr {
     fn from(value: TicketSelector) -> Self {
-        let mut expr = ticket::Column::ChannelId.eq(value.channel_id.to_hex())
+        let mut expr = ticket::Column::ChannelId
+            .eq(value.channel_id.to_hex())
             .and(ticket::Column::ChannelEpoch.eq(value.epoch.to_be_bytes().to_vec()));
 
         if let Some(index) = value.index {
@@ -124,6 +125,8 @@ impl From<TicketSelector> for SimpleExpr {
     }
 }
 
+pub struct RunningAggregation {}
+
 #[async_trait]
 pub trait HoprDbTicketOperations {
     async fn get_ticket<'a>(
@@ -139,7 +142,12 @@ pub trait HoprDbTicketOperations {
     async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
 
     // Remove ChainKeypair once https://github.com/hoprnet/hoprnet/pull/6018 is merged
-    async fn update_ticket_states<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>>;
+    async fn update_ticket_states<'a>(
+        &'a self,
+        selector: TicketSelector,
+        new_state: AcknowledgedTicketStatus,
+        chain_keypair: &'a ChainKeypair,
+    ) -> Result<BoxStream<'a, AcknowledgedTicket>>;
 
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
@@ -148,6 +156,8 @@ pub trait HoprDbTicketOperations {
     async fn invalidate_cached_ticket_index(&self, channel_id: &Hash);
 
     async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
+
+    async fn aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<Option<RunningAggregation>>;
 
     /// Processes the acknowledgements for the pending tickets
     ///
@@ -198,9 +208,13 @@ impl HoprDbTicketOperations for HoprDb {
         selector: TicketSelector,
         chain_keypair: &ChainKeypair,
     ) -> Result<Option<AcknowledgedTicket>> {
-        assert!(selector.index.is_some(), "ticket index must be specified in the selector to fetch a single ticket");
+        assert!(
+            selector.index.is_some(),
+            "ticket index must be specified in the selector to fetch a single ticket"
+        );
 
-        let channel_dst = self.get_chain_data(tx)
+        let channel_dst = self
+            .get_chain_data(tx)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
@@ -263,7 +277,7 @@ impl HoprDbTicketOperations for HoprDb {
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {redeemed_count} ticket as redeemed"
-                            )))
+                            )));
                         }
                     }
 
@@ -300,13 +314,14 @@ impl HoprDbTicketOperations for HoprDb {
 
                             let mut active_stats = stats.into_active_model();
                             active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count as i32);
-                            active_stats.neglected_value =
-                                Set((current_neglected_value + neglectable_value.amount()).to_be_bytes().into());
+                            active_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
+                                .to_be_bytes()
+                                .into());
                             active_stats.save(tx.as_ref()).await?;
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {neglectable_count} ticket as neglected"
-                            )))
+                            )));
                         }
                     }
 
@@ -316,8 +331,18 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn update_ticket_states<'a>(&'a self, selector: TicketSelector, new_state: AcknowledgedTicketStatus, chain_keypair: &'a ChainKeypair) -> Result<BoxStream<'a, AcknowledgedTicket>> {
-        let channel_dst = self.get_chain_data(None)
+    async fn aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<Option<RunningAggregation>> {
+        Ok(None)
+    }
+
+    async fn update_ticket_states<'a>(
+        &'a self,
+        selector: TicketSelector,
+        new_state: AcknowledgedTicketStatus,
+        chain_keypair: &'a ChainKeypair,
+    ) -> Result<BoxStream<'a, AcknowledgedTicket>> {
+        let channel_dst = self
+            .get_chain_data(None)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
@@ -397,20 +422,23 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
-        Ok(self.nest_transaction_in_db(tx, TargetDb::Tickets)
+        Ok(self
+            .nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
-            .perform(|tx| Box::pin(async move {
-                ticket::Entity::find()
-                    .filter(SimpleExpr::from(selector))
-                    .stream(tx.as_ref())
-                    .await
-                    .map_err(DbError::from)?
-                    .map_err(DbError::from)
-                    .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
-                        Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
-                    })
-                    .await
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    ticket::Entity::find()
+                        .filter(SimpleExpr::from(selector))
+                        .stream(tx.as_ref())
+                        .await
+                        .map_err(DbError::from)?
+                        .map_err(DbError::from)
+                        .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
+                            Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
+                        })
+                        .await
+                })
+            })
             .await?)
     }
 
@@ -882,9 +910,9 @@ mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::errors::DbError;
+    use crate::info::{DomainSeparator, HoprDbInfoOperations};
     use crate::tickets::{HoprDbTicketOperations, TicketSelector};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use crate::info::{DomainSeparator, HoprDbInfoOperations};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -954,11 +982,12 @@ mod tests {
         (channel, tickets)
     }
 
-
     #[async_std::test]
     async fn test_insert_get_ticket() {
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await
+            .unwrap();
 
         let (channel, mut tickets) = init_db_with_tickets(&db, 1).await;
         let ack_ticket = tickets.pop().unwrap();
@@ -971,11 +1000,7 @@ mod tests {
         );
 
         let db_ticket = db
-            .get_ticket(
-                None,
-                (&ack_ticket).into(),
-                &ALICE,
-            )
+            .get_ticket(None, (&ack_ticket).into(), &ALICE)
             .await
             .expect("should get ticket")
             .expect("ticket should exist");
@@ -1053,9 +1078,10 @@ mod tests {
         let ticket = init_db_with_tickets(&db, 1).await.1.pop().unwrap();
 
         db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail");
-        assert_eq!(0, db.mark_tickets_redeemed((&ticket).into())
-            .await
-            .expect("must not fail"));
+        assert_eq!(
+            0,
+            db.mark_tickets_redeemed((&ticket).into()).await.expect("must not fail")
+        );
     }
 
     #[async_std::test]
@@ -1065,7 +1091,10 @@ mod tests {
         let count_tickets = 10;
         let channel = init_db_with_tickets(&db, count_tickets).await.0;
 
-        let count_marked = db.mark_tickets_redeemed((&channel).into()).await.expect("must not fail");
+        let count_marked = db
+            .mark_tickets_redeemed((&channel).into())
+            .await
+            .expect("must not fail");
         assert_eq!(count_tickets, count_marked as u64, "must mark all tickets in channel");
     }
 
@@ -1118,32 +1147,48 @@ mod tests {
     #[async_std::test]
     async fn test_update_tickets_state() {
         let db = HoprDb::new_in_memory().await;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default()).await.unwrap();
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let channel = init_db_with_tickets(&db, 10).await.0;
 
         let mut selector: TicketSelector = (&channel).into();
         selector.index = Some(5);
 
-        let v: Vec<AcknowledgedTicket> = db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
+        let v: Vec<AcknowledgedTicket> = db
+            .update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE)
+            .await
             .expect("must create stream")
             .collect()
             .await;
 
         assert_eq!(1, v.len(), "single ticket must be updated");
-        assert_eq!(AcknowledgedTicketStatus::BeingRedeemed, v.first().unwrap().status, "status must be set");
+        assert_eq!(
+            AcknowledgedTicketStatus::BeingRedeemed,
+            v.first().unwrap().status,
+            "status must be set"
+        );
 
         let mut selector: TicketSelector = (&channel).into();
         selector.state = Some(AcknowledgedTicketStatus::Untouched);
 
-        let v: Vec<AcknowledgedTicket> = db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE).await
+        let v: Vec<AcknowledgedTicket> = db
+            .update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed, &ALICE)
+            .await
             .expect("must create stream")
             .collect()
             .await;
 
         assert_eq!(9, v.len(), "only specific tickets must have state set");
-        assert!(v.iter().all(|t| t.ticket.index != 5), "only tickets with different state must update");
-        assert!(v.iter().all(|t| t.status == AcknowledgedTicketStatus::BeingRedeemed), "tickets must have updated state");
+        assert!(
+            v.iter().all(|t| t.ticket.index != 5),
+            "only tickets with different state must update"
+        );
+        assert!(
+            v.iter().all(|t| t.status == AcknowledgedTicketStatus::BeingRedeemed),
+            "tickets must have updated state"
+        );
     }
 
     #[async_std::test]
