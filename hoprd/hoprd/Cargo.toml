@@ -34,7 +34,7 @@ tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
 opentelemetry = { version = "0.22" }
-opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "grpc-tonic"] }
+opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto"] }
 opentelemetry_sdk = { version = "0.22", features = ["rt-async-std"] }
 tracing-opentelemetry = "0.23"
 
