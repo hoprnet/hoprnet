@@ -51,7 +51,7 @@ use crate::{strategy::SingularStrategy, Strategy};
 
 use async_std::task::spawn;
 use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::{HoprDbTicketOperations, TicketSelector};
+use hopr_db_api::tickets::{HoprDbTicketOperations, RunningAggregation, TicketSelector};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -169,17 +169,18 @@ where
     Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
 {
-    async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
-        trace!("starting aggregation in {channel}");
-        // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn
-        let tickets_to_agg = self
-            .db
-            .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-            .await?;
+    async fn start_aggregation(&self, aggregation: RunningAggregation, redeem_if_failed: bool) -> crate::errors::Result<()> {
+        trace!("starting aggregation in {}", aggregation.channel_id());
 
-        info!("will aggregate {} tickets in {channel}", tickets_to_agg.len());
+        info!("will aggregate {} tickets in {}", aggregation.size(), aggregation.channel_id());
 
-        let list = AggregationList::TicketList(tickets_to_agg);
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_COUNT_AGGREGATIONS.increment();
+
+        spawn(async move {
+            let actions_clone = self.chain_actions.clone();
+
+        })
 
         match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
             Ok(mut awaiter) => {
@@ -244,6 +245,53 @@ where
             }
         };
 
+        match self.db.aggregate_tickets_in_channel(&channel_id).await {
+            Ok(Some(running_agg)) => {
+                let aggregatable_tickets = running_agg.size() as u32;
+                let unredeemed_value = running_agg.total_unaggregated_value();
+
+                let mut can_aggregate = false;
+
+                // Check the aggregation threshold
+                if let Some(agg_threshold) = self.cfg.aggregation_threshold {
+                    if aggregatable_tickets >= agg_threshold {
+                        info!("{channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
+                        can_aggregate = true;
+                    } else {
+                        debug!("{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
+                    }
+                }
+                if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
+                    let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
+
+                    // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
+                    // and there are at least two tickets
+                    if unredeemed_value.ge(&diminished_balance) {
+                        if aggregatable_tickets > 1 {
+                            info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
+                            can_aggregate = true;
+                        } else {
+                            debug!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
+                        }
+                    } else {
+                        debug!(
+                    "{channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
+                );
+                    }
+                }
+
+                if can_aggregate {
+                    self.start_aggregation()
+                }
+            }
+            Ok(None) => {
+                warn!("nothing to aggregate in channel {channel_id}");
+            }
+            Err(e) => {
+                error!("failed to aggregate tickets in channel {channel_id}: {e}");
+            }
+        }
+
         let ack_tickets_in_db = self.db.get_tickets(None, (&channel).into()).await?;
 
         let mut aggregatable_tickets = 0;
@@ -266,35 +314,6 @@ where
             }
         }
 
-        let mut can_aggregate = false;
-
-        // Check the aggregation threshold
-        if let Some(agg_threshold) = self.cfg.aggregation_threshold {
-            if aggregatable_tickets >= agg_threshold {
-                info!("{channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
-                can_aggregate = true;
-            } else {
-                debug!("{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
-            }
-        }
-        if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
-
-            // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
-            // and there are at least two tickets
-            if unredeemed_value.ge(&diminished_balance) {
-                if aggregatable_tickets > 1 {
-                    info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
-                    can_aggregate = true;
-                } else {
-                    debug!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
-                }
-            } else {
-                debug!(
-                    "{channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
-                );
-            }
-        }
 
         // Proceed with aggregation
         if can_aggregate {

@@ -45,6 +45,8 @@ use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::Arc;
 use validator::Validate;
+use hopr_db_api::HoprDbAllOperations;
+use hopr_db_api::peers::HoprDbPeersOperations;
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -163,7 +165,7 @@ pub struct PromiscuousStrategyConfig {
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy<Db, A, T>
 where
-    Db: HoprDbChannelOperations + HoprDbResolverOperations + Clone,
+    Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
 {
     db: Db,
@@ -172,13 +174,12 @@ where
     sma: RwLock<SingleSumSMA<u32>>,
 }
 
-impl<Db, A, T> PromiscuousStrategy<Db, A, T>
+impl<Db, A> PromiscuousStrategy<Db, A>
 where
-    Db: HoprDbChannelOperations + HoprDbResolverOperations + HoprDbInfoOperations + Clone,
+    Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
-    T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
 {
-    pub fn new(cfg: PromiscuousStrategyConfig, db: Db, network: Arc<Network<T>>, chain_actions: A) -> Self {
+    pub fn new(cfg: PromiscuousStrategyConfig, db: Db, chain_actions: A) -> Self {
         Self {
             db,
             chain_actions,
@@ -205,6 +206,8 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
+        self.db.
+
         self.network
             .peer_filter(|status| async move {
                 match status

@@ -164,6 +164,24 @@ impl From<TicketSelector> for SimpleExpr {
 
 pub struct RunningAggregation {}
 
+impl RunningAggregation {
+    pub fn channel_id(&self) -> Hash {
+        Default::default()
+    }
+
+    pub fn size(&self) -> usize {
+        0
+    }
+
+    pub fn total_unaggregated_value(&self) -> Balance {
+        BalanceType::HOPR.zero()
+    }
+
+    pub async fn aggregate(self) -> Result<()> {
+        unimplemented!()
+    }
+}
+
 #[async_trait]
 pub trait HoprDbTicketOperations {
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
