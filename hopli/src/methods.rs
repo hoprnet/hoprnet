@@ -1,3 +1,4 @@
+//! This module contains all the methods used for onchain interaction
 use crate::utils::{
     HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
     DOMAIN_SEPARATOR_TYPEHASH, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_EXECUTION_SUCCESS,
@@ -58,8 +59,8 @@ pub enum SafeTxOperation {
     Call,
     DelegateCall,
 }
-
 impl SafeTxOperation {
+    /// convert the SafeTxOperation to exact one byte
     pub fn to_byte(&self) -> [u8; 1] {
         match self {
             SafeTxOperation::Call => hex!("00"),
@@ -74,6 +75,7 @@ impl From<SafeTxOperation> for u8 {
     }
 }
 
+/// Struct to make a multisend transaction, mainly used by safe instances
 #[derive(Debug, Clone)]
 pub struct MultisendTransaction {
     // data paylaod encoded with selector
@@ -87,6 +89,7 @@ pub struct MultisendTransaction {
 }
 
 impl MultisendTransaction {
+    /// encode a multisend transaction
     fn encode_packed(&self) -> Vec<u8> {
         let tx_operation_bytes = self.tx_operation.to_byte();
 
@@ -104,6 +107,7 @@ impl MultisendTransaction {
         .unwrap()
     }
 
+    /// build a multisend transaction data payload
     fn build_multisend_tx(transactions: Vec<MultisendTransaction>) -> Vec<u8> {
         let mut payload: Vec<u8> = Vec::new();
         for transaction in transactions {
@@ -114,6 +118,7 @@ impl MultisendTransaction {
     }
 }
 
+/// get the domain separator of a safe instance
 /// contract_address should be safe address
 fn get_domain_separator(chain_id: U256, contract_address: Address) -> [u8; 32] {
     keccak256(ethers::abi::encode(&[
