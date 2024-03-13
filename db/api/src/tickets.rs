@@ -162,6 +162,8 @@ impl From<TicketSelector> for SimpleExpr {
     }
 }
 
+pub struct RunningAggregation {}
+
 #[async_trait]
 pub trait HoprDbTicketOperations {
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
@@ -185,6 +187,8 @@ pub trait HoprDbTicketOperations {
     async fn invalidate_cached_ticket_index(&self, channel_id: &Hash);
 
     async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
+
+    async fn aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<Option<RunningAggregation>>;
 
     /// Processes the acknowledgements for the pending tickets
     ///
@@ -340,6 +344,10 @@ impl HoprDbTicketOperations for HoprDb {
                 })
             })
             .await
+    }
+
+    async fn aggregate_tickets_in_channel(&self, channel: &Hash) -> Result<Option<RunningAggregation>> {
+        Ok(None)
     }
 
     async fn update_ticket_states_and_fetch<'a>(
