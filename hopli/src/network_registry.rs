@@ -10,7 +10,7 @@
 //! A manager account can register nodes and safes with `manager-regsiter`
 //! A manager account can deregister nodes with `manager-deregsiter`
 //! A manager account can set eligibility of staking accounts with `manager-force-sync`
-use crate::key_pair::PrivateKeyReader;
+use crate::key_pair::ArgEnvReader;
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},

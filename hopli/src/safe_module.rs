@@ -24,7 +24,7 @@
 //!     - add the Announcement contract as target to the module
 //!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
 //!     - Use the manager wallet to add nodes and Safes to the Network Registry contract of the new network.
-use crate::key_pair::{ManagerPrivateKeyArgs, PrivateKeyReader};
+use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},

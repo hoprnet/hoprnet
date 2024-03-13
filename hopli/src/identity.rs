@@ -1,12 +1,48 @@
 //! This module contains subcommands for `hopli identity`,
-//! This command can create or read identity files, providing correct [PasswordArgs]
+//! This command contains subcommands to read, create or update identity files, providing correct [key_pair::PasswordArgs]
+//!
+//! For all three actions around identity files, at least two arguments are needed:
+//! - Path to files
+//! - Password to encrypt or decrypt the file
+//! To update identity files, a new password must be provided.
+//!
+//! Some sample commands:
+//!
+//! - To read identities
+//! ```text
+//! hopli identity create \
+//!     --identity-directory "./test" \
+//!     --identity-prefix nodes_ \
+//!     --number 2 \
+//!     --password-path "./test/pwd"
+//! ```
+//!
+//! - To create identities
+//! ```text
+//! hopli identity read \
+//!     --identity-directory "./test" \
+//!     --identity-prefix node_ \
+//!     --password-path "./test/pwd"
+//! ```
+//!
+//! - To update password of identities
+//! ```text
+//!     hopli identity update \
+//!     --identity-directory "./test" \
+//!     --identity-prefix node_ \
+//!     --password-path "./test/pwd" \
+//!     --new-password-path "./test/newpwd"
+//! ```
 use clap::{builder::RangedU64ValueParser, Parser};
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_primitive_types::primitives::Address;
 use hoprd_keypair::key_pair::HoprKeys;
 use tracing::{debug, info};
 
-use crate::key_pair::{create_identity, read_identities, IdentityFileArgs};
+use crate::key_pair::{
+    create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
+    NewPasswordArgs,
+};
 use crate::utils::{Cmd, HelperErrors};
 use std::collections::HashMap;
 
@@ -38,13 +74,25 @@ pub enum IdentitySubcommands {
         #[command(flatten)]
         local_identity: IdentityFileArgs,
     },
+
+    /// Update the password of identity files
+    #[command(visible_alias = "up")]
+    Update {
+        /// Arguments to locate identity files of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+
+        /// New password
+        #[command(flatten)]
+        new_password: NewPasswordArgs,
+    },
 }
 
 impl IdentitySubcommands {
     /// Execute the command to create identities
     fn execute_identity_creation_loop(local_identity: IdentityFileArgs, number: u32) -> Result<(), HelperErrors> {
         // check if password is provided
-        let pwd = local_identity.clone().password.read()?;
+        let pwd = local_identity.clone().password.read_default()?;
 
         let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
 
@@ -73,7 +121,7 @@ impl IdentitySubcommands {
     /// Execute the command to read identities
     fn execute_identity_read_loop(local_identity: IdentityFileArgs) -> Result<(), HelperErrors> {
         // check if password is provided
-        let pwd = local_identity.clone().password.read()?;
+        let pwd = local_identity.clone().password.read_default()?;
 
         // read ids
         let files = local_identity.get_files();
@@ -91,6 +139,33 @@ impl IdentitySubcommands {
         info!("Identity addresses: {:?}", node_addresses);
         Ok(())
     }
+
+    /// update the password of an identity file
+    fn execute_identity_update(
+        local_identity: IdentityFileArgs,
+        new_password: NewPasswordArgs,
+    ) -> Result<(), HelperErrors> {
+        // check if old password is provided
+        let pwd = local_identity.clone().password.read_default()?;
+        // check if new password is provided
+        let new_pwd = new_password.read_default()?;
+
+        // read ids
+        let files = local_identity.get_files();
+        debug!("Identities read {:?}", files.len());
+
+        let _ = files
+            .iter()
+            .map(|file| {
+                read_identity(file, &pwd)
+                    .map_err(|_| HelperErrors::UnableToUpdateIdentityPassword)
+                    .and_then(|(_, keys)| update_identity_password(keys, file, &new_pwd))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        info!("Updated password for {:?} identity files", files.len());
+        Ok(())
+    }
 }
 
 impl Cmd for IdentitySubcommands {
@@ -103,6 +178,10 @@ impl Cmd for IdentitySubcommands {
             IdentitySubcommands::Read { local_identity } => {
                 IdentitySubcommands::execute_identity_read_loop(local_identity)
             }
+            IdentitySubcommands::Update {
+                local_identity,
+                new_password,
+            } => IdentitySubcommands::execute_identity_update(local_identity, new_password),
         }
     }
 

@@ -140,28 +140,15 @@ pub fn create_identity(
         .ok_or(HelperErrors::UnableToCreateIdentity)
 }
 
-pub trait PrivateKeyReader {
+pub trait ArgEnvReader<T, K> {
     /// return the wrapped key
-    fn get_key(&self) -> Option<String>;
+    fn get_key(&self) -> Option<K>;
 
-    /// Read the private key and return an address string
-    fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
-        let pri_key = if let Some(pk) = self.get_key() {
-            info!("reading private key from cli");
-            pk
-        } else {
-            info!("reading private key from env {:?}", default_env_name);
-            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
-        };
-
-        // TODO:
-        info!("To validate the private key");
-
-        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
-    }
+    /// Try to read the value from the cli param (given by the key), or read from the env variable
+    fn read(&self, default_env_name: &str) -> Result<T, HelperErrors>;
 
     /// Read the private key with a default env value and return an address string
-    fn read_default(&self) -> Result<ChainKeypair, HelperErrors>;
+    fn read_default(&self) -> Result<T, HelperErrors>;
 }
 
 /// Arguments for private key.
@@ -178,11 +165,28 @@ pub struct PrivateKeyArgs {
     pub private_key: Option<String>,
 }
 
-impl PrivateKeyReader for PrivateKeyArgs {
-    /// Return the wrapped key
+impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
+    /// Return the wrapped key. cli arg: --private-key
     fn get_key(&self) -> Option<String> {
         self.private_key.to_owned()
     }
+
+    /// Read the value from either the cli arg or env
+    fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
+        let pri_key = if let Some(pk) = self.get_key() {
+            info!("reading private key from cli");
+            pk
+        } else {
+            info!("reading private key from env {:?}", default_env_name);
+            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+        };
+
+        // TODO:
+        info!("To validate the private key");
+
+        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+    }
+
     /// Read the default private key and return an address string
     fn read_default(&self) -> Result<ChainKeypair, HelperErrors> {
         self.read("PRIVATE_KEY")
@@ -196,17 +200,35 @@ pub struct ManagerPrivateKeyArgs {
     #[clap(
         long,
         short = 'q',
-        help = "Private key to unlock the account with priviledge that broadcasts the transactio",
+        help = "Private key to unlock the account with priviledge that broadcasts the transaction",
         name = "manager_private_key",
         value_name = "MANAGER_PRIVATE_KEY"
     )]
     pub manager_private_key: Option<String>,
 }
-impl PrivateKeyReader for ManagerPrivateKeyArgs {
-    /// Return the wrapped key
+
+impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
+    /// Return the wrapped key. cli arg: --manager-private-key
     fn get_key(&self) -> Option<String> {
         self.manager_private_key.to_owned()
     }
+
+    /// Read the value from either the cli arg or env
+    fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
+        let pri_key = if let Some(pk) = self.get_key() {
+            info!("reading manager private key from cli");
+            pk
+        } else {
+            info!("reading manager private key from env {:?}", default_env_name);
+            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+        };
+
+        // TODO:
+        info!("To validate the private key");
+
+        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+    }
+
     /// Read the default private key and return an address string
     fn read_default(&self) -> Result<ChainKeypair, HelperErrors> {
         self.read("MANAGER_PRIVATE_KEY")
@@ -224,7 +246,7 @@ pub struct PasswordArgs {
     #[clap(
         short,
         long,
-        help = "The path to read the password. If not specified, the IDENTITY_PASSWORD environment variable.",
+        help = "The path to read the password. If not specified, use the IDENTITY_PASSWORD environment variable.",
         value_hint = ValueHint::FilePath,
         name = "password_path",
         value_name = "PASSWORD_PATH"
@@ -232,18 +254,72 @@ pub struct PasswordArgs {
     pub password_path: Option<PathBuf>,
 }
 
-impl PasswordArgs {
-    /// Read the password either from its path or from the environment variable IDENTITY_PASSWORD
-    pub fn read(self) -> Result<String, HelperErrors> {
-        let pwd = if let Some(pwd_path) = self.password_path {
-            info!("reading password from password_path");
+impl ArgEnvReader<String, PathBuf> for PasswordArgs {
+    /// Return the wrapped key. cli arg: --password-path
+    fn get_key(&self) -> Option<PathBuf> {
+        self.password_path.clone()
+    }
+
+    /// Read the value from either the cli arg or env
+    fn read(&self, default_env_name: &str) -> Result<String, HelperErrors> {
+        let pwd = if let Some(pwd_path) = self.get_key() {
+            info!("reading password from cli");
             fs::read_to_string(pwd_path).map_err(HelperErrors::UnableToReadFromPath)?
         } else {
-            info!("reading password from env IDENTITY_PASSWORD");
-            env::var("IDENTITY_PASSWORD").map_err(|_| HelperErrors::UnableToReadPassword)?
+            info!("reading password from env {:?}", default_env_name);
+            env::var(default_env_name).map_err(|_| HelperErrors::UnableToReadPassword)?
         };
 
         Ok(pwd)
+    }
+
+    /// Read the default private key and return an address string
+    fn read_default(&self) -> Result<String, HelperErrors> {
+        self.read("IDENTITY_PASSWORD")
+    }
+}
+
+/// Arguments for new password.
+///
+/// Password is used for encrypting an identity file
+/// Password can be passed as an environment variable `NEW_IDENTITY_PASSWORD`, or
+/// in a file of which the path is supplied in `--new_password_path`
+#[derive(Debug, Clone, Parser, Default)]
+pub struct NewPasswordArgs {
+    /// The path to a file containing the password that encrypts the identity file
+    #[clap(
+        short,
+        long,
+        help = "The path to read the new password. If not specified, use the NEW_IDENTITY_PASSWORD environment variable.",
+        value_hint = ValueHint::FilePath,
+        name = "new_password_path",
+        value_name = "NEW_IDENTITY_PASSWORD"
+    )]
+    pub new_password_path: Option<PathBuf>,
+}
+
+impl ArgEnvReader<String, PathBuf> for NewPasswordArgs {
+    /// Return the wrapped key. cli arg: --new-password-path
+    fn get_key(&self) -> Option<PathBuf> {
+        self.new_password_path.clone()
+    }
+
+    /// Read the value from either the cli arg or env
+    fn read(&self, default_env_name: &str) -> Result<String, HelperErrors> {
+        let pwd = if let Some(pwd_path) = self.get_key() {
+            info!("reading password from cli");
+            fs::read_to_string(pwd_path).map_err(HelperErrors::UnableToReadFromPath)?
+        } else {
+            info!("reading password from env {:?}", default_env_name);
+            env::var(default_env_name).map_err(|_| HelperErrors::UnableToReadPassword)?
+        };
+
+        Ok(pwd)
+    }
+
+    /// Read the default private key and return an address string
+    fn read_default(&self) -> Result<String, HelperErrors> {
+        self.read("NEW_IDENTITY_PASSWORD")
     }
 }
 
@@ -356,7 +432,7 @@ impl IdentityFileArgs {
         // get Ethereum addresses from identity files
         if !files.is_empty() {
             // check if password is provided
-            let pwd = self.password.read()?;
+            let pwd = self.password.read_default()?;
 
             // read all the identities from the directory
             Ok(read_identities(files, &pwd)?
@@ -679,23 +755,52 @@ mod tests {
     fn password_args_can_read_env_or_cli_args_in_different_scenarios() {
         let tmp = tempdir().unwrap();
         let path = tmp.path().to_str().unwrap();
-        create_file(path, None, 1);
+        create_file(path, None, 2);
 
         // possible password args
         let pwd_args_some = PasswordArgs {
             password_path: Some(PathBuf::from(path).join("fileid1")),
         };
         let pwd_args_none = PasswordArgs { password_path: None };
+        let new_pwd_args_some = NewPasswordArgs {
+            new_password_path: Some(PathBuf::from(path).join("fileid2")),
+        };
+        let new_pwd_args_none = NewPasswordArgs {
+            new_password_path: None,
+        };
+        // let file_path = PathBuf::from(path).join("fileid2");
+        fs::write(&PathBuf::from(path).join("fileid2"), "supersound").unwrap();
+
+        // test new_password_path
+        env::set_var("NEW_IDENTITY_PASSWORD", "ultraviolet");
+        if let Ok(pwd_0) = new_pwd_args_some.read_default() {
+            assert_eq!(
+                pwd_0,
+                "supersound".to_string(),
+                "read a wrong password from path in new_password_path"
+            );
+        } else {
+            panic!("cannot read new password from path");
+        }
+        if let Ok(pwd_1) = new_pwd_args_none.read_default() {
+            assert_eq!(
+                pwd_1,
+                "ultraviolet".to_string(),
+                "read a wrong password from cli in new_password_path"
+            );
+        } else {
+            panic!("cannot read new password from path");
+        }
 
         env::set_var("IDENTITY_PASSWORD", "Hello");
         // fail to take cli password path when both cli arg and env are supplied
-        if let Ok(kp_1) = pwd_args_some.clone().read() {
+        if let Ok(kp_1) = pwd_args_some.clone().read_default() {
             assert_eq!(kp_1, "Hello".to_string(), "read a wrong password from env");
         } else {
             panic!("cannot read password from env when cli arg is also provied");
         }
         // ok when no password path is supplied but env is supplied
-        if let Ok(kp_2) = pwd_args_none.clone().read() {
+        if let Ok(kp_2) = pwd_args_none.clone().read_default() {
             assert_eq!(kp_2, "Hello".to_string(), "read a wrong password from env");
         } else {
             panic!("cannot read password from env when no cli arg is provied");
@@ -703,10 +808,10 @@ mod tests {
 
         // revert when no password path or identity password env is supplied
         env::remove_var("IDENTITY_PASSWORD");
-        assert!(pwd_args_none.read().is_err());
+        assert!(pwd_args_none.read_default().is_err());
 
         // ok when no env is supplied but password path is supplied
-        if let Ok(kp_3) = pwd_args_some.clone().read() {
+        if let Ok(kp_3) = pwd_args_some.clone().read_default() {
             assert_eq!(kp_3, "Hello".to_string(), "read a wrong password from path");
         } else {
             panic!("cannot read password from path when no env is provied");

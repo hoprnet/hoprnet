@@ -59,13 +59,16 @@ hopli identity read \
 ```
 
 #### Update identities password
-To update some identites' password with old and new password as env variables. Alternatively, paths to the passwords files can be provided with `--old-password-path` and `--new-password-path`.
+To update some identites' password. Two [passwords](####Password) must be provided:
+- an old (and valid) password to the identity files. Either provided as cli argument `--password-path` or as an env variable `IDENTITY_PASSWORD`
+- a new password to the identity files. Either provided as cli argument `--new-password-path` or as an env variable `NEW_IDENTITY_PASSWORD`
 
 ```
-IDENTITY_PASSWORD=old_pwd
-NEW_IDENTITY_PASSWORD=new_pwd
-hopli update_identity_password \
-    --identity-directory "./test"
+hopli identity update \
+  --identity-directory "./test" \
+  --identity-prefix node_ \
+  --password-path "./test/pwd" \
+  --new-password-path "./test/newpwd"
 ```
 
 The identities will be modified inplace.

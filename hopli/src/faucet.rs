@@ -12,7 +12,7 @@
 /// the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
 use crate::{
     environment_config::NetworkProviderArgs,
-    key_pair::{IdentityFileArgs, PrivateKeyArgs, PrivateKeyReader},
+    key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };
