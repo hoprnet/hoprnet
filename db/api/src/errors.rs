@@ -1,4 +1,4 @@
-use hopr_crypto_types::prelude::CryptoError;
+use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::errors::CoreTypesError;
 use sea_orm::TransactionError;
@@ -8,6 +8,9 @@ use thiserror::Error;
 pub enum DbError {
     #[error("account entry for announcement not found")]
     MissingAccount,
+
+    #[error("channel not found: {0}")]
+    ChannelNotFound(Hash),
 
     #[error("missing fixed entry in table {0}")]
     MissingFixedTableEntry(String),
