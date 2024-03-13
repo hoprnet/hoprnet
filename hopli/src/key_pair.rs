@@ -95,6 +95,30 @@ pub fn create_identity(
         .ok_or(HelperErrors::UnableToCreateIdentity)
 }
 
+pub trait PrivateKeyReader {
+    /// return the wrapped key
+    fn get_key(&self) -> Option<String>;
+
+    /// Read the private key and return an address string
+    fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
+        let pri_key = if let Some(pk) = self.get_key() {
+            info!("reading private key from cli");
+            pk
+        } else {
+            info!("reading private key from env {:?}", default_env_name);
+            env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
+        };
+
+        // TODO:
+        info!("To validate the private key");
+
+        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+    }
+
+    /// Read the private key with a default env value and return an address string
+    fn read_default(&self) -> Result<ChainKeypair, HelperErrors>;
+}
+
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PrivateKeyArgs {
@@ -103,27 +127,44 @@ pub struct PrivateKeyArgs {
         long,
         short = 'k',
         help = "Private key to unlock the account that broadcasts the transaction",
-        name = "private_key"
+        name = "private_key",
+        value_name = "PRIVATE_KEY"
     )]
     pub private_key: Option<String>,
 }
 
-impl PrivateKeyArgs {
-    /// Read the private key and return an address string
-    pub fn read(self, arg_name: Option<&str>) -> Result<ChainKeypair, HelperErrors> {
-        let pri_key = if let Some(pk) = self.private_key {
-            info!("reading private key from cli");
-            pk
-        } else {
-            info!("reading private key from env PRIVATE_KEY");
-            let env_var_name = arg_name.unwrap_or("PRIVATE_KEY");
-            env::var(env_var_name).map_err(HelperErrors::UnableToReadPrivateKey)?
-        };
+impl PrivateKeyReader for PrivateKeyArgs {
+    /// Return the wrapped key
+    fn get_key(&self) -> Option<String> {
+        self.private_key.to_owned()
+    }
+    /// Read the default private key and return an address string
+    fn read_default(&self) -> Result<ChainKeypair, HelperErrors> {
+        self.read("PRIVATE_KEY")
+    }
+}
 
-        // TODO:
-        info!("To validate the private key");
-
-        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+/// Arguments for private key.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct ManagerPrivateKeyArgs {
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
+    #[clap(
+        long,
+        short = 'q',
+        help = "Private key to unlock the account with priviledge that broadcasts the transactio",
+        name = "manager_private_key",
+        value_name = "MANAGER_PRIVATE_KEY"
+    )]
+    pub manager_private_key: Option<String>,
+}
+impl PrivateKeyReader for ManagerPrivateKeyArgs {
+    /// Return the wrapped key
+    fn get_key(&self) -> Option<String> {
+        self.manager_private_key.to_owned()
+    }
+    /// Read the default private key and return an address string
+    fn read_default(&self) -> Result<ChainKeypair, HelperErrors> {
+        self.read("MANAGER_PRIVATE_KEY")
     }
 }
 
@@ -506,7 +547,7 @@ mod tests {
 
         // when a special env is set but no cli arg, it returns the special env value
         env::set_var("MANAGER_PK", SPECIAL_ENV_KEY);
-        if let Ok(kp_0) = pk_args_none.clone().read(Some("MANAGER_PK")) {
+        if let Ok(kp_0) = pk_args_none.clone().read("MANAGER_PK") {
             assert_eq!(
                 SPECIAL_ENV_KEY,
                 hex::encode(kp_0.secret().as_ref()),
@@ -518,7 +559,7 @@ mod tests {
 
         // when env is set but no cli arg, it returns the env value
         env::set_var("PRIVATE_KEY", DUMMY_PRIVATE_KEY);
-        if let Ok(kp_1) = pk_args_none.clone().read(None) {
+        if let Ok(kp_1) = pk_args_none.clone().read_default() {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_1.secret().as_ref()),
@@ -530,7 +571,7 @@ mod tests {
 
         // when both env and cli args are set, it still uses cli
         env::set_var("PRIVATE_KEY", "0123");
-        if let Ok(kp_2) = pk_args_some.clone().read(None) {
+        if let Ok(kp_2) = pk_args_some.clone().read_default() {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_2.secret().as_ref()),
@@ -542,10 +583,10 @@ mod tests {
 
         // when no env and no cli arg, it returns error
         env::remove_var("PRIVATE_KEY");
-        assert!(pk_args_none.read(None).is_err());
+        assert!(pk_args_none.read_default().is_err());
 
         // when no env is supplied, but private key is supplied
-        if let Ok(kp_3) = pk_args_some.read(None) {
+        if let Ok(kp_3) = pk_args_some.read_default() {
             assert_eq!(
                 DUMMY_PRIVATE_KEY,
                 hex::encode(kp_3.secret().as_ref()),

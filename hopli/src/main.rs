@@ -28,7 +28,7 @@ struct Cli {
     name = "HOPR ethereum package helper",
     author = "HOPR <tech@hoprnet.org>",
     version = "0.1",
-    about = "Helper to create node identities, fund nodes, etc."
+    about = "Helper to create node identities, fund nodes, manage network registry, manage HOPR staking safes and modules, etc."
 )]
 enum Commands {
     /// Commands around identity

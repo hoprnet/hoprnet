@@ -10,6 +10,7 @@
 //! A manager account can register nodes and safes with `manager-regsiter`
 //! A manager account can deregister nodes with `manager-deregsiter`
 //! A manager account can set eligibility of staking accounts with `manager-force-sync`
+use crate::key_pair::PrivateKeyReader;
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},
@@ -144,7 +145,7 @@ impl NetworkRegistrySubcommands {
         }
 
         // read private key. The provided env
-        let signer_private_key = private_key.read(Some("MANAGER_PRIVATE_KEY"))?;
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
@@ -191,7 +192,7 @@ impl NetworkRegistrySubcommands {
         );
 
         // read private key
-        let signer_private_key = private_key.read(Some("MANAGER_PRIVATE_KEY"))?;
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
@@ -232,7 +233,7 @@ impl NetworkRegistrySubcommands {
         );
 
         // read private key
-        let signer_private_key = private_key.read(Some("MANAGER_PRIVATE_KEY"))?;
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
