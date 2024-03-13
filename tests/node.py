@@ -54,8 +54,6 @@ class Node:
                 "./ethereum/contracts",
                 "--hopr-amount",
                 "20000.0",
-                "--native-amount",
-                "1",
             ],
             env=os.environ | custom_env,
             check=True,
