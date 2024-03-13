@@ -1,15 +1,36 @@
+//! ## Promiscuous Strategy
+//! This strategy opens or closes automatically channels based the following rules:
+//! - if node quality is below or equal to a threshold `network_quality_threshold` and we have a channel opened to it, the strategy will close it
+//!   - if node quality is above `network_quality_threshold` and no channel is opened yet, it will try to open channel to it (with initial stake `new_channel_stake`).
+//!     However, the channel is opened only if the following is both true:
+//!   - the total node balance does not drop below `minimum_node_balance`
+//!   - the number of channels opened by this strategy does not exceed `max_channels`
+//!
+//! Also, the candidates for opening (quality > `network_quality_threshold`), are sorted by best quality first.
+//! So that means if some nodes cannot have channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
+//! the better quality ones were taking precedence.
+//!
+//! The sorting algorithm is intentionally unstable, so that the nodes which have the same quality get random order.
+//! The constant `k` can be also set to a value > 1, which will make the strategy to open more channels for smaller networks,
+//! but it would keep the same asymptotic properties.
+//! Per default `k` = 1.
+//!
+//! The strategy starts acting only after at least `min_network_size_samples` network size samples were gathered, which means
+//! it does not start opening/closing channels earlier than `min_network_size_samples` number of minutes after the node has started.
+//!
+//! For details on default parameters see [PromiscuousStrategyConfig].
+//!
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
 use std::collections::HashMap;
+use tracing::{debug, error, info, warn};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use core_transport::constants::PEER_METADATA_PROTOCOL_VERSION;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use hopr_crypto_random::OsRng;
@@ -25,7 +46,7 @@ use validator::Validate;
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
-use crate::{decision::ChannelDecision, Strategy};
+use crate::Strategy;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -40,32 +61,79 @@ lazy_static::lazy_static! {
         SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
-/// Config of promiscuous strategy.
+/// A decision made by the Promiscuous strategy on each tick,
+/// represents which channels should be closed and which should be opened.
+/// Also indicates a number of maximum channels this strategy can open given the current network size.
+/// Note that the number changes as the network size changes.
+#[derive(Clone, Debug, PartialEq, Default)]
+struct ChannelDecision {
+    to_close: Vec<ChannelEntry>,
+    to_open: Vec<(Address, Balance)>,
+}
+
+impl ChannelDecision {
+    pub fn will_channel_be_closed(&self, counter_party: &Address) -> bool {
+        self.to_close.iter().any(|c| &c.destination == counter_party)
+    }
+
+    pub fn will_address_be_opened(&self, address: &Address) -> bool {
+        self.to_open.iter().any(|(addr, _)| addr == address)
+    }
+
+    pub fn add_to_close(&mut self, entry: ChannelEntry) {
+        self.to_close.push(entry);
+    }
+
+    pub fn add_to_open(&mut self, address: Address, balance: Balance) {
+        self.to_open.push((address, balance));
+    }
+
+    pub fn get_to_close(&self) -> &Vec<ChannelEntry> {
+        &self.to_close
+    }
+
+    pub fn get_to_open(&self) -> &Vec<(Address, Balance)> {
+        &self.to_open
+    }
+}
+
+impl Display for ChannelDecision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "channel decision: opening ({}), closing({})",
+            self.to_open.len(),
+            self.to_close.len()
+        )
+    }
+}
+
+/// Configuration of [PromiscuousStrategy].
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-    ///
-    /// Defaults to 0.5
     #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[default = 0.5]
     pub network_quality_threshold: f64,
 
     /// Minimum number of network quality samples before the strategy can start making decisions.
-    ///
-    /// Defaults to 10
     #[validate(range(min = 1_u32))]
+    #[default = 10]
     pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
+    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
@@ -77,29 +145,15 @@ pub struct PromiscuousStrategyConfig {
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
-    ///
-    /// Defaults to true
+    #[default = true]
     pub enforce_max_channels: bool,
 
     /// Specifies minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
     /// Default is ">=2.0.0"
     #[serde_as(as = "DisplayFromStr")]
+    #[default(">=2.0.0".parse().unwrap())]
     pub minimum_peer_version: semver::VersionReq,
-}
-
-impl Default for PromiscuousStrategyConfig {
-    fn default() -> Self {
-        PromiscuousStrategyConfig {
-            network_quality_threshold: 0.5,
-            min_network_size_samples: 10,
-            new_channel_stake: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            max_channels: None,
-            enforce_max_channels: true,
-            minimum_peer_version: ">=2.0.0".parse().unwrap(),
-        }
-    }
 }
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
@@ -111,7 +165,7 @@ where
     A: ChannelActions,
 {
     db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<Net>>>,
+    network: Arc<Network<Net>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
@@ -126,14 +180,14 @@ where
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
-        network: Arc<RwLock<Network<Net>>>,
+        network: Arc<Network<Net>>,
         chain_actions: A,
     ) -> Self {
         Self {
             db,
             network,
             chain_actions,
-            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples)),
+            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
         }
     }
@@ -157,29 +211,24 @@ where
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
         self.network
-            .read()
-            .await
-            .all_peers()
-            .into_iter()
-            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
-                Ok(offchain_key) => {
-                    // Do peer version matching against minimum required version by this strategy
-                    let reported_version = status.metadata().get(PEER_METADATA_PROTOCOL_VERSION);
-                    match reported_version.and_then(|v| semver::Version::from_str(v).ok()) {
-                        Some(v) => self
-                            .cfg
-                            .minimum_peer_version
-                            .matches(&v)
-                            .then_some((offchain_key, status.get_average_quality())),
-                        None => {
-                            debug!(
-                                "peer {} has invalid or missing version info: {:?}",
-                                status.id, reported_version
-                            );
-                            None
-                        }
+            .peer_filter(|status| async move {
+                match status
+                    .peer_version
+                    .clone()
+                    .and_then(|v| semver::Version::from_str(&v).ok())
+                {
+                    Some(v) => self.cfg.minimum_peer_version.matches(&v).then_some(status),
+                    None => {
+                        debug!("peer {} has invalid or missing version info", status.id);
+                        None
                     }
                 }
+            })
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
+            .filter_map(|status| match OffchainPublicKey::try_from(status.id) {
+                Ok(offchain_key) => Some((offchain_key, status.get_average_quality())),
                 Err(_) => {
                     error!("encountered invalid peer id: {}", status.id);
                     None
@@ -203,7 +252,7 @@ where
                 }
             })
             .collect::<FuturesUnordered<_>>()
-            .filter_map(|x| async move { x })
+            .filter_map(futures::future::ready)
             .collect::<HashMap<_, _>>()
             .await
     }
@@ -439,6 +488,7 @@ mod tests {
         PeerId,
     };
     use futures::{future::ok, FutureExt};
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_platform::time::native::current_time;
@@ -447,10 +497,52 @@ mod tests {
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref PEERS: Vec<(Address, PeerId)> = (0..10)
-            .into_iter()
-            .map(|_| (Address::random(), OffchainKeypair::random().public().into()))
-            .collect();
+        static ref PEERS: [(Address, PeerId); 10] = [
+            (
+                hex!("9a66b57d7c3c0b83cbd0d3455bf0bc8f58e1ec46"),
+                hex!("e03640d3184c8aa6f9d4ccd533281c51974a170c0c4d0fe1da9296a081ab1fd9")
+            ),
+            (
+                hex!("5f98dc63889681eb4306f0e3b5ee2e04b13af7c8"),
+                hex!("82a3cec1660697d8f3eb798f82ae281fc885c3e5370ef700c95c17397846c1e7")
+            ),
+            (
+                hex!("6e0bed94a8d2da952ad4468ff81157b6137a5566"),
+                hex!("2b93fcca9db2c5c12d1add5c07dd81d20c68eb713e99aa5c488210179c7505e3")
+            ),
+            (
+                hex!("8275b9ce8a3d2fe14029111f85b72ab05aa0f5d3"),
+                hex!("5cfd16dc160fd43396bfaff06e7c2e62cd087317671c159ce7cbc31c34fc32b6")
+            ),
+            (
+                hex!("3231673fd10c9ebeb9330745f1709c91db9cf40f"),
+                hex!("7f5b421cc58cf8449f5565756697261723fb96bba5f0aa2ba83c4973e0e994bf")
+            ),
+            (
+                hex!("585f4ca77b07ac7a3bf37de3069b641ba97bf76f"),
+                hex!("848af931ce57f54fbf96d7250eda8b0f36e3d1988ec8048c892e8d8ff0798f2f")
+            ),
+            (
+                hex!("ba413645edb6ddbd46d5911466264b119087dfea"),
+                hex!("d79258fc521dba8ded208066fe98fd8a857cf2e8f42f1b71c8f6e29b8f47e406")
+            ),
+            (
+                hex!("9ea8c0f3766022f84c41abd524c942971bd22d23"),
+                hex!("cd7a06caebcb90f95690c72472127cae8732b415440a1783c6ff9f9cb0bacf1e")
+            ),
+            (
+                hex!("9790b6cf8afe6a7d80102570fac18a322e26ef83"),
+                hex!("2dc3ff226be59333127ebfd3c79517eac8f81e0333abaa45189aae309880e55a")
+            ),
+            (
+                hex!("f6ab491cd4e2eccbe60a7f87aeaacfc408dabde8"),
+                hex!("5826ed44f52b3a26c472621812165bb2d3e60a9929e06db8b8df4e4d23068eba")
+            ),
+        ]
+        .map(|(addr, privkey)| (
+            addr.into(),
+            OffchainKeypair::from_secret(&privkey).unwrap().public().into()
+        ));
     }
 
     mock! {
@@ -470,9 +562,6 @@ mod tests {
 
     struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
-        fn is_public(&self, _: &PeerId) -> bool {
-            false
-        }
         fn emit(&self, _: NetworkEvent) {}
     }
 
@@ -497,27 +586,28 @@ mod tests {
         channel
     }
 
-    async fn prepare_network(network: Arc<RwLock<Network<MockNetworkExternalActions>>>, qualities: Vec<f64>) {
+    async fn prepare_network(network: Arc<Network<MockNetworkExternalActions>>, qualities: Vec<f64>) {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
-        let mut net = network.write().await;
+        let net = network;
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
-            net.add(peer, PeerOrigin::Initialization);
+            net.add(peer, PeerOrigin::Initialization, vec![]).await.unwrap();
 
-            while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
-                let metadata = [(PEER_METADATA_PROTOCOL_VERSION.to_string(), "2.0.0".to_string())];
-                net.update_with_metadata(
+            while net.get(peer).await.unwrap().unwrap().get_average_quality() < quality {
+                net.update(
                     peer,
                     Ok(current_time().as_unix_timestamp().as_millis() as u64),
-                    Some(metadata.into()),
-                );
+                    Some("2.0.0".into()),
+                )
+                .await
+                .expect("no errors should occur");
             }
             debug!(
                 "peer {peer} ({}) has avg quality: {}",
                 PEERS[i + 1].0,
-                net.get_peer_status(peer).unwrap().get_average_quality()
+                net.get(peer).await.unwrap().unwrap().get_average_quality()
             );
         }
     }
@@ -575,11 +665,12 @@ mod tests {
             PEERS[0].0,
         )));
 
-        let network = Arc::new(RwLock::new(Network::new(
+        let network = Arc::new(Network::new(
             PEERS[0].1,
+            vec![],
             NetworkConfig::default(),
             MockNetworkExternalActions {},
-        )));
+        ));
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
@@ -593,11 +684,14 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, balance).await;
 
         // Peer 10 has an old node version
-        network.write().await.update_with_metadata(
-            &PEERS[9].1,
-            Ok(current_time().as_unix_timestamp().as_millis() as u64),
-            Some([(PEER_METADATA_PROTOCOL_VERSION.to_string(), "1.92.0".to_string())].into()),
-        );
+        network
+            .update(
+                &PEERS[9].1,
+                Ok(current_time().as_unix_timestamp().as_millis() as u64),
+                Some("1.92.0".into()),
+            )
+            .await
+            .expect("no errors should occur");
 
         let mut strat_cfg = PromiscuousStrategyConfig::default();
         strat_cfg.max_channels = Some(3); // Allow max 3 channels

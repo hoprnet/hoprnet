@@ -26,7 +26,7 @@ permissions:
 jobs:
   cleanup-actions:
     name: Cleanup Actions
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
 
   tag:
     name: Tag images
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
@@ -88,7 +88,7 @@ jobs:
           if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
             docker_pr_tag=$(./scripts/get-current-version.sh docker)
           else
-            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+            docker_pr_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
           fi
           # Set docker release latest tag
           declare base_branch=${{ github.event.pull_request.base.ref }}
@@ -111,7 +111,7 @@ jobs:
 
   deploy_nodes:
     name: Deploy nodes
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     if: needs.tag.result == 'success'
     needs:
       - tag
@@ -121,18 +121,17 @@ jobs:
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
-            namespace=rotsee
-            identity_pool=core-staging
+            identity_pool=hoprd-core-rotsee
           elif [[ "${base_branch}" =~ ^"release" ]]; then
-            namespace=dufour
-            identity_pool="core-dufour-${base_branch/release\/}"
+            identity_pool=hoprd-core-dufour
           else
             echo "Skipping deployment"
             exit 0
           fi
+          namespace=core-team
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
           # Get list of deployments to restart
-          export deployments=($(kubectl get deployments -n ${namespace/-.*} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
+          export deployments=($(kubectl get deployments -n ${namespace} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
           for deployment in "${deployments[@]}"; do
             echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
             kubectl rollout restart deployments -n ${namespace} $deployment;
@@ -140,7 +139,7 @@ jobs:
 
   create_release:
     name: Create Release
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
       - tag

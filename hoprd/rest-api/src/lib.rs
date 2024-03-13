@@ -5,15 +5,15 @@ use std::error::Error;
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
 use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
-use log::{debug, error, warn};
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use tide::http::headers::HeaderValue;
 use tide::{
     http::{
         headers::{HeaderName, AUTHORIZATION},
@@ -23,7 +23,9 @@ use tide::{
     utils::async_trait,
     Middleware, Next, Request, Response, StatusCode,
 };
+use tide_tracing::TraceMiddleware;
 use tide_websockets::{Message, WebSocket};
+use tracing::{debug, error, warn};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
@@ -215,20 +217,14 @@ impl Middleware<InternalState> for TokenBasedAuthenticationMiddleware {
     }
 }
 
-/// Custom request logging middleware
-struct LogRequestMiddleware(log::Level);
+/// Custom prometheus recording middleware
+#[cfg(all(feature = "prometheus", not(test)))]
+struct PrometheusMetricsMiddleware;
 
+#[cfg(all(feature = "prometheus", not(test)))]
 #[async_trait]
-impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
-    async fn handle(&self, mut req: Request<T>, next: Next<'_, T>) -> tide::Result {
-        struct LogMiddlewareHasBeenRun;
-
-        if req.ext::<LogMiddlewareHasBeenRun>().is_some() {
-            return Ok(next.run(req).await);
-        }
-        req.set_ext(LogMiddlewareHasBeenRun);
-
-        let peer_addr = req.peer_addr().map(String::from);
+impl<T: Clone + Send + Sync + 'static> Middleware<T> for PrometheusMetricsMiddleware {
+    async fn handle(&self, req: Request<T>, next: Next<'_, T>) -> tide::Result {
         let path = req.url().path().to_owned();
         let method = req.method().to_string();
 
@@ -238,26 +234,13 @@ impl<T: Clone + Send + Sync + 'static> Middleware<T> for LogRequestMiddleware {
 
         let status = response.status();
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            // We're not interested on metrics for other endpoints
-            if path.starts_with("/api/v3/") {
-                METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
-                METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
-            }
+        // We're not interested on metrics for non-functional
+        if path.starts_with("/api/v3/") && !path.contains("node/metrics") {
+            METRIC_COUNT_API_CALLS.increment(&[&path, &method, &status.to_string()]);
+            METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, &method], response_duration.as_secs_f64());
         }
 
-        log::log!(
-            self.0,
-            r#"{} "{method} {path}" {status} {} {}ms"#,
-            peer_addr.as_deref().unwrap_or("-"),
-            response
-                .len()
-                .map(|l| l.to_string())
-                .unwrap_or_else(|| String::from("-")),
-            response_duration.as_millis()
-        );
-        Ok(response)
+        return Ok(response);
     }
 }
 
@@ -303,8 +286,14 @@ pub async fn run_hopr_api(
 
     let mut app = tide::with_state(state.clone());
 
-    app.with(LogRequestMiddleware(log::Level::Debug));
-    app.with(CorsMiddleware::new().allow_origin(Origin::from("*")));
+    app.with(TraceMiddleware::new());
+    app.with(
+        CorsMiddleware::new()
+            .allow_methods("GET, POST, OPTIONS, DELETE".parse::<HeaderValue>().unwrap())
+            .allow_origin(Origin::from("*")),
+    );
+    #[cfg(all(feature = "prometheus", not(test)))]
+    app.with(PrometheusMetricsMiddleware);
 
     app.at("/api-docs/openapi.json")
         .get(|_| async move { Ok(Response::builder(200).body(json!(ApiDoc::openapi()))) });
@@ -840,7 +829,7 @@ mod account {
 
 mod peers {
     use super::*;
-    use hopr_lib::{HoprTransportError, Multiaddr, PEER_METADATA_PROTOCOL_VERSION};
+    use hopr_lib::{HoprTransportError, Multiaddr};
     use serde_with::DurationMilliSeconds;
     use std::str::FromStr;
     use std::time::Duration;
@@ -941,8 +930,8 @@ mod peers {
                         latency: latency.unwrap_or(Duration::ZERO), // TODO: what should be the correct default ?
                         reported_version: hopr
                             .network_peer_info(&peer)
-                            .await
-                            .and_then(|s| s.metadata().get(PEER_METADATA_PROTOCOL_VERSION).cloned())
+                            .await?
+                            .and_then(|p| p.peer_version)
                             .unwrap_or("unknown".into())
                     }))
                     .build()),
@@ -1894,7 +1883,7 @@ mod messages {
         let args: GetMessageBodyRequest = req.body_json().await?;
         let inbox = req.state().inbox.clone();
 
-        let inbox = inbox.write().await;
+        let inbox = inbox.read().await;
         let messages = inbox
             .peek_all(args.tag, args.timestamp)
             .await
@@ -2234,7 +2223,7 @@ mod tickets {
 mod node {
     use super::*;
     use futures::StreamExt;
-    use hopr_lib::{Health, Multiaddr};
+    use hopr_lib::{AsUnixTimestamp, Health, Multiaddr};
 
     use {std::str::FromStr, tide::Body};
 
@@ -2345,12 +2334,12 @@ mod node {
         let hopr = req.state().hopr.clone();
 
         let quality = query_params.quality.unwrap_or(0f64);
-        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await)
+        let all_network_peers = futures::stream::iter(hopr.network_connected_peers().await?)
             .filter_map(|peer| {
                 let hopr = hopr.clone();
 
                 async move {
-                    if let Some(info) = hopr.network_peer_info(&peer).await {
+                    if let Ok(Some(info)) = hopr.network_peer_info(&peer).await {
                         if info.get_average_quality() >= quality {
                             Some((peer, info))
                         } else {
@@ -2381,16 +2370,12 @@ mod node {
                     sent: info.heartbeats_sent,
                     success: info.heartbeats_succeeded,
                 },
-                last_seen: info.last_seen as u128,
-                last_seen_latency: info.last_seen_latency as u128,
+                last_seen: info.last_seen.as_unix_timestamp().as_millis(),
+                last_seen_latency: info.last_seen_latency.as_millis(),
                 quality: info.get_average_quality(),
                 backoff: info.backoff,
                 is_new: info.heartbeats_sent == 0u64,
-                reported_version: info
-                    .metadata()
-                    .get(&"protocol_version".to_owned())
-                    .cloned()
-                    .unwrap_or("UNKNOWN".to_string()),
+                reported_version: info.peer_version.unwrap_or("UNKNOWN".to_string()),
             })
             .collect::<Vec<_>>()
             .await;

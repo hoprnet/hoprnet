@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+/// Error representing all possible erroneous states of the entire HOPR
+/// on-chain interactions.
 #[derive(Error, Debug)]
 pub enum HoprChainError {
     #[error("API error: {0}")]
@@ -15,4 +17,5 @@ pub enum HoprChainError {
     Db(#[from] utils_db::errors::DbError),
 }
 
+/// The default [Result] object translating errors in the [HoprChainError] type
 pub type Result<T> = core::result::Result<T, HoprChainError>;

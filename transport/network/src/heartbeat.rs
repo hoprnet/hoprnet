@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 
-use log::{debug, info};
+use tracing::{debug, info};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
@@ -29,26 +29,29 @@ lazy_static::lazy_static! {
 
 use async_std::task::sleep;
 use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
 
 use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
 
-/// Configuration of the Heartbeat
+/// Configuration for the Heartbeat mechanism
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HeartbeatConfig {
     /// Round-to-round variance to complicate network sync in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_variance")]
+    #[default(default_heartbeat_variance())]
     pub variance: std::time::Duration,
     /// Interval in which the heartbeat is triggered in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_interval")]
+    #[default(default_heartbeat_interval())]
     pub interval: std::time::Duration,
     /// The time interval for which to consider peer heartbeat renewal in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_heartbeat_threshold")]
+    #[default(default_heartbeat_threshold())]
     pub threshold: std::time::Duration,
 }
 
@@ -67,21 +70,11 @@ fn default_heartbeat_variance() -> std::time::Duration {
     DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
 }
 
-impl Default for HeartbeatConfig {
-    fn default() -> Self {
-        Self {
-            interval: default_heartbeat_interval(),
-            threshold: default_heartbeat_threshold(),
-            variance: default_heartbeat_variance(),
-        }
-    }
-}
-
-/// API trait for external functionality required by the heartbeat mechanism
+/// API trait for external functionality required by the Heartbeat mechanism
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HeartbeatExternalApi {
-    async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
+    async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<PeerId>;
 }
 
 /// Heartbeat mechanism providing the regular trigger and processing for the heartbeat protocol.
@@ -118,14 +111,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let start = current_time();
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
 
-            info!(
-                "Starting a heartbeat round for peers since timestamp {:?}",
-                from_timestamp.as_unix_timestamp()
-            );
-            let peers = self
-                .external_api
-                .get_peers(from_timestamp.as_unix_timestamp().as_millis() as u64)
-                .await;
+            info!("Starting a heartbeat round for peers since timestamp {from_timestamp:?}");
+            let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
             let this_round_planned_duration = std::time::Duration::from_millis({
@@ -211,7 +198,7 @@ mod tests {
             ..simple_heartbeat_config()
         };
 
-        let ping_delay = 2 * config.interval;
+        let ping_delay = 2 * config.interval + config.interval / 2;
         let expected_loop_count = 2;
 
         let mut mock = MockHeartbeatExternalApi::new();

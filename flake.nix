@@ -1,7 +1,6 @@
 {
   description = "hoprnet monorepo";
 
-
   inputs.flake-utils.url = github:numtide/flake-utils;
   inputs.flake-parts.url = github:hercules-ci/flake-parts;
   inputs.nixpkgs.url = github:NixOS/nixpkgs/master;
@@ -11,7 +10,8 @@
   # using a fork with an added source filter
   inputs.crane.url = github:hoprnet/crane/tb/20240117-find-filter;
   inputs.foundry.url = github:shazow/foundry.nix/monthly;
-  inputs.solc.url = github:hellwolf/solc.nix;
+  # use change to add solc 0.8.24
+  inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
 
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
@@ -140,13 +140,21 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = with pkgs; [ hoprd iana-etc cacert ];
+            contents = with pkgs; [
+              hoprd
+              iana-etc
+              cacert
+              bash
+              findutils
+              coreutils
+            ];
             config = {
               Entrypoint = [
                 "/bin/hoprd"
               ];
               Env = [
-                "RUST_LOG=info"
+                "NO_COLOR=true"     # suppress colored log output
+                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
               ];
             };
@@ -156,14 +164,24 @@
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
             created = "now";
-            contents = with pkgs; [ hopli iana-etc cacert ];
+            contents = with pkgs; [
+              hopli
+              iana-etc
+              cacert
+              bash
+              findutils
+              coreutils
+            ];
             config = {
               Entrypoint = [
                 "/bin/hopli"
               ];
               Env = [
-                "RUST_LOG=info"
+                # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
+                "NO_COLOR=true"     # suppress colored log output
+                "ETHERSCAN_API_KEY=placeholder"
+                "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
             };
           };
@@ -191,7 +209,8 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "RUST_LOG=debug"
+                "NO_COLOR=true"     # suppress colored log output
+                "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
                 "RUST_BACKTRACE=full"
               ];
             };

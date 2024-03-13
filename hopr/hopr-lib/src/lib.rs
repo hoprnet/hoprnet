@@ -4,7 +4,7 @@
 //! The [`Hopr`] object is standalone, meaning that once it is constructed and run,
 //! it will perform its functionality autonomously. The API it offers serves as a
 //! high level integration point for other applications and utilities, but offers
-//! a complete and fulle featured HOPR node stripped from top level functionality
+//! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
 //! The intended way to use hopr_lib is for a specific tool to be built on top of it,
@@ -13,9 +13,13 @@
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
 
+/// Types specific for blockchain deployments of HOPR.
 mod chain;
+/// Configuration related public types
 pub mod config;
+/// Various public constants.
 pub mod constants;
+/// Enumerates all errors thrown from this library.
 pub mod errors;
 mod helpers;
 
@@ -25,7 +29,6 @@ pub use {
     core_strategy::Strategy,
     core_transport::{
         config::{looks_like_domain, HostConfig, HostType},
-        constants::PEER_METADATA_PROTOCOL_VERSION,
         errors::{HoprTransportError, ProtocolError},
         ApplicationData, HalfKeyChallenge, Health, Keypair, Multiaddr, TicketStatistics, TransportOutput,
     },
@@ -71,7 +74,7 @@ use core_transport::{
 use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{ExternalNetworkInteractions, IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use utils_db::db::DB;
 use utils_db::CurrentDbShim;
 
@@ -168,7 +171,7 @@ pub fn to_chain_events_refresh_process<Db, S>(
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     transport_indexer_actions: core_transport::IndexerActions,
     indexer_action_tracker: Arc<IndexerActionTracker>,
-    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+    network: Arc<Network<ExternalNetworkInteractions>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
     Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
@@ -191,11 +194,9 @@ where
                             .collect::<Vec<_>>();
 
                         if ! mas.is_empty() {
-                            let mut net = network.write().await;
-                            if ! net.has(&peer) {
-                                debug!("Network event: registering peer '{peer}'");
-                                net.add(&peer, PeerOrigin::NetworkRegistry);
-                                net.store_peer_multiaddresses(&peer, mas.clone());
+                            if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                            {
+                                error!("failed to record '{peer}' from the NetworkRegistry: {e}");
                             }
 
                             transport_indexer_actions
@@ -225,7 +226,11 @@ where
                 ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
                 ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
                     let maybe_direction = channel.direction(&me_onchain);
-                    let change = channel_graph.write().await.update_channel(channel);
+
+                    let change = channel_graph
+                        .write()
+                        .await
+                        .update_channel(channel);
 
                     // Check if this is our own channel
                     if let Some(own_channel_direction) = maybe_direction {
@@ -255,7 +260,8 @@ where
                     }
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    match db.read().await.get_packet_key(&address).await {
+                    let packet_key = db.read().await.get_packet_key(&address).await;
+                    match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
                                 let peer_id = pk.into();
@@ -269,13 +275,14 @@ where
 
                                 match allowed {
                                     chain_types::chain_events::NetworkRegistryStatus::Allowed => {
-                                        let mut net = network.write().await;
-                                        if ! net.has(&peer_id) {
-                                            net.add(&peer_id, PeerOrigin::NetworkRegistry);
+                                        if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, vec![]).await {
+                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
                                         }
                                     },
                                     chain_types::chain_events::NetworkRegistryStatus::Denied => {
-                                        network.write().await.remove(&peer_id);
+                                        if let Err(e) = network.remove(&peer_id).await {
+                                            error!("failed to allow '{peer_id}' locally, although it is allowed on-chain: {e}")
+                                        }
                                     },
                                 };
                             }
@@ -315,15 +322,15 @@ where
 {
     let identity: core_transport::libp2p::identity::Keypair = (&me).into();
 
-    let (network, network_events_rx) = build_network(identity.public().to_peer_id(), cfg.network_options);
-
-    info!("Registering own external multiaddresses: {:?}", my_multiaddresses);
-    async_std::task::block_on(async {
-        network
-            .write()
-            .await
-            .store_peer_multiaddresses(&identity.public().to_peer_id(), my_multiaddresses.clone());
-    });
+    info!(
+        "Creating local network registry and registering own external multiaddresses: {:?}",
+        my_multiaddresses
+    );
+    let (network, network_events_rx) = build_network(
+        identity.public().to_peer_id(),
+        my_multiaddresses.clone(),
+        cfg.network_options,
+    );
 
     let addr_resolver = DbPeerAddressResolver(db.clone());
 
@@ -771,6 +778,10 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
+        // initialize cache and reset state of all acknowledged tickets
+        info!("Initializing acknowledged ticket states and cache");
+        self.chain_api.db().write().await.init_tickets_and_cache().await?;
+
         // wait for the indexer sync
         info!("Start the indexer and sync the chain");
         self.chain_api.sync_chain().await?;
@@ -802,21 +813,7 @@ impl Hopr {
         });
 
         info!("Loading initial peers from the storage");
-        let index_updater = self.transport_api.index_updater();
-        for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
-            if self.transport_api.is_allowed_to_access_network(&peer_id).await {
-                debug!("Using initial public node '{peer_id}'");
-                index_updater
-                    .emit_indexer_update(core_transport::IndexerToProcess::EligibilityUpdate(
-                        peer_id,
-                        PeerEligibility::Eligible,
-                    ))
-                    .await;
-                index_updater
-                    .emit_indexer_update(core_transport::IndexerToProcess::Announce(peer_id, multiaddresses))
-                    .await;
-            }
-        }
+        self.transport_api.init_from_db().await?;
 
         // Possibly register node-safe pair to NodeSafeRegistry. Following that the
         // connector is set to use safe tx variants.
@@ -994,38 +991,40 @@ impl Hopr {
     }
 
     /// List all peers connected to this
-    pub async fn network_connected_peers(&self) -> Vec<PeerId> {
-        self.transport_api.network_connected_peers().await
+    pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
+        Ok(self.transport_api.network_connected_peers().await?)
     }
 
     /// Get all data collected from the network relevant for a PeerId
-    pub async fn network_peer_info(&self, peer: &PeerId) -> Option<core_transport::PeerStatus> {
-        self.transport_api.network_peer_info(peer).await
+    pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<core_transport::PeerStatus>> {
+        Ok(self.transport_api.network_peer_info(peer).await?)
     }
 
     /// Get peers connected peers with quality higher than some value
     pub async fn all_network_peers(
         &self,
         minimum_quality: f64,
-    ) -> Vec<(Option<Address>, PeerId, core_transport::PeerStatus)> {
-        futures::stream::iter(self.transport_api.network_connected_peers().await)
-            .filter_map(|peer| async move {
-                if let Some(info) = self.transport_api.network_peer_info(&peer).await {
-                    if info.get_average_quality() >= minimum_quality {
-                        Some((peer, info))
+    ) -> errors::Result<Vec<(Option<Address>, PeerId, core_transport::PeerStatus)>> {
+        Ok(
+            futures::stream::iter(self.transport_api.network_connected_peers().await?)
+                .filter_map(|peer| async move {
+                    if let Ok(Some(info)) = self.transport_api.network_peer_info(&peer).await {
+                        if info.get_average_quality() >= minimum_quality {
+                            Some((peer, info))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
-                }
-            })
-            .filter_map(|(peer_id, info)| async move {
-                let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
-                Some((address, peer_id, info))
-            })
-            .collect::<Vec<_>>()
-            .await
+                })
+                .filter_map(|(peer_id, info)| async move {
+                    let address = self.peerid_to_chain_key(&peer_id).await.ok().flatten();
+                    Some((address, peer_id, info))
+                })
+                .collect::<Vec<_>>()
+                .await,
+        )
     }
 
     // Ticket ========

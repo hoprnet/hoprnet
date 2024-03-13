@@ -38,8 +38,8 @@ Private key to signer wallet can be passed either as an env variable or as a com
 
 Unless specified, the name of the env variable is `PRIVATE_KEY` by default. In commands that accept two or more private keys, each private key has its own specific name. E.g. `MANAGER_PRIVATE_KEY` for network registry commands that are reserved for wallets with manager privilege.
 
-### Create/Read identities
-To create or read identities, a [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
+### Create identities
+To create identities, a [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
 ```
 hopli identity create \
   --identity-directory "./test" \
@@ -48,7 +48,8 @@ hopli identity create \
   --password-path "./test/pwd"
 ```
 
-Read ethereum addresses from identities
+#### Read identities
+Read ethereum addresses from identities. A [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
 
 ```
 hopli identity read \
@@ -56,6 +57,18 @@ hopli identity read \
   --identity-prefix node_ \
   --password-path "./test/pwd"
 ```
+
+#### Update identities password
+To update some identites' password with old and new password as env variables. Alternatively, paths to the passwords files can be provided with `--old-password-path` and `--new-password-path`.
+
+```
+IDENTITY_PASSWORD=old_pwd
+NEW_IDENTITY_PASSWORD=new_pwd
+hopli update_identity_password \
+    --identity-directory "./test"
+```
+
+The identities will be modified inplace.
 
 ### Faucet
 To fund nodes with password, a [path to it](####Identity-directory-or-path), a [password](####Password), and a [private key](####Private-key) to the faucet wallet (EOA) must be provided.

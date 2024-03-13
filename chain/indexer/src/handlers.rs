@@ -14,19 +14,19 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{error, info, trace, warn};
 use multiaddr::Multiaddr;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use std::{str::FromStr, sync::Arc};
+use tracing::{error, info, trace, warn};
 
 /// Event handling object for on-chain operations
 ///
-/// Once an on-chain operation is recorded by the [chain_indexer::block::Indexer], it is pre-processed
+/// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event specific actions for each on-chain operation.
 ///
 #[derive(Debug, Clone)]
-pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
+pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions + std::fmt::Debug> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: ContractAddresses,
@@ -38,7 +38,7 @@ pub struct ContractEventHandlers<U: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<U>>,
 }
 
-impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
+impl<U: HoprCoreEthereumDbActions + std::fmt::Debug> ContractEventHandlers<U> {
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: Address, db: Arc<RwLock<U>>) -> Self {
         Self {
             addresses,
@@ -530,7 +530,9 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 }
 
 #[async_trait]
-impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler for ContractEventHandlers<U> {
+impl<U: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug> crate::traits::ChainLogHandler
+    for ContractEventHandlers<U>
+{
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
             self.addresses.channels,
@@ -543,6 +545,7 @@ impl<U: HoprCoreEthereumDbActions + Send + Sync> crate::traits::ChainLogHandler 
         ]
     }
 
+    #[tracing::instrument(level = "debug")]
     async fn on_event(
         &self,
         address: Address,
@@ -652,11 +655,11 @@ pub mod tests {
     async fn create_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            Address::random(),
+            *SELF_CHAIN_ADDRESS,
         )))
     }
 
-    fn init_handlers<U: HoprCoreEthereumDbActions>(db: Arc<RwLock<U>>) -> ContractEventHandlers<U> {
+    fn init_handlers<U: HoprCoreEthereumDbActions + std::fmt::Debug>(db: Arc<RwLock<U>>) -> ContractEventHandlers<U> {
         ContractEventHandlers {
             addresses: ContractAddresses {
                 channels: *CHANNELS_ADDR,

@@ -1,11 +1,13 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::debug;
 use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
+use tracing::debug;
 
 /// Holds the signed binding of the chain key and the packet key.
-/// The signature
+///
+/// The signature is done via the offchain key to bind it with the on-chain key. The structure
+/// then makes it on-chain, making it effectively cross-signed with both keys (offchain and onchain).
 /// This is used to attest on-chain that node owns the corresponding packet key and links it with
 /// the chain key.
 #[derive(Clone, Debug, PartialEq)]

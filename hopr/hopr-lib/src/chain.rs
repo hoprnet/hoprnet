@@ -223,6 +223,7 @@ impl ChainNetworkConfig {
     }
 }
 
+// TODO: parts to be replaced by chain_types::ContractAddresses
 #[derive(Debug, Serialize, Clone)]
 pub struct SmartContractConfig {
     pub hopr_announcements_address: Address,
@@ -248,7 +249,7 @@ impl From<&ChainNetworkConfig> for SmartContractConfig {
     }
 }
 
-/// The entire protocol configuration containing the information about
+/// The entire on-chain protocol configuration containing the information about
 /// usable networks and chains.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
@@ -315,7 +316,7 @@ pub fn build_chain_components<Db>(
     RpcOperations<JsonRpcClient>,
 )
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
     // TODO: extract this from the global config type
     let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
@@ -385,7 +386,7 @@ pub fn build_chain_api(
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain {
-    let indexer_cfg = chain_indexer::block::IndexerConfig {
+    let indexer_cfg = chain_indexer::IndexerConfig {
         start_block_number: indexer_start_block,
         ..Default::default()
     };

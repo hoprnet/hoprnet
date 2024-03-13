@@ -1,3 +1,7 @@
+use async_lock::RwLock;
+use std::sync::Arc;
+use tracing::{debug, info, trace};
+
 use crate::errors::{
     PacketError::{OutOfFunds, TicketValidation},
     Result,
@@ -6,12 +10,11 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info, trace};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 #[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
-    db: &T,
+    db: Arc<RwLock<T>>,
     ticket: &Ticket,
     channel: &ChannelEntry,
     sender: &Address,
@@ -62,7 +65,9 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
     if check_unrealized_balance {
         // ticket's channelEpoch MUST match the current DB channel's epoch
-        match db.get_channel_epoch(&ticket.channel_id).await? {
+        let channel_epoch = db.read().await.get_channel_epoch(&ticket.channel_id).await?;
+
+        match channel_epoch {
             Some(epoch) => {
                 if !epoch.eq(&ticket.channel_epoch.into()) {
                     return Err(TicketValidation(format!(
@@ -75,7 +80,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
                 info!("checking unrealized balances for channel {}", channel.get_id());
 
-                let unrealized_balance = db.get_unrealized_balance(&ticket.channel_id).await?;
+                let unrealized_balance = db.read().await.get_unrealized_balance(&ticket.channel_id).await?;
 
                 debug!(
                     "channel balance of {} after subtracting unrealized balance: {unrealized_balance}",
@@ -102,6 +107,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
@@ -110,8 +116,6 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::ops::Add;
@@ -286,7 +290,7 @@ mod tests {
             .returning(move |_| Ok(more_than_ticket_balance));
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
@@ -308,7 +312,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &TARGET_PRIV_KEY.public().to_address(),
@@ -335,7 +339,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
@@ -365,7 +369,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
@@ -393,7 +397,7 @@ mod tests {
         channel.status = ChannelStatus::Closed;
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
@@ -423,7 +427,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
@@ -457,7 +461,7 @@ mod tests {
             .returning(move |_| Ok(Balance::zero(BalanceType::HOPR)));
 
         let ret = validate_unacknowledged_ticket(
-            &db,
+            Arc::new(RwLock::new(db)),
             &ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),

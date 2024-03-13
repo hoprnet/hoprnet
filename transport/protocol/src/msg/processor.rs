@@ -20,7 +20,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use log::{debug, error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use super::packet::{PacketConstructing, TransportPacket};
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
@@ -88,9 +88,10 @@ pub enum MsgProcessed {
 }
 
 /// Implements protocol acknowledgement logic for msg packets
+#[derive(Debug)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     db: Arc<RwLock<Db>>,
     cfg: PacketInteractionConfig,
@@ -98,7 +99,7 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -111,7 +112,7 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     type Input = ApplicationData;
 
@@ -291,7 +292,7 @@ where
                 debug!("price per packet is {price_per_packet}");
 
                 let validation_res = validate_unacknowledged_ticket::<Db>(
-                    &*self.db.read().await,
+                    self.db.clone(),
                     &ticket,
                     &channel,
                     &previous_hop_addr,
@@ -313,7 +314,6 @@ where
                 }
 
                 {
-                    debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
                         .await?;
@@ -371,11 +371,33 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync,
+    Db: HoprCoreEthereumDbActions + std::marker::Send + std::marker::Sync + std::fmt::Debug,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self { db, cfg }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self, pkt_keypair))]
+    pub async fn to_transport_packet_with_metadata(
+        &self,
+        event: MsgToProcess,
+        pkt_keypair: &OffchainKeypair,
+    ) -> (Result<TransportPacket>, PacketMetadata) {
+        let mut metadata = PacketMetadata::default();
+
+        let packet = match event {
+            MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
+                self.from_incoming(data, pkt_keypair, &peer).await
+            }
+            MsgToProcess::ToSend(data, path, finalizer) => {
+                metadata.send_finalizer.replace(finalizer);
+
+                self.into_outgoing(data, &path).await
+            }
+        };
+
+        (packet, metadata)
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
@@ -403,9 +425,10 @@ where
             .await?;
 
         let ticket = {
-            let db = self.db.read().await;
-
-            let price_per_packet = db
+            let price_per_packet = self
+                .db
+                .read()
+                .await
                 .get_ticket_price()
                 .await
                 .unwrap_or_else(|_| {
@@ -572,20 +595,13 @@ impl PacketInteractionConfig {
     }
 }
 
+#[derive(Debug, smart_default::SmartDefault)]
 pub struct PacketMetadata {
+    #[default(None)]
     pub send_finalizer: Option<PacketSendFinalizer>,
+    #[default(std::time::UNIX_EPOCH)]
     #[cfg(all(feature = "prometheus", not(test)))]
     pub start_time: std::time::SystemTime,
-}
-
-impl Default for PacketMetadata {
-    fn default() -> Self {
-        Self {
-            send_finalizer: None,
-            #[cfg(all(feature = "prometheus", not(test)))]
-            start_time: std::time::UNIX_EPOCH,
-        }
-    }
 }
 
 /// Sets up processing of packet interactions and returns relevant read and write mechanism.
@@ -605,7 +621,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    pub fn new<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
         cfg: PacketInteractionConfig,
@@ -623,18 +639,7 @@ impl PacketInteraction {
                 let pkt_keypair = pkt_keypair.clone();
 
                 async move {
-                    let mut metadata = PacketMetadata::default();
-
-                    let packet = match event {
-                        MsgToProcess::ToReceive(data, peer) | MsgToProcess::ToForward(data, peer) => {
-                            processor.from_incoming(data, &pkt_keypair, &peer).await
-                        }
-                        MsgToProcess::ToSend(data, path, finalizer) => {
-                            metadata.send_finalizer.replace(finalizer);
-
-                            processor.into_outgoing(data, &path).await
-                        }
-                    };
+                    let (packet, mut metadata) = processor.to_transport_packet_with_metadata(event, &pkt_keypair).await;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     if let Ok(TransportPacket::Forwarded { .. }) = &packet {
@@ -649,6 +654,8 @@ impl PacketInteraction {
                 let tbf = tbf.clone();
 
                 async move {
+                    tracing::debug!("tbf: check tag replay");
+
                     if let Ok(p) = &packet {
                         let packet_tag = match p {
                             TransportPacket::Final { packet_tag, .. } => Some(packet_tag),
@@ -733,7 +740,7 @@ impl PacketInteraction {
                     Ok((processed, metadata)) => match processed {
                         MsgProcessed::Send(..) | MsgProcessed::Forward(..) => {
                             let random_delay = mixer_cfg.random_delay();
-                            debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
+                            debug!("Mixer created a random packet delay {}ms", random_delay.as_millis());
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_QUEUE_SIZE.increment(1.0f64);
@@ -778,7 +785,7 @@ impl PacketInteraction {
 
                             match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                                 Ok(_) => match processed_tx.start_send(processed_msg) {
-                                    Ok(_) => {}
+                                    Ok(_) => debug!("Pipeline resulted in a processed msg"),
                                     Err(e) => error!("Failed to pass a processed ack message: {}", e),
                                 },
                                 Err(e) => {
@@ -842,9 +849,9 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use log::debug;
     use serial_test::serial;
     use std::{sync::Arc, time::Duration};
+    use tracing::debug;
     use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
@@ -1216,12 +1223,13 @@ mod tests {
         (received_packets, received_challenges, received_tickets)
     }
 
-    async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
-        let peers_addrs = peers
+    async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_onchain: Vec<Address>) -> TransportPath {
+        let peers_addrs = peers_offchain
             .iter()
-            .map(|p| (OffchainPublicKey::try_from(p).unwrap(), Address::random()))
+            .zip(peers_onchain)
+            .map(|(peer_id, addr)| (OffchainPublicKey::try_from(peer_id).unwrap(), addr))
             .collect::<Vec<_>>();
-        let mut cg = ChannelGraph::new(Address::random());
+        let mut cg = ChannelGraph::new(me);
         let mut last_addr = cg.my_address();
         for (_, addr) in peers_addrs.iter() {
             let c = ChannelEntry::new(
@@ -1249,7 +1257,7 @@ mod tests {
             }
         }
 
-        TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)
+        TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
             .await
             .unwrap()
             .0
@@ -1272,10 +1280,12 @@ mod tests {
 
         // Peer 1: start sending out packets
         let packet_path = resolve_mock_path(
-            PEERS[1..peer_count]
+            PEERS_CHAIN[0].public().to_address(),
+            PEERS[1..peer_count].iter().map(|p| p.public().into()).collect(),
+            PEERS_CHAIN[1..peer_count]
                 .iter()
-                .map(|p| p.public().into())
-                .collect::<Vec<PeerId>>(),
+                .map(|key| key.public().to_address())
+                .collect(),
         )
         .await;
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");

@@ -1,17 +1,16 @@
 use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
-use log::{trace, warn};
 use std::time::Duration;
+use tracing::{trace, warn};
 
 use async_std::task::sleep;
 
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
-/// Represents infinitely running timed ticks with a given period in a separate loop.
-///
-/// Could be later extended, so it supports multiple different periods and multiple actions.
+/// Construct an infinitely running background loop producing ticks with a given period
+/// with the maximum tick duration at most the period.
 pub async fn execute_on_tick<F>(cycle: Duration, action: impl Fn() -> F)
 where
     F: std::future::Future<Output = ()> + Send,

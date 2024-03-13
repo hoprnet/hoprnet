@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
@@ -11,7 +11,7 @@ use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler};
+use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -41,34 +41,6 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
         }
     } else {
         blocks
-    }
-}
-
-/// Configuration for the chain indexer functionality
-#[derive(Debug, Clone, Copy)]
-pub struct IndexerConfig {
-    /// The block at which the indexer should start
-    ///
-    /// It typically makes little sense to start indexing from the beginning
-    /// of the chain, all that is sufficient is to start indexing since the
-    /// relevant smart contracts were introduced into the chain.
-    ///
-    /// This value makes sure that indexing is relevant and as minimal as possible.
-    /// Default is 0.
-    pub start_block_number: u64,
-    /// Fetch token transactions
-    ///
-    /// Whether the token transaction topics should also be fetched.
-    /// Default is true.
-    pub fetch_token_transactions: bool,
-}
-
-impl Default for IndexerConfig {
-    fn default() -> Self {
-        Self {
-            start_block_number: 0,
-            fetch_token_transactions: true,
-        }
     }
 }
 
@@ -219,6 +191,18 @@ where
                         block_with_logs
                     }
                 })
+                .then(|block_with_logs| async {
+                    if let Err(error) = db
+                        .write()
+                        .await
+                        .update_latest_block_number(block_with_logs.block_id as u32)
+                        .await
+                    {
+                        error!("failed to write the latest block number into the database: {error}");
+                    }
+
+                    block_with_logs
+                })
                 .flat_map(|mut block_with_logs| {
                     // Assuming sorted and properly organized blocks,
                     // the following lines are just a sanity safety mechanism
@@ -226,15 +210,6 @@ where
                     stream::iter(block_with_logs.logs)
                 })
                 .then(|log| async {
-                    if let Err(error) = db
-                        .write()
-                        .await
-                        .update_latest_block_number(log.block_number as u32)
-                        .await
-                    {
-                        error!("failed to write the latest block number into the database: {error}");
-                    }
-
                     let snapshot = Snapshot::new(
                         U256::from(log.block_number),
                         U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
@@ -306,6 +281,7 @@ pub mod tests {
         contract::EthEvent,
     };
     use futures::{join, Stream};
+    use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
@@ -316,10 +292,22 @@ pub mod tests {
 
     use super::*;
 
+    lazy_static::lazy_static! {
+        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
+        static ref CHRIS: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
+
+        static ref RANDOM_ANNOUNCEMENT_CHAIN_EVENT: ChainEventType = ChainEventType::Announcement {
+            peer: (*OffchainKeypair::from_secret(&hex!("14d2d952715a51aadbd4cc6bfac9aa9927182040da7b336d37d5bb7247aa7566")).unwrap().public()).into(),
+            address: hex!("2f4b7662a192b8125bbf51cfbf1bf5cc00b2c8e5").into(),
+            multiaddresses: vec![Multiaddr::empty()],
+        };
+    }
+
     async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
         Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            Address::random(),
+            *ALICE,
         )))
     }
 
@@ -489,7 +477,7 @@ pub mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
-            logs: build_announcement_logs(Address::random(), 4, head_block - 1, U256::from(23u8)),
+            logs: build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8)),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
@@ -509,14 +497,6 @@ pub mod tests {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
-    }
-
-    fn random_announcement_chain_event() -> ChainEventType {
-        ChainEventType::Announcement {
-            peer: (*OffchainKeypair::random().public()).into(),
-            address: Address::random(),
-            multiaddresses: vec![Multiaddr::empty()],
-        }
     }
 
     #[async_std::test]
@@ -541,17 +521,17 @@ pub mod tests {
             // head - 1 sync block
             BlockWithLogs {
                 block_id: head_block - 1,
-                logs: build_announcement_logs(Address::random(), 1, head_block - 1, U256::from(23u8)),
+                logs: build_announcement_logs(*ALICE, 1, head_block - 1, U256::from(23u8)),
             },
             // head sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+                logs: build_announcement_logs(*BOB, 1, head_block, U256::from(23u8)),
             },
             // post-sync block
             BlockWithLogs {
                 block_id: head_block,
-                logs: build_announcement_logs(Address::random(), 1, head_block, U256::from(23u8)),
+                logs: build_announcement_logs(*CHRIS, 1, head_block, U256::from(23u8)),
             },
         ];
 
@@ -562,7 +542,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(blocks.len())
-            .returning(|_, _, _, _| Ok(Some(random_announcement_chain_event())));
+            .returning(|_, _, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());

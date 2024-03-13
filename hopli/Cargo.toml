@@ -8,7 +8,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 # using own fork until the PR was merged
-clap = { version = "4.4", features = ["derive", "env", "string"] }
+clap = { workspace = true }
 ethers = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -19,6 +19,8 @@ hoprd-keypair = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 log = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
@@ -28,5 +30,5 @@ hex-literal = { workspace = true }
 bindings = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 env_logger = { workspace = true }

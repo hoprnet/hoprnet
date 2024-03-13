@@ -1,4 +1,4 @@
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 use async_std::task::JoinHandle;
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};
@@ -10,8 +10,7 @@ use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_db::db::CoreEthereumDb;
 use chain_db::traits::HoprCoreEthereumDbActions;
-use chain_indexer::block::{Indexer, IndexerConfig};
-use chain_indexer::handlers::ContractEventHandlers;
+use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::client::native::SurfRequestor;
 use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
@@ -27,9 +26,9 @@ use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, info};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, info};
 use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
 use utils_db::db::DB;
 use utils_db::sqlite::SqliteShim;
@@ -238,8 +237,6 @@ async fn start_node_chain_logic(
 
 #[async_std::test]
 async fn integration_test_indexer() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();

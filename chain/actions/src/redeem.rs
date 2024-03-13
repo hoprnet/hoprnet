@@ -1,25 +1,25 @@
-//! This module contains the [TicketRedeemActions](redeem::TicketRedeemActions) trait defining actions regarding
+//! This module contains the [TicketRedeemActions] trait defining actions regarding
 //! ticket redemption.
 //!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue](action_queue::ActionQueue).
+//! operations via [ActionQueue](crate::action_queue::ActionQueue).
 //!
-//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions](redeem::TicketRedeemActions) trait:
-//! - [redeem_all_tickets](redeem::TicketRedeemActions::redeem_all_tickets)
-//! - [redeem_tickets_in_channel](redeem::TicketRedeemActions::redeem_tickets_in_channel)
-//! - [redeem_tickets_with_counterparty](redeem::TicketRedeemActions::redeem_tickets_with_counterparty)
-//! - [redeem_ticket](redeem::TicketRedeemActions::redeem_ticket)
+//! There are 4 functions that can be used to redeem tickets in the [TicketRedeemActions] trait:
+//! - [redeem_all_tickets](TicketRedeemActions::redeem_all_tickets)
+//! - [redeem_tickets_in_channel](TicketRedeemActions::redeem_tickets_in_channel)
+//! - [redeem_tickets_with_counterparty](TicketRedeemActions::redeem_tickets_with_counterparty)
+//! - [redeem_ticket](TicketRedeemActions::redeem_ticket)
 //!
 //! Each method first checks if the tickets are redeemable.
 //! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or
 //! [BeingAggregated](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingAggregated) in the DB),
 //! If they are redeemable, their state is changed to
 //! [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](action_queue::ActionQueue) so the redemption is soon executed on-chain.
+//! Subsequently, the ticket in such state is transmitted into the [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain.
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of each ticket redemption.
 //!
-//! See the details in [ActionQueue](action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -28,9 +28,9 @@ use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, warn};
 use std::ops::DerefMut;
 use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 use utils_db::errors::DbError;
 
 use crate::action_queue::{ActionSender, PendingAction};
@@ -99,20 +99,22 @@ where
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
 }
 
+#[tracing::instrument(level = "debug")]
 async fn unchecked_ticket_redeem<Db>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
     on_chain_tx_sender: ActionSender,
 ) -> Result<PendingAction>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + std::fmt::Debug,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions for ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> TicketRedeemActions for ChainActions<Db> {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(
@@ -142,6 +144,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     }
 
     /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_with_counterparty(
         &self,
         counterparty: &Address,
@@ -156,6 +159,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
     }
 
     /// Redeems all redeemable tickets in the given channel.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,
@@ -236,6 +240,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> TicketRedeemActions fo
 
     /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         let ch = self.db.read().await.get_channel(&ack_ticket.ticket.channel_id).await?;
         if let Some(channel) = ch {

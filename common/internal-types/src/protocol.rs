@@ -4,9 +4,9 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use tracing::warn;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -35,6 +35,7 @@ pub trait PeerAddressResolver {
 }
 
 /// Bloom filter for packet tags to detect packet replays.
+///
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.

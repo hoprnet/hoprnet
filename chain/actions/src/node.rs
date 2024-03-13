@@ -1,15 +1,15 @@
-//! This module contains the [NodeActions](node::NodeActions) trait defining action which relate to HOPR node itself.
+//! This module contains the [NodeActions] trait defining action which relate to HOPR node itself.
 //!
 //! An implementation of this trait is added to [ChainActions] which realizes the redemption
-//! operations via [ActionQueue](action_queue::ActionQueue).
+//! operations via [ActionQueue](crate::action_queue::ActionQueue).
 //!
-//! There are 3 functions that can be used to redeem tickets in the [NodeActions](node::NodeActions) trait:
-//! - [withdraw](node::NodeActions::withdraw)
-//! - [announce](node::NodeActions::announce)
-//! - [register_safe_by_node](node::NodeActions::register_safe_by_node)
+//! There are 3 functions that can be used to redeem tickets in the [NodeActions] trait:
+//! - [withdraw](NodeActions::withdraw)
+//! - [announce](NodeActions::announce)
+//! - [register_safe_by_node](NodeActions::register_safe_by_node)
 //!
-//! All necessary pre-requisites are checked by the implementation before the respective [Action](chain_types::actions::Action) is submitted
-//! to the [ActionQueue](action_queue::ActionQueue).
+//! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
+//! to the [ActionQueue](crate::action_queue::ActionQueue).
 use async_trait::async_trait;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
@@ -17,8 +17,8 @@ use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::info;
 use multiaddr::Multiaddr;
+use tracing::info;
 
 use crate::action_queue::PendingAction;
 use crate::errors::{
@@ -42,7 +42,8 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> NodeActions for ChainActions<Db> {
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()));
@@ -54,6 +55,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainA
         self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data =
@@ -80,6 +82,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync> NodeActions for ChainA
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction> {
         info!("initiating safe address registration of {safe_address}");
         self.tx_sender.send(Action::RegisterSafe(safe_address)).await
@@ -99,6 +102,7 @@ mod tests {
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
+    use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use hopr_crypto_types::prelude::Keypair;
@@ -112,34 +116,38 @@ mod tests {
     use utils_db::db::DB;
     use utils_db::CurrentDbShim;
 
+    lazy_static::lazy_static! {
+        static ref ALICE: Address = hex!("e1fe50e5046d5c05cc89872e244f045bbcdad742").into();
+        static ref BOB: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
+        static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).unwrap();
+    }
+
     #[async_std::test]
     async fn test_announce() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
-        let keypair = OffchainKeypair::random();
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
 
         let ma = announce_multiaddr.clone();
-        let pubkey_clone = keypair.public().clone();
+        let pubkey_clone = ALICE_OFFCHAIN.public().clone();
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_announce()
             .once()
             .withf(move |ad| {
                 let kb = ad.key_binding.clone().unwrap();
-                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == self_addr
+                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE
             })
             .returning(move |_| Ok(random_hash));
 
         let ma = announce_multiaddr.clone();
-        let pk = keypair.public().clone();
+        let pk = ALICE_OFFCHAIN.public().clone();
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
             .expect_register_expectation()
@@ -150,7 +158,7 @@ mod tests {
                     event_type: ChainEventType::Announcement {
                         peer: pk.into(),
                         multiaddresses: vec![ma.clone()],
-                        address: self_addr,
+                        address: *ALICE,
                     },
                 })
                 .boxed())
@@ -162,9 +170,9 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
         let tx_res = actions
-            .announce(&[announce_multiaddr], &keypair)
+            .announce(&[announce_multiaddr], &ALICE_OFFCHAIN)
             .await
             .expect("announcement call should not fail")
             .await
@@ -182,21 +190,19 @@ mod tests {
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let keypair = OffchainKeypair::random();
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
 
         db.write()
             .await
             .update_account_and_snapshot(
                 &AccountEntry::new(
-                    *keypair.public(),
-                    self_addr,
+                    *ALICE_OFFCHAIN.public(),
+                    *ALICE,
                     AccountType::Announced {
                         multiaddr: announce_multiaddr.clone(),
                         updated_block: 0,
@@ -215,9 +221,9 @@ mod tests {
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&[announce_multiaddr], &keypair).await;
+        let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
         assert!(
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
@@ -228,21 +234,19 @@ mod tests {
     async fn test_withdraw() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_withdraw()
             .times(1)
-            .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| *BOB == *dst && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -254,10 +258,10 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(self_addr, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .withdraw(bob, stake)
+            .withdraw(*BOB, stake)
             .await
             .unwrap()
             .await
@@ -278,12 +282,9 @@ mod tests {
     async fn test_should_not_withdraw_zero_amount() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(CurrentDbShim::new_in_memory().await),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -291,12 +292,12 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .withdraw(bob, Balance::zero(BalanceType::HOPR))
+                    .withdraw(*BOB, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
                     .unwrap(),

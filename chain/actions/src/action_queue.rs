@@ -1,6 +1,6 @@
-//! Defines the main FIFO MPSC queue for actions - the [ActionQueue](action_queue::ActionQueue) type.
+//! Defines the main FIFO MPSC queue for actions - the [ActionQueue] type.
 //!
-//! The [ActionQueue](action_queue::ActionQueue) acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
+//! The [ActionQueue] acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -13,13 +13,13 @@ use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 use crate::action_state::{ActionState, IndexerExpectation};
 use crate::errors::ChainActionsError::{
@@ -122,19 +122,14 @@ impl ActionSender {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// Configuration for the [ActionQueue]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct ActionQueueConfig {
     /// Maximum time (in seconds) to wait for the action to be confirmed on-chain and indexed
+    ///
     /// Defaults to 150 seconds.
+    #[default(Duration::from_secs(150))]
     pub max_action_confirmation_wait: Duration,
-}
-
-impl Default for ActionQueueConfig {
-    fn default() -> Self {
-        Self {
-            max_action_confirmation_wait: Duration::from_secs(150),
-        }
-    }
 }
 
 struct ExecutionContext<Db, S, TxExec>
@@ -385,6 +380,7 @@ where
                         if let Action::RedeemTicket(mut ack) = act {
                             error!("marking the acknowledged ticket as untouched - redeem action failed: {err}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
+
                             if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ack).await {
                                 error!("cannot mark {ack} as untouched: {e}");
                             }

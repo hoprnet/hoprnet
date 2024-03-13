@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use futures::{future::poll_fn, StreamExt};
 use libp2p_identity::PeerId;
 
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 
 use hopr_platform::time::native::current_time;
 
@@ -32,50 +32,55 @@ lazy_static::lazy_static! {
 
 const MAX_PARALLEL_PINGS: usize = 14;
 
-// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-// in case of faster input than output the memory might run out.
-//
-// The unboundedness relies on the fact that a back pressure mechanism exists on a
-// higher level of the business logic making sure that only a fixed maximum count
-// of pings ever enter the queues at any given time.
+/// Heartbeat send ping TX type
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
+/// in case of faster input than output the memory might run out.
+///
+/// The unboundedness relies on the fact that a back pressure mechanism exists on a
+/// higher level of the business logic making sure that only a fixed maximum count
+/// of pings ever enter the queues at any given time.
 pub type HeartbeatSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, ControlMessage)>;
+
+/// Heartbeat get pong RX type
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
+/// in case of faster input than output the memory might run out.
+///
+/// The unboundedness relies on the fact that a back pressure mechanism exists on a
+/// higher level of the business logic making sure that only a fixed maximum count
+/// of pings ever enter the queues at any given time.
 pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
+/// Result of the ping operation.
 pub type PingResult = std::result::Result<u64, ()>;
 
+/// External behavior that will be triggered once a [PingResult] is available.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: PingResult, version: String);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Configuration for the [Ping] mechanism
+#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
-    ///
-    /// Default is `14`.
+    #[default = 14]
     pub max_parallel_pings: usize,
     /// The timeout duration for an indiviual ping
-    ///
-    /// Default is `30_000` (30 seconds)
+    #[default(std::time::Duration::from_secs(30))]
     pub timeout: std::time::Duration, // `Duration` -> should be in millis,
 }
 
-impl Default for PingConfig {
-    fn default() -> Self {
-        Self {
-            max_parallel_pings: 14,
-            timeout: std::time::Duration::from_secs(30),
-        }
-    }
-}
-
+/// Trait for the ping operation itself.
 #[async_trait]
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
 
+/// Implementation of the ping mechanism
 #[derive(Debug)]
 pub struct Ping<T: PingExternalAPI + std::marker::Send> {
     config: PingConfig,
@@ -172,7 +177,8 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                             info!("Successfully pinged peer {}", peer);
                             Ok(current_time()
                                 .as_unix_timestamp()
-                                .saturating_sub(std::time::Duration::from_millis(start).div(2u32)))
+                                .saturating_sub(std::time::Duration::from_millis(start))
+                                .div(2u32))
                         } else {
                             error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
                             Err(())

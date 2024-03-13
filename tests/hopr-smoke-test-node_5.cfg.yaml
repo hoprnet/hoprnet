@@ -10,7 +10,6 @@ hopr:
   strategy:
     on_fail_continue: true
     allow_recursive: false
-    finalize_channel_closure: false
     strategies: []
   heartbeat:
     variance: 1
@@ -117,7 +116,3 @@ api:
   host:
     address: !IPv4 127.0.0.1
     port: 13305
-healthcheck:
-  enable: true
-  host: 127.0.0.1
-  port: 18085

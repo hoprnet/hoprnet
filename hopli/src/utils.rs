@@ -29,6 +29,9 @@ pub enum HelperErrors {
     #[error("unable to create identity")]
     UnableToCreateIdentity,
 
+    #[error("unable to update identity password")]
+    UnableToUpdateIdentityPassword,
+
     /// Error due to supplying a non-existing file name
     #[error("incorrect filename: {0}")]
     IncorrectFilename(String),

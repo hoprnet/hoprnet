@@ -1,13 +1,13 @@
 //! Module defining various Ethereum transaction payload generators for the actions.
 //!
-//! This module defines the basic [PayloadGenerator](payload::PayloadGenerator) trait that describes how an action
-//! is translated into a [TypedTransaction](chain_types::TypedTransaction) that can be submitted on-chain (via an RPC provider)
+//! This module defines the basic [PayloadGenerator] trait that describes how an action
+//! is translated into a [TypedTransaction] that can be submitted on-chain (via an RPC provider)
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
-//! - [BasicPayloadGenerator](payload::BasicPayloadGenerator) which implements generation of a direct EIP1559 transaction payload. This is currently
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
 //! not used by a HOPR node.
-//! - [SafePayloadGenerator](payload::SafePayloadGenerator) which implements generation of a payload that embeds the transaction data into the
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
 //! SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
 use crate::errors::{
@@ -530,22 +530,26 @@ pub fn convert_vrf_parameters(
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.get_decompressed_v().unwrap().to_bytes();
+    let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
         .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
-        .to_bytes();
+        // Safe: hash value is always in the allowed length boundaries,
+        //       only fails for longer values
+        // Safe: always encoding to secp256k1 whose field elements are in
+        //       allowed length boundaries
+        .expect("ticket hash exceeded hash2field boundaries or encoding to unsupported curve");
 
-    let h_v = off_chain.get_h_v_witness().to_bytes();
+    let h_v = off_chain.get_h_v_witness();
 
     Vrfparameters {
-        vx: U256::from_big_endian(&v[1..33]),
-        vy: U256::from_big_endian(&v[33..65]),
+        vx: U256::from_big_endian(&v.as_bytes()[1..33]),
+        vy: U256::from_big_endian(&v.as_bytes()[33..65]),
         s: U256::from_big_endian(&off_chain.s.to_bytes()),
         h: U256::from_big_endian(&off_chain.h.to_bytes()),
-        s_bx: U256::from_big_endian(&s_b[1..33]),
-        s_by: U256::from_big_endian(&s_b[33..65]),
-        h_vx: U256::from_big_endian(&h_v[1..33]),
-        h_vy: U256::from_big_endian(&h_v[33..65]),
+        s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),
+        s_by: U256::from_big_endian(&s_b.as_bytes()[33..65]),
+        h_vx: U256::from_big_endian(&h_v.as_bytes()[1..33]),
+        h_vy: U256::from_big_endian(&h_v.as_bytes()[33..65]),
     }
 }
 

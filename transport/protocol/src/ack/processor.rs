@@ -11,9 +11,9 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use log::{debug, error, trace, warn};
 use std::pin::Pin;
 use std::sync::Arc;
+use tracing::{debug, error, trace, warn};
 
 use async_std::task::spawn;
 
@@ -84,6 +84,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<Reply> {
         /*
             There are three cases:
@@ -160,6 +161,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
 
                 // replace the un-acked ticket with acked ticket.
+                debug!(ack = ack.ack_challenge().to_string(), "Replacing unack ticket with ack");
                 self.db
                     .write()
                     .await

@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
-clap = { version = "4.4", features = ["derive", "env", "string"] }
+clap = { workspace = true }
 chrono = "0.4.26"
 fern = "0.6.2"
 futures = { workspace = true }
@@ -20,13 +20,14 @@ hex = { workspace = true }
 home = "0.5"
 humantime = "2.1.0"
 lazy_static = { workspace = true, optional = true }
-log = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
 strum = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true }
@@ -37,7 +38,7 @@ hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 
 [features]
 default = ["prometheus"]

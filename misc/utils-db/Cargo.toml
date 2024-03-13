@@ -19,10 +19,10 @@ hex-literal = { workspace = true }
 pin-project-lite = "0.2.13"
 rusty-leveldb = { version = "3.0.0", default-features = false, optional = true }
 serde = { version = "1.0", features = ["derive"] }
-sqlx = { version = "0.7.3", optional = true, default-features = false, features = ["runtime-async-std", "sqlite", "macros", "migrate"] }
+sqlx = { workspace = true, optional = true }
 thiserror = "1.0"
 
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-platform = { workspace = true }
 
@@ -30,7 +30,7 @@ hopr-platform = { workspace = true }
 async-std = { version = "1.12.0", features = ["attributes"] }
 mockall = "0.11.3"
 scopeguard = "1.1.0"
-tempfile = "3.5.0"
+tempfile = { workspace = true }
 
 [features]
 default = ["sqlite"]

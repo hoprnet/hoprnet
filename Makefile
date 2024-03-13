@@ -410,9 +410,7 @@ endif
 .PHONY: generate-python-sdk
 generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
 generate-python-sdk:
-	$(cargo) build -p hoprd-api
-
-	hoprd-api-schema >| /tmp/openapi.spec.json
+	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
 	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
     
 	mkdir -p ./hoprd-sdk-python/

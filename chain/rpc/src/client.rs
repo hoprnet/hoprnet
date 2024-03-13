@@ -1,22 +1,24 @@
-//! This module defines HTTP clients for the purpose of interaction with an RPC provider.
+//! Extended `JsonRpcClient` abstraction.
 //!
-//! The major type implemented in this module is the [JsonRpcProviderClient](client::JsonRpcProviderClient)
+//! This module contains custom implementation of `ethers::providers::JsonRpcClient`
+//! which allows usage of non-`reqwest` based HTTP clients.
+//!
+//! The major type implemented in this module is the [JsonRpcProviderClient]
 //! which implements the [ethers_providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
 //!
-//! The [JsonRpcProviderClient](client::JsonRpcProviderClient) is abstract over a
-//! [HttpPostRequestor] trait, which makes it possible
+//! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
 //! Secondly, this abstraction also allows to implement WASM-compatible HTTP client if needed at some point.
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError};
-use log::{debug, trace, warn};
+use ethers::providers::{JsonRpcClient, JsonRpcError};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
+use tracing::{debug, warn};
 use validator::Validate;
 
 use crate::client::RetryAction::{NoRetry, RetryAfter};
@@ -52,70 +54,82 @@ lazy_static::lazy_static! {
 }
 
 /// Defines a retry policy suitable for `JsonRpcProviderClient`.
+///
 /// This retry policy distinguishes between 4 types of RPC request failures:
 /// - JSON RPC error (based on error code)
 /// - HTTP error (based on HTTP status)
 /// - Transport error (e.g. connection timeout)
 /// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
+///
 /// The policy will make up to `max_retries` once a JSON RPC request fails.
 /// Each retry `k > 0` will be separated by a delay of `initial_backoff * (1 + backoff_coefficient)^(k - 1)`,
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
 /// specified in `retryable_http_errors`.
+///
+/// The total wait time will be `(initial_backoff/backoff_coefficient) * ((1 + backoff_coefficient)^max_retries - 1)`.
+/// or `max_backoff`, whatever is lower.
+///
 /// Transport and connection errors (such as connection timeouts) are retried without backoff
 /// at a constant delay of `initial_backoff` if `backoff_on_transport_errors` is not set.
+///
 /// No more additional retries are allowed on new requests, if the maximum number of concurrent
 /// requests being retried has reached `max_retry_queue_size`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
     /// Maximum number of retries.
+    ///
     /// If `None` is given, will keep retrying indefinitely.
-    /// Default is 10.
+    ///
+    /// Default is 7.
     #[validate(range(min = 1))]
+    #[default(Some(7))]
     pub max_retries: Option<u32>,
     /// Initial wait before retries.
+    ///
     /// NOTE: Transport and connection errors (such as connection timeouts) are retried at
     /// a constant rate (no backoff) with this delay if `backoff_on_transport_errors` is not set.
+    ///
     /// Default is 1 second.
+    #[default(Duration::from_secs(1))]
     pub initial_backoff: Duration,
     /// Backoff coefficient by which will be each retry multiplied.
+    ///
     /// Must be non-negative. If set to `0`, no backoff will be applied and the
     /// requests will be retried at a constant rate.
+    ///
     /// Default is 1.001
     #[validate(range(min = 0))]
+    #[default(1.001)]
     pub backoff_coefficient: f64,
     /// Maximum backoff value.
+    ///
     /// Once reached, the requests will be retried at a constant rate with this timeout.
+    ///
     /// Default is 120 seconds.
+    #[default(Duration::from_secs(120))]
     pub max_backoff: Duration,
     /// Indicates whether to also apply backoff to transport and connection errors (such as connection timeouts).
+    ///
     /// Default is false.
     pub backoff_on_transport_errors: bool,
     /// List of JSON RPC errors that should be retried with backoff
+    ///
     /// Default is \[429, -32005, -32016\]
+    #[default(_code = "vec![-32005, -32016, 429]")]
     pub retryable_json_rpc_errors: Vec<i64>,
     /// List of HTTP errors that should be retried with backoff.
+    ///
     /// Default is \[429\]
+    #[default(_code = "vec![http_types::StatusCode::TooManyRequests]")]
     pub retryable_http_errors: Vec<http_types::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
+    ///
     /// If any additional request fails after this number is attained, it won't be retried.
+    ///
     /// Defaults to 3
     #[validate(range(min = 1))]
+    #[default = 3]
     pub max_retry_queue_size: u32,
-}
-
-impl Default for SimpleJsonRpcRetryPolicy {
-    fn default() -> Self {
-        Self {
-            max_retries: Some(10),
-            initial_backoff: Duration::from_secs(1),
-            backoff_coefficient: 1.001,
-            max_backoff: Duration::from_secs(120),
-            backoff_on_transport_errors: false,
-            retryable_json_rpc_errors: vec![-32005, -32016, 429],
-            retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
-            max_retry_queue_size: 3,
-        }
-    }
 }
 
 impl SimpleJsonRpcRetryPolicy {
@@ -239,12 +253,14 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
+        debug!("sending rpc request {method}");
+
         // Perform the actual request
         let start = std::time::Instant::now();
         let body = self.requestor.http_post(self.url.as_ref(), payload).await?;
         let req_duration = start.elapsed();
 
-        trace!("rpc call {method} took {}ms", req_duration.as_millis());
+        debug!("rpc call {method} took {}ms", req_duration.as_millis());
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_RPC_CALLS_TIMING.observe(&[method], req_duration.as_secs_f64());
@@ -405,24 +421,19 @@ pub mod native {
     use crate::HttpPostRequestor;
 
     /// Common configuration for all native `HttpPostRequestor`s
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]
     pub struct HttpPostRequestorConfig {
         /// Timeout for HTTP POST request
+        ///
         /// Defaults to 5 seconds.
+        #[default(Duration::from_secs(5))]
         pub http_request_timeout: Duration,
 
         /// Maximum number of HTTP redirects to follow
+        ///
         /// Defaults to 3
+        #[default(3)]
         pub max_redirects: u8,
-    }
-
-    impl Default for HttpPostRequestorConfig {
-        fn default() -> Self {
-            Self {
-                http_request_timeout: Duration::from_secs(5),
-                max_redirects: 3,
-            }
-        }
     }
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
@@ -506,7 +517,7 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor + Debug>(
 pub mod tests {
     use chain_types::utils::create_anvil;
     use chain_types::{ContractAddresses, ContractInstances};
-    use ethers_providers::JsonRpcClient;
+    use ethers::providers::JsonRpcClient;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;

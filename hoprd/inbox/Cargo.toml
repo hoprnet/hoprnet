@@ -17,6 +17,7 @@ async-trait = { workspace = true }
 ringbuffer = "0.15.0"
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
+smart-default = { workspace = true }
 validator = { workspace = true }
 
 hopr-internal-types = { workspace = true }

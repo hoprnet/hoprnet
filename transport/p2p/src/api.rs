@@ -1,25 +1,36 @@
-use futures::{channel::mpsc, future::poll_fn, Stream};
+use futures::{channel::mpsc, Stream};
 use futures_lite::StreamExt;
 use libp2p::identity::PeerId;
 use std::pin::Pin;
 
 use core_network::messaging::ControlMessage;
-use log::error;
+use tracing::error;
 
 use crate::errors::{P2PError, Result};
 
+/// Base type of the heartbeat protocol challenge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeartbeatChallenge(pub PeerId, pub ControlMessage);
 
+/// Base type of the manual ping challenge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 
-// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
-// case of faster input than output the memory might run out, but these are protected
-// by a bounded queue managing the request generation.
+/// Heartbeat request RX type.
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
+/// case of faster input than output the memory might run out, but these are protected
+/// by a bounded queue managing the request generation.
 pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
+
+/// Heartbeat response TX type.
+///
+/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
+/// case of faster input than output the memory might run out, but these are protected
+/// by a bounded queue managing the request generation.
 pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
+/// Heartbeat mechanism API implementations for usage inside the libp2p stack.
 pub struct HeartbeatResponder {
     sender: HeartbeatResponseTx,
 }
@@ -30,24 +41,16 @@ impl HeartbeatResponder {
         Self { sender }
     }
 
-    pub async fn record_pong(
-        &mut self,
-        pong: (PeerId, std::result::Result<(ControlMessage, String), ()>),
-    ) -> Result<()> {
-        match poll_fn(|cx| Pin::new(&mut self.sender).poll_ready(cx)).await {
-            Ok(_) => match self.sender.start_send(pong) {
-                Err(e) => Err(P2PError::Notification(format!(
-                    "Failed to send notification to heartbeat mechanism: {}",
-                    e
-                ))),
-                _ => Ok(()),
-            },
-            Err(_) => Err(P2PError::ProtocolHeartbeat(
-                "The heartbeat mechanism cannot be notified, the receiver was closed".into(),
-            )),
-        }
+    pub fn record_pong(&mut self, pong: (PeerId, std::result::Result<(ControlMessage, String), ()>)) -> Result<()> {
+        self.sender
+            .unbounded_send(pong)
+            .map_err(|e| P2PError::Notification(format!("Failed to send notification to heartbeat mechanism: {}", e)))
     }
 
+    /// Generate the response for a given challenge.
+    ///
+    /// In case of an error generates a response to a random challenge leading to a
+    /// failed pong on the receiver side.
     pub fn generate_challenge_response(challenge: &ControlMessage) -> ControlMessage {
         match ControlMessage::generate_pong_response(challenge) {
             Ok(value) => value,
@@ -60,7 +63,7 @@ impl HeartbeatResponder {
     }
 }
 
-/// Requester of heartbeats implementing the `std::future::Stream` trait.
+/// Heartbeat mechanism trigger implementing the `std::future::Stream` trait.
 pub struct HeartbeatRequester {
     receiver: HeartbeaRequestRx,
 }
@@ -94,6 +97,7 @@ impl Stream for HeartbeatRequester {
     }
 }
 
+/// Manual ping mechanism trigger implementing the `std::future::Stream` trait.
 pub struct ManualPingRequester {
     receiver: HeartbeaRequestRx,
 }
@@ -206,9 +210,7 @@ mod tests {
         let peer = PeerId::random();
         let pong = ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request()).unwrap();
 
-        let result = responder
-            .record_pong((peer, Ok((pong.clone(), "version".to_owned()))))
-            .await;
+        let result = responder.record_pong((peer, Ok((pong.clone(), "version".to_owned()))));
         assert!(result.is_ok());
 
         let notification = pong_receiver.next().await;
@@ -229,7 +231,7 @@ mod tests {
         let pong = ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request()).unwrap();
 
         pong_receiver.close();
-        let result = responder.record_pong((peer, Ok((pong.clone(), "".to_owned())))).await;
+        let result = responder.record_pong((peer, Ok((pong.clone(), "".to_owned()))));
         assert!(result.is_err());
 
         let notification = pong_receiver.next().await;

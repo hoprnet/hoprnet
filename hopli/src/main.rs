@@ -59,6 +59,18 @@ enum Commands {
 
 #[async_std::main]
 async fn main() -> Result<(), HelperErrors> {
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let format = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(false);
+
+    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+
     let cli = Cli::parse();
 
     match cli.command {

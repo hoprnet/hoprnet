@@ -24,10 +24,11 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, strum::Display)]
+#[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// Channel is closed.
+    #[default]
     Closed,
     /// Channel is opened.
     Open,
@@ -35,12 +36,6 @@ pub enum ChannelStatus {
     /// The timestamp marks the *earliest* possible time when the channel can transition into the `Closed` state.
     #[strum(serialize = "PendingToClose")]
     PendingToClose(SystemTime),
-}
-
-impl Default for ChannelStatus {
-    fn default() -> Self {
-        Self::Closed
-    }
 }
 
 // Manual implementation of PartialEq, because we need only precision up to seconds in PendingToClose

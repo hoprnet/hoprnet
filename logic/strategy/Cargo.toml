@@ -1,6 +1,6 @@
 [package]
 name = "core-strategy"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -21,6 +21,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
 semver = "1.0"
+smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
@@ -33,7 +34,7 @@ core-transport = { workspace = true }
 chain-db = { workspace = true }
 chain-actions = { workspace = true }
 utils-db = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
@@ -44,7 +45,7 @@ async-std = { workspace = true }
 chain-types = { workspace = true }
 env_logger = "0.10.0"
 mockall = "0.11.4"
-hex-literal = "0.4.1"
+hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = "0.3.28"
 

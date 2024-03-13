@@ -1,3 +1,32 @@
+//! ## Aggregating Strategy
+//! This strategy automates ticket aggregation on different channel/ticket events.
+//! Note that the aggregating strategy can be combined with the Auto Redeem Strategy above.
+//!
+//! Ticket aggregation is an interactive process and requires cooperation of the ticket issuer, the aggregation
+//! will fail if the aggregation takes more than `aggregation_timeout` (in seconds). This does not affect runtime of the
+//! strategy, since the ticket aggregation and awaiting it is performed on a separate thread.
+//!
+//! This strategy listens for two distinct channel events and triggers the interactive aggregation based on different criteria:
+//!
+//! ### 1) New winning acknowledged ticket event
+//!
+//! This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain channel reaches
+//! an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
+//! The strategy can independently also check if the unrealized balance (current balance _minus_ total unredeemed unaggregated tickets value) in a certain channel
+//! has not gone over `unrelalized_balance_ratio` percent of the current balance in that channel. If that happens, the strategy will also initiate
+//! ticket aggregation.
+//!
+//! ### 2) Channel transition from `Open` to `PendingToClose` event
+//!
+//! If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
+//! This behavior does not have any additional criteria, unlike in the previous event.
+//!
+//! The aggregation on channel closure slightly differs from the one that happens on a new winning ticket.
+//! The difference lies in the on-failure behaviour.
+//! If the aggregation on channel closure fails, the unaggregated tickets in that channel are automatically send for redeeming.
+//! When this strategy is triggered from the
+//!
+//! For details on default parameters see [AggregatingStrategyConfig].
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
@@ -6,7 +35,6 @@ use chain_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -16,6 +44,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -35,50 +64,47 @@ lazy_static::lazy_static! {
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
-#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
+    ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
     /// Default is 100.
     #[validate(range(min = 2))]
+    #[default(Some(100))]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
     /// that triggers the ticket aggregation when exceeded.
+    ///
     /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
     /// This condition is independent of `aggregation_threshold`.
     ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[default(Some(0.9))]
     pub unrealized_balance_ratio: Option<f32>,
 
     /// Maximum time to wait for the ticket aggregation to complete.
+    ///
     /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
     ///
     /// Default is 60 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[default(Duration::from_secs(60))]
     pub aggregation_timeout: Duration,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
-    /// to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
-    /// or `unrealized_balance_ratio` thresholds are met on that channel.
+    /// to the `PendingToClose` state.
+    ///
+    /// This happens regardless if `aggregation_threshold` or `unrealized_balance_ratio` thresholds are met on that channel.
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
+    #[default = true]
     pub aggregate_on_channel_close: bool,
-}
-
-impl Default for AggregatingStrategyConfig {
-    fn default() -> Self {
-        Self {
-            aggregation_threshold: Some(100),
-            unrealized_balance_ratio: Some(0.9),
-            aggregation_timeout: Duration::from_secs(60),
-            aggregate_on_channel_close: true,
-        }
-    }
 }
 
 /// Represents a strategy that starts aggregating tickets in a certain
@@ -139,7 +165,7 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
 {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
@@ -203,7 +229,7 @@ where
 #[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + 'static,
+    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + Sync + 'static,
     T: Send + Sync,
     U: Send + Sync,
@@ -490,7 +516,7 @@ mod tests {
         dbs
     }
 
-    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + 'static>(
+    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
         db_alice: Arc<RwLock<Db>>,
         db_bob: Arc<RwLock<Db>>,
         key_alice: &ChainKeypair,

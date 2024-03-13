@@ -43,7 +43,7 @@ jobs:
 
   load-tests:
     name: Load Tests
-    runs-on: ubuntu-2-core
+    runs-on: self-hosted-hoprnet-small
     steps:
 
       - name: Checkout hoprnet repository
