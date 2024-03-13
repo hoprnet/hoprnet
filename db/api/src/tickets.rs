@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::SystemTime;
+use tracing::error;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -173,6 +174,7 @@ pub trait HoprDbTicketOperations {
     async fn process_received_aggregated_ticket(
         &self,
         aggregated_ticket: hopr_internal_types::channels::Ticket,
+        chain_keypair: &ChainKeypair,
     ) -> Result<AcknowledgedTicket>;
 
     async fn aggregate_tickets(
@@ -359,14 +361,6 @@ impl HoprDbTicketOperations for HoprDb {
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
     ) -> Result<Ticket> {
-        // if acked_tickets.is_empty() {
-        //     return Err(ProtocolTicketAggregation("At least one ticket required".to_owned()));
-        // }
-
-        // if acked_tickets.len() == 1 {
-        //     return Ok(acked_tickets[0].ticket.clone());
-        // }
-
         // let domain_separator = self
         //     .db
         //     .read()
@@ -493,117 +487,145 @@ impl HoprDbTicketOperations for HoprDb {
     async fn process_received_aggregated_ticket(
         &self,
         aggregated_ticket: hopr_internal_types::channels::Ticket,
+        chain_keypair: &ChainKeypair,
     ) -> Result<AcknowledgedTicket> {
-        // let channel_id = aggregated_ticket.channel_id;
-        // debug!("received aggregated {aggregated_ticket}");
-        //
-        // let stored_acked_tickets = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_acknowledged_tickets_range(
-        //         &aggregated_ticket.channel_id,
-        //         aggregated_ticket.channel_epoch,
-        //         aggregated_ticket.index,
-        //         aggregated_ticket.index + aggregated_ticket.index_offset as u64 - 1u64,
-        //     )
-        //     .await?;
+        if aggregated_ticket.win_prob() != 1.0f64 {
+            return Err(DbError::LogicalError(
+                "Aggregated tickets must have 100% win probability".into(),
+            ));
+        }
 
-        // if stored_acked_tickets.is_empty() {
-        //     debug!("Received unexpected aggregated ticket in channel {}", channel_id);
-        //     return Err(ProtocolTicketAggregation("Unexpected ticket".into()));
-        // }
+        let myself = self.clone();
 
-        // let mut stored_value = Balance::zero(BalanceType::HOPR);
+        let channel_id = aggregated_ticket.channel_id;
 
-        // for stored_acked_ticket in stored_acked_tickets.iter() {
-        //     stored_value = stored_value.add(&stored_acked_ticket.ticket.amount);
-        // }
+        let (channel_entry, domain_separator) =
+            self.nest_transaction_in_db(None, TargetDb::Index)
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let entry = myself
+                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .await?
+                            .ok_or(DbError::ChannelNotFound(channel_id))?;
 
-        // // Value of received ticket can be higher (profit for us) but not lower
-        // if aggregated_ticket.amount.lt(&stored_value) {
-        //     debug!(
-        //         "Dropping aggregated ticket in channel {} because its value is lower than sum of stored tickets",
-        //         channel_id
-        //     );
-        //     return Err(ProtocolTicketAggregation(
-        //         "Value of received aggregated ticket is too low".into(),
-        //     ));
-        // }
+                        if entry.status != ChannelStatus::Open {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        }
 
-        // if aggregated_ticket.win_prob() != 1.0f64 {
-        //     debug!(
-        //         "Received aggregated ticket in channel {} win probability less than 100%",
-        //         channel_id
-        //     );
-        //     return Err(ProtocolTicketAggregation(
-        //         "Aggregated tickets must have 100% win probability".into(),
-        //     ));
-        // }
+                        // TODO: this should not be needed, because there are no tickets
+                        // for channels not associated with us?
+                        // // Perform sanity checks on the arguments
+                        // assert_eq!(
+                        //     ChannelDirection::Incoming,
+                        //     channel.direction(&self.me).expect("must be own channel"),
+                        //     "aggregation request can happen on incoming channels only"
+                        // );
 
-        // let first_stored_ticket = stored_acked_tickets.first().unwrap();
+                        let domain_separator =
+                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("domain separator missing".into())
+                            })?;
 
-        // let domain_separator = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_channels_domain_separator()
-        //     .await?
-        //     .ok_or_else(|| {
-        //         debug!(
-        //             "cannot process aggregated ticket in channel {} due to missing domain separator",
-        //             channel_id
-        //         );
-        //         ProtocolTicketAggregation("Missing domain separator".into())
-        //     })?;
+                        Ok((entry, domain_separator))
+                    })
+                })
+                .await?;
 
-        // // calculate the new current ticket index
-        // let current_ticket_index_from_aggregated_ticket =
-        //     U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
+        let acknowledged_tickets = self
+            .nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .all(tx.as_ref())
+                        .await
+                        .map_err(DbError::BackendError)
+                })
+            })
+            .await?;
 
-        // let acked_aggregated_ticket = AcknowledgedTicket::new(
-        //     aggregated_ticket,
-        //     first_stored_ticket.response.clone(),
-        //     first_stored_ticket.signer,
-        //     &self.chain_key,
-        //     &domain_separator,
-        // )
-        // .map_err(|e| {
-        //     ProtocolTicketAggregation(format!(
-        //         "Cannot create acknowledged ticket from aggregated ticket {}",
-        //         e
-        //     ))
-        // })?;
+        if acknowledged_tickets.is_empty() {
+            debug!("Received unexpected aggregated ticket in channel {channel_id}");
+            return Err(DbError::LogicalError(format!(
+                "failed insert aggregated ticket, because no tickets seem to be aggregated for '{channel_id}'",
+            )));
+        }
 
-        // if acked_aggregated_ticket
-        //     .verify(
-        //         &first_stored_ticket.signer,
-        //         &(&self.chain_key).into(),
-        //         &domain_separator,
-        //     )
-        //     .is_err()
-        // {
-        //     debug!(
-        //         "Received an aggregated ticket in channel {} that is invalid. Dropping ticket.",
-        //         channel_id
-        //     );
-        //     return Err(ProtocolTicketAggregation("Aggregated ticket is invalid".into()));
-        // }
+        let stored_value = acknowledged_tickets
+            .iter()
+            .map(|m| BalanceType::HOPR.balance_bytes(&m.amount))
+            .fold(Balance::zero(BalanceType::HOPR), |acc, amount| acc.add(amount));
 
-        // self.db
-        //     .write()
-        //     .await
-        //     .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
-        //     .await?;
+        // Value of received ticket can be higher (profit for us) but not lower
+        if aggregated_ticket.amount.lt(&stored_value) {
+            error!("Aggregated ticket value in '{channel_id}' is lower than sum of stored tickets",);
+            return Err(DbError::LogicalError(
+                "Value of received aggregated ticket is too low".into(),
+            ));
+        }
 
-        // self.db
-        //     .write()
-        //     .await
-        //     .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
-        //     .await?;
+        let acknowledged_tickets = acknowledged_tickets
+            .into_iter()
+            .map(|m| model_to_acknowledged_ticket(&m, domain_separator, &chain_keypair).map_err(DbError::from))
+            .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
-        // Ok(acked_aggregated_ticket)
-        Err(DbError::LogicalError("TODO".into()))
+        // can be done, because the tickets collection is tested for emptiness before
+        let first_stored_ticket = acknowledged_tickets.first().unwrap();
+
+        // calculate the new current ticket index
+        let current_ticket_index_from_aggregated_ticket =
+            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
+
+        let acked_aggregated_ticket = AcknowledgedTicket::new(
+            aggregated_ticket,
+            first_stored_ticket.response.clone(),
+            first_stored_ticket.signer,
+            &chain_keypair,
+            &domain_separator,
+        )?;
+
+        if acked_aggregated_ticket
+            .verify(&first_stored_ticket.signer, &(chain_keypair).into(), &domain_separator)
+            .is_err()
+        {
+            debug!("Aggregated ticket in '{channel_id}' is invalid. Dropping ticket.",);
+            return Err(DbError::LogicalError("Aggregated ticket is invalid".into()));
+        }
+
+        let ticket = acked_aggregated_ticket.clone();
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    let deleted = ticket::Entity::delete_many()
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    // TODO: check that delete row count == length of current collection
+
+                    ticket::Entity::insert::<hopr_db_entity::ticket::ActiveModel>(ticket.into())
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    // self.db
+                    //     .write()
+                    //     .await
+                    //     .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
+                    //     .await?;
+
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await?;
+
+        Ok(acked_aggregated_ticket)
     }
 
     async fn calculate_aggregatable_tickets_in_channel(
