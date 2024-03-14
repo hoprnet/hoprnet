@@ -22,7 +22,9 @@ use async_trait::async_trait;
 use chain_actions::ChainActions;
 use chain_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::Network;
-use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
+use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -124,16 +126,20 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, T>(
+    pub fn new<Db, Db2, T, U, V>(
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
+        new_db: Db2,
         network: Arc<Network<T>>,
         chain_actions: ChainActions<Db>,
-        ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
+        ticket_aggregator: AwaitingAggregator<U, V, Db2>,
     ) -> Self
     where
         Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
+        Db2: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
         T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+        U: Sync + Send + std::fmt::Debug + 'static,
+        V: Sync + Send + std::fmt::Debug + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
@@ -152,7 +158,7 @@ impl MultiStrategy {
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
                     *sub_cfg,
-                    db.clone(),
+                    new_db.clone(),
                     chain_actions.clone(),
                     ticket_aggregator.clone(),
                 ))),
@@ -177,6 +183,7 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             db.clone(),
+                            new_db.clone(),
                             network.clone(),
                             chain_actions.clone(),
                             ticket_aggregator.clone(),

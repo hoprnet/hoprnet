@@ -65,7 +65,10 @@ use chain_db::db::CoreEthereumDb;
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
-use core_strategy::strategy::{MultiStrategy, SingularStrategy};
+use core_strategy::{
+    aggregating::AwaitingAggregator,
+    strategy::{MultiStrategy, SingularStrategy},
+};
 use core_transport::libp2p::identity::PeerId;
 use core_transport::{
     build_index_updater, build_network, build_packet_actions, build_ticket_aggregation, build_transport_components,
@@ -344,7 +347,7 @@ where
         new_db.clone(),
     );
 
-    let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
+    let ticket_aggregation = build_ticket_aggregation(new_db.clone(), &me_onchain);
 
     let contract_addrs = ContractAddresses {
         announcements: chain_config.announcements,
@@ -371,9 +374,15 @@ where
     let multi_strategy = Arc::new(MultiStrategy::new(
         cfg.strategy,
         db.clone(),
+        new_db.clone(),
         network.clone(),
         chain_actions.clone(),
-        ticket_aggregation.writer(),
+        AwaitingAggregator::new(
+            new_db.clone(),
+            me_onchain.clone(),
+            ticket_aggregation.writer(),
+            cfg.protocol.ticket_aggregation.timeout,
+        ),
     ));
     debug!("initialized strategies: {multi_strategy:?}");
 

@@ -181,7 +181,7 @@ pub trait HoprDbTicketOperations {
     ) -> Result<AcknowledgedTicket>;
 
     async fn aggregate_tickets(
-        &mut self,
+        &self,
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
@@ -361,7 +361,7 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn aggregate_tickets(
-        &mut self,
+        &self,
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
