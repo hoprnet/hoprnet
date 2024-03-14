@@ -31,8 +31,9 @@ use async_trait::async_trait;
 use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -176,24 +177,30 @@ where
     T: Send,
     U: Send,
 {
-    async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
+    async fn start_aggregation(
+        &self,
+        channel: &Hash,
+        criteria: AggregationPrerequisites,
+        redeem_if_failed: bool,
+    ) -> crate::errors::Result<()> {
         trace!("starting aggregation in {channel}");
 
         if let Err(e) = self
             .ticket_aggregator
-            .aggregate_tickets_in_the_channel(&channel.get_id())
+            .aggregate_tickets_in_the_channel(&channel, Some(criteria))
             .await
         {
             warn!("could not aggregate tickets: {e}");
             if redeem_if_failed {
                 info!("initiating redemption of all tickets in {channel} after aggregation failure");
 
-                if let Err(e) = self.chain_actions.redeem_tickets_in_channel(&channel, false).await {
-                    error!("failed to issue redeeming of all tickets in {channel}: {e}");
-                    return Err(e.into());
-                } else {
-                    return Ok(());
-                }
+                // TODO: redeem in channel actions should be migrated for this to use only the hash
+                // if let Err(e) = self.chain_actions.redeem_tickets_in_channel(channel, false).await {
+                //     error!("failed to issue redeeming of all tickets in {channel}: {e}");
+                //     return Err(e.into());
+                // } else {
+                //     return Ok(());
+                // }
 
                 // We do not need to await the redemption completion of all the tickets
             }
@@ -218,56 +225,12 @@ where
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 
-        let channel = match self.db.get_channel_by_id(None, channel_id.clone()).await? {
-            Some(channel) => channel,
-            None => {
-                error!("encountered {ack} in a non-existing channel!");
-                return Err(ChannelDoesNotExist.into());
-            }
+        let criteria = AggregationPrerequisites {
+            min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(2) as usize,
+            min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
         };
 
-        let (aggregatable_tickets, unredeemed_value) = self
-            .ticket_aggregator
-            .calculate_aggregatable_tickets_in_channel(&channel_id)
-            .await?;
-
-        let mut can_aggregate = false;
-
-        // Check the aggregation threshold
-        if let Some(agg_threshold) = self.cfg.aggregation_threshold {
-            if aggregatable_tickets >= agg_threshold {
-                info!("{channel_id} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
-                can_aggregate = true;
-            } else {
-                debug!("{channel_id} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
-            }
-        }
-        if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
-
-            // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
-            // and there are at least two tickets
-            if unredeemed_value.ge(&diminished_balance) {
-                if aggregatable_tickets > 1 {
-                    info!("{channel_id} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
-                    can_aggregate = true;
-                } else {
-                    debug!("{channel_id} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
-                }
-            } else {
-                debug!(
-                    "{channel_id} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
-                );
-            }
-        }
-
-        // Proceed with aggregation
-        if can_aggregate {
-            self.start_aggregation(channel, false).await
-        } else {
-            debug!("channel {channel_id} has not met the criteria for aggregation");
-            Err(CriteriaNotSatisfied)
-        }
+        self.start_aggregation(&channel_id, criteria, false).await
     }
 
     async fn on_own_channel_changed(
@@ -285,20 +248,15 @@ where
                 debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
+
             info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
-            let (aggregatable_tickets, unredeemed_value) = self
-                .ticket_aggregator
-                .calculate_aggregatable_tickets_in_channel(&channel.get_id())
-                .await?;
+            let criteria = AggregationPrerequisites {
+                min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(1) as usize,
+                min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
+            };
 
-            if aggregatable_tickets > 1 {
-                debug!("{channel} has {aggregatable_tickets} aggregatable tickets");
-                self.start_aggregation(*channel, true).await
-            } else {
-                debug!("closing {channel} does not have more than 1 tickets to aggregate");
-                Ok(())
-            }
+            Ok(self.start_aggregation(&channel.get_id(), criteria, true).await?)
         } else {
             Ok(())
         }

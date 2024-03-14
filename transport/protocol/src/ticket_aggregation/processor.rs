@@ -14,6 +14,7 @@ use futures::{
 };
 use futures_lite::stream::{Stream, StreamExt};
 use hopr_crypto_types::prelude::*;
+pub use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -56,7 +57,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
-    ToSend(Hash, TicketAggregationFinalizer),
+    ToSend(Hash, Option<AggregationPrerequisites>, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
@@ -388,16 +389,12 @@ where
         }
     }
 
-    pub async fn calculate_aggregatable_tickets_in_channel(&self, channel: &Hash) -> Result<(u32, Balance)> {
-        Ok(self
-            .db
-            .calculate_aggregatable_tickets_in_channel(channel, &self.ck)
-            .await
-            .map_err(|e| ProtocolTicketAggregation(e.to_string()))?)
-    }
-
-    pub async fn aggregate_tickets_in_the_channel(&self, channel: &Hash) -> Result<()> {
-        let mut awaiter = self.writer.clone().aggregate_tickets(channel)?;
+    pub async fn aggregate_tickets_in_the_channel(
+        &self,
+        channel: &Hash,
+        prerequisites: Option<AggregationPrerequisites>,
+    ) -> Result<()> {
+        let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
             error!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
@@ -498,11 +495,16 @@ impl<T, U> TicketAggregationActions<T, U> {
     }
 
     /// Pushes a new collection of tickets into the processing.
-    pub fn aggregate_tickets(&mut self, channel: &Hash) -> Result<TicketAggregationAwaiter> {
+    pub fn aggregate_tickets(
+        &mut self,
+        channel: &Hash,
+        prerequisites: Option<AggregationPrerequisites>,
+    ) -> Result<TicketAggregationAwaiter> {
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
             channel.clone(),
+            prerequisites,
             TicketAggregationFinalizer::new(tx),
         ))?;
 
@@ -607,11 +609,12 @@ where
                                 }
                             }
                     }
-                    TicketAggregationToProcess::ToSend(channel, finalizer) => {
-                        match db.prepare_aggregation_in_channel(&channel, &chain_key).await {
-                            Ok((source, tickets)) => {
+                    TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
+                        match db.prepare_aggregation_in_channel(&channel, &chain_key, prerequsites).await {
+                            Ok(Some((source, tickets))) => {
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
+                            Ok(None) => { finalizer.finalize(); None },
                             Err(_) => None,
                         }
                     }

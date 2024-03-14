@@ -496,7 +496,7 @@ where
         Ok(self
             .ticket_aggregate_actions
             .clone()
-            .aggregate_tickets(&entry.get_id())?
+            .aggregate_tickets(&entry.get_id(), None)?
             .consume_and_wait(std::time::Duration::from_millis(60000))
             .await?)
     }
