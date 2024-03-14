@@ -1,10 +1,13 @@
 use async_stream::stream;
+use libp2p_identity::PeerId;
 use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::SystemTime;
+use tracing::error;
+use tracing::info;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -219,6 +222,19 @@ pub trait HoprDbTicketOperations {
         chain_keypair: &ChainKeypair,
     ) -> Result<(OffchainPublicKey, Vec<AcknowledgedTicket>)>;
 
+    async fn process_received_aggregated_ticket(
+        &self,
+        aggregated_ticket: hopr_internal_types::channels::Ticket,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<AcknowledgedTicket>;
+
+    async fn aggregate_tickets(
+        &mut self,
+        destination: OffchainPublicKey,
+        mut acked_tickets: Vec<AcknowledgedTicket>,
+        me: &ChainKeypair,
+    ) -> Result<hopr_internal_types::channels::Ticket>;
+
     /// Processes the acknowledgements for the pending tickets
     ///
     /// There are three cases:
@@ -374,6 +390,297 @@ impl HoprDbTicketOperations for HoprDb {
                 })
             })
             .await
+    }
+
+    async fn aggregate_tickets(
+        &mut self,
+        destination: OffchainPublicKey,
+        mut acked_tickets: Vec<AcknowledgedTicket>,
+        me: &ChainKeypair,
+    ) -> Result<hopr_internal_types::channels::Ticket> {
+        if acked_tickets.is_empty() {
+            return Err(DbError::LogicalError("At least one ticket required".to_owned()));
+        }
+
+        if acked_tickets.len() == 1 {
+            return Ok(acked_tickets[0].ticket.clone());
+        }
+
+        acked_tickets.sort();
+        acked_tickets.dedup();
+
+        let myself = self.clone();
+        let chain_keypair = me.clone();
+
+        let (channel_entry, channel_id, destination, domain_separator) =
+            self.nest_transaction_in_db(None, TargetDb::Index)
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let address = myself
+                            .resolve_chain_key(&destination)
+                            .await?
+                            .ok_or(DbError::LogicalError(format!(
+                                "peer '{}' has no chain key record",
+                                destination.to_peerid_str()
+                            )))?;
+
+                        let channel_id = generate_channel_id(&(&chain_keypair).into(), &address);
+
+                        let entry = myself
+                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .await?
+                            .ok_or(DbError::ChannelNotFound(channel_id))?;
+
+                        if entry.status != ChannelStatus::Open {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        }
+
+                        // TODO: this should not be needed, because there are no tickets
+                        // for channels not associated with us?
+                        // // Perform sanity checks on the arguments
+                        // assert_eq!(
+                        //     ChannelDirection::Incoming,
+                        //     channel.direction(&self.me).expect("must be own channel"),
+                        //     "aggregation request can happen on incoming channels only"
+                        // );
+
+                        let domain_separator =
+                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("domain separator missing".into())
+                            })?;
+
+                        Ok((entry, channel_id, address, domain_separator))
+                    })
+                })
+                .await?;
+
+        let channel_balance = channel_entry.balance;
+        let channel_epoch = channel_entry.channel_epoch;
+
+        let mut final_value = Balance::zero(BalanceType::HOPR);
+
+        for (i, acked_ticket) in acked_tickets.iter().enumerate() {
+            if channel_id != acked_ticket.ticket.channel_id {
+                return Err(DbError::LogicalError(format!(
+                    "aggregated ticket has an invalid channel id {}",
+                    acked_ticket.ticket.channel_id
+                )));
+            }
+
+            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
+                return Err(DbError::LogicalError("Channel epochs do not match".to_owned()));
+            }
+
+            if i + 1 < acked_tickets.len()
+                && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
+                    > acked_tickets[i + 1].ticket.index
+            {
+                return Err(DbError::LogicalError(
+                    "Tickets with overlapping index intervals".to_owned(),
+                ));
+            }
+
+            if acked_ticket
+                .verify(&(me).into(), &destination, &domain_separator)
+                .is_err()
+            {
+                return Err(DbError::LogicalError("Not a valid ticket".to_owned()));
+            }
+
+            if !acked_ticket.is_winning_ticket(&domain_separator) {
+                return Err(DbError::LogicalError("Not a winning ticket".to_owned()));
+            }
+
+            final_value = final_value.add(&acked_ticket.ticket.amount);
+            if final_value.gt(&channel_balance) {
+                return Err(DbError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
+            }
+
+            // #[cfg(all(feature = "prometheus", not(test)))]
+            // METRIC_AGGREGATED_TICKETS.increment();
+        }
+
+        info!(
+            "aggregated {} tickets in channel {channel_id} with total value {final_value}",
+            acked_tickets.len()
+        );
+
+        let first_acked_ticket = acked_tickets.first().unwrap();
+        let last_acked_ticket = acked_tickets.last().unwrap();
+
+        // #[cfg(all(feature = "prometheus", not(test)))]
+        // METRIC_AGGREGATION_COUNT.increment();
+
+        // trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
+        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
+        // {
+        //     self.db
+        //         .write()
+        //         .await
+        //         .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
+        //         .await?;
+        // }
+
+        hopr_internal_types::channels::Ticket::new(
+            &destination,
+            &final_value,
+            first_acked_ticket.ticket.index.into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
+            1.0, // Aggregated tickets have always 100% winning probability
+            channel_epoch,
+            first_acked_ticket.ticket.challenge.clone(),
+            &me,
+            &domain_separator,
+        )
+        .map_err(|e| e.into())
+    }
+
+    async fn process_received_aggregated_ticket(
+        &self,
+        aggregated_ticket: hopr_internal_types::channels::Ticket,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<AcknowledgedTicket> {
+        if aggregated_ticket.win_prob() != 1.0f64 {
+            return Err(DbError::LogicalError(
+                "Aggregated tickets must have 100% win probability".into(),
+            ));
+        }
+
+        let myself = self.clone();
+
+        let channel_id = aggregated_ticket.channel_id;
+
+        let (channel_entry, domain_separator) =
+            self.nest_transaction_in_db(None, TargetDb::Index)
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let entry = myself
+                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .await?
+                            .ok_or(DbError::ChannelNotFound(channel_id))?;
+
+                        if entry.status != ChannelStatus::Open {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        }
+
+                        // TODO: this should not be needed, because there are no tickets
+                        // for channels not associated with us?
+                        // // Perform sanity checks on the arguments
+                        // assert_eq!(
+                        //     ChannelDirection::Incoming,
+                        //     channel.direction(&self.me).expect("must be own channel"),
+                        //     "aggregation request can happen on incoming channels only"
+                        // );
+
+                        let domain_separator =
+                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("domain separator missing".into())
+                            })?;
+
+                        Ok((entry, domain_separator))
+                    })
+                })
+                .await?;
+
+        let acknowledged_tickets = self
+            .nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .all(tx.as_ref())
+                        .await
+                        .map_err(DbError::BackendError)
+                })
+            })
+            .await?;
+
+        if acknowledged_tickets.is_empty() {
+            debug!("Received unexpected aggregated ticket in channel {channel_id}");
+            return Err(DbError::LogicalError(format!(
+                "failed insert aggregated ticket, because no tickets seem to be aggregated for '{channel_id}'",
+            )));
+        }
+
+        let stored_value = acknowledged_tickets
+            .iter()
+            .map(|m| BalanceType::HOPR.balance_bytes(&m.amount))
+            .fold(Balance::zero(BalanceType::HOPR), |acc, amount| acc.add(amount));
+
+        // Value of received ticket can be higher (profit for us) but not lower
+        if aggregated_ticket.amount.lt(&stored_value) {
+            error!("Aggregated ticket value in '{channel_id}' is lower than sum of stored tickets",);
+            return Err(DbError::LogicalError(
+                "Value of received aggregated ticket is too low".into(),
+            ));
+        }
+
+        let acknowledged_tickets = acknowledged_tickets
+            .into_iter()
+            .map(|m| model_to_acknowledged_ticket(&m, domain_separator, &chain_keypair).map_err(DbError::from))
+            .collect::<Result<Vec<AcknowledgedTicket>>>()?;
+
+        // can be done, because the tickets collection is tested for emptiness before
+        let first_stored_ticket = acknowledged_tickets.first().unwrap();
+
+        // calculate the new current ticket index
+        let current_ticket_index_from_aggregated_ticket =
+            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
+
+        let acked_aggregated_ticket = AcknowledgedTicket::new(
+            aggregated_ticket,
+            first_stored_ticket.response.clone(),
+            first_stored_ticket.signer,
+            &chain_keypair,
+            &domain_separator,
+        )?;
+
+        if acked_aggregated_ticket
+            .verify(&first_stored_ticket.signer, &(chain_keypair).into(), &domain_separator)
+            .is_err()
+        {
+            debug!("Aggregated ticket in '{channel_id}' is invalid. Dropping ticket.",);
+            return Err(DbError::LogicalError("Aggregated ticket is invalid".into()));
+        }
+
+        let ticket = acked_aggregated_ticket.clone();
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    let deleted = ticket::Entity::delete_many()
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    // TODO: check that delete row count == length of current collection
+
+                    ticket::Entity::insert::<hopr_db_entity::ticket::ActiveModel>(ticket.into())
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    // TODO: is this necessary for an incoming channel?
+                    // self.db
+                    //     .write()
+                    //     .await
+                    //     .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
+                    //     .await?;
+
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await?;
+
+        Ok(acked_aggregated_ticket)
     }
 
     async fn calculate_aggregatable_tickets_in_channel(
