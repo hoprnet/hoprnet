@@ -35,7 +35,6 @@ use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
 
-/// ABI of Safe contract
 abigen!(
     SafeSingleton,
     r"[
@@ -51,7 +50,6 @@ abigen!(
 ]"
 );
 
-/// ABI of Multisend contract
 abigen!(
     MultiSend,
     r"[
