@@ -1,5 +1,4 @@
 use async_stream::stream;
-use libp2p_identity::PeerId;
 use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
@@ -206,6 +205,8 @@ pub trait HoprDbTicketOperations {
         channel: &Hash,
         chain_keypair: &ChainKeypair,
     ) -> Result<(OffchainPublicKey, Vec<AcknowledgedTicket>)>;
+
+    async fn rollback_aggregation_in_channel(&self, channel: Hash) -> Result<()>;
 
     async fn process_received_aggregated_ticket(
         &self,
@@ -497,6 +498,7 @@ impl HoprDbTicketOperations for HoprDb {
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_AGGREGATION_COUNT.increment();
 
+        // TODO: Add this to a new table
         // trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
@@ -641,6 +643,7 @@ impl HoprDbTicketOperations for HoprDb {
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     let deleted = ticket::Entity::delete_many()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
                         .filter(
                             hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
                         )
@@ -716,9 +719,11 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    let channel_id = channel_entry.get_id().to_hex();
+
                     // verify that no aggregation is in progress in the channel
                     if ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
                         .filter(
                             hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
                         )
@@ -731,7 +736,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     // find the index of the last ticket being redeemed
                     let idx_of_last_being_redeemed = ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
                         .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed as u8))
                         .order_by_desc(hopr_db_entity::ticket::Column::Index)
                         .one(tx.as_ref())
@@ -741,6 +746,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     // get the list of all tickets to be aggregated
                     let to_be_aggregated = ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id))
                         .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
                         .filter(
                             hopr_db_entity::ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8),
@@ -818,9 +824,11 @@ impl HoprDbTicketOperations for HoprDb {
             .ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
+                    let channel_id = channel_entry.get_id().to_hex();
+
                     // verify that no aggregation is in progress in the channel
                     if ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
                         .filter(
                             hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
                         )
@@ -836,7 +844,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     // find the index of the last ticket being redeemed
                     let idx_of_last_being_redeemed = ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
                         .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed as u8))
                         .order_by_desc(hopr_db_entity::ticket::Column::Index)
                         .one(tx.as_ref())
@@ -846,6 +854,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                     // get the list of all tickets to be aggregated
                     let to_be_aggregated = ticket::Entity::find()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
                         .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
                         .filter(
                             hopr_db_entity::ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8),
@@ -876,6 +885,7 @@ impl HoprDbTicketOperations for HoprDb {
                     let to_be_aggregated_count = to_be_aggregated.len();
                     if to_be_aggregated_count > 0 {
                         let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
+                            .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id))
                             .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
                             .filter(hopr_db_entity::ticket::Column::Index.lte(last_idx_to_take))
                             .filter(
@@ -910,6 +920,34 @@ impl HoprDbTicketOperations for HoprDb {
             .await?;
 
         Ok((peer, tickets))
+    }
+
+    async fn rollback_aggregation_in_channel(&self, channel: Hash) -> Result<()> {
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    // mark all being aggregated tickets as untouched
+                    let rolled_back: sea_orm::UpdateResult = ticket::Entity::update_many()
+                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel.to_hex()))
+                        .filter(
+                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                        )
+                        .col_expr(
+                            hopr_db_entity::ticket::Column::State,
+                            Expr::value(Value::Int(Some(AcknowledgedTicketStatus::Untouched as u8 as i32))),
+                        )
+                        .exec(tx.as_ref())
+                        .await?;
+
+                    debug!(
+                        "rollback happened for ticket aggregation in '{channel}' with {} tickets rolled back as a result",
+                        rolled_back.rows_affected
+                    );
+
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await
     }
 
     async fn update_ticket_states_and_fetch<'a>(
