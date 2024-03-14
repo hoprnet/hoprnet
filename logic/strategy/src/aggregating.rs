@@ -28,7 +28,6 @@
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
 pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
 use hopr_crypto_types::prelude::Hash;
@@ -48,12 +47,10 @@ use std::{
 use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
-use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::{strategy::SingularStrategy, Strategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
-use hopr_primitive_types::prelude::UnitaryFloatOps;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -113,12 +110,11 @@ pub struct AggregatingStrategyConfig {
 /// was successful.
 pub struct AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
 {
-    db: Db,
     chain_actions: A,
     ticket_aggregator: Arc<AwaitingAggregator<T, U, Db>>,
     cfg: AggregatingStrategyConfig,
@@ -126,7 +122,7 @@ where
 
 impl<Db, T, U, A> Debug for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
@@ -138,7 +134,7 @@ where
 
 impl<Db, T, U, A> Display for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
@@ -150,20 +146,18 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
 {
     pub fn new(
         cfg: AggregatingStrategyConfig,
-        db: Db,
         chain_actions: A,
         ticket_aggregator: AwaitingAggregator<T, U, Db>,
     ) -> Self {
         Self {
             cfg,
-            db,
             chain_actions,
             ticket_aggregator: Arc::new(ticket_aggregator),
         }

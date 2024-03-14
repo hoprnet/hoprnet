@@ -158,7 +158,6 @@ impl MultiStrategy {
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
                     *sub_cfg,
-                    new_db.clone(),
                     chain_actions.clone(),
                     ticket_aggregator.clone(),
                 ))),
