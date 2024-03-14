@@ -7,11 +7,11 @@ use futures::StreamExt;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
 use std::ops::Sub;
 use std::sync::Arc;
 use std::time::Duration;
-use serde_with::serde_as;
 use tracing::{debug, error, info};
 use validator::Validate;
 
