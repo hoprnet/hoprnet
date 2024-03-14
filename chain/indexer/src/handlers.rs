@@ -309,7 +309,7 @@ where
 
                         match matching_tickets.len().cmp(&1) {
                             Ordering::Equal => {
-                                let chain_info = self.db.get_chain_data(Some(tx)).await?;
+                                let chain_info = self.db.get_indexer_data(Some(tx)).await?;
                                 let redeemed_ticket = matching_tickets.pop().unwrap();
                                 let ack_ticket = model_to_acknowledged_ticket(
                                     &redeemed_ticket,
@@ -1168,7 +1168,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.get_chain_data(None).await.unwrap().nr_enabled);
+        assert!(db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
 
     #[async_std::test]
@@ -1199,7 +1199,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.get_chain_data(None).await.unwrap().nr_enabled);
+        assert!(!db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
 
     #[async_std::test]
@@ -1309,11 +1309,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.get_chain_data(None).await.unwrap().channels_dst.is_none());
+        assert!(db.get_indexer_data(None).await.unwrap().channels_dst.is_none());
 
         handlers.on_event(handlers.addresses.channels, 0u32, log).await.unwrap();
 
-        assert_eq!(separator, db.get_chain_data(None).await.unwrap().channels_dst.unwrap());
+        assert_eq!(
+            separator,
+            db.get_indexer_data(None).await.unwrap().channels_dst.unwrap()
+        );
     }
 
     #[async_std::test]
@@ -1646,7 +1649,7 @@ pub mod tests {
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]),
         };
 
-        assert_eq!(db.get_chain_data(None).await.unwrap().ticket_price, None);
+        assert_eq!(db.get_indexer_data(None).await.unwrap().ticket_price, None);
 
         handlers
             .on_event(handlers.addresses.price_oracle, 0u32, log)
@@ -1656,7 +1659,11 @@ pub mod tests {
         // TODO: check for Vec<ChainEventType> content here
 
         assert_eq!(
-            db.get_chain_data(None).await.unwrap().ticket_price.map(|p| p.amount()),
+            db.get_indexer_data(None)
+                .await
+                .unwrap()
+                .ticket_price
+                .map(|p| p.amount()),
             Some(U256::from(123u64))
         );
     }

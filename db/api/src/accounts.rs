@@ -17,18 +17,35 @@ use crate::errors::DbError::MissingAccount;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
+/// Defines DB API for accessing HOPR accounts and corresponding on-chain announcements.
+///
+/// Accounts store the Chain and Packet key information, so as the
+/// routable network information, if the account has been announced as well.
 #[async_trait]
 pub trait HoprDbAccountOperations {
+    /// Retrieves the account entry using a Packet key or Chain key.
     async fn get_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<Option<AccountEntry>>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    /// Retrieves account entry about this node's account.
+    /// This a unique account in the database that must always be present.
     async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry>;
 
+    /// Retrieves entries of accounts with routable address announcements (if `public_only` is `true`)
+    /// or about all accounts without routeable address announcements (if `public_only` is `false`).
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
 
+    /// Inserts new account entry to the database.
+    /// Fails if such entry already exists.
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()>;
 
+    /// Inserts routable address announcement linked to a specific entry.
+    ///
+    /// If an account matching the given `key` (chain or off-chain key) does not exist, an
+    /// error is returned.
+    /// If such `multiaddr` has been already announced for the given account `key`, only
+    /// the `at_block` will be updated on that announcement.
     async fn insert_announcement<'a, T>(
         &'a self,
         tx: OptTx<'a>,
@@ -39,14 +56,20 @@ pub trait HoprDbAccountOperations {
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    /// Deletes all address announcements for the given account.
     async fn delete_all_announcements<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    /// Deletes account with the given `key` (chain or off-chain).
     async fn delete_account<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<()>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
 
+    /// Translates the given Chain or Packet key to its counterpart.
+    ///
+    /// If `Address` is given as `key`, the result will contain `OffchainPublicKey` if present.
+    /// If `OffchainPublicKey` is given as `key`, the result will contain `Address` if present.
     async fn translate_key<'a, T>(&'a self, tx: OptTx<'a>, key: T) -> Result<Option<ChainOrPacketKey>>
     where
         T: Into<ChainOrPacketKey> + Send + Sync;
@@ -157,7 +180,7 @@ impl HoprDbAccountOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     if account.is_self && myself.get_self_account(Some(tx)).await.is_ok() {
-                        return Err(DbError::LogicalError("cannot insert multiple self-accounts".into()))
+                        return Err(DbError::LogicalError("cannot insert multiple self-accounts".into()));
                     }
 
                     let new_account = account::ActiveModel {
@@ -439,13 +462,22 @@ mod tests {
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
 
-        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self())
-            .await
-            .unwrap();
+        db.insert_account(
+            None,
+            AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self(),
+        )
+        .await
+        .unwrap();
 
-        assert!(db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self())
+        assert!(
+            db.insert_account(
+                None,
+                AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced).make_self()
+            )
             .await
-            .is_err(), "should fail inserting multiple self accounts");
+            .is_err(),
+            "should fail inserting multiple self accounts"
+        );
     }
 
     #[async_std::test]

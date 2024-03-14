@@ -347,7 +347,7 @@ where
     pub async fn action_loop(mut self) {
         let channel_dst = self
             .db
-            .get_chain_data(None)
+            .get_indexer_data(None)
             .await
             .map_err(ChainActionsError::from)
             .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))

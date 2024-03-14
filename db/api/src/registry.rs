@@ -8,15 +8,20 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
+/// Defines DB access API for network registry operations.
 #[async_trait]
 pub trait HoprDbRegistryOperations {
+    /// Sets the given node as allowed or denied in network registry.
     async fn set_access_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address, allowed: bool)
         -> Result<()>;
 
+    /// Returns `true` if the given node is allowed in network registry.
     async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 
+    /// Sets or unsets Safe NR eligibility.
     async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
 
+    /// Returns `true` if the given Safe is NR eligible.
     async fn is_safe_eligible<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 }
 

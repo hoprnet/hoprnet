@@ -75,7 +75,7 @@ pub struct PeerSelector {
     /// Lower and upper bounds (both inclusive) on last seen timestamp.
     pub last_seen: (Option<SystemTime>, Option<SystemTime>),
     /// Lower and upper bounds (both inclusive) on peer quality.
-    pub quality: (Option<f64>, Option<f64>)
+    pub quality: (Option<f64>, Option<f64>),
 }
 
 impl PeerSelector {
@@ -104,7 +104,7 @@ impl Default for PeerSelector {
     fn default() -> Self {
         Self {
             last_seen: (None, None),
-            quality: (None, None)
+            quality: (None, None),
         }
     }
 }
@@ -570,7 +570,10 @@ mod tests {
 
         assert!(db.cleanup_network_peers().await.is_ok());
 
-        let not_found_peer = db.get_network_peer(&peer_id).await.expect("should not encounter a DB issue");
+        let not_found_peer = db
+            .get_network_peer(&peer_id)
+            .await
+            .expect("should not encounter a DB issue");
 
         assert_eq!(not_found_peer, None);
     }
@@ -673,7 +676,9 @@ mod tests {
 
         assert_ne!(peer_status, peer_status_from_db, "entries must not be equal");
 
-        db.update_network_peer(peer_status.clone()).await.expect("update should succeed");
+        db.update_network_peer(peer_status.clone())
+            .await
+            .expect("update should succeed");
 
         let peer_status_from_db = db
             .get_network_peer(&peer_id)
@@ -765,14 +770,14 @@ mod tests {
                     peer_status.update_quality(i);
                 }
 
-                db.update_network_peer(peer_status).await.expect("must update peer status");
+                db.update_network_peer(peer_status)
+                    .await
+                    .expect("must update peer status");
             }
         }
 
         let peers_from_db: Vec<PeerId> = db
-            .get_network_peers(PeerSelector::default().with_quality_gte(0.501_f64),
-                               false,
-            )
+            .get_network_peers(PeerSelector::default().with_quality_gte(0.501_f64), false)
             .await
             .expect("should get stream")
             .map(|s| s.id)
@@ -842,7 +847,9 @@ mod tests {
             peer_status.update_quality(i);
         }
 
-        db.update_network_peer(peer_status).await.expect("must be able to update peer");
+        db.update_network_peer(peer_status)
+            .await
+            .expect("must be able to update peer");
 
         let stats = db.network_peer_stats(0.2).await.expect("must get stats");
         assert_eq!(
@@ -867,7 +874,9 @@ mod tests {
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
 
-        db.update_network_peer(peer_status).await.expect("must be able to update peer");
+        db.update_network_peer(peer_status)
+            .await
+            .expect("must be able to update peer");
 
         let stats = db.network_peer_stats(0.2).await.expect("must get stats");
         assert_eq!(

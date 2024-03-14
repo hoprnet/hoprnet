@@ -15,12 +15,12 @@ use hopr_platform::time::native::current_time;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 
+use hopr_db_api::peers::PeerSelector;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_primitive_types::prelude::*,
 };
-use hopr_db_api::peers::PeerSelector;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

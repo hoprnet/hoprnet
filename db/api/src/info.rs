@@ -9,54 +9,94 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
+/// Contains various on-chain information collected by Indexer,
+/// such as domain separators, ticket price Network Registry status and last indexed block number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct OnChainData {
+pub struct IndexerData {
+    /// Ledger smart contract domain separator
     pub ledger_dst: Option<Hash>,
+    /// Node safe registry smart contract domain separator
     pub safe_registry_dst: Option<Hash>,
+    /// Channels smart contract domain separator
     pub channels_dst: Option<Hash>,
+    /// Current ticket price
     pub ticket_price: Option<Balance>,
+    /// Network registry state
     pub nr_enabled: bool,
+    /// Last block processed by the indexer
     pub last_indexed_block: u32,
 }
 
+/// Contains information about node's safe.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SafeInfo {
+    /// Safe address
     pub safe_address: Address,
+    /// Safe module address.
     pub module_address: Address,
 }
 
+/// Enumerates different domain separators
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DomainSeparator {
+    /// Ledger smart contract domain separator
     Ledger,
+    /// Node safe registry smart contract domain separator
     SafeRegistry,
+    /// Channels smart contract domain separator
     Channel,
 }
 
+/// Defines DB access API for various node information.
 #[async_trait]
 pub trait HoprDbInfoOperations {
+    /// Gets node's Safe balance.
     async fn get_safe_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
+    /// Sets node's Safe balance.
     async fn set_safe_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
 
+    /// Gets node's Safe allowance.
     async fn get_safe_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
 
+    /// Sets node's Safe allowance.
     async fn set_safe_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
 
+    /// Gets node's Safe addresses info.
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
 
+    /// Sets node's Safe addresses info.
     async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()>;
 
-    async fn get_chain_data<'a>(&'a self, tx: OptTx<'a>) -> Result<OnChainData>;
+    /// Gets stored Indexer data.
+    /// To update information stored in [IndexerData], use the individual setter methods,
+    /// such as [`HoprDbInfoOperations::set_last_indexed_block`]... etc.
+    async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData>;
 
+    /// Sets a domain separator.
+    /// To retrieve stored domain separator info, use [`HoprDbInfoOperations::get_indexer_data`].
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()>;
 
+    /// Updates the ticket price.
+    /// To retrieve stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`].
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
+    /// Updates the last indexed block.
+    /// To retrieve stored last indexed block, use [`HoprDbInfoOperations::get_indexer_data`].
     async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
+    /// Updates the network registry state.
+    /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`].
     async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()>;
 
+    /// Gets global setting value with the given key.
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>>;
 
+    /// Sets the global setting value with the given key.
+    ///
+    /// If setting with the given `key` does not exist, it is created.
+    /// /// If setting with the given `key` exists, it is created.
+    /// If `value` is `None` and setting with the given `key` exists it is removed.
     async fn set_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str, value: Option<&[u8]>) -> Result<()>;
 }
 
@@ -176,7 +216,7 @@ impl HoprDbInfoOperations for HoprDb {
             .await
     }
 
-    async fn get_chain_data<'a>(&'a self, tx: OptTx<'a>) -> Result<OnChainData> {
+    async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -204,7 +244,7 @@ impl HoprDbInfoOperations for HoprDb {
                         None
                     };
 
-                    Ok::<OnChainData, DbError>(OnChainData {
+                    Ok::<IndexerData, DbError>(IndexerData {
                         ledger_dst,
                         safe_registry_dst,
                         channels_dst,
@@ -427,12 +467,12 @@ mod tests {
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        assert_eq!(0, db.get_chain_data(None).await.unwrap().last_indexed_block);
+        assert_eq!(0, db.get_indexer_data(None).await.unwrap().last_indexed_block);
 
         let block_num = 100000;
         db.set_last_indexed_block(None, block_num).await.unwrap();
 
-        assert_eq!(block_num, db.get_chain_data(None).await.unwrap().last_indexed_block);
+        assert_eq!(block_num, db.get_indexer_data(None).await.unwrap().last_indexed_block);
     }
 
     #[async_std::test]

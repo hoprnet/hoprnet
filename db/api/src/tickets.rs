@@ -84,6 +84,7 @@ pub struct TicketSelector {
 }
 
 impl TicketSelector {
+    /// Create a new ticket selector given the `channel_id` and `epoch`.
     pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
         Self {
             channel_id,
@@ -99,21 +100,25 @@ impl TicketSelector {
         self.index.is_some()
     }
 
+    /// Returns this instance with ticket index set.
     pub fn with_index(mut self, index: u64) -> Self {
         self.index = Some(index);
         self
     }
 
+    /// Returns this instance with ticket state set.
     pub fn with_state(mut self, state: AcknowledgedTicketStatus) -> Self {
         self.state = Some(state);
         self
     }
 
+    /// Returns this instance without ticket state set.
     pub fn with_no_state(mut self) -> Self {
         self.state = None;
         self
     }
 
+    /// Returns this instance with `only_aggregated` flag value.
     pub fn with_aggregated_only(mut self, only_aggregated: bool) -> Self {
         self.only_aggregated = only_aggregated;
         self
@@ -163,26 +168,6 @@ impl From<TicketSelector> for SimpleExpr {
         }
 
         expr
-    }
-}
-
-pub struct RunningAggregation {}
-
-impl RunningAggregation {
-    pub fn channel_id(&self) -> Hash {
-        Default::default()
-    }
-
-    pub fn size(&self) -> usize {
-        0
-    }
-
-    pub fn total_unaggregated_value(&self) -> Balance {
-        BalanceType::HOPR.zero()
-    }
-
-    pub async fn aggregate(self) -> Result<()> {
-        unimplemented!()
     }
 }
 
@@ -280,7 +265,7 @@ pub struct AllTicketStatistics {
 impl HoprDbTicketOperations for HoprDb {
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
         let channel_dst = self
-            .get_chain_data(tx)
+            .get_indexer_data(tx)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
@@ -446,7 +431,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // );
 
                         let domain_separator =
-                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
                             })?;
 
@@ -577,7 +562,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // );
 
                         let domain_separator =
-                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
                             })?;
 
@@ -717,7 +702,7 @@ impl HoprDbTicketOperations for HoprDb {
                         // );
 
                         let domain_separator =
-                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
                             })?;
 
@@ -820,7 +805,7 @@ impl HoprDbTicketOperations for HoprDb {
                             )))?;
 
                         let domain_separator =
-                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
                             })?;
 
@@ -933,7 +918,7 @@ impl HoprDbTicketOperations for HoprDb {
         new_state: AcknowledgedTicketStatus,
     ) -> Result<BoxStream<'a, AcknowledgedTicket>> {
         let channel_dst = self
-            .get_chain_data(None)
+            .get_indexer_data(None)
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
@@ -1112,7 +1097,7 @@ impl HoprDbTicketOperations for HoprDb {
                             }
 
                             let domain_separator =
-                                myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                     crate::errors::DbError::LogicalError("domain separator missing".into())
                                 })?;
 
@@ -1159,7 +1144,7 @@ impl HoprDbTicketOperations for HoprDb {
                         ))
                     })?;
 
-                    let domain_separator = myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                    let domain_separator = myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                         crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
                     })?;
 
@@ -1261,7 +1246,7 @@ impl HoprDbTicketOperations for HoprDb {
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
-                            let chain_data = myself.get_chain_data(Some(tx)).await?;
+                            let chain_data = myself.get_indexer_data(Some(tx)).await?;
 
                             let domain_separator = chain_data.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
@@ -1431,7 +1416,7 @@ impl HoprDb {
 
                             let old_ticket_index = ticket_index.fetch_add(1, Ordering::SeqCst) as u128;
 
-                            let ticket_price = myself.get_chain_data(Some(tx)).await?.ticket_price;
+                            let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
 
                             Some((
                                 {

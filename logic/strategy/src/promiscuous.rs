@@ -36,7 +36,9 @@ use hopr_crypto_random::OsRng;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::errors::DbError;
 use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::peers::{HoprDbPeersOperations, PeerSelector};
 use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_api::HoprDbAllOperations;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -45,8 +47,6 @@ use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use validator::Validate;
-use hopr_db_api::HoprDbAllOperations;
-use hopr_db_api::peers::{HoprDbPeersOperations, PeerSelector};
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -208,47 +208,47 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> Result<HashMap<Address, f64>> {
-        Ok(
-            self.db.get_network_peers(PeerSelector::default(), false)
-                .await?
-                .filter_map(|status| async move {
-                    // Check if peer reports any version
-                    if let Some(version) = status
-                        .peer_version
-                        .clone()
-                        .and_then(|v| semver::Version::from_str(&v).ok())
-                    {
-                        // Check if the reported version matches the version semver expression
-                        if self.cfg.minimum_peer_version.matches(&version) {
-                            if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
-                                // Resolve peer's chain key and average quality
-                                if let Some(addr) = self
-                                        .db
-                                        .resolve_chain_key(&offchain_key)
-                                        .await
-                                        .and_then(|addr| addr.ok_or(DbError::MissingAccount)) {
-                                    Some((addr, status.get_average_quality()))
-                                } else {
-                                    error!("could not find on-chain address for {k_clone}");
-                                    None
-                                }
+        Ok(self
+            .db
+            .get_network_peers(PeerSelector::default(), false)
+            .await?
+            .filter_map(|status| async move {
+                // Check if peer reports any version
+                if let Some(version) = status
+                    .peer_version
+                    .clone()
+                    .and_then(|v| semver::Version::from_str(&v).ok())
+                {
+                    // Check if the reported version matches the version semver expression
+                    if self.cfg.minimum_peer_version.matches(&version) {
+                        if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
+                            // Resolve peer's chain key and average quality
+                            if let Some(addr) = self
+                                .db
+                                .resolve_chain_key(&offchain_key)
+                                .await
+                                .and_then(|addr| addr.ok_or(DbError::MissingAccount))
+                            {
+                                Some((addr, status.get_average_quality()))
                             } else {
-                                error!("encountered invalid peer id: {}", status.id);
+                                error!("could not find on-chain address for {k_clone}");
                                 None
                             }
                         } else {
-                            debug!("version of peer {} reports non-matching version {version}", status.id);
+                            error!("encountered invalid peer id: {}", status.id);
                             None
                         }
                     } else {
-                        error!("cannot get version for peer id: {}", status.id);
+                        debug!("version of peer {} reports non-matching version {version}", status.id);
                         None
                     }
-                })
-                .collect()
-                .await
-        )
-
+                } else {
+                    error!("cannot get version for peer id: {}", status.id);
+                    None
+                }
+            })
+            .collect()
+            .await)
     }
 
     async fn collect_tick_decision(&self) -> Result<ChannelDecision> {
@@ -474,10 +474,7 @@ mod tests {
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
-    use core_network::{
-        network::PeerOrigin,
-        PeerId,
-    };
+    use core_network::{network::PeerOrigin, PeerId};
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
@@ -566,14 +563,15 @@ mod tests {
         channel
     }
 
-    async fn prepare_network(db: HoprDb, qualities: Vec<f64>)
-    {
+    async fn prepare_network(db: HoprDb, qualities: Vec<f64>) {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
         for (i, quality) in qualities.into_iter().enumerate() {
             let peer = &PEERS[i + 1].1;
 
-            db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.0, 10).await.unwrap();
+            db.add_network_peer(peer, PeerOrigin::Initialization, vec![], 0.0, 10)
+                .await
+                .unwrap();
 
             let mut status = db.get_network_peer(peer).await.unwrap().unwrap();
             status.peer_version = Some("2.0.0".into());

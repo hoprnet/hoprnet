@@ -60,6 +60,7 @@ impl TicketManager {
         }
     }
 
+    /// Sends a new acknowledged ticket into the FIFO queue.
     pub fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
         self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
             crate::errors::DbError::LogicalError(format!(
@@ -68,6 +69,7 @@ impl TicketManager {
         })
     }
 
+    /// Acquires write lock to the Ticket DB and starts a new transaction.
     pub async fn with_write_locked_db<'a, F, T, E>(&'a self, f: F) -> std::result::Result<T, E>
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,

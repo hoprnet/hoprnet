@@ -88,7 +88,7 @@ where
                         return Err(BalanceTooLow);
                     }
 
-                    if db_clone.get_chain_data(Some(tx)).await?.nr_enabled
+                    if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
                         && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
                     {
                         return Err(PeerAccessDenied);

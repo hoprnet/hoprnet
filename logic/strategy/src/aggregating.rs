@@ -169,18 +169,26 @@ where
     Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
 {
-    async fn start_aggregation(&self, aggregation: RunningAggregation, redeem_if_failed: bool) -> crate::errors::Result<()> {
+    async fn start_aggregation(
+        &self,
+        aggregation: RunningAggregation,
+        redeem_if_failed: bool,
+    ) -> crate::errors::Result<()> {
         trace!("starting aggregation in {}", aggregation.channel_id());
 
-        info!("will aggregate {} tickets in {}", aggregation.size(), aggregation.channel_id());
+        info!(
+            "will aggregate {} tickets in {}",
+            aggregation.size(),
+            aggregation.channel_id()
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_COUNT_AGGREGATIONS.increment();
 
-        spawn(async move {
+        /*spawn(async move {
             let actions_clone = self.chain_actions.clone();
 
-        })
+        })*/
 
         match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
             Ok(mut awaiter) => {
@@ -258,7 +266,9 @@ where
                         info!("{channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
                         can_aggregate = true;
                     } else {
-                        debug!("{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
+                        debug!(
+                            "{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet"
+                        );
                     }
                 }
                 if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
@@ -313,7 +323,6 @@ where
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
             }
         }
-
 
         // Proceed with aggregation
         if can_aggregate {

@@ -47,7 +47,7 @@ impl AccountEntry {
             public_key,
             chain_addr: address,
             entry_type,
-            is_self: false
+            is_self: false,
         }
     }
 

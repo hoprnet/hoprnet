@@ -151,7 +151,7 @@ enum Account {
     Id,
     PacketKey,
     ChainKey,
-    IsSelf
+    IsSelf,
 }
 
 #[derive(DeriveIden)]

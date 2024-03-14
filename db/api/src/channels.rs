@@ -4,15 +4,19 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, ToHex};
+use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
+/// Defines DB API for accessing information about HOPR payment channels.
 #[async_trait]
 pub trait HoprDbChannelOperations {
+    /// Retrieves channel by its channel ID hash.
+    ///
+    /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
@@ -23,8 +27,10 @@ pub trait HoprDbChannelOperations {
         target: Address,
     ) -> Result<Vec<ChannelEntry>>;
 
+    /// Retrieves all channel information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
+    /// Inserts or updates the given channel entry.
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 }
 

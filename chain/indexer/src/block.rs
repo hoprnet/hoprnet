@@ -110,7 +110,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.get_chain_data(None).await?.last_indexed_block as u64;
+        let db_latest_block = self.db.get_indexer_data(None).await?.last_indexed_block as u64;
 
         let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
