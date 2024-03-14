@@ -204,14 +204,14 @@ impl NetworkProviderArgs {
         // if a customized provider is given
         if let Some(customized_provider_url) = &self.provider_url {
             // check if the provided url matches with the network
-            let customized_proivder_client = JsonRpcClient::new(
+            let customized_provider_client = JsonRpcClient::new(
                 customized_provider_url,
                 DefaultHttpPostRequestor::new(default_rpc_http_config),
                 default_rpc_http_retry_policy,
             );
             // Build default JSON RPC provider
             let customized_proivder = Arc::new(
-                Provider::new(customized_proivder_client).interval(RpcOperationsConfig::default().tx_polling_interval),
+                Provider::new(customized_provider_client).interval(RpcOperationsConfig::default().tx_polling_interval),
             );
 
             let customized_chain_id = customized_proivder
@@ -302,16 +302,6 @@ mod tests {
     use super::*;
 
     fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
-        let output = std::process::Command::new(env!("CARGO"))
-            .arg("locate-project")
-            .arg("--workspace")
-            .arg("--message-format=plain")
-            .output()
-            .unwrap()
-            .stdout;
-        let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
-        let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
-
         let mut anvil = ethers::utils::Anvil::new();
 
         if !default {

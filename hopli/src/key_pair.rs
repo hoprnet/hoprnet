@@ -173,6 +173,7 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
+        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
             info!("reading private key from cli");
             pk
@@ -181,10 +182,14 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
             env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
         };
 
-        // TODO:
-        info!("To validate the private key");
+        // trim the 0x prefix if needed
+        let priv_key_without_prefix = if pri_key.starts_with("0x") {
+            pri_key[prefix.len()..].to_string()
+        } else {
+            pri_key
+        };
 
-        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
     }
 
     /// Read the default private key and return an address string
@@ -215,6 +220,7 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
 
     /// Read the value from either the cli arg or env
     fn read(&self, default_env_name: &str) -> Result<ChainKeypair, HelperErrors> {
+        let prefix = "0x";
         let pri_key = if let Some(pk) = self.get_key() {
             info!("reading manager private key from cli");
             pk
@@ -223,10 +229,14 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
             env::var(default_env_name).map_err(HelperErrors::UnableToReadPrivateKey)?
         };
 
-        // TODO:
-        info!("To validate the private key");
+        // trim the 0x prefix if needed
+        let priv_key_without_prefix = if pri_key.starts_with("0x") {
+            pri_key[prefix.len()..].to_string()
+        } else {
+            pri_key
+        };
 
-        Ok(ChainKeypair::from_secret(hex::decode(pri_key).unwrap().as_slice()).unwrap())
+        Ok(ChainKeypair::from_secret(hex::decode(priv_key_without_prefix).unwrap().as_slice()).unwrap())
     }
 
     /// Read the default private key and return an address string
@@ -448,10 +458,28 @@ impl IdentityFileArgs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hopr_crypto_types::types::ToChecksum;
     use tempfile::tempdir;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
     const SPECIAL_ENV_KEY: &str = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+
+    #[test]
+    fn read_pk_with_0x() {
+        let private_key_args = PrivateKeyArgs {
+            private_key: Some("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()),
+        };
+        let key = private_key_args.read_default().unwrap();
+
+        let ref_decoded_value = hex::decode(&DUMMY_PRIVATE_KEY).unwrap();
+        println!("ref_decoded_value {:?}", ref_decoded_value);
+
+        assert_eq!(
+            key.public().to_address().to_checksum(),
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "cannot read private key with 0x prefix"
+        )
+    }
 
     #[test]
     fn create_identities_from_directory_with_id_files() {

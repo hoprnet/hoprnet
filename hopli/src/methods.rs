@@ -2155,7 +2155,7 @@ mod tests {
                 .send()
                 .await
                 .unwrap();
-        let new_network_registry = HoprNetworkRegistry::deploy(
+        let _new_network_registry = HoprNetworkRegistry::deploy(
             client.clone(),
             (
                 ethers::types::Address::from(instances.network_registry_proxy.address()),
@@ -2208,7 +2208,7 @@ mod tests {
         .await
         .unwrap();
 
-        // check new network is not included
+        // check new network is included
         let old_channels_inclusion = node_module
             .try_get_target(instances.channels.address())
             .call()
