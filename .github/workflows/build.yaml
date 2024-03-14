@@ -125,6 +125,11 @@ jobs:
     #   - tag
     steps:
 
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprnet-ci
+
       - name: Set up Google Cloud Credentials
         id: auth
         uses: google-github-actions/auth@v1
