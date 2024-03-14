@@ -13,7 +13,6 @@ use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::{action_queue::ActionQueue, ChainActions};
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use chain_api::{DefaultHttpPostRequestor, JsonRpcClient};
-use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use chain_types::chain_events::SignificantChainEvent;
@@ -22,7 +21,6 @@ use core_path::channel_graph::ChannelGraph;
 use core_transport::{ChainKeypair, Keypair};
 use hopr_db_api::HoprDbAllOperations;
 use hopr_primitive_types::primitives::Address;
-use utils_db::CurrentDbShim;
 
 use crate::errors::HoprLibError;
 
@@ -310,14 +308,14 @@ pub fn build_chain_components<Db>(
     chain_config: ChainNetworkConfig,
     contract_addrs: ContractAddresses,
     module_address: Address,
-    db: Arc<RwLock<Db>>,
+    db: Db,
 ) -> (
     ActionQueue<Db, IndexerActionTracker, ActiveTxExecutor>,
     ChainActions<Db>,
     RpcOperations<JsonRpcClient>,
 )
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
     // TODO: extract this from the global config type
     let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
@@ -383,7 +381,7 @@ pub fn build_chain_api<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::
     safe_address: Address,
     indexer_start_block: u64,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<T>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> chain_api::HoprChain<T> {

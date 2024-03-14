@@ -7,7 +7,6 @@ pub use chain_types::chain_events::SignificantChainEvent;
 pub use hopr_internal_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
-use chain_db::db::CoreEthereumDb;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,7 +19,6 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-use utils_db::CurrentDbShim;
 
 use crate::errors::{HoprChainError, Result};
 
@@ -118,7 +116,7 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::De
     indexer_cfg: IndexerConfig,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     db: T,
-    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<T>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
@@ -132,7 +130,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-        chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+        chain_actions: ChainActions<T>,
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
@@ -213,11 +211,11 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_safe_allowance(None).await?)
     }
 
-    pub fn actions_ref(&self) -> &ChainActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_ref(&self) -> &ChainActions<T> {
         &self.chain_actions
     }
 
-    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<T> {
         &mut self.chain_actions
     }
 

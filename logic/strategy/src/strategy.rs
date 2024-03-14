@@ -19,14 +19,10 @@
 //! For details on default parameters see [MultiStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::ChainActions;
-use core_network::network::Network;
 use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use tracing::{error, warn};
 use validator::Validate;
 
@@ -125,18 +121,14 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, Db2, T, U, V>(
+    pub fn new<Db, U, V>(
         cfg: MultiStrategyConfig,
         db: Db,
-        new_db: Db2,
-        network: Arc<Network<T>>,
         chain_actions: ChainActions<Db>,
-        ticket_aggregator: AwaitingAggregator<U, V, Db2>,
+        ticket_aggregator: AwaitingAggregator<U, V, Db>,
     ) -> Self
     where
         Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-        Db2: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-        T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
         U: Sync + Send + std::fmt::Debug + 'static,
         V: Sync + Send + std::fmt::Debug + 'static,
     {
@@ -180,8 +172,6 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             db.clone(),
-                            new_db.clone(),
-                            network.clone(),
                             chain_actions.clone(),
                             ticket_aggregator.clone(),
                         )))

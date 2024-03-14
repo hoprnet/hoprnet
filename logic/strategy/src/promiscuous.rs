@@ -29,15 +29,10 @@ use tracing::{debug, error, info, warn};
 use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use core_network::network::Network;
-use futures::stream::FuturesUnordered;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use hopr_crypto_random::OsRng;
-use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::errors::DbError;
-use hopr_db_api::info::HoprDbInfoOperations;
-use hopr_db_api::peers::{HoprDbPeersOperations, PeerSelector};
-use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_api::peers::PeerSelector;
 use hopr_db_api::HoprDbAllOperations;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -45,7 +40,6 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Sub;
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -172,7 +166,6 @@ where
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
-    self_account: OnceLock<AccountEntry>,
 }
 
 impl<Db, A> PromiscuousStrategy<Db, A>
@@ -186,7 +179,6 @@ where
             chain_actions,
             sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
-            self_account: OnceLock::new(),
         }
     }
 
@@ -223,7 +215,7 @@ where
                     if self.cfg.minimum_peer_version.matches(&version) {
                         if let Ok(offchain_key) = OffchainPublicKey::try_from(status.id) {
                             // Resolve peer's chain key and average quality
-                            if let Some(addr) = self
+                            if let Ok(addr) = self
                                 .db
                                 .resolve_chain_key(&offchain_key)
                                 .await
@@ -231,7 +223,7 @@ where
                             {
                                 Some((addr, status.get_average_quality()))
                             } else {
-                                error!("could not find on-chain address for {k_clone}");
+                                error!("could not find on-chain address for {}", status.id);
                                 None
                             }
                         } else {

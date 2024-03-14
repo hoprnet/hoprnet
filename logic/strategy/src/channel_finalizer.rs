@@ -1,15 +1,14 @@
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_db_api::accounts::HoprDbAccountOperations;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Sub;
-use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use validator::Validate;
@@ -76,13 +75,19 @@ where
 #[async_trait]
 impl<Db, A> SingularStrategy for ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprDbChannelOperations + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + HoprDbAccountOperations + Clone + Send + Sync,
     A: ChannelActions + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self.db.get_channels_via(None, ChannelDirection::Incoming, me).await?;
+        // TODO: cache this
+        let me_onchain = self.db.get_self_account(None).await?;
+
+        let outgoing_channels = self
+            .db
+            .get_channels_via(None, ChannelDirection::Incoming, me_onchain.chain_addr)
+            .await?;
 
         let to_close = outgoing_channels
             .iter()

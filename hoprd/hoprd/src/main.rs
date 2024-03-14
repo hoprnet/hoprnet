@@ -200,7 +200,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
         let version = hopr_lib::constants::APP_VERSION;
 
-        while !hopr_clone.is_allowed_to_access_network(&my_peer_id).await {
+        while !hopr_clone
+            .is_allowed_to_access_network(&my_peer_id)
+            .await
+            .unwrap_or(false)
+        {
             info!("
                 Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
             ");

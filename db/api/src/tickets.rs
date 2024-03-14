@@ -218,7 +218,7 @@ pub trait HoprDbTicketOperations {
     async fn aggregate_tickets(
         &self,
         destination: OffchainPublicKey,
-        mut acked_tickets: Vec<AcknowledgedTicket>,
+        acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
     ) -> Result<hopr_internal_types::channels::Ticket>;
 

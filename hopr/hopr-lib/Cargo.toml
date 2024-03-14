@@ -34,7 +34,6 @@ core-strategy = { workspace = true }        # TODO: better organize and cleanup,
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-rpc = { workspace = true }
-chain-db = { workspace = true }
 chain-types = { workspace = true }
 chain-indexer = { workspace = true }
 hopr-platform = { workspace = true }
@@ -43,6 +42,7 @@ hopr-db-api = { workspace = true, features = ["accounts", "peers", "registry", "
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
 serde_yaml = { version = "0.9" }

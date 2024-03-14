@@ -3,7 +3,6 @@
 //! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far less on-chain transactions being issued).
 //!
 //! For details on default parameters see [AutoRedeemingStrategyConfig].
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_api::tickets::HoprDbTicketOperations;
@@ -13,7 +12,6 @@ use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use tracing::{debug, info};
 use validator::Validate;
 

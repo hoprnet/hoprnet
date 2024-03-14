@@ -34,7 +34,6 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -44,7 +43,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
