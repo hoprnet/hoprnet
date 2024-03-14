@@ -135,10 +135,6 @@ jobs:
         with:
           base64-kube-config: ${{ secrets.GKE_STAGING_KUBE_CONFIG }}
 
-      - name: "Set GKE credentials"
-        run: |
-          kubectl get nodes
-
       - name: "Restart deployments"
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
