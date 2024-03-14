@@ -3,8 +3,6 @@
 //! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum wallet.
 //! This identity file uses password (received from [PasswordArgs]) for encryption.
 //!
-//! Actions related to identity files are specified in [IdentityActionType].
-//!
 //! Location of identity files can be provided with [IdentityFileArgs].
 //!
 //! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].

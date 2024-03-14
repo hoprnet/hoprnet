@@ -1,4 +1,8 @@
-//! This module contains all the methods used for onchain interaction
+//! This module contains all the methods used for onchain interaction, especially with Safe instance, Mutlicall, and Multisend contracts.
+//!
+//! [SafeTxOperation] corresponds to the `Operation` Enum used in Safe smart contract.
+//!
+//! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
 use crate::utils::{
     HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
     DOMAIN_SEPARATOR_TYPEHASH, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_EXECUTION_SUCCESS,
@@ -31,6 +35,7 @@ use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
 
+/// ABI of Safe contract
 abigen!(
     SafeSingleton,
     r"[
@@ -46,6 +51,7 @@ abigen!(
 ]"
 );
 
+/// ABI of Multisend contract
 abigen!(
     MultiSend,
     r"[
@@ -88,6 +94,7 @@ pub struct MultisendTransaction {
     pub value: U256,
 }
 
+/// Methods for Multisend transaction
 impl MultisendTransaction {
     /// encode a multisend transaction
     fn encode_packed(&self) -> Vec<u8> {

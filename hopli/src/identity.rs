@@ -1,5 +1,5 @@
 //! This module contains subcommands for `hopli identity`,
-//! This command contains subcommands to read, create or update identity files, providing correct [key_pair::PasswordArgs]
+//! This command contains subcommands to read, create or update identity files, providing correct [crate::key_pair::PasswordArgs]
 //!
 //! For all three actions around identity files, at least two arguments are needed:
 //! - Path to files

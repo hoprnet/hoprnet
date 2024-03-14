@@ -5,11 +5,23 @@
 //! HOPR token contract addresses vary on the network.
 //!
 //! Attention! Do not use this function to distribute large amount of tokens
-///
-/// Note that to save gas in batch funding, multicall is used to facilitate token distribution, via `transferFrom`
-/// To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
-/// to be transferred. As it's a separate function, there is a window between granting the allowance and executing
-/// the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
+//!
+//! Note that to save gas in batch funding, multicall is used to facilitate token distribution, via `transferFrom`
+//! To use this functionality, caller must grant Multicall3 contract the exact allowance equal to the sum of tokens
+//! to be transferred. As it's a separate function, there is a window between granting the allowance and executing
+//! the transactin. Attacker may take advantage of this window and steal tokens from the caller's account.
+//!
+//! A sample command:
+//! ```text
+//! hopli faucet \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+//!     --identity-directory "./test" --identity-prefix node_ \
+//!     --password-path "./test/pwd" \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --hopr-amount 10 --native-amount 0.1
+//! ```
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
