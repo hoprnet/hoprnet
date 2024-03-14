@@ -130,6 +130,19 @@ jobs:
         with:
           repository: hoprnet/hoprnet-ci
 
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: hopr-staging
+          install_components: beta
+
       - name: Setup Kubectl
         uses: tale/kubectl-action@v1
         with:
@@ -149,6 +162,7 @@ jobs:
           fi
           namespace=core-team
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
+          sleep 99999999
           # Get list of deployments to restart
           export deployments=($(kubectl get deployments -n ${namespace} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
           for deployment in "${deployments[@]}"; do
