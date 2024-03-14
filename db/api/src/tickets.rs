@@ -1,4 +1,5 @@
 use async_stream::stream;
+use libp2p_identity::PeerId;
 use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
@@ -6,6 +7,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicUsize, Arc};
 use std::time::SystemTime;
 use tracing::error;
+use tracing::info;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -181,7 +183,8 @@ pub trait HoprDbTicketOperations {
         &mut self,
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
-    ) -> Result<Ticket>;
+        me: &ChainKeypair,
+    ) -> Result<hopr_internal_types::channels::Ticket>;
 
     /// Processes the acknowledgements for the pending tickets
     ///
@@ -360,107 +363,126 @@ impl HoprDbTicketOperations for HoprDb {
         &mut self,
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
-    ) -> Result<Ticket> {
-        // let domain_separator = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_channels_domain_separator()
-        //     .await?
-        //     .ok_or_else(|| {
-        //         warn!("Missing domain separator");
-        //         ProtocolTicketAggregation("Missing domain separator".into())
-        //     })?;
+        me: &ChainKeypair,
+    ) -> Result<hopr_internal_types::channels::Ticket> {
+        if acked_tickets.is_empty() {
+            return Err(DbError::LogicalError("At least one ticket required".to_owned()));
+        }
 
-        // let destination = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_chain_key(
-        //         &OffchainPublicKey::try_from(destination)
-        //             .expect("Invalid PeerId. Could not convert to OffchainPublicKey"),
-        //     )
-        //     .await?
-        //     .ok_or_else(|| {
-        //         warn!("Could not find chain key for {}", destination);
-        //         ProtocolTicketAggregation("Could not find chain key".into())
-        //     })?;
+        if acked_tickets.len() == 1 {
+            return Ok(acked_tickets[0].ticket.clone());
+        }
 
-        // let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
-        // let channel_entry = self
-        //     .db
-        //     .read()
-        //     .await
-        //     .get_channel(&channel_id)
-        //     .await?
-        //     .ok_or(ProtocolTicketAggregation(format!(
-        //         "channel {channel_id} does not exist"
-        //     )))?;
-        // let channel_balance = channel_entry.balance;
+        acked_tickets.sort();
+        acked_tickets.dedup();
 
-        // acked_tickets.sort();
-        // acked_tickets.dedup();
+        let myself = self.clone();
+        let chain_keypair = me.clone();
 
-        // let channel_epoch = channel_entry.channel_epoch;
+        let (channel_entry, channel_id, destination, domain_separator) =
+            self.nest_transaction_in_db(None, TargetDb::Index)
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let address = myself
+                            .resolve_chain_key(&destination)
+                            .await?
+                            .ok_or(DbError::LogicalError(format!(
+                                "peer '{}' has no chain key record",
+                                destination.to_peerid_str()
+                            )))?;
 
-        // let mut final_value = Balance::zero(BalanceType::HOPR);
+                        let channel_id = generate_channel_id(&(&chain_keypair).into(), &address);
 
-        // for (i, acked_ticket) in acked_tickets.iter().enumerate() {
-        //     if channel_id != acked_ticket.ticket.channel_id {
-        //         return Err(ProtocolTicketAggregation(format!(
-        //             "aggregated ticket has an invalid channel id {}",
-        //             acked_ticket.ticket.channel_id
-        //         )));
-        //     }
+                        let entry = myself
+                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .await?
+                            .ok_or(DbError::ChannelNotFound(channel_id))?;
 
-        //     if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
-        //         return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
-        //     }
+                        if entry.status != ChannelStatus::Open {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        }
 
-        //     if i + 1 < acked_tickets.len()
-        //         && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
-        //             > acked_tickets[i + 1].ticket.index
-        //     {
-        //         return Err(ProtocolTicketAggregation(
-        //             "Tickets with overlapping index intervals".to_owned(),
-        //         ));
-        //     }
+                        // TODO: this should not be needed, because there are no tickets
+                        // for channels not associated with us?
+                        // // Perform sanity checks on the arguments
+                        // assert_eq!(
+                        //     ChannelDirection::Incoming,
+                        //     channel.direction(&self.me).expect("must be own channel"),
+                        //     "aggregation request can happen on incoming channels only"
+                        // );
 
-        //     if acked_ticket
-        //         .verify(&(&self.chain_key).into(), &destination, &domain_separator)
-        //         .is_err()
-        //     {
-        //         return Err(ProtocolTicketAggregation("Not a valid ticket".to_owned()));
-        //     }
+                        let domain_separator =
+                            myself.get_chain_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                crate::errors::DbError::LogicalError("domain separator missing".into())
+                            })?;
 
-        //     if !acked_ticket.is_winning_ticket(&domain_separator) {
-        //         return Err(ProtocolTicketAggregation("Not a winning ticket".to_owned()));
-        //     }
+                        Ok((entry, channel_id, address, domain_separator))
+                    })
+                })
+                .await?;
 
-        //     final_value = final_value.add(&acked_ticket.ticket.amount);
-        //     if final_value.gt(&channel_balance) {
-        //         return Err(ProtocolTicketAggregation(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
-        //     }
+        let channel_balance = channel_entry.balance;
+        let channel_epoch = channel_entry.channel_epoch;
 
-        //     #[cfg(all(feature = "prometheus", not(test)))]
-        //     METRIC_AGGREGATED_TICKETS.increment();
-        // }
+        let mut final_value = Balance::zero(BalanceType::HOPR);
 
-        // info!(
-        //     "aggregated {} tickets in channel {channel_id} with total value {final_value}",
-        //     acked_tickets.len()
-        // );
+        for (i, acked_ticket) in acked_tickets.iter().enumerate() {
+            if channel_id != acked_ticket.ticket.channel_id {
+                return Err(DbError::LogicalError(format!(
+                    "aggregated ticket has an invalid channel id {}",
+                    acked_ticket.ticket.channel_id
+                )));
+            }
 
-        // let first_acked_ticket = acked_tickets.first().unwrap();
-        // let last_acked_ticket = acked_tickets.last().unwrap();
+            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
+                return Err(DbError::LogicalError("Channel epochs do not match".to_owned()));
+            }
+
+            if i + 1 < acked_tickets.len()
+                && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
+                    > acked_tickets[i + 1].ticket.index
+            {
+                return Err(DbError::LogicalError(
+                    "Tickets with overlapping index intervals".to_owned(),
+                ));
+            }
+
+            if acked_ticket
+                .verify(&(me).into(), &destination, &domain_separator)
+                .is_err()
+            {
+                return Err(DbError::LogicalError("Not a valid ticket".to_owned()));
+            }
+
+            if !acked_ticket.is_winning_ticket(&domain_separator) {
+                return Err(DbError::LogicalError("Not a winning ticket".to_owned()));
+            }
+
+            final_value = final_value.add(&acked_ticket.ticket.amount);
+            if final_value.gt(&channel_balance) {
+                return Err(DbError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
+            }
+
+            // #[cfg(all(feature = "prometheus", not(test)))]
+            // METRIC_AGGREGATED_TICKETS.increment();
+        }
+
+        info!(
+            "aggregated {} tickets in channel {channel_id} with total value {final_value}",
+            acked_tickets.len()
+        );
+
+        let first_acked_ticket = acked_tickets.first().unwrap();
+        let last_acked_ticket = acked_tickets.last().unwrap();
 
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_AGGREGATION_COUNT.increment();
 
         // trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
-        // // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        // let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
-        // let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
+        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
         // {
         //     self.db
         //         .write()
@@ -469,19 +491,18 @@ impl HoprDbTicketOperations for HoprDb {
         //         .await?;
         // }
 
-        // Ticket::new(
-        //     &destination,
-        //     &final_value,
-        //     first_acked_ticket.ticket.index.into(),
-        //     (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
-        //     1.0, // Aggregated tickets have always 100% winning probability
-        //     channel_epoch,
-        //     first_acked_ticket.ticket.challenge.clone(),
-        //     &self.chain_key,
-        //     &domain_separator,
-        // )
-        // .map_err(|e| e.into())
-        Err(DbError::LogicalError("TODO".into()))
+        hopr_internal_types::channels::Ticket::new(
+            &destination,
+            &final_value,
+            first_acked_ticket.ticket.index.into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
+            1.0, // Aggregated tickets have always 100% winning probability
+            channel_epoch,
+            first_acked_ticket.ticket.challenge.clone(),
+            &me,
+            &domain_separator,
+        )
+        .map_err(|e| e.into())
     }
 
     async fn process_received_aggregated_ticket(
