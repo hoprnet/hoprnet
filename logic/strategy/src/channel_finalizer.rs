@@ -11,6 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::Sub;
 use std::sync::Arc;
 use std::time::Duration;
+use serde_with::serde_as;
 use tracing::{debug, error, info};
 use validator::Validate;
 
@@ -30,12 +31,14 @@ lazy_static::lazy_static! {
 }
 
 /// Contains configuration of the [ClosureFinalizerStrategy].
+#[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ClosureFinalizerStrategyConfig {
     /// Do not attempt to finalize closure of channels that have
     /// been overdue for closure for more than this period.
     ///
     /// Default is 3600 seconds.
+    #[serde_as(as = "DurationSeconds<u64>")]
     #[default(Duration::from_secs(3600))]
     pub max_closure_overdue: Duration,
 }
