@@ -27,17 +27,18 @@
 //! When this strategy is triggered from the
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
-use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
-use chain_actions::errors::ChainActionsError::ChannelDoesNotExist;
 use chain_actions::redeem::TicketRedeemActions;
-use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
+pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use hopr_crypto_types::prelude::Hash;
+use hopr_db_api::channels::HoprDbChannelOperations;
+use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
-use std::ops::Add;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
@@ -46,16 +47,10 @@ use std::{
 use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
-use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::{strategy::SingularStrategy, Strategy};
-
-use async_std::task::spawn;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::{HoprDbTicketOperations, RunningAggregation, TicketSelector};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
-use hopr_primitive_types::prelude::UnitaryFloatOps;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -115,19 +110,22 @@ pub struct AggregatingStrategyConfig {
 /// was successful.
 pub struct AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + Clone,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
+    T: Send,
+    U: Send,
 {
-    db: Db,
     chain_actions: A,
-    ticket_aggregator: Arc<Mutex<TicketAggregationActions<T, U>>>,
+    ticket_aggregator: Arc<AwaitingAggregator<T, U, Db>>,
     cfg: AggregatingStrategyConfig,
 }
 
 impl<Db, T, U, A> Debug for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + Clone,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
+    T: Send,
+    U: Send,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Aggregating(self.cfg))
@@ -136,8 +134,10 @@ where
 
 impl<Db, T, U, A> Display for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + Clone,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
+    T: Send,
+    U: Send,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Aggregating(self.cfg))
@@ -146,191 +146,85 @@ where
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + Clone,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
     A: TicketRedeemActions + Clone,
+    T: Send,
+    U: Send,
 {
     pub fn new(
         cfg: AggregatingStrategyConfig,
-        db: Db,
         chain_actions: A,
-        ticket_aggregator: TicketAggregationActions<T, U>,
+        ticket_aggregator: AwaitingAggregator<T, U, Db>,
     ) -> Self {
         Self {
             cfg,
-            db,
             chain_actions,
-            ticket_aggregator: Arc::new(Mutex::new(ticket_aggregator)),
+            ticket_aggregator: Arc::new(ticket_aggregator),
         }
     }
 }
 
 impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + 'static,
+    T: Send,
+    U: Send,
 {
     async fn start_aggregation(
         &self,
-        aggregation: RunningAggregation,
+        channel: &Hash,
+        criteria: AggregationPrerequisites,
         redeem_if_failed: bool,
     ) -> crate::errors::Result<()> {
-        trace!("starting aggregation in {}", aggregation.channel_id());
+        trace!("starting aggregation in {channel}");
 
-        info!(
-            "will aggregate {} tickets in {}",
-            aggregation.size(),
-            aggregation.channel_id()
-        );
+        if let Err(e) = self
+            .ticket_aggregator
+            .aggregate_tickets_in_the_channel(&channel, Some(criteria))
+            .await
+        {
+            warn!("could not aggregate tickets: {e}");
+            if redeem_if_failed {
+                info!("initiating redemption of all tickets in {channel} after aggregation failure");
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_COUNT_AGGREGATIONS.increment();
+                // TODO: redeem in channel actions should be migrated for this to use only the hash
+                // if let Err(e) = self.chain_actions.redeem_tickets_in_channel(channel, false).await {
+                //     error!("failed to issue redeeming of all tickets in {channel}: {e}");
+                //     return Err(e.into());
+                // } else {
+                //     return Ok(());
+                // }
 
-        /*spawn(async move {
-            let actions_clone = self.chain_actions.clone();
-
-        })*/
-
-        match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
-            Ok(mut awaiter) => {
-                // Spawn waiting for the aggregation as a separate task
-                let agg_timeout = self.cfg.aggregation_timeout;
-                let actions_clone = self.chain_actions.clone();
-                let db_clone = self.db.clone();
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_COUNT_AGGREGATIONS.increment();
-
-                spawn(async move {
-                    match awaiter.consume_and_wait(agg_timeout).await {
-                        Ok(_) => {
-                            // The TicketAggregationActions will raise the on_acknowledged_ticket event,
-                            // so the AutoRedeem strategy can take care of redeeming if needed
-                            info!("completed ticket aggregation");
-                        }
-                        Err(e) => {
-                            warn!("could not aggregate tickets: {e}");
-                            if let Err(e) = list.rollback(db_clone).await {
-                                error!("could not rollback failed aggregation: {e}")
-                            } else if redeem_if_failed {
-                                info!("initiating redemption of all tickets in {channel} after aggregation failure");
-
-                                if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
-                                    error!("failed to issue redeeming of all tickets in {channel}: {e}");
-                                }
-
-                                // We do not need to await the redemption completion of all the tickets
-                            }
-                        }
-                    }
-                });
-
-                Ok(())
+                // We do not need to await the redemption completion of all the tickets
             }
-            Err(e) => {
-                warn!("could not initiate aggregate tickets due to {e}");
-                Err(crate::errors::StrategyError::Other("ticket aggregation failed".into()))
-            }
+        } else {
+            // The TicketAggregationActions will raise the on_acknowledged_ticket event,
+            // so the AutoRedeem strategy can take care of redeeming if needed
+            info!("completed ticket aggregation");
         }
+
+        Ok(())
     }
 }
 
 #[async_trait]
 impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
 where
-    Db: HoprDbTicketOperations + HoprDbChannelOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     A: TicketRedeemActions + Clone + Send + Sync + 'static,
-    T: Send + Sync,
-    U: Send + Sync,
+    T: Send,
+    U: Send,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 
-        let channel = match self.db.get_channel_by_id(None, channel_id).await? {
-            Some(channel) => channel,
-            None => {
-                error!("encountered {ack} in a non-existing channel!");
-                return Err(ChannelDoesNotExist.into());
-            }
+        let criteria = AggregationPrerequisites {
+            min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(2) as usize,
+            min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
         };
 
-        match self.db.aggregate_tickets_in_channel(&channel_id).await {
-            Ok(Some(running_agg)) => {
-                let aggregatable_tickets = running_agg.size() as u32;
-                let unredeemed_value = running_agg.total_unaggregated_value();
-
-                let mut can_aggregate = false;
-
-                // Check the aggregation threshold
-                if let Some(agg_threshold) = self.cfg.aggregation_threshold {
-                    if aggregatable_tickets >= agg_threshold {
-                        info!("{channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
-                        can_aggregate = true;
-                    } else {
-                        debug!(
-                            "{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet"
-                        );
-                    }
-                }
-                if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-                    let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64)?;
-
-                    // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
-                    // and there are at least two tickets
-                    if unredeemed_value.ge(&diminished_balance) {
-                        if aggregatable_tickets > 1 {
-                            info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
-                            can_aggregate = true;
-                        } else {
-                            debug!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
-                        }
-                    } else {
-                        debug!(
-                    "{channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
-                );
-                    }
-                }
-
-                if can_aggregate {
-                    self.start_aggregation()
-                }
-            }
-            Ok(None) => {
-                warn!("nothing to aggregate in channel {channel_id}");
-            }
-            Err(e) => {
-                error!("failed to aggregate tickets in channel {channel_id}: {e}");
-            }
-        }
-
-        let ack_tickets_in_db = self.db.get_tickets(None, (&channel).into()).await?;
-
-        let mut aggregatable_tickets = 0;
-        let mut unredeemed_value = Balance::zero(BalanceType::HOPR);
-
-        for ticket in ack_tickets_in_db.iter() {
-            match ticket.status {
-                AcknowledgedTicketStatus::Untouched => {
-                    aggregatable_tickets += 1;
-                    // Do not account aggregated tickets into the unrealized balance calculation
-                    if !ticket.ticket.is_aggregated() {
-                        unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
-                    }
-                }
-                AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                    debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
-                    return Ok(());
-                }
-                AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
-            }
-        }
-
-        // Proceed with aggregation
-        if can_aggregate {
-            self.start_aggregation(channel, false).await
-        } else {
-            debug!("channel {channel_id} has not met the criteria for aggregation");
-            Err(CriteriaNotSatisfied)
-        }
+        self.start_aggregation(&channel_id, criteria, false).await
     }
 
     async fn on_own_channel_changed(
@@ -348,34 +242,15 @@ where
                 debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
+
             info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
-            let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
+            let criteria = AggregationPrerequisites {
+                min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(1) as usize,
+                min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
+            };
 
-            let selector = TicketSelector::from(channel).with_state(AcknowledgedTicketStatus::Untouched);
-
-            let mut aggregatable_tickets = 0;
-
-            for ticket in ack_tickets_in_db.iter() {
-                match ticket.status {
-                    AcknowledgedTicketStatus::Untouched => {
-                        aggregatable_tickets += 1;
-                    }
-                    AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                        debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
-                        return Ok(());
-                    }
-                    AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
-                }
-            }
-
-            if aggregatable_tickets > 1 {
-                debug!("{channel} has {aggregatable_tickets} aggregatable tickets");
-                self.start_aggregation(*channel, true).await
-            } else {
-                debug!("closing {channel} does not have more than 1 tickets to aggregate");
-                Ok(())
-            }
+            Ok(self.start_aggregation(&channel.get_id(), criteria, true).await?)
         } else {
             Ok(())
         }
@@ -396,6 +271,7 @@ mod tests {
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::db::HoprDb;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -404,6 +280,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
+    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
@@ -519,10 +396,10 @@ mod tests {
         (acked_tickets, channel)
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
+    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<HoprDb>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
-            let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
+            let db = Arc::new(HoprDb::new_in_memory());
 
             db.write()
                 .await

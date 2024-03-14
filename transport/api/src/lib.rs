@@ -98,11 +98,11 @@ where
 
 /// Build the ticket aggregation mechanism and processes.
 pub fn build_ticket_aggregation<Db>(
-    db: Arc<RwLock<Db>>,
+    db: Db,
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
-    Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static,
+    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -272,7 +272,6 @@ use core_path::path::TransportPath;
 use core_path::selectors::legacy::LegacyPathSelector;
 use core_path::selectors::PathSelector;
 use core_protocol::errors::ProtocolError;
-use core_protocol::ticket_aggregation::processor::AggregationList;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_internal_types::channels::ChannelStatus;
@@ -497,7 +496,7 @@ where
         Ok(self
             .ticket_aggregate_actions
             .clone()
-            .aggregate_tickets(AggregationList::WholeChannel(entry))?
+            .aggregate_tickets(&entry.get_id(), None)?
             .consume_and_wait(std::time::Duration::from_millis(60000))
             .await?)
     }

@@ -25,6 +25,9 @@ pub enum ProtocolError {
     DbError(#[from] DbError),
 
     #[error("db error {0}")]
+    DatabaseError(#[from] hopr_db_api::errors::DbError),
+
+    #[error("db error {0}")]
     UnifiedDbError(String),
 
     #[error("Failed to notify an external process: {0}")]
