@@ -665,21 +665,24 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_lock::RwLock;
-    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use chain_db::traits::HoprCoreEthereumDbActions;
     use futures_lite::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
+    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::channels::HoprDbChannelOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::tickets::HoprDbTicketOperations;
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
-    use std::{sync::Arc, time::Duration};
-    use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::{db::DB, CurrentDbShim};
+    use std::time::Duration;
 
     use super::TicketAggregationProcessed;
 
@@ -734,46 +737,39 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>> {
-        let mut dbs = Vec::new();
-        for (i, inner_db) in inner_dbs.into_iter().enumerate() {
-            let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
-
-            db.write()
-                .await
-                .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
-                .await
-                .unwrap();
-
-            for i in 0..PEERS.len() {
-                db.write()
-                    .await
-                    .link_chain_and_packet_keys(&(&PEERS_CHAIN[i]).into(), PEERS[i].public(), &Snapshot::default())
-                    .await
-                    .unwrap();
-            }
-
-            dbs.push(db);
-        }
-        dbs
-    }
-
-    fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
-        let mut ack_key = Vec::new();
-
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
-        ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
-        ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
-
-        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
+    async fn init_db(db: HoprDb, chain_keypair: ChainKeypair, offchain_keypair: OffchainKeypair) {
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
+                        .await
+                        .unwrap();
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(
+                                *offchain_keypair.public(),
+                                chain_keypair.public().to_address(),
+                                AccountType::NotAnnounced,
+                            ),
+                        )
+                        .await
+                })
+            })
+            .await
+            .unwrap();
     }
 
     #[async_std::test]
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut inner_dbs =
-            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
         const NUM_TICKETS: u64 = 30;
 
@@ -789,13 +785,11 @@ mod tests {
                 agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
             }
 
-            inner_dbs[1]
-                .set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket)
-                .await
-                .unwrap();
+            db_bob.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
         }
 
-        let dbs = init_dbs(inner_dbs).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
         let alice_addr: Address = (&PEERS_CHAIN[0]).into();
         let bob_addr: Address = (&PEERS_CHAIN[1]).into();
@@ -814,24 +808,16 @@ mod tests {
             1u32.into(),
         );
 
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
-            .await
+        db_alice.upsert_channel(None, channel_alice_bob).await.unwrap();
+        db_bob.upsert_channel(None, channel_alice_bob).await.unwrap();
+
+        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
+        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
+
+        let mut awaiter = bob
+            .writer()
+            .aggregate_tickets(&channel_alice_bob.get_id(), None)
             .unwrap();
-
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
-            .await
-            .unwrap();
-
-        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
-
-        let mut awaiter = bob.writer().aggregate_tickets(&channel_alice_bob.get_id()).unwrap();
         let mut finalizer = None;
         match bob.next().await {
             Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
@@ -859,12 +845,7 @@ mod tests {
             _ => panic!("unexpected action happened"),
         }
 
-        let stored_acked_tickets = dbs[1]
-            .read()
-            .await
-            .get_acknowledged_tickets_range(&channel_id_alice_bob, 1u32, 0, u64::MAX)
-            .await
-            .unwrap();
+        let stored_acked_tickets = db_bob.get_tickets(None, (&channel_alice_bob).into()).await.unwrap();
 
         assert_eq!(
             stored_acked_tickets.len(),

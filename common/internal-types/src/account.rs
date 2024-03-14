@@ -132,9 +132,6 @@ mod test {
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(!ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 
     #[test]
@@ -156,9 +153,6 @@ mod test {
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 
     #[test]
@@ -171,8 +165,5 @@ mod test {
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());
         assert!(!ae1.contains_routing_info());
-
-        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
-        assert_eq!(ae1, ae2);
     }
 }

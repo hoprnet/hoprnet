@@ -472,7 +472,10 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::HoprDbInfoOperations;
+    use hopr_db_api::peers::HoprDbPeersOperations;
     use hopr_db_api::HoprDbGeneralModelOperations;
     use lazy_static::lazy_static;
     use mockall::mock;

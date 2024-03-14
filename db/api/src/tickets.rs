@@ -148,6 +148,12 @@ impl From<&ChannelEntry> for TicketSelector {
     }
 }
 
+impl From<ChannelEntry> for TicketSelector {
+    fn from(value: ChannelEntry) -> Self {
+        TicketSelector::from(&value)
+    }
+}
+
 impl From<TicketSelector> for SimpleExpr {
     fn from(value: TicketSelector) -> Self {
         let mut expr = ticket::Column::ChannelId

@@ -617,6 +617,7 @@ mod tests {
                                 multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
                                 updated_block: 1,
                             },
+                            is_self: true,
                         },
                     )
                     .await

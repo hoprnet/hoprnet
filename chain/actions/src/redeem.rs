@@ -373,7 +373,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -455,7 +455,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -546,7 +546,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
@@ -627,7 +627,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
@@ -696,7 +696,7 @@ mod tests {
             tx_queue.action_loop().await;
         });
 
-        let actions = ChainActions::new(ALICE.clone(), db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions

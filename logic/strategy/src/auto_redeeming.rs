@@ -322,7 +322,7 @@ mod tests {
         let ack_ticket = generate_random_ack_ticket(1, 5);
 
         db.upsert_channel(None, channel).await.unwrap();
-        db.upsert_ticket(None, ack_ticket).await.unwrap();
+        db.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
 
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();

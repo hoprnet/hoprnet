@@ -35,8 +35,13 @@ use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 
+use async_lock::Mutex;
+use async_std::task::JoinHandle;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::{
     fmt::{Display, Formatter},
@@ -48,6 +53,7 @@ use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
 
+use crate::errors::StrategyError;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
 
@@ -178,32 +184,46 @@ where
     ) -> crate::errors::Result<()> {
         trace!("starting aggregation in {channel}");
 
-        if let Err(e) = self
-            .ticket_aggregator
-            .aggregate_tickets_in_the_channel(&channel, Some(criteria))
+        todo!()
+
+        /*
+        let aggregator_clone = self.ticket_aggregator.clone();
+        let channel = *channel;
+
+
+        self.aggregation_handles
+            .clone()
+            .send(async_std::task::spawn(async move {
+                if let Err(e) = aggregator_clone
+                    .aggregate_tickets_in_the_channel(&channel, Some(criteria))
+                    .await
+                {
+                    warn!("could not aggregate tickets in channel {channel}: {e}");
+                    if redeem_if_failed {
+                        info!("initiating redemption of all tickets in {channel} after aggregation failure");
+
+                        // TODO: redeem in channel actions should be migrated for this to use only the hash
+                        // if let Err(e) = self.chain_actions.redeem_tickets_in_channel(channel, false).await {
+                        //     error!("failed to issue redeeming of all tickets in {channel}: {e}");
+                        //     return Err(e.into());
+                        // } else {
+                        //     return Ok(());
+                        // }
+
+                        // We do not need to await the redemption completion of all the tickets
+                    }
+                } else {
+                    // The TicketAggregationActions will raise the on_acknowledged_ticket event,
+                    // so the AutoRedeem strategy can take care of redeeming if needed
+                    info!("completed ticket aggregation in {channel}");
+                }
+                channel
+            }))
             .await
-        {
-            warn!("could not aggregate tickets: {e}");
-            if redeem_if_failed {
-                info!("initiating redemption of all tickets in {channel} after aggregation failure");
+            .map_err(|_| StrategyError::Other("failed to send join-handle for aggregation task".into()))?;
 
-                // TODO: redeem in channel actions should be migrated for this to use only the hash
-                // if let Err(e) = self.chain_actions.redeem_tickets_in_channel(channel, false).await {
-                //     error!("failed to issue redeeming of all tickets in {channel}: {e}");
-                //     return Err(e.into());
-                // } else {
-                //     return Ok(());
-                // }
 
-                // We do not need to await the redemption completion of all the tickets
-            }
-        } else {
-            // The TicketAggregationActions will raise the on_acknowledged_ticket event,
-            // so the AutoRedeem strategy can take care of redeeming if needed
-            info!("completed ticket aggregation");
-        }
-
-        Ok(())
+        Ok(())*/
     }
 }
 
@@ -259,27 +279,29 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
-    use async_lock::RwLock;
     use async_trait::async_trait;
     use chain_actions::action_queue::PendingAction;
     use chain_actions::redeem::TicketRedeemActions;
     use core_protocol::ticket_aggregation::processor::{
-        TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
+        AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
     };
-    use futures::channel::oneshot::Receiver;
     use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
+    use hopr_db_api::errors::DbError;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::tickets::HoprDbTicketOperations;
+    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::ops::Add;
     use std::pin::pin;
-    use std::sync::Arc;
     use std::time::Duration;
-    use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, CurrentDbShim};
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
@@ -357,31 +379,31 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
-        let mut ack_key = Vec::new();
+    async fn populate_db_with_ack_tickets(db: HoprDb, amount: usize) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
+        let db_clone = db.clone();
+        let (acked_tickets, total_value) = db
+            .begin_transaction_in_db(TargetDb::Tickets)
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    let mut acked_tickets = Vec::new();
+                    let mut total_value = Balance::zero(BalanceType::HOPR);
 
-        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
-        ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
-        ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
+                    for i in 0..amount {
+                        let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
 
-        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
-    }
+                        db_clone.upsert_ticket(Some(tx), acked_ticket.clone()).await?;
 
-    async fn populate_db_with_ack_tickets(
-        db: &mut DB<CurrentDbShim>,
-        amount: usize,
-    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
-        let mut acked_tickets = Vec::new();
-        let mut total_value = Balance::zero(BalanceType::HOPR);
-        for i in 0..amount {
-            let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
-            db.set(to_acknowledged_ticket_key(&acked_ticket), &acked_ticket)
-                .await
-                .unwrap();
+                        total_value = total_value.add(&acked_ticket.ticket.amount);
+                        acked_tickets.push(acked_ticket);
+                    }
 
-            total_value = total_value.add(&acked_ticket.ticket.amount);
-            acked_tickets.push(acked_ticket);
-        }
+                    Ok::<_, DbError>((acked_tickets, total_value))
+                })
+            })
+            .await
+            .unwrap();
 
         let channel = ChannelEntry::new(
             (&PEERS_CHAIN[0]).into(),
@@ -395,38 +417,44 @@ mod tests {
         (acked_tickets, channel)
     }
 
-    async fn init_dbs(inner_dbs: Vec<DB<CurrentDbShim>>) -> Vec<Arc<HoprDb>> {
-        let mut dbs = Vec::new();
-        for (i, inner_db) in inner_dbs.into_iter().enumerate() {
-            let db = Arc::new(HoprDb::new_in_memory());
-
-            db.write()
-                .await
-                .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
-                .await
-                .unwrap();
-
-            for i in 0..PEERS.len() {
-                db.write()
-                    .await
-                    .link_chain_and_packet_keys(&(&PEERS_CHAIN[i]).into(), PEERS[i].public(), &Snapshot::default())
-                    .await
-                    .unwrap();
-            }
-
-            dbs.push(db);
-        }
-        dbs
+    async fn init_db(db: HoprDb, chain_keypair: ChainKeypair, offchain_keypair: OffchainKeypair) {
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
+                        .await
+                        .unwrap();
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(
+                                *offchain_keypair.public(),
+                                chain_keypair.public().to_address(),
+                                AccountType::NotAnnounced,
+                            ),
+                        )
+                        .await
+                })
+            })
+            .await
+            .unwrap();
     }
 
-    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + Send + Sync + std::fmt::Debug + 'static>(
-        db_alice: Arc<RwLock<Db>>,
-        db_bob: Arc<RwLock<Db>>,
+    fn spawn_aggregation_interaction(
+        db_alice: HoprDb,
+        db_bob: HoprDb,
         key_alice: &ChainKeypair,
         key_bob: &ChainKeypair,
-    ) -> (TicketAggregationActions<(), ()>, Receiver<()>) {
+    ) -> (
+        AwaitingAggregator<(), (), HoprDb>,
+        futures::channel::oneshot::Receiver<()>,
+    ) {
         let mut alice = TicketAggregationInteraction::<(), ()>::new(db_alice, key_alice);
-        let mut bob = TicketAggregationInteraction::<(), ()>::new(db_bob, key_bob);
+        let mut bob = TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), key_bob);
 
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
         let bob_aggregator = bob.writer();
@@ -463,7 +491,10 @@ mod tests {
             let _ = tx.send(());
         });
 
-        return (bob_aggregator, awaiter);
+        (
+            AwaitingAggregator::new(db_bob, key_bob.clone(), bob_aggregator, Duration::from_secs(5)),
+            awaiter,
+        )
     }
 
     #[async_std::test]
@@ -472,29 +503,19 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs =
-            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
+        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
-        let dbs = init_dbs(inner_dbs).await;
+        let (acked_tickets, channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        db_alice.upsert_channel(None, channel).await.unwrap();
+        db_bob.upsert_channel(None, channel).await.unwrap();
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: Some(5),
@@ -505,7 +526,7 @@ mod tests {
 
         let actions = MockTicketRedeemAct::new();
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -518,17 +539,8 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)).fuse());
         let _ = futures::future::select(f1, f2).await;
 
-        assert_eq!(
-            dbs[1]
-                .read()
-                .await
-                .get_acknowledged_tickets_range(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "there should be a single aggregated ticket"
-        );
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 
     #[async_std::test]
@@ -537,29 +549,19 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs =
-            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
+        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
-        let dbs = init_dbs(inner_dbs).await;
+        let (acked_tickets, channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await;
 
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        db_alice.upsert_channel(None, channel).await.unwrap();
+        db_bob.upsert_channel(None, channel).await.unwrap();
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
@@ -570,7 +572,7 @@ mod tests {
 
         let actions = MockTicketRedeemAct::new();
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
 
@@ -584,17 +586,8 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
         let _ = futures::future::select(f1, f2).await;
 
-        assert_eq!(
-            dbs[1]
-                .read()
-                .await
-                .get_acknowledged_tickets_range(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "there should be a single aggregated ticket"
-        );
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 
     #[async_std::test]
@@ -603,40 +596,25 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs =
-            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
+        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
-        let dbs = init_dbs(inner_dbs).await;
+        let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await;
+
+        let (bob_aggregator, awaiter) =
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         // Make this ticket aggregated
         acked_tickets[0].ticket.index_offset = 2;
+        db_bob.upsert_ticket(None, acked_tickets[0].clone()).await.unwrap();
+
         channel.balance = Balance::new(100_u32, BalanceType::HOPR);
 
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_acknowledged_ticket(&acked_tickets[0])
-            .await
-            .unwrap();
-
-        let (bob_aggregator, _) =
-            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+        db_alice.upsert_channel(None, channel).await.unwrap();
+        db_bob.upsert_channel(None, channel).await.unwrap();
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
@@ -647,7 +625,7 @@ mod tests {
 
         let actions = MockTicketRedeemAct::new();
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
 
@@ -663,10 +641,13 @@ mod tests {
 
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
-        let mut inner_dbs =
-            futures::future::join_all((0..2).map(|_| async { DB::new(CurrentDbShim::new_in_memory().await) })).await;
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        let (_, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
+        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
+        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
+
+        let (_, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
@@ -675,44 +656,17 @@ mod tests {
             aggregate_on_channel_close: true,
         };
 
-        let dbs = init_dbs(inner_dbs).await;
+        channel.status = ChannelStatus::PendingToClose(std::time::SystemTime::now());
 
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        db_alice.upsert_channel(None, channel).await.unwrap();
+        db_bob.upsert_channel(None, channel).await.unwrap();
 
         let (bob_aggregator, awaiter) =
-            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         let actions = MockTicketRedeemAct::new();
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
-
-        channel.status = ChannelStatus::PendingToClose(std::time::SystemTime::now());
-
-        dbs[0]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
 
         aggregation_strategy
             .on_own_channel_changed(
@@ -731,16 +685,7 @@ mod tests {
         let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
         let _ = futures::future::select(f1, f2).await;
 
-        assert_eq!(
-            dbs[1]
-                .read()
-                .await
-                .get_acknowledged_tickets_range(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "there should be a single aggregated ticket"
-        );
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
     }
 }
