@@ -778,6 +778,10 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
+        // initialize cache and reset state of all acknowledged tickets
+        info!("Initializing acknowledged ticket states and cache");
+        self.chain_api.db().write().await.init_tickets_and_cache().await?;
+
         // wait for the indexer sync
         info!("Start the indexer and sync the chain");
         self.chain_api.sync_chain().await?;

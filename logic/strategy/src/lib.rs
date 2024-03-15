@@ -46,6 +46,7 @@ use strum::{Display, EnumString, EnumVariantNames};
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;
 use crate::auto_redeeming::AutoRedeemingStrategyConfig;
+use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
 use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
@@ -53,6 +54,7 @@ use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
 pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
+mod channel_finalizer;
 pub mod errors;
 pub mod promiscuous;
 pub mod strategy;
@@ -65,19 +67,21 @@ pub enum Strategy {
     Aggregating(AggregatingStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
+    ClosureFinalizer(ClosureFinalizerStrategyConfig),
     Multi(MultiStrategyConfig),
     Passive,
 }
 
-/// Default HOPR node strategies:
+/// Default HOPR node strategies (in order).
 ///
-/// Aggregation strategy:
+/// ## Aggregation strategy
 ///  - aggregate every 100 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
 ///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
-/// Auto-redeem Strategy
+/// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
-/// Auto-funding Strategy
+/// - redeem single tickets on channel close if worth at least 2 HOPR
+/// ## Auto-funding Strategy
 /// - funding amount: 10 HOPR
 /// - lower limit: 1 HOPR
 /// - the strategy will fund channels which fall below the lower limit with the funding amount
@@ -85,7 +89,6 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
-        finalize_channel_closure: false,
         strategies: vec![
             AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
@@ -99,6 +102,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
+                on_close_redeem_single_tickets_value_min: Balance::new_from_str(
+                    "2000000000000000000",
+                    BalanceType::HOPR,
+                ),
             }),
         ],
     }
