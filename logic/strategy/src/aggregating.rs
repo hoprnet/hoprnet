@@ -617,6 +617,7 @@ mod tests {
 
         let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
+        std::mem::drop(awaiter);
     }
 
     #[async_std::test]

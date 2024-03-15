@@ -682,6 +682,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
     use std::time::Duration;
+    use async_std::prelude::FutureExt;
 
     use super::TicketAggregationProcessed;
 
@@ -763,7 +764,6 @@ mod tests {
             .unwrap();
     }
 
-    #[ignore]
     #[async_std::test]
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -819,32 +819,31 @@ mod tests {
             .aggregate_tickets(&channel_alice_bob.get_id(), None)
             .unwrap();
 
-        panic!("=========+> HERE");
         let mut finalizer = None;
-        match bob.next().await {
-            Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
+        match bob.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer))) => {
                 let _ = finalizer.insert(request_finalizer);
                 alice
                     .writer()
                     .receive_aggregation_request(bob_packet_key, acked_tickets, ())
                     .unwrap();
             }
-            _ => panic!("unexpected action happened"),
+            _ => panic!("unexpected action happened while sending agg request by Bob"),
         };
 
-        match alice.next().await {
-            Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
+        match alice.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ()))) => bob
                 .writer()
                 .receive_ticket(alice_packet_key, aggregated_ticket, ())
                 .unwrap(),
-            _ => panic!("unexpected action happened"),
+            _ => panic!("unexpected action happened while awaiting agg request at Alice"),
         };
 
-        match bob.next().await {
-            Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ())) => {
+        match bob.next().timeout(Duration::from_secs(5)).await {
+            Ok(Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ()))) => {
                 finalizer.take().unwrap().finalize()
             }
-            _ => panic!("unexpected action happened"),
+            _ => panic!("unexpected action happened while awaiting agg response at Bob"),
         }
 
         let stored_acked_tickets = db_bob.get_tickets(None, (&channel_alice_bob).into()).await.unwrap();
