@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required internally by the HOPR library, these are not generic enough to be used in the external APIs"
 edition = "2021"

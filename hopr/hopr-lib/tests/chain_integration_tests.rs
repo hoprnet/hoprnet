@@ -69,7 +69,7 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         .unwrap();
 
     let mut ack_key = Vec::new();
-    ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
+    ack_key.extend_from_slice(ack_ticket.ticket.channel_id.as_ref());
     ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
     ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
     let key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap();
