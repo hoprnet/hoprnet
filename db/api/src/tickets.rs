@@ -11,7 +11,7 @@ use tracing::info;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set, Value};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
 use sea_query::{Expr, SimpleExpr};
 use tracing::{debug, instrument, trace};
 
@@ -736,10 +736,8 @@ impl HoprDbTicketOperations for HoprDb {
 
                     // verify that no aggregation is in progress in the channel
                     if ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
-                        .filter(
-                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
-                        )
+                        .filter(ticket::Column::ChannelId.eq(channel_id.clone()))
+                        .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8), )
                         .one(tx.as_ref())
                         .await?
                         .is_some()
@@ -751,49 +749,53 @@ impl HoprDbTicketOperations for HoprDb {
                     }
 
                     // find the index of the last ticket being redeemed
-                    let idx_of_last_being_redeemed = ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
-                        .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed as u8))
-                        .order_by_desc(hopr_db_entity::ticket::Column::Index)
+                    let first_idx_to_take = ticket::Entity::find()
+                        .filter(ticket::Column::ChannelId.eq(channel_id.clone()))
+                        .filter(ticket::Column::ChannelEpoch.eq(channel_entry.channel_epoch.to_be_bytes().to_vec()))
+                        .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed as u8))
+                        .order_by_desc(ticket::Column::Index)
                         .one(tx.as_ref())
                         .await?
-                        .map(|m| m.id)
-                        .unwrap_or(i32::MIN); // go from the lowest possible index of none is found
+                        .map(|m| U256::from_be_bytes(m.index).as_u64() + 1)
+                        .unwrap_or(0_u64.into()); // go from the lowest possible index of none is found
 
                     // get the list of all tickets to be aggregated
                     let to_be_aggregated = ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id.clone()))
-                        .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
-                        .filter(
-                            hopr_db_entity::ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8),
-                        )
+                        .filter(ticket::Column::ChannelId.eq(channel_id.clone()))
+                        .filter(ticket::Column::ChannelEpoch.eq(channel_entry.channel_epoch.to_be_bytes().to_vec()))
+                        .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
+                        .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
+                        .order_by_asc(ticket::Column::Index)
                         .all(tx.as_ref())
                         .await?;
 
                     // do a balance check to be sure not to aggregate more than current channel stake
                     let mut total_balance = Balance::zero(BalanceType::HOPR);
                     let mut aggregated_balance = Balance::zero(BalanceType::HOPR);
-                    let mut last_idx_to_take = i32::MIN;
+                    let mut first_idx_to_not_take = 0_u64;
 
-                    while let Some(m) = to_be_aggregated.iter().next() {
+                    for m in &to_be_aggregated {
+                        let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
+                        debug!("to_add = {to_add}");
                         if m.index_offset > 1 {
-                            aggregated_balance = aggregated_balance.add(BalanceType::HOPR.balance_bytes(&m.amount))
+                            aggregated_balance = aggregated_balance.add(to_add);
                         }
-                        total_balance = total_balance.add(BalanceType::HOPR.balance_bytes(&m.amount));
+
+                        total_balance = total_balance.add(to_add);
                         if total_balance.gt(&channel_entry.balance) {
-                            panic!(
-                                "TODO: temporary panic to remove: ========++> single amount to be added: {}, total_balance: {total_balance}, channel_entry.balance: {}",
+                            debug!(
+                                "single amount to be added: {}, total_balance: {total_balance}, channel_entry.balance: {}",
                                 BalanceType::HOPR.balance_bytes(&m.amount), channel_entry.balance
                             );
                             break;
                         } else {
-                            last_idx_to_take = m.id;
+                            first_idx_to_not_take = U256::from_be_bytes(&m.index).as_u64() + 1;
                         }
                     }
 
                     let to_be_aggregated = to_be_aggregated
                         .into_iter()
-                        .take_while(|m| m.id != last_idx_to_take)
+                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() < first_idx_to_not_take)
                         .map(|m| model_to_acknowledged_ticket(&m, ds, &chain_keypair).map_err(DbError::from))
                         .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
@@ -812,19 +814,12 @@ impl HoprDbTicketOperations for HoprDb {
                         let to_be_aggregated_count = to_be_aggregated.len();
                         if to_be_aggregated_count > 0 {
                             let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
-                                .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_id))
-                                .filter(hopr_db_entity::ticket::Column::Index.gt(idx_of_last_being_redeemed))
-                                .filter(hopr_db_entity::ticket::Column::Index.lte(last_idx_to_take))
-                                .filter(
-                                    hopr_db_entity::ticket::Column::State
-                                        .ne(AcknowledgedTicketStatus::BeingAggregated as u8),
-                                )
-                                .col_expr(
-                                    hopr_db_entity::ticket::Column::State,
-                                    Expr::value(Value::Int(Some(
-                                        AcknowledgedTicketStatus::BeingAggregated as u8 as i32,
-                                    ))),
-                                )
+                                .filter(ticket::Column::ChannelId.eq(channel_id))
+                                .filter(ticket::Column::ChannelEpoch.eq(channel_entry.channel_epoch.to_be_bytes().to_vec()))
+                                .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
+                                .filter(ticket::Column::Index.lt(first_idx_to_not_take.to_be_bytes().to_vec()))
+                                .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
+                                .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32))
                                 .exec(tx.as_ref())
                                 .await?;
 
@@ -858,14 +853,9 @@ impl HoprDbTicketOperations for HoprDb {
                 Box::pin(async move {
                     // mark all being aggregated tickets as untouched
                     let rolled_back: sea_orm::UpdateResult = ticket::Entity::update_many()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel.to_hex()))
-                        .filter(
-                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
-                        )
-                        .col_expr(
-                            hopr_db_entity::ticket::Column::State,
-                            Expr::value(Value::Int(Some(AcknowledgedTicketStatus::Untouched as u8 as i32))),
-                        )
+                        .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
+                        .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+                        .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::Untouched as u8 as i32))
                         .exec(tx.as_ref())
                         .await?;
 
@@ -907,7 +897,7 @@ impl HoprDbTicketOperations for HoprDb {
                         {
                             let _g = self.ticket_manager.mutex.lock();
                             if let Err(e) = active_ticket.update(self.conn(TargetDb::Tickets)).await {
-                                tracing::error!("failed to update ticket in the db: {e}");
+                                error!("failed to update ticket in the db: {e}");
                             }
                         }
 
@@ -1870,8 +1860,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_prepare_request_with_mulitple_tickets_should_return_that_ticket(
+    async fn test_ticket_aggregation_prepare_request_with_multiple_tickets_should_return_that_ticket(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -1889,7 +1881,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_within_limits(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -1910,7 +1901,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "TBD"]
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_outside_limits(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
