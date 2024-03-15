@@ -15,6 +15,8 @@ use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_api::errors::DbError;
 use hopr_db_api::errors::DbError::LogicalError;
+use hopr_db_api::info::DomainSeparator;
+use hopr_db_api::tickets::TicketSelector;
 use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
@@ -27,7 +29,6 @@ use std::fmt::Formatter;
 use std::ops::{Add, Sub};
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
-use hopr_db_api::tickets::TicketSelector;
 
 /// Event handling object for on-chain operations
 ///
@@ -204,9 +205,7 @@ where
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel_entry.destination == self.chain_key.public().to_address() {
-                        self.db
-                            .mark_tickets_neglected((&channel_entry).into())
-                            .await?;
+                        self.db.mark_tickets_neglected((&channel_entry).into()).await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -248,13 +247,7 @@ where
                         || destination == self.chain_key.public().to_address()
                     {
                         self.db
-                            .mark_tickets_neglected(TicketSelector {
-                                channel_id,
-                                epoch: current_epoch,
-                                index: None,
-                                state: None,
-                                only_aggregated: false,
-                            })
+                            .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
                             .await?;
 
                         self.db.invalidate_cached_ticket_index(&channel_id).await;
@@ -316,7 +309,7 @@ where
 
                         match matching_tickets.len().cmp(&1) {
                             Ordering::Equal => {
-                                let chain_info = self.db.get_chain_data(Some(tx)).await?;
+                                let chain_info = self.db.get_indexer_data(Some(tx)).await?;
                                 let redeemed_ticket = matching_tickets.pop().unwrap();
                                 let ack_ticket = model_to_acknowledged_ticket(
                                     &redeemed_ticket,
@@ -379,24 +372,24 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    channels_dst: Set(Some(domain_separator_updated.domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::Channel,
+                        domain_separator_updated.domain_separator.into(),
+                    )
+                    .await?;
 
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    ledger_dst: Set(Some(ledger_domain_separator_updated.ledger_domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::Ledger,
+                        ledger_domain_separator_updated.ledger_domain_separator.into(),
+                    )
+                    .await?;
 
                 Ok(None)
             }
@@ -549,13 +542,13 @@ where
                 }
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    safe_registry_dst: Set(Some(domain_separator_updated.domain_separator.into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db
+                    .set_domain_separator(
+                        Some(tx),
+                        DomainSeparator::SafeRegistry,
+                        domain_separator_updated.domain_separator.into(),
+                    )
+                    .await?;
             }
         }
 
@@ -724,7 +717,7 @@ pub mod tests {
     }
 
     async fn create_db() -> HoprDb {
-        HoprDb::new_in_memory().await
+        HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
@@ -1175,7 +1168,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.get_chain_data(None).await.unwrap().nr_enabled);
+        assert!(db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
 
     #[async_std::test]
@@ -1206,7 +1199,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.get_chain_data(None).await.unwrap().nr_enabled);
+        assert!(!db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
 
     #[async_std::test]
@@ -1272,7 +1265,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
@@ -1316,11 +1309,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.get_chain_data(None).await.unwrap().channels_dst.is_none());
+        assert!(db.get_indexer_data(None).await.unwrap().channels_dst.is_none());
 
         handlers.on_event(handlers.addresses.channels, 0u32, log).await.unwrap();
 
-        assert_eq!(separator, db.get_chain_data(None).await.unwrap().channels_dst.unwrap());
+        assert_eq!(
+            separator,
+            db.get_indexer_data(None).await.unwrap().channels_dst.unwrap()
+        );
     }
 
     #[async_std::test]
@@ -1338,7 +1334,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
@@ -1383,7 +1379,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let channel_closed_log = RawLog {
             topics: vec![
@@ -1464,7 +1460,7 @@ pub mod tests {
             3.into(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let channel_opened_log = RawLog {
             topics: vec![
@@ -1510,7 +1506,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let ticket_index = U256::from((1u128 << 48) - 1);
 
@@ -1554,7 +1550,7 @@ pub mod tests {
             U256::one(),
         );
 
-        db.insert_channel(None, channel).await.unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let timestamp = SystemTime::now();
         //let timestamp = U256::from((1u64 << 32) - 1);
@@ -1653,7 +1649,7 @@ pub mod tests {
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]),
         };
 
-        assert_eq!(db.get_chain_data(None).await.unwrap().ticket_price, None);
+        assert_eq!(db.get_indexer_data(None).await.unwrap().ticket_price, None);
 
         handlers
             .on_event(handlers.addresses.price_oracle, 0u32, log)
@@ -1663,7 +1659,11 @@ pub mod tests {
         // TODO: check for Vec<ChainEventType> content here
 
         assert_eq!(
-            db.get_chain_data(None).await.unwrap().ticket_price.map(|p| p.amount()),
+            db.get_indexer_data(None)
+                .await
+                .unwrap()
+                .ticket_price
+                .map(|p| p.amount()),
             Some(U256::from(123u64))
         );
     }

@@ -532,6 +532,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::{random_bytes, random_integer};
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::info::DomainSeparator;
     use hopr_db_api::{
         accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
     };
@@ -543,7 +544,6 @@ mod tests {
     use serial_test::serial;
     use std::{str::FromStr, sync::Arc, time::Duration};
     use tracing::debug;
-    use hopr_db_api::info::DomainSeparator;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [
@@ -586,7 +586,7 @@ mod tests {
     }
 
     async fn create_dbs(amount: usize) -> Vec<HoprDb> {
-        futures::future::join_all((0..amount).map(|_| HoprDb::new_in_memory())).await
+        futures::future::join_all((0..amount).map(|_| HoprDb::new_in_memory(ChainKeypair::random()))).await
     }
 
     async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> crate::errors::Result<()> {
@@ -617,6 +617,7 @@ mod tests {
                                 multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
                                 updated_block: 1,
                             },
+                            is_self: true,
                         },
                     )
                     .await
@@ -636,14 +637,14 @@ mod tests {
                 );
 
                 dbs[index]
-                    .insert_channel(None, channel.unwrap())
+                    .upsert_channel(None, channel.unwrap())
                     .await
                     .map_err(|e| crate::errors::ProtocolError::Logic(e.to_string()))?;
             }
 
             if index > 0 {
                 dbs[index]
-                    .insert_channel(None, previous_channel.unwrap())
+                    .upsert_channel(None, previous_channel.unwrap())
                     .await
                     .map_err(|e| crate::errors::ProtocolError::Logic(e.to_string()))?;
             }

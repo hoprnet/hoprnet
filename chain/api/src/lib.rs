@@ -7,7 +7,6 @@ pub use chain_types::chain_events::SignificantChainEvent;
 pub use hopr_internal_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
-use chain_db::db::CoreEthereumDb;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,14 +19,13 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-use utils_db::CurrentDbShim;
 
 use crate::errors::{HoprChainError, Result};
 
 use async_std::task::sleep;
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use hopr_db_api::HoprDbAllOperations;
-use hopr_internal_types::prelude::generate_channel_id;
+use hopr_internal_types::prelude::{generate_channel_id, ChannelDirection};
 
 /// The default HTTP request engine
 ///
@@ -118,7 +116,7 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::De
     indexer_cfg: IndexerConfig,
     indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     db: T,
-    chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+    chain_actions: ChainActions<T>,
     rpc_operations: RpcOperations<JsonRpcClient>,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
@@ -132,7 +130,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
-        chain_actions: ChainActions<CoreEthereumDb<CurrentDbShim>>,
+        chain_actions: ChainActions<T>,
         rpc_operations: RpcOperations<JsonRpcClient>,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
@@ -190,12 +188,15 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             })
     }
 
-    pub async fn channel_from(&self, src: &Address) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_from(None, *src).await?)
+    pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
+        Ok(self.db.get_channels_via(None, ChannelDirection::Outgoing, *src).await?)
     }
 
-    pub async fn channel_to(&self, dest: &Address) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_to(None, *dest).await?)
+    pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
+        Ok(self
+            .db
+            .get_channels_via(None, ChannelDirection::Incoming, *dest)
+            .await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
@@ -203,18 +204,18 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.get_chain_data(None).await?.ticket_price.map(|b| b.amount()))
+        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
         Ok(self.db.get_safe_allowance(None).await?)
     }
 
-    pub fn actions_ref(&self) -> &ChainActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_ref(&self) -> &ChainActions<T> {
         &self.chain_actions
     }
 
-    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<CoreEthereumDb<CurrentDbShim>> {
+    pub fn actions_mut_ref(&mut self) -> &mut ChainActions<T> {
         &mut self.chain_actions
     }
 

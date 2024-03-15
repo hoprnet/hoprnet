@@ -50,7 +50,7 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 /// streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
-/// 1. prime the RPC endpoinnt
+/// 1. prime the RPC endpoint
 /// 2. request an RPC stream of changes to process
 /// 3. process block and log stream
 /// 4. ensure finalization by postponing processing until the head is far enough
@@ -110,7 +110,7 @@ where
         let db_processor = self.db_processor.take().expect("db_processor should be present");
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.get_chain_data(None).await?.last_indexed_block as u64;
+        let db_latest_block = self.db.get_indexer_data(None).await?.last_indexed_block as u64;
 
         let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
@@ -270,6 +270,7 @@ pub mod tests {
     use futures::{join, Stream};
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::prelude::ChainKeypair;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
@@ -281,7 +282,8 @@ pub mod tests {
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHRIS: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
 
@@ -293,7 +295,7 @@ pub mod tests {
     }
 
     async fn create_stub_db() -> HoprDb {
-        HoprDb::new_in_memory().await
+        HoprDb::new_in_memory(ChainKeypair::random()).await
     }
 
     fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {

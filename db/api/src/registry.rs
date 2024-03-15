@@ -8,15 +8,20 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
+/// Defines DB access API for network registry operations.
 #[async_trait]
 pub trait HoprDbRegistryOperations {
+    /// Sets the given node as allowed or denied in network registry.
     async fn set_access_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address, allowed: bool)
         -> Result<()>;
 
+    /// Returns `true` if the given node is allowed in network registry.
     async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 
+    /// Sets or unsets Safe NR eligibility.
     async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
 
+    /// Returns `true` if the given Safe is NR eligible.
     async fn is_safe_eligible<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
 }
 
@@ -136,6 +141,8 @@ impl HoprDbRegistryOperations for HoprDb {
 mod tests {
     use crate::db::HoprDb;
     use crate::registry::HoprDbRegistryOperations;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::prelude::Address;
     use lazy_static::lazy_static;
 
@@ -146,7 +153,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_registry_db() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert!(!db
             .is_allowed_in_network_registry(None, *ADDR_1)
@@ -212,7 +219,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_network_eligiblity_db() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert!(!db.is_safe_eligible(None, *ADDR_1).await.expect("should not fail"));
         assert!(!db.is_safe_eligible(None, *ADDR_2).await.expect("should not fail"));

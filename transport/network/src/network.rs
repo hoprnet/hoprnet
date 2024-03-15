@@ -15,6 +15,7 @@ use hopr_platform::time::native::current_time;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 
+use hopr_db_api::peers::PeerSelector;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
@@ -174,7 +175,7 @@ where
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
         }
 
-        if let Err(e) = async_std::task::block_on(db.cleanup()) {
+        if let Err(e) = async_std::task::block_on(db.cleanup_network_peers()) {
             error!("Failed to initially cleanup the 'peers' database: {e}")
         }
 
@@ -192,7 +193,7 @@ where
     /// Check whether the PeerId is present in the network
     pub async fn has(&self, peer: &PeerId) -> bool {
         peer == &self.me
-            || self.db.get(peer).await.is_ok_and(|p| {
+            || self.db.get_network_peer(peer).await.is_ok_and(|p| {
                 p.map(|peer_status| !self.should_still_be_ignored(&peer_status))
                     .unwrap_or(false)
             })
@@ -208,7 +209,7 @@ where
 
         debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
 
-        if let Some(mut peer_status) = self.db.get(peer).await? {
+        if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
             if !self.should_still_be_ignored(&peer_status) {
                 peer_status.ignored = None;
                 peer_status.multiaddresses.append(&mut addrs);
@@ -218,11 +219,11 @@ where
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
-                self.db.update(peer_status).await?;
+                self.db.update_network_peer(peer_status).await?;
             }
         } else {
             self.db
-                .add(
+                .add_network_peer(
                     peer,
                     origin,
                     addrs,
@@ -234,7 +235,7 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
+            let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
             self.refresh_metrics(&stats)
         }
 
@@ -251,7 +252,7 @@ where
         } else {
             Ok(self
                 .db
-                .get(peer)
+                .get_network_peer(peer)
                 .await?
                 .filter(|peer_status| !self.should_still_be_ignored(peer_status)))
         }
@@ -263,11 +264,11 @@ where
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        self.db.remove(peer).await?;
+        self.db.remove_network_peer(peer).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
+            let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
             self.refresh_metrics(&stats)
         }
 
@@ -285,7 +286,7 @@ where
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        if let Some(mut entry) = self.db.get(peer).await? {
+        if let Some(mut entry) = self.db.get_network_peer(peer).await? {
             if !self.should_still_be_ignored(&entry) {
                 entry.ignored = None;
             }
@@ -304,18 +305,18 @@ where
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
                 if entry.get_quality() < (self.cfg.quality_step / 2.0) {
-                    self.db.remove(&entry.id).await?;
+                    self.db.remove_network_peer(&entry.id).await?;
                     return Ok(Some(NetworkTriggeredEvent::CloseConnection(entry.id)));
                 } else if entry.get_quality() < self.cfg.quality_bad_threshold {
                     entry.ignored = Some(current_time());
                 }
             }
 
-            self.db.update(entry.clone()).await?;
+            self.db.update_network_peer(entry.clone()).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
-                let stats = self.db.stats(self.cfg.quality_bad_threshold).await?;
+                let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
                 self.refresh_metrics(&stats)
             }
 
@@ -332,7 +333,7 @@ where
     /// Returns the quality of the network as a network health indicator.
     pub async fn health(&self) -> Health {
         self.db
-            .stats(self.cfg.quality_bad_threshold)
+            .network_peer_stats(self.cfg.quality_bad_threshold)
             .await
             .map(|stats| health_from_stats(&stats, self.am_i_public))
             .unwrap_or(Health::Unknown)
@@ -362,7 +363,7 @@ where
         F: FnMut(PeerStatus) -> Fut,
         Fut: std::future::Future<Output = Option<V>>,
     {
-        let stream = self.db.get_multiple(None, false).await?;
+        let stream = self.db.get_network_peers(Default::default(), false).await?;
         futures::pin_mut!(stream);
         Ok(stream.filter_map(filter).collect().await)
     }
@@ -370,16 +371,7 @@ where
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
-            .get_multiple(
-                Some(
-                    sea_query::Expr::col(hopr_db_entity::network_peer::Column::LastSeen).lte(chrono::DateTime::<
-                        chrono::Utc,
-                    >::from(
-                        threshold
-                    )),
-                ),
-                true,
-            )
+            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), true)
             .await?;
         futures::pin_mut!(stream);
         let mut data: Vec<PeerStatus> = stream
@@ -420,7 +412,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
@@ -441,7 +433,12 @@ mod tests {
     async fn basic_network(my_id: &PeerId) -> Network<hopr_db_api::db::HoprDb> {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
-        Network::new(*my_id, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await)
+        Network::new(
+            *my_id,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        )
     }
 
     #[test]
@@ -766,7 +763,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -787,7 +789,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.6;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -814,7 +821,12 @@ mod tests {
         let mut cfg = NetworkConfig::default();
         cfg.quality_offline_threshold = 0.3;
 
-        let peers = Network::new(me, vec![], cfg, hopr_db_api::db::HoprDb::new_in_memory().await);
+        let peers = Network::new(
+            me,
+            vec![],
+            cfg,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
+        );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();
 
@@ -841,7 +853,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            hopr_db_api::db::HoprDb::new_in_memory().await,
+            hopr_db_api::db::HoprDb::new_in_memory(ChainKeypair::random()).await,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await.unwrap();

@@ -56,7 +56,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_offchain_key_should_return_nothing_if_a_mapping_to_chain_key_does_not_exist() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain = ChainKeypair::random().public().to_address();
 
@@ -66,7 +66,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_chain_key_should_return_nothing_if_a_mapping_to_offchain_key_does_not_exist() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let packet = OffchainKeypair::random().public().clone();
 
@@ -76,7 +76,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
@@ -105,7 +105,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();

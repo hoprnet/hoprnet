@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_db_entity::ticket;
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
@@ -45,6 +46,7 @@ pub struct HoprDb {
     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_manager: Arc<TicketManager>,
+    pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -52,7 +54,7 @@ pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
 impl HoprDb {
-    pub async fn new(directory: String, cfg: HoprDbConfig) -> Self {
+    pub async fn new(directory: String, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Self {
         let dir = Path::new(&directory);
         std::fs::create_dir_all(dir).unwrap_or_else(|_| panic!("cannot create main database directory {directory}")); // hard-failure
 
@@ -82,11 +84,12 @@ impl HoprDb {
             .await
             .unwrap_or_else(|e| panic!("failed to create main database: {e}"));
 
-        Self::new_sqlx_sqlite(index, peers, tickets).await
+        Self::new_sqlx_sqlite(chain_key, index, peers, tickets).await
     }
 
-    pub async fn new_in_memory() -> Self {
+    pub async fn new_in_memory(chain_key: ChainKeypair) -> Self {
         Self::new_sqlx_sqlite(
+            chain_key,
             SqlitePool::connect(":memory:").await.unwrap(),
             SqlitePool::connect(":memory:").await.unwrap(),
             SqlitePool::connect(":memory:").await.unwrap(),
@@ -94,7 +97,12 @@ impl HoprDb {
         .await
     }
 
-    async fn new_sqlx_sqlite(index_db: SqlitePool, peers_db: SqlitePool, tickets_db: SqlitePool) -> Self {
+    async fn new_sqlx_sqlite(
+        chain_key: ChainKeypair,
+        index_db: SqlitePool,
+        peers_db: SqlitePool,
+        tickets_db: SqlitePool,
+    ) -> Self {
         let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
 
         MigratorIndex::up(&index_db, None)
@@ -140,6 +148,7 @@ impl HoprDb {
             .expect("must reset ticket state on init");
 
         Self {
+            chain_key,
             db: index_db,
             peers_db,
             unacked_tickets,
@@ -157,11 +166,13 @@ impl HoprDbAllOperations for HoprDb {}
 mod tests {
     use crate::db::HoprDb;
     use crate::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 
     #[async_std::test]
     async fn test_basic_db_init() {
-        let db = HoprDb::new_in_memory().await;
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         // TODO: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
         MigratorIndex::status(db.conn(TargetDb::Index))

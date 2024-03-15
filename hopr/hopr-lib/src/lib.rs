@@ -61,7 +61,6 @@ use chain_actions::{
 };
 use chain_api::HoprChain;
 use chain_api::{can_register_with_safe, wait_for_funds, SignificantChainEvent};
-use chain_db::db::CoreEthereumDb;
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
 use core_path::channel_graph::ChannelGraph;
@@ -78,8 +77,6 @@ use core_transport::{ChainKeypair, Hash, HoprTransport, OffchainKeypair};
 use core_transport::{IndexerToProcess, Network, PeerEligibility, PeerOrigin};
 use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info};
-use utils_db::db::DB;
-use utils_db::CurrentDbShim;
 
 use crate::chain::ChainNetworkConfig;
 use crate::chain::SmartContractConfig;
@@ -94,6 +91,8 @@ use hopr_db_api::{
     resolver::HoprDbResolverOperations,
 };
 use hopr_db_api::{channels::HoprDbChannelOperations, HoprDbAllOperations};
+
+use hopr_crypto_types::prelude::OffchainPublicKey;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleCounter, SimpleGauge},
@@ -175,7 +174,7 @@ impl HoprLoopComponents {
 pub fn to_chain_events_refresh_process<Db, S, T>(
     me: PeerId,
     me_onchain: Address,
-    db: Arc<RwLock<Db>>,
+    db: Db,
     multi_strategy: Arc<MultiStrategy>,
     event_stream: S,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
@@ -184,7 +183,7 @@ pub fn to_chain_events_refresh_process<Db, S, T>(
     network: Arc<Network<T>>,
 ) -> Pin<Box<dyn futures::Future<Output = ()> + Send>>
 where
-    Db: chain_db::traits::HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbAllOperations + Send + Sync + 'static,
     S: Stream<Item = SignificantChainEvent> + Send + 'static,
     T: HoprDbAllOperations + Sync + Send + std::fmt::Debug + 'static,
 {
@@ -215,9 +214,7 @@ where
                                 .await;
 
                             if db
-                                .read()
-                                .await
-                                .is_allowed_to_access_network(&address)
+                                .is_allowed_in_network_registry(None, address)
                                 .await
                                 .unwrap_or(false)
                             {
@@ -271,11 +268,12 @@ where
                     }
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    let packet_key = db.read().await.get_packet_key(&address).await;
+                    let packet_key = db.translate_key(None, address).await;
                     match packet_key {
                         Ok(pk) => {
                             if let Some(pk) = pk {
-                                let peer_id = pk.into();
+                                let offchain_key: OffchainPublicKey = pk.try_into().expect("must be an offchain key at this point");
+                                let peer_id = offchain_key.into();
 
                                 transport_indexer_actions
                                     .emit_indexer_update(IndexerToProcess::EligibilityUpdate(
@@ -317,8 +315,7 @@ pub fn build_components<FSaveTbf, T>(
     chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<CurrentDbShim>>>,
-    new_db: T,
+    db: T,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
@@ -344,10 +341,10 @@ where
         identity.public().to_peer_id(),
         my_multiaddresses.clone(),
         cfg.network_options,
-        new_db.clone(),
+        db.clone(),
     );
 
-    let ticket_aggregation = build_ticket_aggregation(new_db.clone(), &me_onchain);
+    let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
     let contract_addrs = ContractAddresses {
         announcements: chain_config.announcements,
@@ -374,11 +371,9 @@ where
     let multi_strategy = Arc::new(MultiStrategy::new(
         cfg.strategy,
         db.clone(),
-        new_db.clone(),
-        network.clone(),
         chain_actions.clone(),
         AwaitingAggregator::new(
-            new_db.clone(),
+            db.clone(),
             me_onchain.clone(),
             ticket_aggregation.writer(),
             cfg.protocol.ticket_aggregation.timeout,
@@ -388,7 +383,7 @@ where
 
     let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
-    let (indexer_updater, indexer_update_rx) = build_index_updater(new_db.clone(), network.clone());
+    let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
 
     let indexer_refreshing_loop = to_chain_events_refresh_process(
         (*me.public()).into(),
@@ -404,7 +399,7 @@ where
 
     let hopr_chain_api: HoprChain<T> = crate::chain::build_chain_api(
         me_onchain.clone(),
-        new_db.clone(),
+        db.clone(),
         contract_addrs,
         cfg.safe_module.safe_address,
         chain_config.channel_contract_deploy_block as u64,
@@ -429,14 +424,14 @@ where
 
     let tbf = Arc::new(RwLock::new(tbf));
 
-    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, new_db.clone(), tbf.clone());
+    let (packet_actions, ack_actions) = build_packet_actions(&me, &me_onchain, db.clone(), tbf.clone());
 
     let ((ping, ping_rx, pong_tx), (mut heartbeat, hb_ping_rx, hb_pong_tx), network_events_rx) =
         build_transport_components(
             cfg.protocol,
             cfg.heartbeat,
             network.clone(),
-            new_db.clone(),
+            db.clone(),
             channel_graph.clone(),
         );
 
@@ -445,7 +440,6 @@ where
         me_onchain.clone(),
         cfg.transport,
         db.clone(),
-        new_db.clone(),
         ping,
         network.clone(),
         indexer_updater,
@@ -609,13 +603,7 @@ impl Hopr {
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
         };
-        let db = async_std::task::block_on(HoprDb::new(db_path.clone(), db_cfg));
-
-        let old_db_shim = async_std::task::block_on(utils_db::CurrentDbShim::new(&db_path, cfg.db.initialize));
-        let old_db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(old_db_shim),
-            me_onchain.public().to_address(),
-        )));
+        let db = async_std::task::block_on(HoprDb::new(db_path.clone(), me_onchain.clone(), db_cfg));
 
         info!("Creating chain components using provider URL: {:?}", cfg.chain.provider);
         let resolved_environment = crate::chain::ChainNetworkConfig::new(
@@ -662,7 +650,6 @@ impl Hopr {
             resolved_environment.clone(),
             me.clone(),
             me_onchain.clone(),
-            old_db,
             db.clone(),
             tbf,
             save_tbf,
@@ -798,10 +785,9 @@ impl Hopr {
                 AccountEntry {
                     public_key: *self.me.public(),
                     chain_addr: self.chain_api.me_onchain(),
-                    entry_type: AccountType::Announced {
-                        multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
-                        updated_block: 1,
-                    },
+                    is_self: true,
+                    // Will be set once we announce ourselves and Indexer processes the announcement
+                    entry_type: AccountType::NotAnnounced,
                 },
             )
             .await?;
@@ -946,8 +932,8 @@ impl Hopr {
     }
 
     /// Test whether the peer with PeerId is allowed to access the network
-    pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
-        self.transport_api.is_allowed_to_access_network(peer).await
+    pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> errors::Result<bool> {
+        Ok(self.transport_api.is_allowed_to_access_network(peer).await?)
     }
 
     /// Ping another node in the network based on the PeerId
@@ -1104,12 +1090,12 @@ impl Hopr {
 
     /// List all channels open from a specified Address
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.chain_api.channel_from(src).await?.into_iter().collect())
+        Ok(self.chain_api.channels_from(src).await?)
     }
 
     /// List all channels open to a specified address
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.chain_api.channel_to(dest).await?.into_iter().collect())
+        Ok(self.chain_api.channels_to(dest).await?)
     }
 
     /// List all channels

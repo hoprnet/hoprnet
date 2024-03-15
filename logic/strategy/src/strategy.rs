@@ -17,18 +17,12 @@
 //! This can be controlled by the `finalize_channel_closure` parameter.
 //!
 //! For details on default parameters see [MultiStrategyConfig].
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::ChainActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
-use core_network::network::Network;
 use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
-use hopr_db_api::channels::HoprDbChannelOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use tracing::{error, warn};
 use validator::Validate;
 
@@ -40,6 +34,7 @@ use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
+use hopr_db_api::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 
@@ -126,18 +121,14 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, Db2, T, U, V>(
+    pub fn new<Db, U, V>(
         cfg: MultiStrategyConfig,
-        db: Arc<RwLock<Db>>,
-        new_db: Db2,
-        network: Arc<Network<T>>,
+        db: Db,
         chain_actions: ChainActions<Db>,
-        ticket_aggregator: AwaitingAggregator<U, V, Db2>,
+        ticket_aggregator: AwaitingAggregator<U, V, Db>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug + 'static,
-        Db2: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-        T: core_network::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
+        Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
         U: Sync + Send + std::fmt::Debug + 'static,
         V: Sync + Send + std::fmt::Debug + 'static,
     {
@@ -153,7 +144,6 @@ impl MultiStrategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
                     sub_cfg.clone(),
                     db.clone(),
-                    network.clone(),
                     chain_actions.clone(),
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
@@ -182,8 +172,6 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             db.clone(),
-                            new_db.clone(),
-                            network.clone(),
                             chain_actions.clone(),
                             ticket_aggregator.clone(),
                         )))

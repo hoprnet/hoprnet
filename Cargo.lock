@@ -1146,13 +1146,12 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
- "chain-db",
  "chain-rpc",
  "chain-types",
  "env_logger",
@@ -1162,6 +1161,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1173,7 +1173,7 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
+ "tracing-test",
 ]
 
 [[package]]
@@ -1671,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
@@ -1702,7 +1702,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
@@ -3604,7 +3603,6 @@ dependencies = [
  "atomic_enum",
  "chain-actions",
  "chain-api",
- "chain-db",
  "chain-indexer",
  "chain-rpc",
  "chain-types",

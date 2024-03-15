@@ -1,4 +1,3 @@
-use async_lock::RwLock;
 use async_std::task::JoinHandle;
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use chain_actions::action_state::{ActionState, IndexerActionTracker};
@@ -8,8 +7,6 @@ use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::redeem::TicketRedeemActions;
 use chain_actions::ChainActions;
 use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use chain_db::db::CoreEthereumDb;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use chain_rpc::client::native::SurfRequestor;
 use chain_rpc::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
@@ -24,16 +21,13 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::db::HoprDb;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info};
-use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-use utils_db::db::DB;
-use utils_db::sqlite::SqliteShim;
-use utils_db::CurrentDbShim;
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(
@@ -69,18 +63,9 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
         .acknowledge(&hk2, &myself.chain_key, &domain_separator)
         .unwrap();
 
-    let mut ack_key = Vec::new();
-    ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
-    ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
-    ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
-    let key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap();
-
     myself
         .db
-        .write()
-        .await
-        .db
-        .set(key, &ack_ticket)
+        .upsert_ticket(None, ack_ticket)
         .await
         .expect("should store ack key");
 }
@@ -158,12 +143,10 @@ async fn onboard_node<M: Middleware>(
 
 type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcRetryPolicy>>;
 
-type TestDb = CoreEthereumDb<SqliteShim<'static>>;
-
 struct ChainNode {
     chain_key: ChainKeypair,
-    db: Arc<RwLock<TestDb>>,
-    actions: ChainActions<TestDb>,
+    db: HoprDb,
+    actions: ChainActions<HoprDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
@@ -180,13 +163,7 @@ async fn start_node_chain_logic(
     indexer_cfg: IndexerConfig,
 ) -> ChainNode {
     // DB
-    let inner_db = DB::new(CurrentDbShim::new_in_memory().await);
-    let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-        inner_db,
-        chain_key.public().to_address(),
-    )));
-
-    let new_db = HoprDb::new_in_memory().await;
+    let db = HoprDb::new_in_memory(chain_key.clone()).await;
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(
@@ -223,9 +200,9 @@ async fn start_node_chain_logic(
     }));
 
     // Indexer
-    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), new_db.clone());
+    let chain_log_handler = ContractEventHandlers::new(contract_addrs, safe_addr, chain_key.clone(), db.clone());
 
-    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, new_db.clone(), indexer_cfg, sce_tx);
+    let mut indexer = Indexer::new(rpc_ops.clone(), chain_log_handler, db.clone(), indexer_cfg, sce_tx);
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {
@@ -393,9 +370,13 @@ async fn integration_test_indexer() {
 
     let channel_alice_bob = alice_node
         .db
-        .read()
-        .await
-        .get_channel_to(&bob_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
@@ -443,18 +424,26 @@ async fn integration_test_indexer() {
     // after the second funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
         .db
-        .read()
-        .await
-        .get_channel_to(&bob_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
     let channel_alice_bob_seen_by_bob = bob_node
         .db
-        .read()
-        .await
-        .get_channel_from(&alice_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
@@ -471,9 +460,13 @@ async fn integration_test_indexer() {
 
     let channel_bob_alice = bob_node
         .db
-        .read()
-        .await
-        .get_channel_to(&alice_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Alice from Bob");
@@ -484,9 +477,7 @@ async fn integration_test_indexer() {
 
     let alice_ack_tickets = alice_node
         .db
-        .read()
-        .await
-        .get_acknowledged_tickets(Some(channel_bob_alice))
+        .get_tickets(None, channel_bob_alice.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
@@ -499,9 +490,13 @@ async fn integration_test_indexer() {
     let channel_balance_before_redeem = channel_alice_bob.balance;
     let channel_bob_alice = alice_node
         .db
-        .read()
-        .await
-        .get_channel_from(&bob_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Bob");
@@ -548,9 +543,7 @@ async fn integration_test_indexer() {
 
     let alice_ack_tickets = alice_node
         .db
-        .read()
-        .await
-        .get_acknowledged_tickets(Some(channel_bob_alice))
+        .get_tickets(None, channel_bob_alice.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
@@ -562,9 +555,13 @@ async fn integration_test_indexer() {
 
     let channel_bob_alice = alice_node
         .db
-        .read()
-        .await
-        .get_channel_from(&bob_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Bob");
@@ -614,9 +611,13 @@ async fn integration_test_indexer() {
         Some(ChainEventType::ChannelClosureInitiated(channel)) => {
             let closing_channel_in_db = alice_node
                 .db
-                .read()
-                .await
-                .get_channel_to(&bob_chain_key.public().to_address())
+                .get_channel_by_id(
+                    None,
+                    generate_channel_id(
+                        &alice_chain_key.public().to_address(),
+                        &bob_chain_key.public().to_address(),
+                    ),
+                )
                 .await
                 .expect("db call should not fail")
                 .expect("should contain a channel to Bob");
@@ -632,9 +633,13 @@ async fn integration_test_indexer() {
 
     let channel_alice_bob = alice_node
         .db
-        .read()
-        .await
-        .get_channel_to(&bob_chain_key.public().to_address())
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &alice_chain_key.public().to_address(),
+                &bob_chain_key.public().to_address(),
+            ),
+        )
         .await
         .expect("must get channel")
         .expect("channel to bob must exist");

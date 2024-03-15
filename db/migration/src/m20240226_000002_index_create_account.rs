@@ -20,6 +20,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Account::ChainKey).string_len(40).not_null())
                     .col(ColumnDef::new(Account::PacketKey).string_len(64).not_null())
+                    .col(ColumnDef::new(Account::IsSelf).boolean().not_null().default(false))
                     .to_owned(),
             )
             .await?;
@@ -150,6 +151,7 @@ enum Account {
     Id,
     PacketKey,
     ChainKey,
+    IsSelf,
 }
 
 #[derive(DeriveIden)]

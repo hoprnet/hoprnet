@@ -14,9 +14,9 @@
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
+use hopr_db_api::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -54,10 +54,13 @@ pub trait ChannelActions {
 }
 
 #[async_trait]
-impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> ChannelActions for ChainActions<Db> {
+impl<Db> ChannelActions for ChainActions<Db>
+where
+    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+{
     #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
-        if self.me == destination {
+        if self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
@@ -65,32 +68,45 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
-        debug!("current staking safe allowance is {allowance}");
-        if allowance.lt(&amount) {
-            return Err(NotEnoughAllowance);
-        }
+        // Perform all checks
+        let db_clone = self.db.clone();
+        let self_addr = self.self_address();
+        self.db
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    debug!("current staking safe allowance is {allowance}");
+                    if allowance.lt(&amount) {
+                        return Err(NotEnoughAllowance);
+                    }
 
-        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current Safe HOPR balance is {hopr_balance}");
-        if hopr_balance.lt(&amount) {
-            return Err(BalanceTooLow);
-        }
+                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    if hopr_balance.lt(&amount) {
+                        return Err(BalanceTooLow);
+                    }
 
-        if self.db.read().await.is_network_registry_enabled().await?
-            && !self.db.read().await.is_allowed_to_access_network(&destination).await?
-        {
-            return Err(PeerAccessDenied);
-        }
+                    if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
+                        && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
+                    {
+                        return Err(PeerAccessDenied);
+                    }
 
-        let maybe_channel = self.db.read().await.get_channel_x(&self.me, &destination).await?;
-        if let Some(channel) = maybe_channel {
-            debug!("already found existing {channel}");
-            if channel.status != ChannelStatus::Closed {
-                error!("channel to {destination} is already opened or pending to close");
-                return Err(ChannelAlreadyExists);
-            }
-        }
+                    let channel_id = generate_channel_id(&self_addr, &destination);
+                    let maybe_channel = db_clone.get_channel_by_id(Some(tx), channel_id).await?;
+                    if let Some(channel) = maybe_channel {
+                        debug!("already found existing {channel}");
+                        if channel.status != ChannelStatus::Closed {
+                            error!("channel to {destination} is already opened or pending to close");
+                            return Err(ChannelAlreadyExists);
+                        }
+                    }
+                    Ok(())
+                })
+            })
+            .await?;
 
         info!("initiating channel open to {destination} with {amount}");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
@@ -102,19 +118,30 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
-        debug!("current staking safe allowance is {allowance}");
-        if allowance.lt(&amount) {
-            return Err(NotEnoughAllowance);
-        }
+        let db_clone = self.db.clone();
+        let maybe_channel = self
+            .db
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let allowance = db_clone.get_safe_allowance(Some(tx)).await?;
+                    debug!("current staking safe allowance is {allowance}");
+                    if allowance.lt(&amount) {
+                        return Err(NotEnoughAllowance);
+                    }
 
-        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
-        debug!("current Safe HOPR balance is {hopr_balance}");
-        if hopr_balance.lt(&amount) {
-            return Err(BalanceTooLow);
-        }
+                    let hopr_balance = db_clone.get_safe_balance(Some(tx)).await?;
+                    debug!("current Safe HOPR balance is {hopr_balance}");
+                    if hopr_balance.lt(&amount) {
+                        return Err(BalanceTooLow);
+                    }
 
-        let maybe_channel = self.db.read().await.get_channel(&channel_id).await?;
+                    Ok(db_clone.get_channel_by_id(Some(tx), channel_id).await?)
+                })
+            })
+            .await?;
+
         match maybe_channel {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
@@ -135,10 +162,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone + Send + Sync + std::fmt::Debug> Chan
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
-        let maybe_channel = match direction {
-            ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
-            ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
+        let channel_id = match direction {
+            ChannelDirection::Incoming => generate_channel_id(&counterparty, &self.self_address()),
+            ChannelDirection::Outgoing => generate_channel_id(&self.self_address(), &counterparty),
         };
+
+        let maybe_channel = self.db.get_channel_by_id(None, channel_id).await?;
 
         match maybe_channel {
             Some(channel) => {
@@ -184,28 +213,36 @@ mod tests {
     use crate::channels::ChannelActions;
     use crate::errors::ChainActionsError;
     use crate::ChainActions;
-    use async_lock::RwLock;
-    use chain_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use chain_types::actions::Action;
     use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::types::Hash;
+    use hopr_crypto_types::prelude::*;
+    use hopr_db_api::channels::HoprDbChannelOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{
         ops::{Add, Sub},
-        sync::Arc,
         time::{Duration, SystemTime},
     };
-    use utils_db::{db::DB, CurrentDbShim};
 
     lazy_static! {
-        static ref ALICE: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
-        static ref BOB: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
+        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
+        ))
+        .unwrap();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
+        static ref BOB: Address = BOB_KP.public().to_address();
     }
 
     #[async_std::test]
@@ -215,27 +252,27 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
-        db.write()
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await
+                })
+            })
             .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(5_000_000_u64, BalanceType::HOPR))
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_network_registry(false, &Snapshot::default())
-            .await
-            .unwrap();
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -290,10 +327,30 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -301,32 +358,6 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(5_000_000_u64, BalanceType::HOPR))
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_network_registry(false, &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -345,22 +376,34 @@ mod tests {
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -377,22 +420,34 @@ mod tests {
     async fn test_open_should_not_allow_invalid_balance() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
@@ -421,22 +476,34 @@ mod tests {
 
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(1000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -455,10 +522,27 @@ mod tests {
 
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -466,18 +550,6 @@ mod tests {
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(1_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(1_u64, BalanceType::HOPR))
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
@@ -496,29 +568,30 @@ mod tests {
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(5_000_000u64, BalanceType::HOPR))
-            .await
-            .unwrap();
-
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
-        db.write()
+
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
             .await
-            .unwrap();
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -571,28 +644,34 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(5_000_000u64, BalanceType::HOPR))
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::HOPR);
@@ -611,22 +690,34 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(10_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(10_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32, BalanceType::Native);
@@ -654,22 +745,34 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(1000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
@@ -688,28 +791,34 @@ mod tests {
 
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(100_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(1_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-
-        db.write()
-            .await
-            .set_staking_safe_allowance(&Balance::new(1_000_000_u64, BalanceType::HOPR), &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.write()
-            .await
-            .set_hopr_balance(&Balance::new(1_u64, BalanceType::HOPR))
-            .await
-            .unwrap();
 
         let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
@@ -729,18 +838,30 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
-
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        db.write()
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
             .await
-            .unwrap();
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -812,11 +933,7 @@ mod tests {
         // Transition the channel to the PendingToClose state with the closure time already elapsed
         channel.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
 
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
         let tx_res = actions
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
@@ -841,18 +958,30 @@ mod tests {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
-
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        db.write()
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
             .await
-            .unwrap();
+            .expect("must initialize db");
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -904,11 +1033,6 @@ mod tests {
     async fn test_should_not_close_when_closure_time_did_not_elapse() {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
-
         let channel = ChannelEntry::new(
             *ALICE,
             *BOB,
@@ -918,11 +1042,28 @@ mod tests {
             U256::zero(),
         );
 
-        db.write()
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
             .await
-            .unwrap();
+            .expect("must initialize db");
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -950,10 +1091,28 @@ mod tests {
     async fn test_should_not_close_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
@@ -980,25 +1139,39 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel).await
+                })
+            })
+            .await
+            .expect("must initialize db");
+
         let tx_queue = ActionQueue::new(
             db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
+        let actions = ChainActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(

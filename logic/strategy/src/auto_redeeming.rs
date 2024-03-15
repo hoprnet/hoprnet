@@ -3,17 +3,15 @@
 //! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far less on-chain transactions being issued).
 //!
 //! For details on default parameters see [AutoRedeemingStrategyConfig].
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use tracing::{debug, info};
 use validator::Validate;
 
@@ -51,26 +49,26 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> {
+pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprDbTicketOperations> {
     chain_actions: A,
-    db: Arc<RwLock<Db>>,
+    db: Db,
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> Debug for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Debug for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Display for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<A, Db> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Arc<RwLock<Db>>, chain_actions: A) -> Self {
+impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> AutoRedeemingStrategy<A, Db> {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Db, chain_actions: A) -> Self {
         Self { cfg, db, chain_actions }
     }
 }
@@ -79,7 +77,7 @@ impl<A: TicketRedeemActions, Db: HoprCoreEthereumDbActions> AutoRedeemingStrateg
 impl<A, Db> SingularStrategy for AutoRedeemingStrategy<A, Db>
 where
     A: TicketRedeemActions + Send + Sync,
-    Db: HoprCoreEthereumDbActions + Send + Sync,
+    Db: HoprDbTicketOperations + Send + Sync,
 {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
@@ -115,9 +113,7 @@ where
 
             let mut ack_ticket_in_db = self
                 .db
-                .read()
-                .await
-                .get_acknowledged_tickets(Some(*channel))
+                .get_tickets(None, channel.into())
                 .await?
                 .into_iter()
                 .filter(|t| {
@@ -154,27 +150,24 @@ where
 mod tests {
     use crate::auto_redeeming::{AutoRedeemingStrategy, AutoRedeemingStrategyConfig};
     use crate::strategy::SingularStrategy;
-    use async_lock::RwLock;
     use async_trait::async_trait;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use chain_actions::redeem::TicketRedeemActions;
-    use chain_db::db::CoreEthereumDb;
-    use chain_db::traits::HoprCoreEthereumDbActions;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::channels::HoprDbChannelOperations;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use std::ops::Add;
-    use std::sync::Arc;
     use std::time::{Duration, SystemTime};
-    use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -209,16 +202,6 @@ mod tests {
 
         let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
-    }
-
-    fn ack_ticket_key(ack_ticket: &AcknowledgedTicket) -> utils_db::db::Key {
-        let mut ack_key = Vec::new();
-
-        ack_key.extend_from_slice(&ack_ticket.ticket.channel_id.to_bytes());
-        ack_key.extend_from_slice(&ack_ticket.ticket.channel_epoch.to_be_bytes());
-        ack_key.extend_from_slice(&ack_ticket.ticket.index.to_be_bytes());
-
-        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
     mock! {
@@ -261,10 +244,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_redeem() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            ALICE.public().to_address(),
-        )));
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let ack_ticket = generate_random_ack_ticket(1, 5);
         let ack_clone = ack_ticket.clone();
@@ -288,10 +271,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_redeem_agg_only() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            ALICE.public().to_address(),
-        )));
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let ack_ticket_unagg = generate_random_ack_ticket(1, 5);
         let ack_ticket_agg = generate_random_ack_ticket(3, 5);
@@ -321,10 +304,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            ALICE.public().to_address(),
-        )));
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -334,20 +317,12 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
-            .await
-            .unwrap();
 
         // Make ticket worth exactly the threshold
         let ack_ticket = generate_random_ack_ticket(1, 5);
-        db.write()
-            .await
-            .db
-            .set(ack_ticket_key(&ack_ticket), &ack_ticket)
-            .await
-            .unwrap();
+
+        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
 
         let ack_clone = ack_ticket.clone();
         let ack_clone_2 = ack_ticket.clone();
@@ -379,10 +354,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_should_not_redeem_singular_ticket_worth_less_on_close() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            ALICE.public().to_address(),
-        )));
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -392,20 +367,12 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
-            .await
-            .unwrap();
 
         // Make this ticket worth less than the threshold
         let ack_ticket = generate_random_ack_ticket(1, 3);
-        db.write()
-            .await
-            .db
-            .set(ack_ticket_key(&ack_ticket), &ack_ticket)
-            .await
-            .unwrap();
+
+        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_ticket(None, ack_ticket).await.unwrap();
 
         let mut actions = MockTicketRedeemAct::new();
         actions.expect_redeem_ticket().never();
@@ -430,10 +397,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_should_not_redeem_non_singular_tickets_on_close() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            ALICE.public().to_address(),
-        )));
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -443,29 +410,26 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
-            .await
-            .unwrap();
 
-        // Make this ticket worth exactly the threshold
-        let mut ack_ticket = generate_random_ack_ticket(1, 5);
-        ack_ticket.ticket.index = 1;
-        db.write()
-            .await
-            .db
-            .set(ack_ticket_key(&ack_ticket), &ack_ticket)
-            .await
-            .unwrap();
+        db.upsert_channel(None, channel).await.unwrap();
 
-        // Make one more ticket worth exactly the threshold
-        let mut ack_ticket = generate_random_ack_ticket(1, 5);
-        ack_ticket.ticket.index = 2;
-        db.write()
+        let db_clone = db.clone();
+        db.begin_transaction_in_db(TargetDb::Tickets)
             .await
-            .db
-            .set(ack_ticket_key(&ack_ticket), &ack_ticket)
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    // Make this ticket worth exactly the threshold
+                    let mut ack_ticket = generate_random_ack_ticket(1, 5);
+                    ack_ticket.ticket.index = 1;
+                    db_clone.upsert_ticket(Some(tx), ack_ticket).await?;
+
+                    // Make one more ticket worth exactly the threshold
+                    let mut ack_ticket = generate_random_ack_ticket(1, 5);
+                    ack_ticket.ticket.index = 2;
+                    db_clone.upsert_ticket(Some(tx), ack_ticket).await
+                })
+            })
             .await
             .unwrap();
 
