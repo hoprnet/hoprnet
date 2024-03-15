@@ -81,12 +81,9 @@ where
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        // TODO: cache this
-        let me_onchain = self.db.get_self_account(None).await?;
-
         let outgoing_channels = self
             .db
-            .get_channels_via(None, ChannelDirection::Incoming, me_onchain.chain_addr)
+            .get_outgoing_channels(None)
             .await?;
 
         let to_close = outgoing_channels
@@ -146,7 +143,7 @@ mod tests {
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
         .unwrap();
-        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();

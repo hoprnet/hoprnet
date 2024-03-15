@@ -29,16 +29,14 @@
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::redeem::TicketRedeemActions;
-pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
+use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_internal_types::prelude::*;
 
-use async_lock::Mutex;
+use async_lock::RwLock;
 use async_std::task::JoinHandle;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::collections::HashMap;
@@ -48,12 +46,11 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
 
-use crate::errors::StrategyError;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
 
@@ -113,22 +110,21 @@ pub struct AggregatingStrategyConfig {
 /// above the given threshold.
 /// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
 /// was successful.
-pub struct AggregatingStrategy<Db, T, U, A>
+pub struct AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    A: TicketRedeemActions + Clone,
-    T: Send,
-    U: Send,
+    T: Send + 'static,
+    U: Send + 'static,
 {
-    chain_actions: A,
+    db: Db,
     ticket_aggregator: Arc<AwaitingAggregator<T, U, Db>>,
     cfg: AggregatingStrategyConfig,
+    agg_tasks: Arc<RwLock<HashMap<Hash, (bool, JoinHandle<()>)>>>,
 }
 
-impl<Db, T, U, A> Debug for AggregatingStrategy<Db, T, U, A>
+impl<Db, T, U> Debug for AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
 {
@@ -137,10 +133,9 @@ where
     }
 }
 
-impl<Db, T, U, A> Display for AggregatingStrategy<Db, T, U, A>
+impl<Db, T, U> Display for AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
 {
@@ -149,102 +144,120 @@ where
     }
 }
 
-impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
+impl<Db, T, U> AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug,
-    A: TicketRedeemActions + Clone,
     T: Send,
     U: Send,
 {
     pub fn new(
         cfg: AggregatingStrategyConfig,
-        chain_actions: A,
+        db: Db,
         ticket_aggregator: AwaitingAggregator<T, U, Db>,
     ) -> Self {
         Self {
+            db,
             cfg,
-            chain_actions,
             ticket_aggregator: Arc::new(ticket_aggregator),
+            agg_tasks: Arc::new(RwLock::new(HashMap::new()))
         }
     }
 }
 
-impl<Db, T, U, A> AggregatingStrategy<Db, T, U, A>
+impl<Db, T, U> AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
-    A: TicketRedeemActions + Clone + Send + 'static,
-    T: Send,
-    U: Send,
+    T: Send + 'static,
+    U: Send + 'static,
 {
-    async fn start_aggregation(
+    async fn try_start_aggregation(
         &self,
-        channel: &Hash,
+        channel_id: Hash,
         criteria: AggregationPrerequisites,
-        redeem_if_failed: bool,
     ) -> crate::errors::Result<()> {
-        trace!("starting aggregation in {channel}");
+        trace!("starting aggregation in {channel_id}");
 
-        todo!()
-
-        /*
-        let aggregator_clone = self.ticket_aggregator.clone();
-        let channel = *channel;
-
-
-        self.aggregation_handles
-            .clone()
-            .send(async_std::task::spawn(async move {
-                if let Err(e) = aggregator_clone
-                    .aggregate_tickets_in_the_channel(&channel, Some(criteria))
-                    .await
-                {
-                    warn!("could not aggregate tickets in channel {channel}: {e}");
-                    if redeem_if_failed {
-                        info!("initiating redemption of all tickets in {channel} after aggregation failure");
-
-                        // TODO: redeem in channel actions should be migrated for this to use only the hash
-                        // if let Err(e) = self.chain_actions.redeem_tickets_in_channel(channel, false).await {
-                        //     error!("failed to issue redeeming of all tickets in {channel}: {e}");
-                        //     return Err(e.into());
-                        // } else {
-                        //     return Ok(());
-                        // }
-
-                        // We do not need to await the redemption completion of all the tickets
+        if !self.is_strategy_aggregating_in_channel(channel_id).await {
+            let agg_tasks_clone = self.agg_tasks.clone();
+            let aggregator_clone = self.ticket_aggregator.clone();
+            let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
+            let task = async_std::task::spawn(async move {
+                match aggregator_clone.aggregate_tickets_in_the_channel(&channel_id, Some(criteria)).await {
+                    Ok(_) => {
+                        info!("completed ticket aggregation in channel {channel_id}");
                     }
-                } else {
-                    // The TicketAggregationActions will raise the on_acknowledged_ticket event,
-                    // so the AutoRedeem strategy can take care of redeeming if needed
-                    info!("completed ticket aggregation in {channel}");
+                    Err(e) => {
+                        error!("cannot complete aggregation in channel {channel_id}: {e}");
+                    }
                 }
-                channel
-            }))
-            .await
-            .map_err(|_| StrategyError::Other("failed to send join-handle for aggregation task".into()))?;
 
+                // Wait until we're added to the aggregation tasks table
+                let _ = can_remove_rx.await;
+                if let Some((done, _)) = agg_tasks_clone.write().await.get_mut(&channel_id) {
+                    *done = true;
+                }
+            });
 
-        Ok(())*/
+            self.agg_tasks.write().await.insert(channel_id, (false, task));
+            let _ = can_remove_tx.send(()); // Allow the task to mark itself as done
+        } else {
+            warn!("this strategy already aggregates in channel {channel_id}");
+        }
+
+        Ok(())
+    }
+
+    async fn is_strategy_aggregating_in_channel(&self, channel_id: Hash) -> bool {
+        let existing = self.agg_tasks.read().await.get(&channel_id).map(|(done,_)| *done);
+        if let Some(done) = existing {
+            // Task exists, check if it has been completed
+            if done {
+                if let Some((_, task)) = self.agg_tasks.write().await.remove(&channel_id) {
+                    // Task has been completed, remove it and await its join handle
+                    task.await;
+                    false
+                } else {
+                    // Should not happen, but means there's no more aggregation task for the channel
+                    false
+                }
+            } else {
+                // There's still a running aggregation task for this channel
+                true
+            }
+        } else {
+            // No aggregation task found for this channel
+            false
+        }
     }
 }
 
 #[async_trait]
-impl<Db, T, U, A> SingularStrategy for AggregatingStrategy<Db, T, U, A>
+impl<Db, T, U> SingularStrategy for AggregatingStrategy<Db, T, U>
 where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-    A: TicketRedeemActions + Clone + Send + Sync + 'static,
     T: Send,
     U: Send,
 {
-    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        let channel_id = ack.ticket.channel_id;
+    async fn on_tick(&self) -> crate::errors::Result<()> {
+        let incoming = self.db.get_incoming_channels(None)
+            .await?
+            .into_iter()
+            .map(|c| c.get_id());
 
         let criteria = AggregationPrerequisites {
-            min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(2) as usize,
+            min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(1) as usize,
             min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
         };
 
-        self.start_aggregation(&channel_id, criteria, false).await
+        for channel_id in incoming {
+            if let Err(e) = self.try_start_aggregation(channel_id, criteria).await {
+                debug!("skipped aggregation in channel {channel_id}: {e}");
+            }
+        }
+
+        Ok(())
     }
+
 
     async fn on_own_channel_changed(
         &self,
@@ -269,7 +282,7 @@ where
                 min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
             };
 
-            Ok(self.start_aggregation(&channel.get_id(), criteria, true).await?)
+            Ok(self.try_start_aggregation(channel.get_id(), criteria).await?)
         } else {
             Ok(())
         }
@@ -318,31 +331,6 @@ mod tests {
         .iter()
         .map(|private| ChainKeypair::from_secret(private).unwrap())
         .collect();
-    }
-
-    mock! {
-        TicketRedeemAct { }
-        #[async_trait]
-        impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> chain_actions::errors::Result<Vec<PendingAction >>;
-            async fn redeem_tickets_with_counterparty(
-                &self,
-                counterparty: &Address,
-                only_aggregated: bool,
-            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
-            async fn redeem_tickets_in_channel(
-                &self,
-                channel: &ChannelEntry,
-                only_aggregated: bool,
-            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
-            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> chain_actions::errors::Result<PendingAction>;
-        }
-    }
-
-    impl Clone for MockTicketRedeemAct {
-        fn clone(&self) -> Self {
-            Self::new()
-        }
     }
 
     fn mock_acknowledged_ticket(signer: &ChainKeypair, destination: &ChainKeypair, index: u64) -> AcknowledgedTicket {
@@ -524,13 +512,11 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let actions = MockTicketRedeemAct::new();
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
-
-        let threshold_ticket = acked_tickets.last().unwrap();
+        //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
-            .on_acknowledged_winning_ticket(&threshold_ticket)
+            .on_tick()
             .await
             .expect("strategy call should succeed");
 
@@ -570,14 +556,11 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let actions = MockTicketRedeemAct::new();
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
-
-        let threshold_ticket = acked_tickets.last().unwrap();
-
+        //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
-            .on_acknowledged_winning_ticket(&threshold_ticket)
+            .on_tick()
             .await
             .expect("strategy call should succeed");
 
@@ -602,7 +585,8 @@ mod tests {
         init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
         init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
-        let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await;
+        const NUM_TICKETS: usize = 4;
+        let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await;
 
         let (bob_aggregator, awaiter) =
             spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
@@ -623,16 +607,16 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let actions = MockTicketRedeemAct::new();
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
-
-        let threshold_ticket = acked_tickets.last().unwrap();
-
+        //let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
-            .on_acknowledged_winning_ticket(&threshold_ticket)
+            .on_tick()
             .await
-            .expect_err("strategy call should not satisfy the criteria");
+            .expect("strategy call should succeed");
+
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
     }
 
     #[async_std::test]
@@ -664,9 +648,7 @@ mod tests {
         let (bob_aggregator, awaiter) =
             spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
-        let actions = MockTicketRedeemAct::new();
-
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_alice.clone(), bob_aggregator);
 
         aggregation_strategy
             .on_own_channel_changed(

@@ -247,12 +247,9 @@ where
         let mut tick_decision = ChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
 
-        // TODO: cache this
-        let me_onchain = self.db.get_self_account(None).await?;
-
         let outgoing_open_channels = self
             .db
-            .get_channels_via(None, ChannelDirection::Outgoing, me_onchain.chain_addr)
+            .get_outgoing_channels(None)
             .await?
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)

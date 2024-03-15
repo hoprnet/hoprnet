@@ -27,6 +27,20 @@ pub trait HoprDbChannelOperations {
         target: Address,
     ) -> Result<Vec<ChannelEntry>>;
 
+    /// Fetches all channels that are `Incoming` to this node.
+    /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
+    async fn get_incoming_channels<'a>(
+        &'a self,
+        tx: OptTx<'a>
+    ) -> Result<Vec<ChannelEntry>>;
+
+    /// Fetches all channels that are `Incoming` to this node.
+    /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
+    async fn get_outgoing_channels<'a>(
+        &'a self,
+        tx: OptTx<'a>
+    ) -> Result<Vec<ChannelEntry>>;
+
     /// Retrieves all channel information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
@@ -84,6 +98,14 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
+    async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        self.get_channels_via(tx, ChannelDirection::Incoming, self.chain_key.public().to_address()).await
+    }
+
+    async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        self.get_channels_via(tx, ChannelDirection::Outgoing, self.chain_key.public().to_address()).await
+    }
+
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
         self.nest_transaction(tx)
             .await?
@@ -132,6 +154,7 @@ mod tests {
     use hopr_internal_types::channels::ChannelStatus;
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
     use hopr_primitive_types::prelude::{Address, BalanceType};
+    use crate::HoprDbGeneralModelOperations;
 
     #[async_std::test]
     async fn test_insert_get() {
@@ -194,5 +217,52 @@ mod tests {
             .cloned();
 
         assert_eq!(Some(ce), from_db, "should return a valid channel");
+    }
+
+    #[async_std::test]
+    async fn test_incoming_outgoing_channels() {
+        let ckp = ChainKeypair::random();
+        let addr_1 = ckp.public().to_address();
+        let addr_2 = ChainKeypair::random().public().to_address();
+
+        let db = HoprDb::new_in_memory(ckp).await;
+
+        let ce_1 = ChannelEntry::new(
+            addr_1,
+            addr_2,
+            BalanceType::HOPR.zero(),
+            1_u32.into(),
+            ChannelStatus::Open,
+            0_u32.into(),
+        );
+
+        let ce_2 = ChannelEntry::new(
+            addr_2,
+            addr_1,
+            BalanceType::HOPR.zero(),
+            2_u32.into(),
+            ChannelStatus::Open,
+            0_u32.into(),
+        );
+
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move {
+                db_clone.upsert_channel(Some(tx), ce_1).await?;
+                db_clone.upsert_channel(Some(tx), ce_2).await
+            }))
+            .await
+            .unwrap();
+
+        let incoming = db.get_incoming_channels(None).await
+            .expect("should get incoming channels");
+
+        let outgoing = db.get_outgoing_channels(None).await
+            .expect("should get outgoing channels");
+
+        assert_eq!(vec![ce_2], incoming);
+        assert_eq!(vec![ce_1], outgoing);
     }
 }

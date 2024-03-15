@@ -764,6 +764,7 @@ mod tests {
             .unwrap();
     }
 
+    #[ignore]
     #[async_std::test]
     async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();

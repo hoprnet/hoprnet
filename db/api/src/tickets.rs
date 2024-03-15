@@ -176,7 +176,7 @@ impl From<TicketSelector> for SimpleExpr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AggregationPrerequisites {
     pub min_ticket_count: usize,
     pub min_unaggregated_ratio: f64,
