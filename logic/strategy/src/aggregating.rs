@@ -28,7 +28,6 @@
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::redeem::TicketRedeemActions;
 pub use core_protocol::ticket_aggregation::processor::AwaitingAggregator;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::channels::HoprDbChannelOperations;
