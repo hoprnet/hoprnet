@@ -37,6 +37,12 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
     }
 }
 
+pub struct DbCaches {
+    pub(crate) unrealized_value: Cache<Hash, Balance>,
+    pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
+    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
+}
+
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,

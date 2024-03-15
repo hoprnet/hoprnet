@@ -427,17 +427,11 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        } else if entry.direction(&myself.chain_key.public().to_address())
+                            != Some(ChannelDirection::Incoming)
+                        {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
                         }
-
-                        // TODO: this should not be needed, because there are no tickets
-                        // for channels not associated with us?
-                        // // Perform sanity checks on the arguments
-                        // assert_eq!(
-                        //     ChannelDirection::Incoming,
-                        //     channel.direction(&self.me).expect("must be own channel"),
-                        //     "aggregation request can happen on incoming channels only"
-                        // );
-
                         let domain_separator =
                             myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
@@ -559,16 +553,11 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        } else if entry.direction(&myself.chain_key.public().to_address())
+                            != Some(ChannelDirection::Incoming)
+                        {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
                         }
-
-                        // TODO: this should not be needed, because there are no tickets
-                        // for channels not associated with us?
-                        // // Perform sanity checks on the arguments
-                        // assert_eq!(
-                        //     ChannelDirection::Incoming,
-                        //     channel.direction(&self.me).expect("must be own channel"),
-                        //     "aggregation request can happen on incoming channels only"
-                        // );
 
                         let domain_separator =
                             myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
@@ -701,16 +690,11 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{channel}' not open")));
+                        } else if entry.direction(&myself.chain_key.public().to_address())
+                            != Some(ChannelDirection::Incoming)
+                        {
+                            return Err(DbError::LogicalError(format!("channel '{channel}' is not incoming")));
                         }
-
-                        // TODO: this should not be needed, because there are no tickets
-                        // for channels not associated with us?
-                        // // Perform sanity checks on the arguments
-                        // assert_eq!(
-                        //     ChannelDirection::Incoming,
-                        //     channel.direction(&self.me).expect("must be own channel"),
-                        //     "aggregation request can happen on incoming channels only"
-                        // );
 
                         let pk = myself
                             .resolve_packet_key(&entry.source)
