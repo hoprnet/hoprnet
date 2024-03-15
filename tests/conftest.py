@@ -249,6 +249,8 @@ def fund_nodes(private_key: str):
             "./ethereum/contracts",
             "--hopr-amount",
             "0.0",
+            "--native-amount",
+            "10.0",
         ],
         env=os.environ | custom_env,
         check=True,
