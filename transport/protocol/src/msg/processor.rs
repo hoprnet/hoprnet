@@ -586,7 +586,7 @@ mod tests {
     }
 
     async fn create_dbs(amount: usize) -> Vec<HoprDb> {
-        futures::future::join_all((0..amount).map(|_| HoprDb::new_in_memory(ChainKeypair::random()))).await
+        futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone()))).await
     }
 
     async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> crate::errors::Result<()> {
@@ -617,7 +617,6 @@ mod tests {
                                 multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444").unwrap(),
                                 updated_block: 1,
                             },
-                            is_self: true,
                         },
                     )
                     .await

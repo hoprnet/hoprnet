@@ -785,7 +785,6 @@ impl Hopr {
                 AccountEntry {
                     public_key: *self.me.public(),
                     chain_addr: self.chain_api.me_onchain(),
-                    is_self: true,
                     // Will be set once we announce ourselves and Indexer processes the announcement
                     entry_type: AccountType::NotAnnounced,
                 },

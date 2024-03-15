@@ -38,7 +38,6 @@ pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
     pub entry_type: AccountType,
-    pub is_self: bool,
 }
 
 impl AccountEntry {
@@ -47,14 +46,7 @@ impl AccountEntry {
             public_key,
             chain_addr: address,
             entry_type,
-            is_self: false,
         }
-    }
-
-    /// Converts this instance to an `AccountEntry` representing this node.
-    pub fn make_self(mut self) -> Self {
-        self.is_self = true;
-        self
     }
 
     /// Gets the block number of the announcement if this peer ID has been announced.
