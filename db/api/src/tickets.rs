@@ -777,10 +777,14 @@ impl HoprDbTicketOperations for HoprDb {
 
                     while let Some(m) = to_be_aggregated.iter().next() {
                         if m.index_offset > 1 {
-                            aggregated_balance = aggregated_balance + BalanceType::HOPR.balance_bytes(&m.amount)
+                            aggregated_balance = aggregated_balance.add(BalanceType::HOPR.balance_bytes(&m.amount))
                         }
-                        total_balance = total_balance + BalanceType::HOPR.balance_bytes(&m.amount);
+                        total_balance = total_balance.add(BalanceType::HOPR.balance_bytes(&m.amount));
                         if total_balance.gt(&channel_entry.balance) {
+                            panic!(
+                                "TODO: temporary panic to remove: ========++> single amount to be added: {}, total_balance: {total_balance}, channel_entry.balance: {}",
+                                BalanceType::HOPR.balance_bytes(&m.amount), channel_entry.balance
+                            );
                             break;
                         } else {
                             last_idx_to_take = m.id;
@@ -1475,6 +1479,7 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
+    use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::errors::DbError;
@@ -1487,7 +1492,28 @@ mod tests {
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
     }
 
+    lazy_static::lazy_static! {
+        static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
+        static ref BOB_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
+    }
+
     const TICKET_VALUE: u64 = 100_000;
+
+    async fn add_peer_mappings(db: &HoprDb, peers: Vec<(OffchainKeypair, ChainKeypair)>) -> crate::errors::Result<()> {
+        for (peer_offchain, peer_onchain) in peers.into_iter() {
+            db.insert_account(
+                None,
+                AccountEntry {
+                    public_key: *peer_offchain.public(),
+                    chain_addr: peer_onchain.public().to_address(),
+                    entry_type: AccountType::NotAnnounced,
+                },
+            )
+            .await?
+        }
+
+        Ok(())
+    }
 
     fn generate_random_ack_ticket(index: u32) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
@@ -1518,7 +1544,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100_u32),
+            BalanceType::HOPR.balance(u32::MAX),
             (count_tickets + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -1799,6 +1825,110 @@ mod tests {
 
         assert_eq!(cache.get(&1).await, None);
         assert_eq!(cache.get(&1).await, clone.get(&1).await);
+    }
+
+    async fn create_alice_db_with_tickets_from_bob(
+        ticket_count: usize,
+    ) -> crate::errors::Result<(HoprDb, ChannelEntry, Vec<AcknowledgedTicket>)> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await?;
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await?;
+
+        let (channel, tickets) = init_db_with_tickets(&db, ticket_count as u64).await;
+
+        Ok((db, channel, tickets))
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_0_tickets_should_return_empty_result(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 0;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_0_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_0_tickets, None)
+            .await?;
+
+        assert_eq!(actual, None);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_mulitple_tickets_should_return_that_ticket(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 2;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_within_limits(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 2;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        Ok(())
+    }
+
+    #[ignore = "TBD"]
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_outside_limits(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 2;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        Ok(())
     }
 
     // TODO: think about incorporating these tests
