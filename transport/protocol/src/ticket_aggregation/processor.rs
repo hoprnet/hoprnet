@@ -665,7 +665,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use chain_db::traits::HoprCoreEthereumDbActions;
     use futures_lite::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -819,6 +818,8 @@ mod tests {
             .writer()
             .aggregate_tickets(&channel_alice_bob.get_id(), None)
             .unwrap();
+
+        panic!("=========+> HERE");
         let mut finalizer = None;
         match bob.next().await {
             Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
