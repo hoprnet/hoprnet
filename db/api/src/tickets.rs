@@ -1444,7 +1444,13 @@ impl HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let selector = TicketSelector::from(&acknowledged_ticket);
+                    // For purpose of upserting, we must select only by the triplet (channel id, epoch, index)
+                    let selector = TicketSelector::new(
+                        acknowledged_ticket.ticket.channel_id,
+                        acknowledged_ticket.ticket.channel_epoch,
+                    )
+                    .with_index(acknowledged_ticket.ticket.index);
+
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);
 
                     if let Some(ticket) = ticket::Entity::find()

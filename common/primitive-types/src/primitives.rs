@@ -85,6 +85,12 @@ impl From<[u8; Address::SIZE]> for Address {
     }
 }
 
+impl From<Address> for [u8; Address::SIZE] {
+    fn from(value: Address) -> Self {
+        value.0
+    }
+}
+
 impl From<primitive_types::H160> for Address {
     fn from(value: primitive_types::H160) -> Self {
         Self(value.0)

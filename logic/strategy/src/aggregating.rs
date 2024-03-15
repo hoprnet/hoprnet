@@ -150,16 +150,12 @@ where
     T: Send,
     U: Send,
 {
-    pub fn new(
-        cfg: AggregatingStrategyConfig,
-        db: Db,
-        ticket_aggregator: AwaitingAggregator<T, U, Db>,
-    ) -> Self {
+    pub fn new(cfg: AggregatingStrategyConfig, db: Db, ticket_aggregator: AwaitingAggregator<T, U, Db>) -> Self {
         Self {
             db,
             cfg,
             ticket_aggregator: Arc::new(ticket_aggregator),
-            agg_tasks: Arc::new(RwLock::new(HashMap::new()))
+            agg_tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -182,7 +178,10 @@ where
             let aggregator_clone = self.ticket_aggregator.clone();
             let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
             let task = async_std::task::spawn(async move {
-                match aggregator_clone.aggregate_tickets_in_the_channel(&channel_id, Some(criteria)).await {
+                match aggregator_clone
+                    .aggregate_tickets_in_the_channel(&channel_id, Some(criteria))
+                    .await
+                {
                     Ok(_) => {
                         info!("completed ticket aggregation in channel {channel_id}");
                     }
@@ -208,7 +207,7 @@ where
     }
 
     async fn is_strategy_aggregating_in_channel(&self, channel_id: Hash) -> bool {
-        let existing = self.agg_tasks.read().await.get(&channel_id).map(|(done,_)| *done);
+        let existing = self.agg_tasks.read().await.get(&channel_id).map(|(done, _)| *done);
         if let Some(done) = existing {
             // Task exists, check if it has been completed
             if done {
@@ -239,7 +238,9 @@ where
     U: Send,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
-        let incoming = self.db.get_incoming_channels(None)
+        let incoming = self
+            .db
+            .get_incoming_channels(None)
             .await?
             .into_iter()
             .map(|c| c.get_id());
@@ -257,7 +258,6 @@ where
 
         Ok(())
     }
-
 
     async fn on_own_channel_changed(
         &self,
@@ -486,7 +486,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_strategy_aggregation_on_ack() {
+    async fn test_strategy_aggregation_on_tick() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // db_0: Alice (channel source)
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_strategy_aggregation_on_ack_when_unrealized_balance_exceeded() {
+    async fn test_strategy_aggregation_on_tick_when_unrealized_balance_exceeded() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // db_0: Alice (channel source)
@@ -574,7 +574,8 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_strategy_aggregation_on_ack_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets() {
+    async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets()
+    {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // db_0: Alice (channel source)

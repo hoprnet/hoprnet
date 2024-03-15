@@ -315,7 +315,7 @@ mod tests {
             BalanceType::HOPR.balance(10),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            0.into(),
+            4.into(),
         );
 
         // Make ticket worth exactly the threshold

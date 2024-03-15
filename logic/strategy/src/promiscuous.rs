@@ -478,9 +478,13 @@ mod tests {
     use mockall::mock;
 
     lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
         static ref PEERS: [(Address, PeerId); 10] = [
             (
-                hex!("9a66b57d7c3c0b83cbd0d3455bf0bc8f58e1ec46"),
+                ALICE.public().to_address().into(),
                 hex!("e03640d3184c8aa6f9d4ccd533281c51974a170c0c4d0fe1da9296a081ab1fd9")
             ),
             (
@@ -629,7 +633,7 @@ mod tests {
     async fn test_promiscuous_strategy_tick_decisions() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 

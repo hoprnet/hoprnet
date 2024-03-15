@@ -81,10 +81,7 @@ where
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self
-            .db
-            .get_outgoing_channels(None)
-            .await?;
+        let outgoing_channels = self.db.get_outgoing_channels(None).await?;
 
         let to_close = outgoing_channels
             .iter()

@@ -29,17 +29,11 @@ pub trait HoprDbChannelOperations {
 
     /// Fetches all channels that are `Incoming` to this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
-    async fn get_incoming_channels<'a>(
-        &'a self,
-        tx: OptTx<'a>
-    ) -> Result<Vec<ChannelEntry>>;
+    async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
-    async fn get_outgoing_channels<'a>(
-        &'a self,
-        tx: OptTx<'a>
-    ) -> Result<Vec<ChannelEntry>>;
+    async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     /// Retrieves all channel information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
@@ -99,11 +93,13 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Incoming, self.chain_key.public().to_address()).await
+        self.get_channels_via(tx, ChannelDirection::Incoming, self.chain_key.public().to_address())
+            .await
     }
 
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Outgoing, self.chain_key.public().to_address()).await
+        self.get_channels_via(tx, ChannelDirection::Outgoing, self.chain_key.public().to_address())
+            .await
     }
 
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
@@ -149,12 +145,12 @@ impl HoprDbChannelOperations for HoprDb {
 mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
+    use crate::HoprDbGeneralModelOperations;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::channels::ChannelStatus;
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
     use hopr_primitive_types::prelude::{Address, BalanceType};
-    use crate::HoprDbGeneralModelOperations;
 
     #[async_std::test]
     async fn test_insert_get() {
@@ -249,17 +245,23 @@ mod tests {
         db.begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| Box::pin(async move {
-                db_clone.upsert_channel(Some(tx), ce_1).await?;
-                db_clone.upsert_channel(Some(tx), ce_2).await
-            }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone.upsert_channel(Some(tx), ce_1).await?;
+                    db_clone.upsert_channel(Some(tx), ce_2).await
+                })
+            })
             .await
             .unwrap();
 
-        let incoming = db.get_incoming_channels(None).await
+        let incoming = db
+            .get_incoming_channels(None)
+            .await
             .expect("should get incoming channels");
 
-        let outgoing = db.get_outgoing_channels(None).await
+        let outgoing = db
+            .get_outgoing_channels(None)
+            .await
             .expect("should get outgoing channels");
 
         assert_eq!(vec![ce_2], incoming);
