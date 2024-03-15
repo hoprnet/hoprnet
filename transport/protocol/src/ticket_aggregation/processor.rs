@@ -610,7 +610,7 @@ where
                             }
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
-                        match db.prepare_aggregation_in_channel(&channel, &chain_key, prerequsites).await {
+                        match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
                             Ok(Some((source, tickets))) => {
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }

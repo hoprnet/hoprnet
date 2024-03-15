@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_db_entity::ticket;
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-use hopr_primitive_types::primitives::Balance;
+use hopr_primitive_types::primitives::{Address, Balance};
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
@@ -37,11 +38,12 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
     }
 }
 
-pub struct DbCaches {
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
-    pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
-    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-}
+// TODO: hide these behind a single Arc to simplify the clone process on the HoprDb object
+// pub struct DbCaches {
+//     pub(crate) unrealized_value: Cache<Hash, Balance>,
+//     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
+//     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
+// }
 
 #[derive(Debug, Clone)]
 pub struct HoprDb {
@@ -53,6 +55,7 @@ pub struct HoprDb {
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
+    pub(crate) me_onchain: Address,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -154,6 +157,7 @@ impl HoprDb {
             .expect("must reset ticket state on init");
 
         Self {
+            me_onchain: chain_key.public().to_address(),
             chain_key,
             db: index_db,
             peers_db,

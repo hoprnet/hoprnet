@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
@@ -132,7 +131,7 @@ impl HoprDbAccountOperations for HoprDb {
     }
 
     async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry> {
-        self.get_account(tx, self.chain_key.public().to_address())
+        self.get_account(tx, self.me_onchain)
             .await?
             .ok_or(DbError::MissingAccount)
     }

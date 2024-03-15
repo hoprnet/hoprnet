@@ -209,7 +209,6 @@ pub trait HoprDbTicketOperations {
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
-        chain_keypair: &ChainKeypair,
         prerequisites: Option<AggregationPrerequisites>,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>>;
 
@@ -391,8 +390,16 @@ impl HoprDbTicketOperations for HoprDb {
         mut acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
     ) -> Result<hopr_internal_types::channels::Ticket> {
+        if me.public().to_address() != self.me_onchain {
+            return Err(DbError::LogicalError(
+                "chain key for ticket aggregation does not match the DB public address".into(),
+            ));
+        }
+
         if acked_tickets.is_empty() {
-            return Err(DbError::LogicalError("At least one ticket required".to_owned()));
+            return Err(DbError::LogicalError(
+                "at least one ticket required for aggregation".to_owned(),
+            ));
         }
 
         if acked_tickets.len() == 1 {
@@ -403,9 +410,8 @@ impl HoprDbTicketOperations for HoprDb {
         acked_tickets.dedup();
 
         let myself = self.clone();
-        let chain_keypair = me.clone();
 
-        let (channel_entry, channel_id, destination, domain_separator) =
+        let (channel_entry, destination, domain_separator) =
             self.nest_transaction_in_db(None, TargetDb::Index)
                 .await?
                 .perform(|tx| {
@@ -418,32 +424,33 @@ impl HoprDbTicketOperations for HoprDb {
                                 destination.to_peerid_str()
                             )))?;
 
-                        let channel_id = generate_channel_id(&(&chain_keypair).into(), &address);
-
+                        let channel_id = generate_channel_id(&myself.me_onchain, &address);
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .get_channel_by_id(Some(tx), channel_id)
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
                         if entry.status != ChannelStatus::Open {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
-                        } else if entry.direction(&myself.chain_key.public().to_address())
-                            != Some(ChannelDirection::Incoming)
-                        {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
+                            return Err(DbError::LogicalError(format!("channel '{}' not open", entry.get_id())));
+                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
+                            return Err(DbError::LogicalError(format!(
+                                "channel '{}' is not incoming",
+                                entry.get_id()
+                            )));
                         }
                         let domain_separator =
                             myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
                                 crate::errors::DbError::LogicalError("domain separator missing".into())
                             })?;
 
-                        Ok((entry, channel_id, address, domain_separator))
+                        Ok((entry, address, domain_separator))
                     })
                 })
                 .await?;
 
         let channel_balance = channel_entry.balance;
         let channel_epoch = channel_entry.channel_epoch;
+        let channel_id = channel_entry.get_id();
 
         let mut final_value = Balance::zero(BalanceType::HOPR);
 
@@ -531,6 +538,12 @@ impl HoprDbTicketOperations for HoprDb {
         aggregated_ticket: hopr_internal_types::channels::Ticket,
         chain_keypair: &ChainKeypair,
     ) -> Result<AcknowledgedTicket> {
+        if chain_keypair.public().to_address() != self.me_onchain {
+            return Err(DbError::LogicalError(
+                "chain key for ticket aggregation does not match the DB public address".into(),
+            ));
+        }
+
         if aggregated_ticket.win_prob() != 1.0f64 {
             return Err(DbError::LogicalError(
                 "Aggregated tickets must have 100% win probability".into(),
@@ -553,9 +566,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
-                        } else if entry.direction(&myself.chain_key.public().to_address())
-                            != Some(ChannelDirection::Incoming)
-                        {
+                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
                             return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
                         }
 
@@ -608,7 +619,7 @@ impl HoprDbTicketOperations for HoprDb {
 
         let acknowledged_tickets = acknowledged_tickets
             .into_iter()
-            .map(|m| model_to_acknowledged_ticket(&m, domain_separator, &chain_keypair).map_err(DbError::from))
+            .map(|m| model_to_acknowledged_ticket(&m, domain_separator, &self.chain_key).map_err(DbError::from))
             .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
         // can be done, because the tickets collection is tested for emptiness before
@@ -646,7 +657,13 @@ impl HoprDbTicketOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await?;
 
-                    // TODO: check that delete row count == length of current collection
+                    if deleted.rows_affected as usize != acknowledged_tickets.len() {
+                        return Err(DbError::LogicalError(format!(
+                            "The deleted aggregated ticket count ({}) does not correspond to the expected count: {}",
+                            deleted.rows_affected,
+                            acknowledged_tickets.len(),
+                        )));
+                    }
 
                     ticket::Entity::insert::<hopr_db_entity::ticket::ActiveModel>(ticket.into())
                         .exec(tx.as_ref())
@@ -670,11 +687,10 @@ impl HoprDbTicketOperations for HoprDb {
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
-        chain_keypair: &ChainKeypair,
         prerequisites: Option<AggregationPrerequisites>,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>> {
         let myself = self.clone();
-        let chain_keypair = chain_keypair.clone();
+        let chain_keypair = self.chain_key.clone();
 
         let channel = *channel;
 
@@ -690,9 +706,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{channel}' not open")));
-                        } else if entry.direction(&myself.chain_key.public().to_address())
-                            != Some(ChannelDirection::Incoming)
-                        {
+                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
                             return Err(DbError::LogicalError(format!("channel '{channel}' is not incoming")));
                         }
 
