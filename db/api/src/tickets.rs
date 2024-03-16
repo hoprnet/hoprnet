@@ -789,13 +789,13 @@ impl HoprDbTicketOperations for HoprDb {
                             );
                             break;
                         } else {
-                            last_idx_to_take = U256::from_be_bytes(&m.index).as_u64() + 1;
+                            last_idx_to_take = U256::from_be_bytes(&m.index).as_u64();
                         }
                     }
 
                     let to_be_aggregated = to_be_aggregated
                         .into_iter()
-                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() < last_idx_to_take)
+                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() <= last_idx_to_take)
                         .map(|m| model_to_acknowledged_ticket(&m, ds, &chain_keypair).map_err(DbError::from))
                         .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
@@ -1852,18 +1852,16 @@ mod tests {
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
-        // mark the first ticket as being redeemed
+        // mark the first ticket as being aggregated
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
             .await?.unwrap().into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
         ticket.save(&db.tickets_db).await?;
 
-        let actual = db
+        assert!(db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
-            .await;
-
-        assert!(actual.is_err());
+            .await.is_err());
 
         Ok(())
     }
@@ -1907,12 +1905,12 @@ mod tests {
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
-        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
             .count(&db.tickets_db)
             .await? as usize;
 
-        assert_eq!(actual_being_redeemed_count, COUNT_TICKETS);
+        assert_eq!(actual_being_aggregated_count, COUNT_TICKETS);
 
         Ok(())
     }
@@ -1944,12 +1942,12 @@ mod tests {
         tickets.remove(0);
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
-        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
             .count(&db.tickets_db)
             .await? as usize;
 
-        assert_eq!(actual_being_redeemed_count, COUNT_TICKETS - 1);
+        assert_eq!(actual_being_aggregated_count, COUNT_TICKETS - 1);
 
         Ok(())
     }
@@ -2007,12 +2005,12 @@ mod tests {
 
         assert_eq!(actual, None);
 
-        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
-        .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
-        .count(&db.tickets_db)
-        .await? as usize;
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
 
-    assert_eq!(actual_being_redeemed_count, 0);
+        assert_eq!(actual_being_aggregated_count, 0);
 
         Ok(())
     }
