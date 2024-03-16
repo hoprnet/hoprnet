@@ -776,17 +776,12 @@ impl HoprDbTicketOperations for HoprDb {
 
                     for m in &to_be_aggregated {
                         let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
-                        debug!("to_add = {to_add}");
                         if m.index_offset > 1 {
                             aggregated_balance = aggregated_balance.add(to_add);
                         }
 
                         total_balance = total_balance.add(to_add);
                         if total_balance.gt(&channel_entry.balance) {
-                            debug!(
-                                "single amount to be added: {}, total_balance: {total_balance}, channel_entry.balance: {}",
-                                BalanceType::HOPR.balance_bytes(&m.amount), channel_entry.balance
-                            );
                             break;
                         } else {
                             last_idx_to_take = U256::from_be_bytes(&m.index).as_u64();
