@@ -2021,6 +2021,44 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_no_aggregatable_tickets_should_return_nothing(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 3;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        // mark all tickets as being redeemed
+        for ticket in hopr_db_entity::ticket::Entity::find()
+            .all(&db.tickets_db)
+            .await?
+            .into_iter()
+        {
+            let mut ticket = ticket.into_active_model();
+            ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+            ticket.save(&db.tickets_db).await?;
+        }
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, None);
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, 0);
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn test_ticket_aggregation_rollback_should_rollback_all_the_being_aggregated_tickets_but_nothing_else(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let _ = env_logger::builder().is_test(true).try_init();
