@@ -75,18 +75,16 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
-                        Channel::find()
-                            .filter(match direction {
-                                ChannelDirection::Incoming => channel::Column::Destination.eq(target.to_string()),
-                                ChannelDirection::Outgoing => channel::Column::Source.eq(target.to_string()),
-                            })
-                            .all(tx.as_ref())
-                            .await?
-                            .into_iter()
-                            .map(|x| ChannelEntry::try_from(x).map_err(DbError::from))
-                            .collect::<Result<Vec<_>>>()?,
-                    )
+                    Channel::find()
+                        .filter(match direction {
+                            ChannelDirection::Incoming => channel::Column::Destination.eq(target.to_string()),
+                            ChannelDirection::Outgoing => channel::Column::Source.eq(target.to_string()),
+                        })
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|x| ChannelEntry::try_from(x).map_err(DbError::from))
+                        .collect::<Result<Vec<_>>>()
                 })
             })
             .await

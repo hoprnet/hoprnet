@@ -129,7 +129,7 @@ impl From<&AcknowledgedTicket> for TicketSelector {
         Self {
             channel_id: value.ticket.channel_id,
             epoch: value.ticket.channel_epoch.into(),
-            index: Some(value.ticket.index.into()),
+            index: Some(value.ticket.index),
             state: Some(value.status),
             only_aggregated: value.ticket.index_offset > 1,
         }
@@ -282,15 +282,13 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbError>(
-                        ticket::Entity::find()
-                            .filter(SimpleExpr::from(selector))
-                            .all(tx.as_ref())
-                            .await?
-                            .into_iter()
-                            .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
-                            .collect::<Result<Vec<_>>>()?,
-                    )
+                    ticket::Entity::find()
+                        .filter(SimpleExpr::from(selector))
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
+                        .collect::<Result<Vec<_>>>()
                 })
             })
             .await
@@ -510,6 +508,7 @@ impl HoprDbTicketOperations for HoprDb {
         // trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
+        #[allow(unused_variables)]
         let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
         // {
         //     self.db
@@ -527,7 +526,7 @@ impl HoprDbTicketOperations for HoprDb {
             1.0, // Aggregated tickets have always 100% winning probability
             channel_epoch,
             first_acked_ticket.ticket.challenge.clone(),
-            &me,
+            me,
             &domain_separator,
         )
         .map_err(|e| e.into())
@@ -560,7 +559,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .perform(|tx| {
                     Box::pin(async move {
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel_id.clone())
+                            .get_channel_by_id(Some(tx), channel_id)
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
@@ -626,6 +625,7 @@ impl HoprDbTicketOperations for HoprDb {
         let first_stored_ticket = acknowledged_tickets.first().unwrap();
 
         // calculate the new current ticket index
+        #[allow(unused_variables)]
         let current_ticket_index_from_aggregated_ticket =
             U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
 
@@ -633,7 +633,7 @@ impl HoprDbTicketOperations for HoprDb {
             aggregated_ticket,
             first_stored_ticket.response.clone(),
             first_stored_ticket.signer,
-            &chain_keypair,
+            chain_keypair,
             &domain_separator,
         )?;
 
@@ -700,7 +700,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .perform(|tx| {
                     Box::pin(async move {
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel.clone())
+                            .get_channel_by_id(Some(tx), channel)
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel))?;
 
@@ -757,7 +757,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .map(|m| U256::from_be_bytes(m.index).as_u64() + 1)
-                        .unwrap_or(0_u64.into()); // go from the lowest possible index of none is found
+                        .unwrap_or(0_u64); // go from the lowest possible index of none is found
 
                     // get the list of all tickets to be aggregated
                     let to_be_aggregated = ticket::Entity::find()
@@ -809,7 +809,7 @@ impl HoprDbTicketOperations for HoprDb {
                             return Ok(vec![])
                         }
                     };
-                    
+
                     // mark all tickets with appropriate characteristics as being aggregated
                     let to_be_aggregated_count = to_be_aggregated.len();
                     if to_be_aggregated_count > 0 {
@@ -1855,13 +1855,16 @@ mod tests {
         // mark the first ticket as being aggregated
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
-            .await?.unwrap().into_active_model();
+            .await?
+            .unwrap()
+            .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
-            .await.is_err());
+            .await
+            .is_err());
 
         Ok(())
     }
@@ -1931,7 +1934,9 @@ mod tests {
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
-            .await?.unwrap().into_active_model();
+            .await?
+            .unwrap()
+            .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
 
@@ -2031,13 +2036,16 @@ mod tests {
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()
             .one(&db.tickets_db)
-            .await?.unwrap().into_active_model();
+            .await?
+            .unwrap()
+            .into_active_model();
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
-            .await.is_ok());
+            .await
+            .is_ok());
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2046,7 +2054,10 @@ mod tests {
 
         assert_eq!(actual_being_aggregated_count, COUNT_TICKETS - 1);
 
-        assert!(db.rollback_aggregation_in_channel(existing_channel_with_multiple_tickets).await.is_ok());
+        assert!(db
+            .rollback_aggregation_in_channel(existing_channel_with_multiple_tickets)
+            .await
+            .is_ok());
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))

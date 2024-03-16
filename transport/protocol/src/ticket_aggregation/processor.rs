@@ -364,7 +364,7 @@ where
             db: self.db.clone(),
             ck: self.ck.clone(),
             writer: self.writer.clone(),
-            agg_timeout: self.agg_timeout.clone(),
+            agg_timeout: self.agg_timeout,
         }
     }
 }
@@ -503,7 +503,7 @@ impl<T, U> TicketAggregationActions<T, U> {
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
-            channel.clone(),
+            *channel,
             prerequisites,
             TicketAggregationFinalizer::new(tx),
         ))?;
@@ -665,6 +665,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use async_std::prelude::FutureExt;
     use futures_lite::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -682,7 +683,6 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
     use std::time::Duration;
-    use async_std::prelude::FutureExt;
 
     use super::TicketAggregationProcessed;
 

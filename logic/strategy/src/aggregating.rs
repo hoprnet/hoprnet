@@ -118,6 +118,7 @@ where
     db: Db,
     ticket_aggregator: Arc<AwaitingAggregator<T, U, Db>>,
     cfg: AggregatingStrategyConfig,
+    #[allow(clippy::type_complexity)]
     agg_tasks: Arc<RwLock<HashMap<Hash, (bool, JoinHandle<()>)>>>,
 }
 

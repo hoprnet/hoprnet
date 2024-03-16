@@ -70,7 +70,7 @@ impl Stats {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct PeerSelector {
     /// Lower and upper bounds (both inclusive) on last seen timestamp.
     pub last_seen: (Option<SystemTime>, Option<SystemTime>),
@@ -97,15 +97,6 @@ impl PeerSelector {
     pub fn with_quality_lte(mut self, upper_bound: f64) -> Self {
         self.quality.1 = Some(upper_bound);
         self
-    }
-}
-
-impl Default for PeerSelector {
-    fn default() -> Self {
-        Self {
-            last_seen: (None, None),
-            quality: (None, None),
-        }
     }
 }
 
