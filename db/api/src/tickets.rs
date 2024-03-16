@@ -772,7 +772,7 @@ impl HoprDbTicketOperations for HoprDb {
                     // do a balance check to be sure not to aggregate more than current channel stake
                     let mut total_balance = Balance::zero(BalanceType::HOPR);
                     let mut aggregated_balance = Balance::zero(BalanceType::HOPR);
-                    let mut first_idx_to_not_take = 0_u64;
+                    let mut last_idx_to_take = 0_u64;
 
                     for m in &to_be_aggregated {
                         let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
@@ -789,13 +789,13 @@ impl HoprDbTicketOperations for HoprDb {
                             );
                             break;
                         } else {
-                            first_idx_to_not_take = U256::from_be_bytes(&m.index).as_u64() + 1;
+                            last_idx_to_take = U256::from_be_bytes(&m.index).as_u64() + 1;
                         }
                     }
 
                     let to_be_aggregated = to_be_aggregated
                         .into_iter()
-                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() < first_idx_to_not_take)
+                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() < last_idx_to_take)
                         .map(|m| model_to_acknowledged_ticket(&m, ds, &chain_keypair).map_err(DbError::from))
                         .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
@@ -803,43 +803,42 @@ impl HoprDbTicketOperations for HoprDb {
                         if to_be_aggregated.len() < prerequisites.min_ticket_count
                             && total_balance
                                 .sub(aggregated_balance)
-                                .lt(&channel_entry.balance.mul_f64(prerequisites.min_unaggregated_ratio)?)
+                                .gt(&channel_entry.balance.mul_f64(prerequisites.min_unaggregated_ratio)?)
                         {
-                            Ok(vec![])
-                        } else {
-                            Ok(to_be_aggregated)
+                            // aborting, because the constraints have not been met
+                            return Ok(vec![])
                         }
-                    } else {
-                        // mark all tickets with appropriate characteristics as being aggregated
-                        let to_be_aggregated_count = to_be_aggregated.len();
-                        if to_be_aggregated_count > 0 {
-                            let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
-                                .filter(ticket::Column::ChannelId.eq(channel_id))
-                                .filter(ticket::Column::ChannelEpoch.eq(channel_entry.channel_epoch.to_be_bytes().to_vec()))
-                                .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
-                                .filter(ticket::Column::Index.lt(first_idx_to_not_take.to_be_bytes().to_vec()))
-                                .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
-                                .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32))
-                                .exec(tx.as_ref())
-                                .await?;
+                    };
+                    
+                    // mark all tickets with appropriate characteristics as being aggregated
+                    let to_be_aggregated_count = to_be_aggregated.len();
+                    if to_be_aggregated_count > 0 {
+                        let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
+                            .filter(ticket::Column::ChannelId.eq(channel_id))
+                            .filter(ticket::Column::ChannelEpoch.eq(channel_entry.channel_epoch.to_be_bytes().to_vec()))
+                            .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
+                            .filter(ticket::Column::Index.lte(last_idx_to_take.to_be_bytes().to_vec()))
+                            .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
+                            .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32))
+                            .exec(tx.as_ref())
+                            .await?;
 
-                            if marked.rows_affected as usize != to_be_aggregated_count {
-                                return Err(DbError::LogicalError(format!(
-                                    "expected to mark {to_be_aggregated_count}, but was only able to mark {}",
-                                    marked.rows_affected
-                                )));
-                            }
+                        if marked.rows_affected as usize != to_be_aggregated_count {
+                            return Err(DbError::LogicalError(format!(
+                                "expected to mark {to_be_aggregated_count}, but was able to mark {}",
+                                marked.rows_affected
+                            )));
                         }
-
-                        debug!(
-                            "prepared {} tickets to aggregate in {} ({})",
-                            to_be_aggregated.len(),
-                            channel_entry.get_id(),
-                            channel_entry.channel_epoch,
-                        );
-
-                        Ok(to_be_aggregated)
                     }
+
+                    debug!(
+                        "prepared {} tickets to aggregate in {} ({})",
+                        to_be_aggregated.len(),
+                        channel_entry.get_id(),
+                        channel_entry.channel_epoch,
+                    );
+
+                    Ok(to_be_aggregated)
                 })
             })
             .await?;
@@ -1468,13 +1467,14 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
 
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::errors::DbError;
     use crate::info::{DomainSeparator, HoprDbInfoOperations};
-    use crate::tickets::{HoprDbTicketOperations, TicketSelector};
+    use crate::tickets::{AggregationPrerequisites, HoprDbTicketOperations, TicketSelector};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
 
     lazy_static::lazy_static! {
@@ -1840,6 +1840,35 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_ticket_aggregation_should_fail_if_any_ticket_is_being_aggregated_in_that_channel(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?.unwrap().into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as u8 as i32);
+        ticket.save(&db.tickets_db).await?;
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await;
+
+        assert!(actual.is_err());
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_0_tickets_should_return_empty_result(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         const COUNT_TICKETS: usize = 0;
@@ -1878,13 +1907,58 @@ mod tests {
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
 
+        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_redeemed_count, COUNT_TICKETS);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_prepare_request_with_a_being_redeemed_ticket_should_aggregate_only_the_tickets_following_it(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, mut tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?.unwrap().into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+        ticket.save(&db.tickets_db).await?;
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        tickets.remove(0);
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_redeemed_count, COUNT_TICKETS - 1);
+
         Ok(())
     }
 
     #[async_std::test]
     async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_within_limits(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        const COUNT_TICKETS: usize = 2;
+        const COUNT_TICKETS: usize = 5;
+        const COUNT_JUST_WANTED_TICKETS: usize = 4;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
@@ -1892,17 +1966,28 @@ mod tests {
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
+        let constraints = Some(AggregationPrerequisites {
+            min_ticket_count: COUNT_JUST_WANTED_TICKETS,
+            min_unaggregated_ratio: 0.0,
+        });
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, constraints)
             .await?;
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, COUNT_TICKETS);
 
         Ok(())
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_outside_limits(
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_outside_limits_not_marking_anything(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         const COUNT_TICKETS: usize = 2;
 
@@ -1912,11 +1997,65 @@ mod tests {
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
+        let constraints = Some(AggregationPrerequisites {
+            min_ticket_count: COUNT_TICKETS + 1,
+            min_unaggregated_ratio: 0.0,
+        });
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, constraints)
             .await?;
 
-        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+        assert_eq!(actual, None);
+
+        let actual_being_redeemed_count = hopr_db_entity::ticket::Entity::find()
+        .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+        .count(&db.tickets_db)
+        .await? as usize;
+
+    assert_eq!(actual_being_redeemed_count, 0);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_rollback_should_rollback_all_the_being_aggregated_tickets_but_nothing_else(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?.unwrap().into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as u8 as i32);
+        ticket.save(&db.tickets_db).await?;
+
+        assert!(db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await.is_ok());
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, COUNT_TICKETS - 1);
+
+        assert!(db.rollback_aggregation_in_channel(existing_channel_with_multiple_tickets).await.is_ok());
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, 0);
 
         Ok(())
     }
