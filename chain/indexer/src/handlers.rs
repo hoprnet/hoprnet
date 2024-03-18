@@ -17,7 +17,7 @@ use hopr_db_api::info::DomainSeparator;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::{account, chain_info, channel};
+use hopr_db_entity::{chain_info, channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -120,12 +120,12 @@ where
                     OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
                 ) {
                     Ok(binding) => {
-                        let account = account::ActiveModel {
-                            chain_key: Set(binding.chain_key.to_hex()),
-                            packet_key: Set(binding.packet_key.to_hex()),
-                            ..Default::default()
-                        };
-                        account.save(tx.as_ref()).await?;
+                        self.db
+                            .insert_account(
+                                Some(tx),
+                                AccountEntry::new(binding.packet_key, binding.chain_key, AccountType::NotAnnounced),
+                            )
+                            .await?;
                     }
                     Err(_) => {
                         warn!(

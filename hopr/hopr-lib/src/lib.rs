@@ -159,7 +159,9 @@ pub enum HoprLoopComponents {
     #[strum(to_string = "initial indexing operation into the DB")]
     Indexing,
     #[strum(to_string = "on-chain transaction queue component for outgoing transactions")]
-    OutgoingOnchainTxQueue,
+    OutgoingOnchainActionQueue,
+    #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
+    TicketIndexFlush,
 }
 
 impl HoprLoopComponents {
@@ -461,7 +463,7 @@ where
             Box::pin(async move {
                 action_queue
                     .action_loop()
-                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                    .map(|_| HoprLoopComponents::OutgoingOnchainActionQueue)
                     .await
             }),
         ];
@@ -513,6 +515,19 @@ where
             async move {
                 let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
                 (save_tbf)(bloom.to_bytes());
+            }
+        })),
+    );
+
+    processes.insert(
+        HoprLoopComponents::TicketIndexFlush,
+        Box::pin(execute_on_tick(Duration::from_secs(5), move || {
+            let db_clone = db.clone();
+            async move {
+                match db_clone.persist_outgoing_ticket_indices().await {
+                    Ok(n) => debug!("successfully flushed states of {} outgoing ticket indices", n),
+                    Err(e) => error!("failed to flush ticket indices: {e}"),
+                }
             }
         })),
     );
