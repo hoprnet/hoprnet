@@ -220,8 +220,8 @@ where
                     {
                         // Reset the current_ticket_index to zero
                         self.db
-                            .invalidate_cached_ticket_index(&channel_closed.channel_id.into())
-                            .await;
+                            .compare_and_set_ticket_index(channel_closed.channel_id.into(), 0)
+                            .await?;
                     }
 
                     Ok(Some(ChainEventType::ChannelClosed(channel_entry)))
@@ -250,7 +250,7 @@ where
                             .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
                             .await?;
 
-                        self.db.invalidate_cached_ticket_index(&channel_id).await;
+                        self.db.compare_and_set_ticket_index(channel_id, 0).await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -285,65 +285,76 @@ where
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry: ChannelEntry = (&channel).try_into()?;
-                    self.db.invalidate_cached_ticket_index(&channel_entry.get_id()).await;
+                    // TODO: ensure ticket index
 
                     // For channels that destination is us, it means that our ticket
                     // has been redeemed, so mark it in the DB as redeemed
-                    let ack_ticket = if channel_entry.destination == self.chain_key.public().to_address() {
-                        // Filter all tickets in this channel and its current epoch
-                        let mut matching_tickets: Vec<ticket::Model> = ticket::Entity::find()
-                            .filter(ticket::Column::ChannelId.eq(&channel.channel_id))
-                            .filter(ticket::Column::ChannelEpoch.eq(channel.epoch.clone()))
-                            .stream(tx.as_ref())
-                            .await?
-                            .try_filter(|ticket| {
-                                // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
-                                // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
-                                let ticket_idx = U256::from_be_bytes(&ticket.index).as_u64();
-                                let ticket_off = ticket.index_offset as u64;
+                    let ack_ticket = match channel_entry.direction(&self.chain_key.public().to_address()) {
+                        Some(ChannelDirection::Incoming) => {
+                            // Filter all tickets in this channel and its current epoch
+                            let mut matching_tickets: Vec<ticket::Model> = ticket::Entity::find()
+                                .filter(ticket::Column::ChannelId.eq(&channel.channel_id))
+                                .filter(ticket::Column::ChannelEpoch.eq(channel.epoch.clone()))
+                                .stream(tx.as_ref())
+                                .await?
+                                .try_filter(|ticket| {
+                                    // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
+                                    // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
+                                    let ticket_idx = U256::from_be_bytes(&ticket.index).as_u64();
+                                    let ticket_off = ticket.index_offset as u64;
 
-                                futures::future::ready(ticket_idx + ticket_off == ticket_redeemed.new_ticket_index)
-                            })
-                            .try_collect()
-                            .await?;
+                                    futures::future::ready(ticket_idx + ticket_off == ticket_redeemed.new_ticket_index)
+                                })
+                                .try_collect()
+                                .await?;
 
-                        match matching_tickets.len().cmp(&1) {
-                            Ordering::Equal => {
-                                let chain_info = self.db.get_indexer_data(Some(tx)).await?;
-                                let redeemed_ticket = matching_tickets.pop().unwrap();
-                                let ack_ticket = model_to_acknowledged_ticket(
-                                    &redeemed_ticket,
-                                    chain_info
-                                        .channels_dst
-                                        .ok_or(LogicalError("missing channels dst".into()))?,
-                                    &self.chain_key,
-                                )?;
+                            match matching_tickets.len().cmp(&1) {
+                                Ordering::Equal => {
+                                    let chain_info = self.db.get_indexer_data(Some(tx)).await?;
+                                    let redeemed_ticket = matching_tickets.pop().unwrap();
+                                    let ack_ticket = model_to_acknowledged_ticket(
+                                        &redeemed_ticket,
+                                        chain_info
+                                            .channels_dst
+                                            .ok_or(LogicalError("missing channels dst".into()))?,
+                                        &self.chain_key,
+                                    )?;
 
-                                self.db.mark_tickets_redeemed((&ack_ticket).into()).await?;
-                                info!("{ack_ticket} has been marked as redeemed");
-                                Some(ack_ticket)
-                            }
-                            Ordering::Less => {
-                                error!(
-                                    "could not find acknowledged ticket with idx {} in {channel_entry}",
-                                    ticket_redeemed.new_ticket_index - 1
-                                );
-                                None
-                            }
-                            Ordering::Greater => {
-                                error!(
-                                    "found {} tickets matching redeemed index {} in {channel_entry}",
-                                    matching_tickets.len(),
-                                    ticket_redeemed.new_ticket_index - 1
-                                );
-                                None
+                                    self.db.mark_tickets_redeemed((&ack_ticket).into()).await?;
+                                    info!("{ack_ticket} has been marked as redeemed");
+                                    Some(ack_ticket)
+                                }
+                                Ordering::Less => {
+                                    error!(
+                                        "could not find acknowledged ticket with idx {} in {channel_entry}",
+                                        ticket_redeemed.new_ticket_index - 1
+                                    );
+                                    None
+                                }
+                                Ordering::Greater => {
+                                    error!(
+                                        "found {} tickets matching redeemed index {} in {channel_entry}",
+                                        matching_tickets.len(),
+                                        ticket_redeemed.new_ticket_index - 1
+                                    );
+                                    None
+                                }
                             }
                         }
-                    } else {
-                        debug!("observed redeem event on a foreign {channel_entry}");
-                        None // Not our redeem event
+                        Some(ChannelDirection::Outgoing) => {
+                            // We need to ensure the outgoing ticket index is at least this new value
+                            self.db
+                                .compare_and_set_ticket_index(channel_entry.get_id(), ticket_redeemed.new_ticket_index)
+                                .await?;
+                            None
+                        }
+                        None => {
+                            debug!("observed redeem event on a foreign {channel_entry}");
+                            None // Not our redeem event
+                        }
                     };
 
+                    // Update ticket index on the Channel entry
                     let mut active_channel = channel.into_active_model();
                     active_channel.ticket_index = Set(ticket_redeemed.new_ticket_index.to_be_bytes().into());
                     active_channel.save(tx.as_ref()).await?;
@@ -1400,7 +1411,7 @@ pub mod tests {
         assert_eq!(closed_channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_cached_ticket_index(&closed_channel.get_id())
+            db.get_ticket_index(closed_channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1438,7 +1449,7 @@ pub mod tests {
         assert_eq!(channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_cached_ticket_index(&channel.get_id())
+            db.get_ticket_index(channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1484,7 +1495,7 @@ pub mod tests {
 
         assert_eq!(
             0,
-            db.get_cached_ticket_index(&channel.get_id())
+            db.get_ticket_index(channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1528,11 +1539,11 @@ pub mod tests {
         assert_eq!(channel.ticket_index, ticket_index);
 
         assert!(db
-            .get_cached_ticket_index(&channel.get_id())
+            .get_ticket_index(channel.get_id())
             .await
             .unwrap()
             .load(Ordering::Relaxed)
-            .ge(&ticket_index.as_usize()));
+            .ge(&ticket_index.as_u64()));
     }
 
     #[async_std::test]

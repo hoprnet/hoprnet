@@ -11,11 +11,13 @@ mod m20240226_000008_node_create_settings;
 mod m20240226_000009_peers_create_peer_store;
 mod m20240301_000010_tickets_create_ticket;
 mod m20240301_000011_tickets_create_ticket_stats;
-mod m20240301_000012_initial_seed_tickets;
+mod m20240301_000012_tickets_create_outgoing_ticket_index;
+mod m20240301_000013_initial_seed_tickets;
 
 #[derive(PartialEq)]
 pub enum BackendType {
     SQLite,
+    Postgres,
 }
 
 pub struct Migrator;
@@ -36,7 +38,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20240226_000009_peers_create_peer_store::Migration),
             Box::new(m20240301_000010_tickets_create_ticket::Migration(BackendType::SQLite)),
             Box::new(m20240301_000011_tickets_create_ticket_stats::Migration),
-            Box::new(m20240301_000012_initial_seed_tickets::Migration),
+            Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
+                BackendType::SQLite,
+            )),
+            Box::new(m20240301_000013_initial_seed_tickets::Migration),
         ]
     }
 }
@@ -81,7 +86,10 @@ impl MigratorTrait for MigratorTickets {
         vec![
             Box::new(m20240301_000010_tickets_create_ticket::Migration(BackendType::SQLite)),
             Box::new(m20240301_000011_tickets_create_ticket_stats::Migration),
-            Box::new(m20240301_000012_initial_seed_tickets::Migration),
+            Box::new(m20240301_000012_tickets_create_outgoing_ticket_index::Migration(
+                BackendType::SQLite,
+            )),
+            Box::new(m20240301_000013_initial_seed_tickets::Migration),
         ]
     }
 }

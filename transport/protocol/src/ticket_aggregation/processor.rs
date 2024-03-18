@@ -797,8 +797,6 @@ mod tests {
         let alice_packet_key = PEERS[0].public().into();
         let bob_packet_key = PEERS[1].public().into();
 
-        let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
-
         let channel_alice_bob = ChannelEntry::new(
             alice_addr,
             bob_addr,

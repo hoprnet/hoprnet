@@ -2,8 +2,8 @@ use async_stream::stream;
 use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
-use std::sync::atomic::Ordering;
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::error;
 use tracing::info;
@@ -19,8 +19,8 @@ use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unac
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 use hopr_db_entity::prelude::{Ticket, TicketStatistics};
-use hopr_db_entity::ticket;
 use hopr_db_entity::ticket_statistics;
+use hopr_db_entity::{outgoing_ticket_index, ticket};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -202,9 +202,13 @@ pub trait HoprDbTicketOperations {
 
     async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)>;
 
-    async fn invalidate_cached_ticket_index(&self, channel_id: &Hash);
+    /// Sets the stored ticket index to `index`, only if the currently stored value
+    /// is less than `index`. This ensures the stored value can only be growing.
+    async fn compare_and_set_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
 
-    async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>>;
+    async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+
+    async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
 
     async fn prepare_aggregation_in_channel(
         &self,
@@ -504,19 +508,11 @@ impl HoprDbTicketOperations for HoprDb {
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_AGGREGATION_COUNT.increment();
 
-        // TODO: Add this to a new table
-        // trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
-        #[allow(unused_variables)]
-        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
-        // {
-        //     self.db
-        //         .write()
-        //         .await
-        //         .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
-        //         .await?;
-        // }
+        self.compare_and_set_ticket_index(channel_entry.get_id(), current_ticket_index_from_acked_tickets.as_u64())
+            .await?;
 
         hopr_internal_types::channels::Ticket::new(
             &destination,
@@ -737,7 +733,7 @@ impl HoprDbTicketOperations for HoprDb {
                     // verify that no aggregation is in progress in the channel
                     if ticket::Entity::find()
                         .filter(ticket::Column::ChannelId.eq(channel_id.clone()))
-                        .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8), )
+                        .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
                         .one(tx.as_ref())
                         .await?
                         .is_some()
@@ -801,7 +797,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 .gt(&channel_entry.balance.mul_f64(prerequisites.min_unaggregated_ratio)?)
                         {
                             // aborting, because the constraints have not been met
-                            return Ok(vec![])
+                            return Ok(vec![]);
                         }
                     };
 
@@ -814,7 +810,10 @@ impl HoprDbTicketOperations for HoprDb {
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::Index.lte(last_idx_to_take.to_be_bytes().to_vec()))
                             .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
-                            .col_expr(ticket::Column::State, Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32))
+                            .col_expr(
+                                ticket::Column::State,
+                                Expr::value(AcknowledgedTicketStatus::BeingAggregated as u8 as i32),
+                            )
                             .exec(tx.as_ref())
                             .await?;
 
@@ -985,21 +984,59 @@ impl HoprDbTicketOperations for HoprDb {
             .await?)
     }
 
-    async fn invalidate_cached_ticket_index(&self, channel_id: &Hash) {
-        self.ticket_index.invalidate(channel_id).await;
+    async fn compare_and_set_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64> {
+        let old_value = self
+            .get_ticket_index(channel_id)
+            .await?
+            .fetch_max(index, Ordering::SeqCst);
+
+        if old_value < index {
+            // TODO: mark channel id as changed, so it can be persisted to the DB
+        }
+
+        Ok(old_value)
     }
 
-    async fn get_cached_ticket_index(&self, channel_id: &Hash) -> Option<Arc<AtomicUsize>> {
-        let db = self.clone();
+    async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+        let old_value = self.get_ticket_index(channel_id).await?.fetch_max(1, Ordering::SeqCst);
+
+        // TODO: mark channel id as changed, so it can be persisted to the DB
+
+        Ok(old_value)
+    }
+
+    async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
+        let tkt_manager = self.ticket_manager.clone();
+
         self.ticket_index
-            .optionally_get_with_by_ref(channel_id, async move {
-                db.get_channel_by_id(None, *channel_id)
-                    .await
-                    .ok() // TODO: log the error here
-                    .flatten()
-                    .map(|c| Arc::new(AtomicUsize::from(c.ticket_index.as_usize())))
+            .try_get_with(channel_id, async move {
+                let maybe_index = outgoing_ticket_index::Entity::find()
+                    .filter(outgoing_ticket_index::Column::ChannelId.eq(channel_id.to_hex()))
+                    .one(&tkt_manager.tickets_db)
+                    .await?;
+
+                Ok(Arc::new(AtomicU64::new(match maybe_index {
+                    Some(model) => U256::from_be_bytes(model.index).as_u64(),
+                    None => {
+                        tkt_manager
+                            .with_write_locked_db(|tx| {
+                                Box::pin(async move {
+                                    outgoing_ticket_index::ActiveModel {
+                                        channel_id: Set(channel_id.to_hex()),
+                                        ..Default::default()
+                                    }
+                                    .save(tx.as_ref())
+                                    .await?;
+                                    Ok::<_, DbError>(())
+                                })
+                            })
+                            .await?;
+                        0_u64
+                    }
+                })))
             })
             .await
+            .map_err(|e: Arc<DbError>| LogicalError(format!("failed to retrieve ticket index: {e}")))
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -1258,14 +1295,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 return Err(crate::errors::DbError::TicketValidationError(e.to_string()));
                             }
 
-                            let ticket_index = myself
-                                .ticket_index
-                                .get_with(channel.get_id(), async {
-                                    let channel_ticket_index = channel.ticket_index.as_usize();
-                                    Arc::new(AtomicUsize::from(channel_ticket_index))
-                                })
-                                .await;
-                            ticket_index.fetch_add(1, Ordering::SeqCst);
+                            myself.increment_ticket_index(channel.get_id()).await?;
 
                             myself
                                 .unacked_tickets
@@ -1357,16 +1387,7 @@ impl HoprDb {
                         {
                             let channel_id = Hash::from_str(&model.channel_id)?;
 
-                            let ticket_index = myself
-                                .ticket_index
-                                .get_with(channel_id, async {
-                                    let channel_ticket_index =
-                                        U256::from_be_bytes(model.ticket_index.clone()).as_usize();
-                                    Arc::new(AtomicUsize::from(channel_ticket_index))
-                                })
-                                .await;
-
-                            let old_ticket_index = ticket_index.fetch_add(1, Ordering::SeqCst) as u128;
+                            let old_ticket_index = myself.increment_ticket_index(channel_id).await?;
 
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
 

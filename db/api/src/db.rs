@@ -14,7 +14,7 @@ use sea_query::Expr;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use tracing::log::LevelFilter;
 
@@ -51,11 +51,11 @@ pub struct HoprDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) unrealized_value: Cache<Hash, Balance>,
-    pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
+    pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
