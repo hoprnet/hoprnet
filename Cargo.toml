@@ -15,7 +15,6 @@ members = [
     "crypto/types",
     "chain/actions",
     "chain/api",
-    "chain/db",
     "chain/indexer",
     "chain/types",
     "chain/rpc",
@@ -90,7 +89,6 @@ validator = { version = "0.16.1", features = ["derive"] }
 bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/actions", default-features = false }
 chain-api = { path = "chain/api", default-features = false }
-chain-db = { path = "chain/db", default-features = false }
 chain-rpc = { path = "chain/rpc", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
