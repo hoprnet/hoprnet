@@ -345,20 +345,20 @@ where
     ///
     /// The method will panic if Channel Domain Separator is not yet populated in the DB.
     pub async fn action_loop(mut self) {
-        let channel_dst = self
-            .db
-            .get_indexer_data(None)
-            .await
-            .map_err(ChainActionsError::from)
-            .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
-            .unwrap();
-
         while let Some((act, tx_finisher)) = self.queue_recv.next().await {
             // Some minimum separation to avoid batching txs
             futures_timer::Delay::new(Duration::from_millis(100)).await;
 
             let exec_context = self.ctx.clone();
             let db_clone = self.db.clone();
+            let channel_dst = self
+                .db
+                .get_indexer_data(None)
+                .await
+                .map_err(ChainActionsError::from)
+                .and_then(|data| data.channels_dst.ok_or(InvalidState("missing channels dst".into())))
+                .unwrap();
+
             spawn(async move {
                 let act_id = act.to_string();
                 let act_name: &'static str = (&act).into();
