@@ -3542,6 +3542,7 @@ dependencies = [
  "futures",
  "hex-literal",
  "hopr-crypto-packet",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-entity",
  "hopr-db-migration",

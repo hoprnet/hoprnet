@@ -240,6 +240,11 @@ pub trait HoprDbTicketOperations {
     /// If the entry is not yet present for the given ID, it is initialized to 0.
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
 
+    /// Compares outgoing ticket indices in the cache with the stored values
+    /// and updates the stored value where changed.
+    /// Returns the number of updated ticket indices.
+    async fn persist_outgoing_ticket_indices(&self) -> Result<usize>;
+
     /// Prepare a viable collection of tickets to be aggregated.
     ///
     /// Some preconditions for tickets apply. This callback will collect the aggregatable
@@ -688,6 +693,10 @@ impl HoprDbTicketOperations for HoprDb {
                     let deleted = ticket::Entity::delete_many()
                         .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
                         .filter(
+                            hopr_db_entity::ticket::Column::ChannelEpoch
+                                .eq(channel_entry.channel_epoch.to_be_bytes().to_vec()),
+                        )
+                        .filter(
                             hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
                         )
                         .exec(tx.as_ref())
@@ -1030,9 +1039,8 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .fetch_max(index, Ordering::SeqCst);
 
-        if old_value < index {
-            // TODO: mark channel id as changed, so it can be persisted to the DB
-        }
+        // TODO: should we hint the persisting mechanism to trigger the flush?
+        // if old_value < index {}
 
         Ok(old_value)
     }
@@ -1040,7 +1048,7 @@ impl HoprDbTicketOperations for HoprDb {
     async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64> {
         let old_value = self.get_ticket_index(channel_id).await?.fetch_add(1, Ordering::SeqCst);
 
-        // TODO: mark channel id as changed, so it can be persisted to the DB
+        // TODO: should we hint the persisting mechanism to trigger the flush?
 
         Ok(old_value)
     }
@@ -1048,11 +1056,49 @@ impl HoprDbTicketOperations for HoprDb {
     async fn reset_ticket_index(&self, channel_id: Hash) -> Result<u64> {
         let old_value = self.get_ticket_index(channel_id).await?.swap(0, Ordering::SeqCst);
 
-        if old_value > 0 {
-            // TODO: mark channel id as changed, so it can be persisted to the DB
-        }
+        // TODO: should we hint the persisting mechanism to trigger the flush?
+        // if old_value > 0 { }
 
         Ok(old_value)
+    }
+
+    async fn persist_outgoing_ticket_indices(&self) -> Result<usize> {
+        let outgoing_indices = outgoing_ticket_index::Entity::find().all(&self.tickets_db).await?;
+
+        let mut updated = 0;
+        for index_model in outgoing_indices {
+            let channel_id = Hash::from_hex(&index_model.channel_id)?;
+            let db_index = U256::from_be_bytes(&index_model.index).as_u64();
+            if let Some(cached_index) = self.ticket_index.get(&channel_id).await {
+                // Note that the persisted value is always lagging behind the cache,
+                // so the fact that the cached index can change between this load
+                // storing it in the DB is allowed.
+                let cached_index = cached_index.load(Ordering::SeqCst);
+
+                // Store the ticket index in a separate write transaction
+                if cached_index > db_index {
+                    let mut index_active_model = index_model.into_active_model();
+                    index_active_model.index = Set(cached_index.to_be_bytes().to_vec());
+                    self.ticket_manager
+                        .with_write_locked_db(|wtx| {
+                            Box::pin(async move {
+                                index_active_model.save(wtx.as_ref()).await?;
+                                Ok::<_, DbError>(())
+                            })
+                        })
+                        .await?;
+
+                    debug!("updated ticket index in channel {channel_id} from {db_index} to {cached_index}");
+                    updated += 1;
+                }
+            } else {
+                // The value is not yet in the cache, meaning there's low traffic on this
+                // channel, so the value  has not been yet fetched.
+                debug!("channel {channel_id} is in the DB but not yet in the cache.");
+            }
+        }
+
+        Ok::<_, DbError>(updated)
     }
 
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
@@ -1946,6 +1992,56 @@ mod tests {
 
         let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "new value must be 0");
+    }
+
+    #[async_std::test]
+    async fn test_persist_ticket_indices() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let hash_1 = Hash::default();
+        let hash_2 = Hash::from(hopr_crypto_random::random_bytes());
+
+        db.get_ticket_index(hash_1).await.unwrap();
+        db.compare_and_set_ticket_index(hash_2, 10).await.unwrap();
+
+        let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
+        assert_eq!(1, persisted);
+
+        let indices = hopr_db_entity::outgoing_ticket_index::Entity::find()
+            .all(&db.tickets_db)
+            .await
+            .unwrap();
+        let idx_1 = indices
+            .iter()
+            .find(|idx| idx.channel_id == hash_1.to_hex())
+            .expect("must contain index 1");
+        let idx_2 = indices
+            .iter()
+            .find(|idx| idx.channel_id == hash_2.to_hex())
+            .expect("must contain index 2");
+        assert_eq!(0, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 0");
+        assert_eq!(10, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 10");
+
+        db.compare_and_set_ticket_index(hash_1, 3).await.unwrap();
+        db.increment_ticket_index(hash_2).await.unwrap();
+
+        let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
+        assert_eq!(2, persisted);
+
+        let indices = hopr_db_entity::outgoing_ticket_index::Entity::find()
+            .all(&db.tickets_db)
+            .await
+            .unwrap();
+        let idx_1 = indices
+            .iter()
+            .find(|idx| idx.channel_id == hash_1.to_hex())
+            .expect("must contain index 1");
+        let idx_2 = indices
+            .iter()
+            .find(|idx| idx.channel_id == hash_2.to_hex())
+            .expect("must contain index 2");
+        assert_eq!(3, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 3");
+        assert_eq!(11, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 11");
     }
 
     #[async_std::test]

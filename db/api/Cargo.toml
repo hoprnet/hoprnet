@@ -40,6 +40,7 @@ hopr-internal-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 env_logger = { workspace = true }
 lazy_static = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hex-literal = { workspace = true }
 tracing-test = { workspace = true }
 
