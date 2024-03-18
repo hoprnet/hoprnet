@@ -1778,7 +1778,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
         request_body(
             content = TagQueryRequest,
-            description = "Tag of message queue to pop from",
+            description = "Tag of message queue to pop from. When an empty object or an object with a `tag: 0` is provided, it lists and removes all the messages.",
             content_type = "application/json"
         ),
         responses(
@@ -1862,7 +1862,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
             content = GetMessageBodyRequest,
-            description = "Tag of message queue and optionally a timestamp since from to start peeking",
+            description = "Tag of message queue and optionally a timestamp since from to start peeking. When an empty object or an object with a `tag: 0` is provided, it fetches all the messages.",
             content_type = "application/json"
         ),
         responses(
