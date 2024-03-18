@@ -25,7 +25,6 @@ tracing = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true, features = ["resolver"] }
-utils-db = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }

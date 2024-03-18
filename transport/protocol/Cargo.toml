@@ -38,7 +38,6 @@ hopr-crypto-packet = { workspace = true }
 core-path = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-platform = { workspace = true }
-utils-db = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

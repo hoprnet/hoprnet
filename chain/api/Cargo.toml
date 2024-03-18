@@ -21,6 +21,7 @@ futures = { workspace = true }
 serde = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 chain-actions = { workspace = true }
@@ -28,8 +29,6 @@ chain-indexer = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
-utils-db = { workspace = true }
-tracing = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-db-api = { workspace = true }
