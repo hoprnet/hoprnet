@@ -1,0 +1,26 @@
+toolchain:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flake.lock'
+          - 'flake.nix'
+          - '.github/**/*'
+          - '.githooks/**/*'
+          - '.processes/**/*'
+          - 'scripts/**/*'
+          - 'rust-toolchain.toml'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Cargo.lock'
+          - '**/Cargo.toml'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**/*'
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**/*'
