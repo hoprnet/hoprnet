@@ -12,6 +12,8 @@
   inputs.foundry.url = github:shazow/foundry.nix/monthly;
   # use change to add solc 0.8.24
   inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
+  inputs.pre-commit.url = github:cachix/pre-commit-hooks.nix;
+  inputs.treefmt-nix.url = github:numtide/treefmt-nix;
 
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
@@ -21,7 +23,7 @@
   inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
   inputs.solc.inputs.flake-utils.follows = "flake-utils";
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, rust-overlay, crane, foundry, solc, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       perSystem = { config, lib, self', inputs', system, ... }:
         let
@@ -153,7 +155,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
               ];
@@ -179,7 +181,7 @@
               Env = [
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 "ETHERSCAN_API_KEY=placeholder"
                 "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
@@ -209,7 +211,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
                 "RUST_BACKTRACE=full"
               ];
@@ -316,6 +318,27 @@
             '';
             doCheck = true;
           };
+          treefmt = treefmt-nix.lib.evalModule pkgs {
+            projectRootFile = "flake.nix";
+
+            programs.rustfmt.enable = true;
+            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
+
+            programs.nixpkgs-fmt.enable = true;
+            settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
+          };
+          pre-commit-check = pre-commit.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              clippy.enable = true;
+              treefmt.enable = true;
+            };
+            tools = pkgs;
+            settings = {
+              clippy.denyWarnings = true;
+              treefmt.package = treefmt.config.build;
+            };
+          };
           buildDevShell = extraPackages: craneLib.devShell {
             packages = with pkgs; [
               # testing utilities
@@ -340,6 +363,10 @@
               ## python is required by integration tests
               python39
               python39Packages.venvShellHook
+
+              ## formatting
+              treefmt.config.build.wrapper
+              treefmt.config.build.programs
             ] ++ buildInputs ++ nativeBuildInputs ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
@@ -352,6 +379,9 @@
             '';
             preShellHook = ''
               sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
+            '';
+            postShellHook = ''
+              ${pre-commit-check.shellHook}
             '';
           };
           defaultDevShell = buildDevShell [ ];
@@ -368,6 +398,7 @@
             inherit hopli hopli-test hopli-docker;
             inherit anvil-docker;
             inherit smoke-tests docs;
+            inherit pre-commit-check;
             default = hoprd;
           };
           devShells.default = defaultDevShell;
