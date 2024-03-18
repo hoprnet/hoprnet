@@ -225,14 +225,24 @@ pub trait HoprDbTicketOperations {
     /// If the entry is not yet present for the given ID, it is initialized to 0.
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
 
+    /// Prepare a viable collection of tickets to be aggregated.
+    ///
+    /// Some preconditions for tickets apply. This callback will collect the aggregatable
+    /// tickets and marks them as being aggregated.
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
         prerequisites: Option<AggregationPrerequisites>,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>>;
 
+    /// Perform a ticket aggregation rollback in the channel.
+    ///
+    /// If a ticket aggregation fails, this callback can be invoked to make sure that
+    /// resources are properly restored and cleaned up in the database, allowing further
+    /// aggregations.
     async fn rollback_aggregation_in_channel(&self, channel: Hash) -> Result<()>;
 
+    /// Replace the aggregated tickets locally with an aggregated ticket from the counterparty.
     async fn process_received_aggregated_ticket(
         &self,
         aggregated_ticket: hopr_internal_types::channels::Ticket,
@@ -2227,6 +2237,149 @@ mod tests {
             .await? as usize;
 
         assert_eq!(actual_being_aggregated_count, 0);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_should_replace_the_tickes_with_a_correctly_aggregated_ticket(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
+            &ALICE.public().to_address(),
+            &tickets
+                .iter()
+                .fold(Balance::zero(BalanceType::HOPR), |acc, v| acc + v.ticket.amount),
+            tickets.first().expect("should contain tickets").ticket.index.into(),
+            (tickets.last().expect("should contain tickets").ticket.index
+                - tickets.first().expect("should contain tickets").ticket.index
+                + 1)
+            .into(),
+            1.0, // 100% winning probability
+            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
+            tickets
+                .first()
+                .expect("should contain tickets")
+                .ticket
+                .challenge
+                .clone(),
+            &BOB,
+            &Hash::default(),
+        )?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        let _ = db.process_received_aggregated_ticket(aggregated_ticket, &ALICE).await?;
+
+        let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
+            .count(&db.tickets_db)
+            .await? as usize;
+
+        assert_eq!(actual_being_aggregated_count, 0);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_value_is_lower_than_the_stored_one(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
+            &ALICE.public().to_address(),
+            &Balance::zero(BalanceType::HOPR),
+            tickets.first().expect("should contain tickets").ticket.index.into(),
+            (tickets.last().expect("should contain tickets").ticket.index
+                - tickets.first().expect("should contain tickets").ticket.index
+                + 1)
+            .into(),
+            1.0, // 100% winning probability
+            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
+            tickets
+                .first()
+                .expect("should contain tickets")
+                .ticket
+                .challenge
+                .clone(),
+            &BOB,
+            &Hash::default(),
+        )?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        assert!(db
+            .process_received_aggregated_ticket(aggregated_ticket, &ALICE)
+            .await
+            .is_err());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_win_probability_is_not_equal_to_1(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const COUNT_TICKETS: usize = 5;
+
+        let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
+
+        let aggregated_ticket = hopr_internal_types::channels::Ticket::new(
+            &ALICE.public().to_address(),
+            &tickets
+                .iter()
+                .fold(Balance::zero(BalanceType::HOPR), |acc, v| acc + v.ticket.amount),
+            tickets.first().expect("should contain tickets").ticket.index.into(),
+            (tickets.last().expect("should contain tickets").ticket.index
+                - tickets.first().expect("should contain tickets").ticket.index
+                + 1)
+            .into(),
+            0.5, // 50% winning probability
+            (tickets.first().expect("should contain tickets").ticket.channel_epoch).into(),
+            tickets
+                .first()
+                .expect("should contain tickets")
+                .ticket
+                .challenge
+                .clone(),
+            &BOB,
+            &Hash::default(),
+        )?;
+
+        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+
+        let existing_channel_with_multiple_tickets = channel.get_id();
+
+        let actual = db
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .await?;
+
+        assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
+
+        assert!(db
+            .process_received_aggregated_ticket(aggregated_ticket, &ALICE)
+            .await
+            .is_err());
 
         Ok(())
     }
