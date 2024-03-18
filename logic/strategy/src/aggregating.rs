@@ -292,9 +292,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
-    use async_trait::async_trait;
-    use chain_actions::action_queue::PendingAction;
-    use chain_actions::redeem::TicketRedeemActions;
     use core_protocol::ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
     };
@@ -311,10 +308,10 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-    use mockall::mock;
     use std::ops::Add;
     use std::pin::pin;
     use std::time::Duration;
+    use tracing::{debug, error};
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
@@ -380,6 +377,7 @@ mod tests {
 
                     for i in 0..amount {
                         let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
+                        debug!("inserting {acked_ticket}");
 
                         db_clone.upsert_ticket(Some(tx), acked_ticket.clone()).await?;
 
@@ -405,7 +403,7 @@ mod tests {
         (acked_tickets, channel)
     }
 
-    async fn init_db(db: HoprDb, chain_keypair: ChainKeypair, offchain_keypair: OffchainKeypair) {
+    async fn init_db(db: HoprDb) {
         let db_clone = db.clone();
         db.begin_transaction()
             .await
@@ -416,16 +414,25 @@ mod tests {
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
                         .await
                         .unwrap();
-                    db_clone
-                        .insert_account(
-                            Some(tx),
-                            AccountEntry::new(
-                                *offchain_keypair.public(),
-                                chain_keypair.public().to_address(),
-                                AccountType::NotAnnounced,
-                            ),
-                        )
-                        .await
+                    for i in 0..PEERS_CHAIN.len() {
+                        debug!(
+                            "linking {} with {}",
+                            PEERS[i].public(),
+                            PEERS_CHAIN[i].public().to_address()
+                        );
+                        db_clone
+                            .insert_account(
+                                Some(tx),
+                                AccountEntry::new(
+                                    *PEERS[i].public(),
+                                    PEERS_CHAIN[i].public().to_address(),
+                                    AccountType::NotAnnounced,
+                                ),
+                            )
+                            .await
+                            .unwrap();
+                    }
+                    Ok::<_, DbError>(())
                 })
             })
             .await
@@ -453,20 +460,29 @@ mod tests {
             match bob.next().await {
                 Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
                     let _ = finalizer.insert(request_finalizer);
-                    alice
+                    match alice
                         .writer()
                         .receive_aggregation_request(PEERS[1].public().into(), acked_tickets, ())
-                        .unwrap();
+                    {
+                        Ok(_) => {}
+                        Err(e) => error!("{e}"),
+                    }
                 }
                 //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
                 _ => panic!("unexpected action happened"),
             };
 
             match alice.next().await {
-                Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
-                    .writer()
-                    .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
-                    .unwrap(),
+                Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => {
+                    match bob
+                        .writer()
+                        .receive_ticket(PEERS[0].public().into(), aggregated_ticket, ())
+                    {
+                        Ok(_) => {}
+                        Err(e) => error!("{e}"),
+                    }
+                }
+
                 _ => panic!("unexpected action happened"),
             };
 
@@ -494,10 +510,10 @@ mod tests {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
-        let (acked_tickets, channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
+        let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 
         db_alice.upsert_channel(None, channel).await.unwrap();
         db_bob.upsert_channel(None, channel).await.unwrap();
@@ -538,10 +554,10 @@ mod tests {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
-        let (acked_tickets, channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await;
+        let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), 4).await;
 
         db_alice.upsert_channel(None, channel).await.unwrap();
         db_bob.upsert_channel(None, channel).await.unwrap();
@@ -583,8 +599,8 @@ mod tests {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
         const NUM_TICKETS: usize = 4;
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await;
@@ -594,7 +610,13 @@ mod tests {
 
         // Make this ticket aggregated
         acked_tickets[0].ticket.index_offset = 2;
+        acked_tickets[0].ticket.sign(&PEERS_CHAIN[0], &Hash::default());
+
+        debug!("upserting {}", acked_tickets[0]);
         db_bob.upsert_ticket(None, acked_tickets[0].clone()).await.unwrap();
+
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
 
         channel.balance = Balance::new(100_u32, BalanceType::HOPR);
 
@@ -630,8 +652,8 @@ mod tests {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
 
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_bob.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
         let (_, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 

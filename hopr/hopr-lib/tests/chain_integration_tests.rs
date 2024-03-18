@@ -21,9 +21,12 @@ use ethers::providers::Middleware;
 use ethers::utils::AnvilInstance;
 use futures::StreamExt;
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::accounts::HoprDbAccountOperations;
 use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_db_api::db::HoprDb;
+use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
 use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::HoprDbGeneralModelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -145,6 +148,7 @@ type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcR
 
 struct ChainNode {
     chain_key: ChainKeypair,
+    offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
@@ -154,6 +158,7 @@ struct ChainNode {
 #[allow(clippy::too_many_arguments)]
 async fn start_node_chain_logic(
     chain_key: &ChainKeypair,
+    offchain_key: &OffchainKeypair,
     anvil: &AnvilInstance,
     contract_addrs: ContractAddresses,
     module_addr: Address,
@@ -164,6 +169,24 @@ async fn start_node_chain_logic(
 ) -> ChainNode {
     // DB
     let db = HoprDb::new_in_memory(chain_key.clone()).await;
+    let self_db = db.clone();
+    let ock = offchain_key.public().clone();
+    let ckp = chain_key.public().to_address().clone();
+    db.begin_transaction()
+        .await
+        .unwrap()
+        .perform(|tx| {
+            Box::pin(async move {
+                self_db
+                    .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
+                    .await?;
+                self_db
+                    .insert_account(Some(tx), AccountEntry::new(ock, ckp, AccountType::NotAnnounced))
+                    .await
+            })
+        })
+        .await
+        .unwrap();
 
     // RPC
     let json_rpc_client = JsonRpcProviderClient::new(
@@ -206,6 +229,7 @@ async fn start_node_chain_logic(
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {
+        offchain_key: offchain_key.clone(),
         chain_key: chain_key.clone(),
         db,
         actions,
@@ -222,6 +246,9 @@ async fn integration_test_indexer() {
 
     let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
     let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref()).unwrap();
+
+    let alice_offchain_key = OffchainKeypair::random();
+    let bob_offchain_key = OffchainKeypair::random();
 
     let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
     let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -266,6 +293,7 @@ async fn integration_test_indexer() {
 
     let alice_node = start_node_chain_logic(
         &alice_chain_key,
+        &alice_offchain_key,
         &anvil,
         contract_addrs,
         alice_module_addr,
@@ -284,6 +312,7 @@ async fn integration_test_indexer() {
 
     let bob_node = start_node_chain_logic(
         &bob_chain_key,
+        &bob_offchain_key,
         &anvil,
         contract_addrs,
         bob_module_addr,

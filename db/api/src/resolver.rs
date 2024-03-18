@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_primitive_types::{primitives::Address, traits::ToHex};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use hopr_primitive_types::primitives::Address;
 
+use crate::accounts::HoprDbAccountOperations;
 use crate::{db::HoprDb, errors::Result};
 
 /// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
@@ -18,33 +18,17 @@ pub trait HoprDbResolverOperations {
 #[async_trait]
 impl HoprDbResolverOperations for HoprDb {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
-        let packet_key = hopr_db_entity::account::Entity::find()
-            .filter(hopr_db_entity::account::Column::ChainKey.eq(onchain_key.to_hex()))
-            .one(&self.db)
+        Ok(self
+            .translate_key(None, onchain_key.clone())
             .await?
-            .map(|model| {
-                OffchainPublicKey::from_hex(&model.packet_key).map_err(|_| crate::errors::DbError::DecodingError)
-            });
-
-        if let Some(packet_key) = packet_key {
-            Ok(Some(packet_key?))
-        } else {
-            Ok(None)
-        }
+            .map(|k| k.try_into().unwrap()))
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
-        let chain_key = hopr_db_entity::account::Entity::find()
-            .filter(hopr_db_entity::account::Column::PacketKey.eq(offchain_key.to_string()))
-            .one(&self.db)
+        Ok(self
+            .translate_key(None, offchain_key.clone())
             .await?
-            .map(|model| Address::from_hex(&model.chain_key).map_err(|_| crate::errors::DbError::DecodingError));
-
-        if let Some(chain_key) = chain_key {
-            Ok(Some(chain_key?))
-        } else {
-            Ok(None)
-        }
+            .map(|k| k.try_into().unwrap()))
     }
 }
 
@@ -52,7 +36,8 @@ impl HoprDbResolverOperations for HoprDb {
 mod tests {
     use super::*;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
-    use sea_orm::Set;
+    use hopr_primitive_types::prelude::ToHex;
+    use sea_orm::{EntityTrait, Set};
 
     #[async_std::test]
     async fn test_get_offchain_key_should_return_nothing_if_a_mapping_to_chain_key_does_not_exist() {

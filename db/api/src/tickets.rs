@@ -477,13 +477,10 @@ impl HoprDbTicketOperations for HoprDb {
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
-                        if entry.status != ChannelStatus::Open {
-                            return Err(DbError::LogicalError(format!("channel '{}' not open", entry.get_id())));
+                        if entry.status == ChannelStatus::Closed {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
                         } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Outgoing) {
-                            return Err(DbError::LogicalError(format!(
-                                "channel '{}' is not incoming",
-                                entry.get_id()
-                            )));
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not outgoing")));
                         }
                         let domain_separator =
                             myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
@@ -547,10 +544,9 @@ impl HoprDbTicketOperations for HoprDb {
         let first_acked_ticket = acked_tickets.first().unwrap();
         let last_acked_ticket = acked_tickets.last().unwrap();
 
-        trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
-        self.compare_and_set_ticket_index(channel_entry.get_id(), current_ticket_index_from_acked_tickets.as_u64())
+        let current_ticket_index_from_acked_tickets = last_acked_ticket.ticket.index + 1;
+        self.compare_and_set_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
             .await?;
 
         hopr_internal_types::channels::Ticket::new(
@@ -598,8 +594,8 @@ impl HoprDbTicketOperations for HoprDb {
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
-                        if entry.status != ChannelStatus::Open {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' not open")));
+                        if entry.status == ChannelStatus::Closed {
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
                         } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
                             return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
                         }
@@ -743,8 +739,8 @@ impl HoprDbTicketOperations for HoprDb {
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel))?;
 
-                        if entry.status != ChannelStatus::Open {
-                            return Err(DbError::LogicalError(format!("channel '{channel}' not open")));
+                        if entry.status == ChannelStatus::Closed {
+                            return Err(DbError::LogicalError(format!("channel '{channel}' is closed")));
                         } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
                             return Err(DbError::LogicalError(format!("channel '{channel}' is not incoming")));
                         }
@@ -2487,6 +2483,13 @@ mod tests {
             .is_err());
 
         Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_tickets() {
+        //let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        // TODO
     }
 
     // TODO: think about incorporating these tests
