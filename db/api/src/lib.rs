@@ -100,8 +100,11 @@ pub type OptTx<'a> = Option<&'a OpenTransaction>;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum TargetDb {
     #[default]
+    /// Indexer database.
     Index,
+    /// Acknowledged winning ticket database.
     Tickets,
+    /// Network peers database
     Peers,
 }
 

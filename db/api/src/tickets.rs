@@ -184,22 +184,37 @@ pub struct AggregationPrerequisites {
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
+    /// Retrieve acknowledged winning tickets according to the given `selector`.
+    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
+    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
+    /// Returns the number of tickets that were redeemed.
     async fn mark_tickets_redeemed(&self, selector: TicketSelector) -> Result<usize>;
 
+    /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
+    /// Returns the number of tickets that were neglected.
     async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
 
+    /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
+    /// Returns the updated tickets in the new state.
     async fn update_ticket_states_and_fetch<'a>(
         &'a self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
     ) -> Result<BoxStream<'a, AcknowledgedTicket>>;
 
+    /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
     async fn update_ticket_states(&self, selector: TicketSelector, new_state: AcknowledgedTicketStatus) -> Result<()>;
 
+    /// Retrieves the ticket statistics.
+    ///
+    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
     async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
 
+    /// Counts the tickets matching the given `selector` and their total value.
+    ///
+    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
     async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
@@ -1060,7 +1075,7 @@ impl HoprDbTicketOperations for HoprDb {
                                         channel_id: Set(channel_id.to_hex()),
                                         ..Default::default()
                                     }
-                                    .save(tx.as_ref())
+                                    .insert(tx.as_ref())
                                     .await?;
                                     Ok::<_, DbError>(())
                                 })
