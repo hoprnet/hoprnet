@@ -612,10 +612,16 @@ where
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
                             Ok(Some((source, tickets))) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
+                                    METRIC_AGGREGATION_COUNT.increment();
+                                }
+
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Ok(None) => { finalizer.finalize(); None },
-                            Err(_) => None,
+                            Err(e) => panic!("We are here {e}"),
                         }
                     }
                 };
@@ -737,27 +743,35 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_db(db: HoprDb, chain_keypair: ChainKeypair, offchain_keypair: OffchainKeypair) {
+    async fn init_db(db: HoprDb) {
         let db_clone = db.clone();
+
+        let peers = PEERS.clone();
+        let peers_chain = PEERS_CHAIN.clone();
+
         db.begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| {
+            .perform(move |tx| {
                 Box::pin(async move {
                     db_clone
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
                         .await
                         .unwrap();
-                    db_clone
-                        .insert_account(
-                            Some(tx),
-                            AccountEntry::new(
-                                *offchain_keypair.public(),
-                                chain_keypair.public().to_address(),
-                                AccountType::NotAnnounced,
-                            ),
-                        )
-                        .await
+                    for (offchain, chain) in peers.iter().zip(peers_chain.iter()) {
+                        db_clone
+                            .insert_account(
+                                Some(tx),
+                                AccountEntry::new(
+                                    *offchain.public(),
+                                    chain.public().to_address(),
+                                    AccountType::NotAnnounced,
+                                ),
+                            )
+                            .await?
+                    }
+
+                    Ok::<(), hopr_db_api::errors::DbError>(())
                 })
             })
             .await
@@ -770,9 +784,12 @@ mod tests {
 
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
         const NUM_TICKETS: u64 = 30;
 
+        let mut tickets = vec![];
         let mut agg_balance = Balance::zero(BalanceType::HOPR);
         // Generate acknowledged tickets
         for i in 1..=NUM_TICKETS {
@@ -785,11 +802,8 @@ mod tests {
                 agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
             }
 
-            db_bob.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
+            tickets.push(ack_ticket)
         }
-
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_alice.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
         let alice_addr: Address = (&PEERS_CHAIN[0]).into();
         let bob_addr: Address = (&PEERS_CHAIN[1]).into();
@@ -808,6 +822,10 @@ mod tests {
 
         db_alice.upsert_channel(None, channel_alice_bob).await.unwrap();
         db_bob.upsert_channel(None, channel_alice_bob).await.unwrap();
+
+        for ticket in tickets.into_iter() {
+            db_bob.upsert_ticket(None, ticket).await.unwrap();
+        }
 
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);
