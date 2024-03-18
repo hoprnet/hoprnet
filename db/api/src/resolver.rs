@@ -19,14 +19,14 @@ pub trait HoprDbResolverOperations {
 impl HoprDbResolverOperations for HoprDb {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
         Ok(self
-            .translate_key(None, onchain_key.clone())
+            .translate_key(None, *onchain_key)
             .await?
             .map(|k| k.try_into().unwrap()))
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
         Ok(self
-            .translate_key(None, offchain_key.clone())
+            .translate_key(None, *offchain_key)
             .await?
             .map(|k| k.try_into().unwrap()))
     }
