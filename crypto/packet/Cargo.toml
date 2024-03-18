@@ -21,7 +21,6 @@ typenum = "1.16"
 
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-db = { workspace = true }
 utils-db = { workspace = true }
 tracing = { workspace = true }
 hopr-internal-types = { workspace = true }

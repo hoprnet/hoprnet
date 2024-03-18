@@ -479,7 +479,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                         if entry.status != ChannelStatus::Open {
                             return Err(DbError::LogicalError(format!("channel '{}' not open", entry.get_id())));
-                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
+                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Outgoing) {
                             return Err(DbError::LogicalError(format!(
                                 "channel '{}' is not incoming",
                                 entry.get_id()
@@ -537,9 +537,6 @@ impl HoprDbTicketOperations for HoprDb {
             if final_value.gt(&channel_balance) {
                 return Err(DbError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
             }
-
-            // #[cfg(all(feature = "prometheus", not(test)))]
-            // METRIC_AGGREGATED_TICKETS.increment();
         }
 
         info!(
@@ -549,9 +546,6 @@ impl HoprDbTicketOperations for HoprDb {
 
         let first_acked_ticket = acked_tickets.first().unwrap();
         let last_acked_ticket = acked_tickets.last().unwrap();
-
-        // #[cfg(all(feature = "prometheus", not(test)))]
-        // METRIC_AGGREGATION_COUNT.increment();
 
         trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry

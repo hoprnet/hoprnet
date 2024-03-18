@@ -1,9 +1,7 @@
 use crate::errors::{
-    ProtocolError::{ProtocolTicketAggregation, Retry, TransportError},
+    ProtocolError::{Retry, TransportError},
     Result,
 };
-use async_lock::RwLock;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use futures::{
     channel::{
         mpsc::{channel, Receiver, Sender},
@@ -17,20 +15,16 @@ use hopr_crypto_types::prelude::*;
 pub use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::tickets::HoprDbTicketOperations;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use libp2p::request_response::{OutboundRequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use std::ops::Add;
-use std::{pin::Pin, sync::Arc, task::Poll};
-use tracing::{debug, error, info, trace, warn};
+use std::{pin::Pin, task::Poll};
+use tracing::{error, warn};
 
 use async_std::task::{sleep, spawn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
-
-use hopr_primitive_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -67,277 +61,6 @@ pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
     Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
-}
-
-/// Implements protocol ticket aggregation logic for acknowledgements
-pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions + std::fmt::Debug> {
-    db: Arc<RwLock<Db>>,
-    chain_key: ChainKeypair,
-}
-
-impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> Clone for TicketAggregationProcessor<Db> {
-    fn clone(&self) -> Self {
-        Self {
-            db: self.db.clone(),
-            chain_key: self.chain_key.clone(),
-        }
-    }
-}
-
-impl<Db: HoprCoreEthereumDbActions + std::fmt::Debug> TicketAggregationProcessor<Db> {
-    pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
-        Self {
-            db,
-            chain_key: chain_key.clone(),
-        }
-    }
-
-    pub async fn aggregate_tickets(
-        &mut self,
-        destination: PeerId,
-        mut acked_tickets: Vec<AcknowledgedTicket>,
-    ) -> Result<Ticket> {
-        if acked_tickets.is_empty() {
-            return Err(ProtocolTicketAggregation("At least one ticket required".to_owned()));
-        }
-
-        if acked_tickets.len() == 1 {
-            return Ok(acked_tickets[0].ticket.clone());
-        }
-
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await?
-            .ok_or_else(|| {
-                warn!("Missing domain separator");
-                ProtocolTicketAggregation("Missing domain separator".into())
-            })?;
-
-        let destination = self
-            .db
-            .read()
-            .await
-            .get_chain_key(
-                &OffchainPublicKey::try_from(destination)
-                    .expect("Invalid PeerId. Could not convert to OffchainPublicKey"),
-            )
-            .await?
-            .ok_or_else(|| {
-                warn!("Could not find chain key for {}", destination);
-                ProtocolTicketAggregation("Could not find chain key".into())
-            })?;
-
-        let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
-        let channel_entry = self
-            .db
-            .read()
-            .await
-            .get_channel(&channel_id)
-            .await?
-            .ok_or(ProtocolTicketAggregation(format!(
-                "channel {channel_id} does not exist"
-            )))?;
-        let channel_balance = channel_entry.balance;
-
-        acked_tickets.sort();
-        acked_tickets.dedup();
-
-        let channel_epoch = channel_entry.channel_epoch;
-
-        let mut final_value = Balance::zero(BalanceType::HOPR);
-
-        for (i, acked_ticket) in acked_tickets.iter().enumerate() {
-            if channel_id != acked_ticket.ticket.channel_id {
-                return Err(ProtocolTicketAggregation(format!(
-                    "aggregated ticket has an invalid channel id {}",
-                    acked_ticket.ticket.channel_id
-                )));
-            }
-
-            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
-                return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
-            }
-
-            if i + 1 < acked_tickets.len()
-                && acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
-                    > acked_tickets[i + 1].ticket.index
-            {
-                return Err(ProtocolTicketAggregation(
-                    "Tickets with overlapping index intervals".to_owned(),
-                ));
-            }
-
-            if acked_ticket
-                .verify(&(&self.chain_key).into(), &destination, &domain_separator)
-                .is_err()
-            {
-                return Err(ProtocolTicketAggregation("Not a valid ticket".to_owned()));
-            }
-
-            if !acked_ticket.is_winning_ticket(&domain_separator) {
-                return Err(ProtocolTicketAggregation("Not a winning ticket".to_owned()));
-            }
-
-            final_value = final_value.add(&acked_ticket.ticket.amount);
-            if final_value.gt(&channel_balance) {
-                return Err(ProtocolTicketAggregation(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")));
-            }
-
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_AGGREGATED_TICKETS.increment();
-        }
-
-        info!(
-            "aggregated {} tickets in channel {channel_id} with total value {final_value}",
-            acked_tickets.len()
-        );
-
-        let first_acked_ticket = acked_tickets.first().unwrap();
-        let last_acked_ticket = acked_tickets.last().unwrap();
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_AGGREGATION_COUNT.increment();
-
-        trace!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
-        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
-        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).add(1);
-        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
-        {
-            self.db
-                .write()
-                .await
-                .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
-                .await?;
-        }
-
-        Ticket::new(
-            &destination,
-            &final_value,
-            first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
-            1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch,
-            first_acked_ticket.ticket.challenge.clone(),
-            &self.chain_key,
-            &domain_separator,
-        )
-        .map_err(|e| e.into())
-    }
-
-    pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<AcknowledgedTicket> {
-        let channel_id = aggregated_ticket.channel_id;
-        debug!("received aggregated {aggregated_ticket}");
-
-        let stored_acked_tickets = self
-            .db
-            .read()
-            .await
-            .get_acknowledged_tickets_range(
-                &aggregated_ticket.channel_id,
-                aggregated_ticket.channel_epoch,
-                aggregated_ticket.index,
-                aggregated_ticket.index + aggregated_ticket.index_offset as u64 - 1u64,
-            )
-            .await?;
-
-        if stored_acked_tickets.is_empty() {
-            debug!("Received unexpected aggregated ticket in channel {}", channel_id);
-            return Err(ProtocolTicketAggregation("Unexpected ticket".into()));
-        }
-
-        let mut stored_value = Balance::zero(BalanceType::HOPR);
-
-        for stored_acked_ticket in stored_acked_tickets.iter() {
-            stored_value = stored_value.add(&stored_acked_ticket.ticket.amount);
-        }
-
-        // Value of received ticket can be higher (profit for us) but not lower
-        if aggregated_ticket.amount.lt(&stored_value) {
-            debug!(
-                "Dropping aggregated ticket in channel {} because its value is lower than sum of stored tickets",
-                channel_id
-            );
-            return Err(ProtocolTicketAggregation(
-                "Value of received aggregated ticket is too low".into(),
-            ));
-        }
-
-        if aggregated_ticket.win_prob() != 1.0f64 {
-            debug!(
-                "Received aggregated ticket in channel {} win probability less than 100%",
-                channel_id
-            );
-            return Err(ProtocolTicketAggregation(
-                "Aggregated tickets must have 100% win probability".into(),
-            ));
-        }
-
-        let first_stored_ticket = stored_acked_tickets.first().unwrap();
-
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await?
-            .ok_or_else(|| {
-                debug!(
-                    "cannot process aggregated ticket in channel {} due to missing domain separator",
-                    channel_id
-                );
-                ProtocolTicketAggregation("Missing domain separator".into())
-            })?;
-
-        // calculate the new current ticket index
-        let current_ticket_index_from_aggregated_ticket =
-            U256::from(aggregated_ticket.index).add(aggregated_ticket.index_offset);
-
-        let acked_aggregated_ticket = AcknowledgedTicket::new(
-            aggregated_ticket,
-            first_stored_ticket.response.clone(),
-            first_stored_ticket.signer,
-            &self.chain_key,
-            &domain_separator,
-        )
-        .map_err(|e| {
-            ProtocolTicketAggregation(format!(
-                "Cannot create acknowledged ticket from aggregated ticket {}",
-                e
-            ))
-        })?;
-
-        if acked_aggregated_ticket
-            .verify(
-                &first_stored_ticket.signer,
-                &(&self.chain_key).into(),
-                &domain_separator,
-            )
-            .is_err()
-        {
-            debug!(
-                "Received an aggregated ticket in channel {} that is invalid. Dropping ticket.",
-                channel_id
-            );
-            return Err(ProtocolTicketAggregation("Aggregated ticket is invalid".into()));
-        }
-
-        self.db
-            .write()
-            .await
-            .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
-            .await?;
-
-        self.db
-            .write()
-            .await
-            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
-            .await?;
-
-        Ok(acked_aggregated_ticket)
-    }
 }
 
 #[derive(Debug)]
@@ -612,10 +335,16 @@ where
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
                             Ok(Some((source, tickets))) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                {
+                                    METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
+                                    METRIC_AGGREGATION_COUNT.increment();
+                                }
+
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Ok(None) => { finalizer.finalize(); None },
-                            Err(_) => None,
+                            Err(e) => panic!("We are here {e}"),
                         }
                     }
                 };
@@ -737,27 +466,35 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    async fn init_db(db: HoprDb, chain_keypair: ChainKeypair, offchain_keypair: OffchainKeypair) {
+    async fn init_db(db: HoprDb) {
         let db_clone = db.clone();
+
+        let peers = PEERS.clone();
+        let peers_chain = PEERS_CHAIN.clone();
+
         db.begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| {
+            .perform(move |tx| {
                 Box::pin(async move {
                     db_clone
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
                         .await
                         .unwrap();
-                    db_clone
-                        .insert_account(
-                            Some(tx),
-                            AccountEntry::new(
-                                *offchain_keypair.public(),
-                                chain_keypair.public().to_address(),
-                                AccountType::NotAnnounced,
-                            ),
-                        )
-                        .await
+                    for (offchain, chain) in peers.iter().zip(peers_chain.iter()) {
+                        db_clone
+                            .insert_account(
+                                Some(tx),
+                                AccountEntry::new(
+                                    *offchain.public(),
+                                    chain.public().to_address(),
+                                    AccountType::NotAnnounced,
+                                ),
+                            )
+                            .await?
+                    }
+
+                    Ok::<(), hopr_db_api::errors::DbError>(())
                 })
             })
             .await
@@ -770,9 +507,12 @@ mod tests {
 
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
 
         const NUM_TICKETS: u64 = 30;
 
+        let mut tickets = vec![];
         let mut agg_balance = Balance::zero(BalanceType::HOPR);
         // Generate acknowledged tickets
         for i in 1..=NUM_TICKETS {
@@ -785,11 +525,8 @@ mod tests {
                 agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
             }
 
-            db_bob.upsert_ticket(None, ack_ticket.clone()).await.unwrap();
+            tickets.push(ack_ticket)
         }
-
-        init_db(db_alice.clone(), PEERS_CHAIN[0].clone(), PEERS[0].clone()).await;
-        init_db(db_alice.clone(), PEERS_CHAIN[1].clone(), PEERS[1].clone()).await;
 
         let alice_addr: Address = (&PEERS_CHAIN[0]).into();
         let bob_addr: Address = (&PEERS_CHAIN[1]).into();
@@ -808,6 +545,10 @@ mod tests {
 
         db_alice.upsert_channel(None, channel_alice_bob).await.unwrap();
         db_bob.upsert_channel(None, channel_alice_bob).await.unwrap();
+
+        for ticket in tickets.into_iter() {
+            db_bob.upsert_ticket(None, ticket).await.unwrap();
+        }
 
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(db_alice.clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(db_bob.clone(), &PEERS_CHAIN[1]);

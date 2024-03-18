@@ -31,7 +31,6 @@ hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-transport = { workspace = true }
-chain-db = { workspace = true }
 chain-actions = { workspace = true }
 tracing = { workspace = true }
 hopr-platform = { workspace = true }

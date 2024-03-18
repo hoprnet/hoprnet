@@ -24,7 +24,6 @@ thiserror = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 chain-actions = { workspace = true }
-chain-db = { workspace = true }
 chain-indexer = { workspace = true }
 chain-rpc = { workspace = true }
 chain-types = { workspace = true }

@@ -34,7 +34,6 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true, features = ["resolver"] }
-chain-db = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 core-path = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
