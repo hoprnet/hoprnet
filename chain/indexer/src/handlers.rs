@@ -219,9 +219,7 @@ where
                         || channel_entry.destination == self.chain_key.public().to_address()
                     {
                         // Reset the current_ticket_index to zero
-                        self.db
-                            .compare_and_set_ticket_index(channel_closed.channel_id.into(), 0)
-                            .await?;
+                        self.db.reset_ticket_index(channel_closed.channel_id.into()).await?;
                     }
 
                     Ok(Some(ChainEventType::ChannelClosed(channel_entry)))
@@ -250,7 +248,7 @@ where
                             .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
                             .await?;
 
-                        self.db.compare_and_set_ticket_index(channel_id, 0).await?;
+                        self.db.reset_ticket_index(channel_id).await?;
                     }
 
                     // set all channel fields like we do on-chain on close

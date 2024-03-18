@@ -202,12 +202,27 @@ pub trait HoprDbTicketOperations {
 
     async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)>;
 
-    /// Sets the stored ticket index to `index`, only if the currently stored value
+    /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
     /// is less than `index`. This ensures the stored value can only be growing.
+    /// Returns the old value.
+    ///
+    /// If the entry is not yet present for the given ID, it is initialized to 0.
     async fn compare_and_set_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
 
+    /// Resets the outgoing ticket index to 0 for the given channel id.
+    /// Returns the old value before reset.
+    ///
+    /// If the entry is not yet present for the given ID, it is initialized to 0.
+    async fn reset_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+
+    /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
+    ///
+    /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
     async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64>;
 
+    /// Gets the current outgoing ticket index for the given channel id.
+    ///
+    /// If the entry is not yet present for the given ID, it is initialized to 0.
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
 
     async fn prepare_aggregation_in_channel(
@@ -998,9 +1013,19 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64> {
-        let old_value = self.get_ticket_index(channel_id).await?.fetch_max(1, Ordering::SeqCst);
+        let old_value = self.get_ticket_index(channel_id).await?.fetch_add(1, Ordering::SeqCst);
 
         // TODO: mark channel id as changed, so it can be persisted to the DB
+
+        Ok(old_value)
+    }
+
+    async fn reset_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+        let old_value = self.get_ticket_index(channel_id).await?.swap(0, Ordering::SeqCst);
+
+        if old_value > 0 {
+            // TODO: mark channel id as changed, so it can be persisted to the DB
+        }
 
         Ok(old_value)
     }
@@ -1484,6 +1509,7 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+    use std::sync::atomic::Ordering;
 
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
@@ -1813,6 +1839,88 @@ mod tests {
             .await;
 
         assert!(v.is_empty(), "must not update if already updated");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_index_should_be_zero_if_not_yet_present() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let hash = Hash::default();
+
+        let idx = db.get_ticket_index(hash).await.unwrap();
+        assert_eq!(0, idx.load(Ordering::SeqCst), "initial index must be zero");
+
+        let r = hopr_db_entity::outgoing_ticket_index::Entity::find()
+            .filter(hopr_db_entity::outgoing_ticket_index::Column::ChannelId.eq(hash.to_hex()))
+            .one(&db.tickets_db)
+            .await
+            .unwrap()
+            .expect("index must exist");
+
+        assert_eq!(0, U256::from_be_bytes(r.index).as_u64(), "index must be zero");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_index_compare_and_set_and_increment() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let hash = Hash::default();
+
+        let old_idx = db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        assert_eq!(0, old_idx, "old value must be 0");
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(1, new_idx, "new value must be 1");
+
+        let old_idx = db.increment_ticket_index(hash).await.unwrap();
+        assert_eq!(1, old_idx, "old value must be 1");
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(2, new_idx, "new value must be 2");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_index_compare_and_set_must_not_decrease() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let hash = Hash::default();
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(0, new_idx, "value must be 0");
+
+        db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(1, new_idx, "new value must be 1");
+
+        let old_idx = db.compare_and_set_ticket_index(hash, 0).await.unwrap();
+        assert_eq!(1, old_idx, "old value must be 1");
+        assert_eq!(1, new_idx, "new value must be 1");
+
+        let old_idx = db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        assert_eq!(1, old_idx, "old value must be 1");
+        assert_eq!(1, new_idx, "new value must be 1");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_index_reset() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let hash = Hash::default();
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(0, new_idx, "value must be 0");
+
+        db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(1, new_idx, "new value must be 1");
+
+        let old_idx = db.reset_ticket_index(hash).await.unwrap();
+        assert_eq!(1, old_idx, "old value must be 1");
+
+        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        assert_eq!(0, new_idx, "new value must be 0");
     }
 
     #[async_std::test]
