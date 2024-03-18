@@ -44,6 +44,7 @@ hopr-primitive-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
 
 [dev-dependencies]
+env_logger = { workspace = true }
 serde_yaml = { version = "0.9" }
 hopr-crypto-types = { workspace = true }
 ethers = { workspace = true }

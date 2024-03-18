@@ -30,7 +30,7 @@ use hopr_db_api::HoprDbGeneralModelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::info;
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket<M: Middleware>(
@@ -148,7 +148,7 @@ type TestRpc = RpcOperations<JsonRpcProviderClient<SurfRequestor, SimpleJsonRpcR
 
 struct ChainNode {
     chain_key: ChainKeypair,
-    offchain_key: OffchainKeypair,
+    _offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
@@ -217,8 +217,8 @@ async fn start_node_chain_logic(
     let (sce_tx, mut sce_rx) = futures::channel::mpsc::unbounded();
     node_tasks.push(async_std::task::spawn(async move {
         while let Some(sce) = sce_rx.next().await {
-            let res = action_state.match_and_resolve(&sce).await;
-            debug!("{:?}: expectations resolved {:?}", sce, res);
+            let _ = action_state.match_and_resolve(&sce).await;
+            //debug!("{:?}: expectations resolved {:?}", sce, res);
         }
     }));
 
@@ -229,7 +229,7 @@ async fn start_node_chain_logic(
     indexer.start().await.expect("indexer should sync");
 
     ChainNode {
-        offchain_key: offchain_key.clone(),
+        _offchain_key: offchain_key.clone(),
         chain_key: chain_key.clone(),
         db,
         actions,
@@ -240,6 +240,8 @@ async fn start_node_chain_logic(
 
 #[async_std::test]
 async fn integration_test_indexer() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
@@ -251,6 +253,7 @@ async fn integration_test_indexer() {
     let bob_offchain_key = OffchainKeypair::random();
 
     let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+    info!("Deploying SCs to Anvil...");
     let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
         .await
         .expect("failed to deploy");
@@ -322,34 +325,20 @@ async fn integration_test_indexer() {
         indexer_cfg,
     )
     .await;
-    // Bob fund channel with 100 HOPR
-    let incoming_funding_amount = BalanceType::HOPR.balance(100);
-    bob_node
-        .actions
-        .register_safe_by_node(bob_safe_addr)
-        .await
-        .expect("should submit safe registration tx")
-        .await
-        .expect("should confirm safe registration");
-    bob_node
-        .actions
-        .open_channel(alice_chain_key.public().to_address(), incoming_funding_amount)
-        .await
-        .expect("should submit incoming channel open tx")
-        .await
-        .expect("should confirm open incoming channel");
 
     info!("======== STARTING TEST ========");
 
     // ----------------
     // Test plan:
-    // Register with Safe
-    // Announce
+    // Register Safe for both nodes
+    // Announce both nodes
     // Open channel to Bob
+    // Fund channel to Bob
+    // Open channel to Alice
     // Redeem ticket in the channel
     // Close channel to Bob
 
-    // Register Safe
+    // Register Safe Alice
     let confirmation = alice_node
         .actions
         .register_safe_by_node(alice_safe_addr)
@@ -362,8 +351,24 @@ async fn integration_test_indexer() {
         matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == alice_safe_addr),
         "confirmed safe address must match"
     );
+    info!("--> Alice's Safe has been registered");
 
-    // Announce the node
+    // Register Safe Bob
+    let confirmation = bob_node
+        .actions
+        .register_safe_by_node(bob_safe_addr)
+        .await
+        .expect("should submit safe registration tx")
+        .await
+        .expect("should confirm safe registration");
+
+    assert!(
+        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == bob_safe_addr),
+        "confirmed safe address must match"
+    );
+    info!("--> Bob's Safe has been registered");
+
+    // Announce the node by Alice
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
     let offchain_key = OffchainKeypair::random();
     let confirmation = alice_node
@@ -382,6 +387,35 @@ async fn integration_test_indexer() {
             multiaddresses.contains(&maddr)
         ),
         "confirmed announcement must match"
+    );
+    info!(
+        "--> Alice's node {} has been announced as {maddr}",
+        alice_chain_key.public().to_address()
+    );
+
+    // Announce the node by Bob
+    let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/20000".parse().unwrap();
+    let offchain_key = OffchainKeypair::random();
+    let confirmation = bob_node
+        .actions
+        .announce(&[maddr.clone()], &offchain_key)
+        .await
+        .expect("should submit announcement tx")
+        .await
+        .expect("should confirm announcement");
+
+    assert!(
+        matches!(confirmation.event,
+            Some(ChainEventType::Announcement{ peer, address, multiaddresses })
+            if peer == offchain_key.public().into() &&
+            address == bob_chain_key.public().to_address() &&
+            multiaddresses.contains(&maddr)
+        ),
+        "confirmed announcement must match"
+    );
+    info!(
+        "--> Bob's node {} has been announced as {maddr}",
+        bob_chain_key.public().to_address()
     );
 
     // Open channel (from Alice to Bob) with 1 HOPR
@@ -417,6 +451,7 @@ async fn integration_test_indexer() {
                 channel_alice_bob.get_id(),
                 "channel in the DB must match the confirmed action"
             );
+            info!("--> successfully opened channel Alice -> Bob: {channel}");
         }
         _ => panic!("invalid confirmation"),
     };
@@ -446,11 +481,12 @@ async fn integration_test_indexer() {
                 "channel in the DB must match the confirmed action"
             );
             assert_eq!(funding_amount, amount, "invalid balance increase");
+            info!("--> successfully opened channel Alice -> Bob with 99 HOPR: {channel}");
         }
         _ => panic!("invalid confirmation"),
     };
 
-    // after the second funding, read channel_alice_bob again and compare its balance
+    // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
         .db
         .get_channel_by_id(
@@ -487,37 +523,63 @@ async fn integration_test_indexer() {
         "channel balance must match"
     );
 
-    let channel_bob_alice = bob_node
+    // Bob fund channel with 100 HOPR
+    let incoming_funding_amount = BalanceType::HOPR.balance(100);
+
+    let confirmation = bob_node
+        .actions
+        .open_channel(alice_chain_key.public().to_address(), incoming_funding_amount)
+        .await
+        .expect("should submit incoming channel open tx")
+        .await
+        .expect("should confirm open incoming channel");
+
+    match confirmation.event {
+        Some(ChainEventType::ChannelOpened(channel)) => {
+            assert_eq!(
+                channel.get_id(),
+                generate_channel_id(
+                    &bob_chain_key.public().to_address(),
+                    &alice_chain_key.public().to_address(),
+                ),
+                "channel in the DB must match the confirmed action"
+            );
+            info!("--> successfully opened channel Bob -> Alice: {channel}");
+        }
+        _ => panic!("invalid confirmation"),
+    };
+
+    async_std::task::sleep(Duration::from_millis(100)).await;
+
+    let channel_bob_alice = alice_node
         .db
         .get_channel_by_id(
             None,
             generate_channel_id(
-                &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
+                &alice_chain_key.public().to_address(),
             ),
         )
         .await
         .expect("db call should not fail")
-        .expect("should contain a channel to Alice from Bob");
+        .expect("should contain a channel to Bob");
+
     let ticket_price = Balance::new(1, BalanceType::HOPR);
 
-    // Create ticket from Bob in Alice's DB
-    generate_the_first_ack_ticket(&alice_node, &bob_chain_key, ticket_price, &instances).await;
+    // Create ticket from Alice in Bob's DB
+    generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, &instances).await;
 
-    let alice_ack_tickets = alice_node
+    let bob_ack_tickets = bob_node
         .db
-        .get_tickets(None, channel_bob_alice.into())
+        .get_tickets(None, channel_alice_bob_seen_by_bob.into())
         .await
         .expect("get ack ticket call on Alice's db must not fail");
 
-    assert_eq!(
-        1,
-        alice_ack_tickets.len(),
-        "Alice must have a single acknowledged ticket"
-    );
+    assert_eq!(1, bob_ack_tickets.len(), "Bob must have a single acknowledged ticket");
+    info!("--> successfully created acknowledged winning ticket by Alice for Bob");
 
-    let channel_balance_before_redeem = channel_alice_bob.balance;
-    let channel_bob_alice = alice_node
+    let channel_alice_bob_balance_before_redeem = channel_alice_bob.balance;
+    let channel_alice_bob = alice_node
         .db
         .get_channel_by_id(
             None,
@@ -548,29 +610,51 @@ async fn integration_test_indexer() {
         on_chain_channel_alice_bob_balance.into(),
         "channel alice->bob balance (before ticket redemption) must match"
     );
+
     assert_eq!(
         100, on_chain_channel_alice_bob_balance,
         "channel alice->bob balance (before ticket redemption) must be 100"
     );
+
     assert_eq!(
         100, on_chain_channel_bob_alice_balance,
         "channel bob->alice balance (before ticket redemption) must be 100"
     );
 
-    // Alice redeems ticket
+    // Bob redeems ticket
     let confirmations = futures::future::try_join_all(
-        alice_node
+        bob_node
             .actions
-            .redeem_tickets_with_counterparty(&bob_chain_key.public().to_address(), false)
+            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), false)
             .await
             .expect("should submit redeem action"),
     )
     .await
     .expect("should redeem all tickets");
 
-    assert_eq!(1, confirmations.len(), "Alice should redeem a single ticket");
+    assert_eq!(1, confirmations.len(), "Bob should redeem a single ticket");
 
-    let alice_ack_tickets = alice_node
+    match &confirmations.first().unwrap().event {
+        Some(ChainEventType::TicketRedeemed(channel, ack_ticket)) => {
+            assert_eq!(
+                channel.get_id(),
+                channel_alice_bob.get_id(),
+                "channel in the DB must match the confirmed action"
+            );
+            let ack_ticket = ack_ticket.clone().expect("event must contain ack ticket");
+            assert_eq!(
+                ack_ticket.ticket.channel_id,
+                channel_alice_bob.get_id(),
+                "channel id on ticket must match"
+            );
+            assert_eq!(0, ack_ticket.ticket.index, "ticket index must match");
+
+            info!("--> Bob successfully redeemed {ack_ticket}");
+        }
+        _ => panic!("invalid confirmation"),
+    };
+
+    let bob_ack_tickets = alice_node
         .db
         .get_tickets(None, channel_bob_alice.into())
         .await
@@ -578,11 +662,26 @@ async fn integration_test_indexer() {
 
     assert_eq!(
         0,
-        alice_ack_tickets.len(),
-        "Alice must have no acknowledged tickets after redeeming"
+        bob_ack_tickets.len(),
+        "Bob must have no acknowledged tickets after redeeming"
     );
 
+    async_std::task::sleep(Duration::from_millis(100)).await;
+
     let channel_bob_alice = alice_node
+        .db
+        .get_channel_by_id(
+            None,
+            generate_channel_id(
+                &bob_chain_key.public().to_address(),
+                &alice_chain_key.public().to_address(),
+            ),
+        )
+        .await
+        .expect("db call should not fail")
+        .expect("should contain a channel from Alice");
+
+    let channel_alice_bob = alice_node
         .db
         .get_channel_by_id(
             None,
@@ -593,7 +692,7 @@ async fn integration_test_indexer() {
         )
         .await
         .expect("db call should not fail")
-        .expect("should contain a channel from Bob");
+        .expect("should contain a channel from Alice");
 
     let (on_chain_channel_bob_alice_balance, _, _, _, _) = instances
         .channels
@@ -601,6 +700,7 @@ async fn integration_test_indexer() {
         .call()
         .await
         .unwrap();
+
     let (on_chain_channel_alice_bob_balance, _, _, _, _) = instances
         .channels
         .channels(channel_alice_bob.get_id().into())
@@ -609,23 +709,25 @@ async fn integration_test_indexer() {
         .unwrap();
 
     assert_eq!(
-        101, on_chain_channel_alice_bob_balance,
-        "channel alice->bob balance (before ticket redemption) must be 101"
+        channel_alice_bob.balance.amount(),
+        on_chain_channel_alice_bob_balance.into(),
+        "channel alice->bob balance (after ticket redemption) must match"
     );
+
     assert_eq!(
-        99, on_chain_channel_bob_alice_balance,
-        "channel bob->alice balance (after ticket redemption) must be 99"
+        channel_alice_bob_balance_before_redeem - ticket_price,
+        BalanceType::HOPR.balance(on_chain_channel_alice_bob_balance),
+        "channel alice->bob balance (after ticket redemption) must be decreased"
     );
+
+    // Channel balances were the same on both channels before redeeming
     assert_eq!(
-        channel_bob_alice.balance.amount(),
-        on_chain_channel_bob_alice_balance.into(),
-        "channel bob->alice balance (after ticket redemption) must match"
+        channel_alice_bob_balance_before_redeem + ticket_price,
+        BalanceType::HOPR.balance(on_chain_channel_bob_alice_balance),
+        "channel bob->alice balance (after ticket redemption) must be increase"
     );
-    assert_eq!(
-        channel_balance_before_redeem - ticket_price,
-        channel_bob_alice.balance,
-        "channel balance must decrease after redeem"
-    );
+
+    info!("--> successfully passed all tests after redemption");
 
     // Close channel
     let confirmation = alice_node
@@ -677,6 +779,8 @@ async fn integration_test_indexer() {
         matches!(channel_alice_bob.status, ChannelStatus::PendingToClose(_)),
         "channel must be pending to close"
     );
+
+    info!("--> successfully initiated channel closure for Alice -> Bob");
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| t.cancel())).await;
 }

@@ -173,10 +173,11 @@ impl HoprDbAccountOperations for HoprDb {
                     .on_conflict(
                         OnConflict::columns([account::Column::ChainKey, account::Column::PacketKey])
                             .do_nothing()
-                            .to_owned()
+                            .to_owned(),
                     )
                     .exec(tx.as_ref())
-                    .await {
+                    .await
+                    {
                         // Proceed if succeeded or already exists
                         Ok(_) | Err(DbErr::RecordNotInserted) => {
                             if let AccountType::Announced {
@@ -184,11 +185,13 @@ impl HoprDbAccountOperations for HoprDb {
                                 updated_block,
                             } = account.entry_type
                             {
-                                myself.insert_announcement(Some(tx), account.chain_addr, multiaddr, updated_block).await?;
+                                myself
+                                    .insert_announcement(Some(tx), account.chain_addr, multiaddr, updated_block)
+                                    .await?;
                             }
                             Ok::<(), DbError>(())
-                        },
-                        Err(e) => Err(e.into())
+                        }
+                        Err(e) => Err(e.into()),
                     }
                 })
             })

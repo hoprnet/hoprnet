@@ -3588,6 +3588,7 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-transport",
+ "env_logger 0.11.3",
  "ethers",
  "futures",
  "hopr-crypto-types",

@@ -285,7 +285,9 @@ where
                     let ack_ticket = match channel_entry.direction(&self.chain_key.public().to_address()) {
                         Some(ChannelDirection::Incoming) => {
                             // Filter all tickets in this channel and its current epoch
-                            let mut matching_tickets = self.db.get_tickets(None, (&channel_entry).into())
+                            let mut matching_tickets = self
+                                .db
+                                .get_tickets(None, (&channel_entry).into())
                                 .await?
                                 .into_iter()
                                 .filter(|ticket| {
