@@ -2,7 +2,6 @@ use hopr_crypto_types::errors::CryptoError;
 use hopr_internal_types::errors::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
 
 #[derive(Error, Debug)]
 pub enum PacketError {
@@ -50,9 +49,6 @@ pub enum PacketError {
 
     #[error(transparent)]
     CryptographicError(#[from] CryptoError),
-
-    #[error(transparent)]
-    PacketDbError(#[from] DbError),
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),

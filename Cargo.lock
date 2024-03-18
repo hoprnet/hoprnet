@@ -943,12 +943,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "build_const"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ae4235e6dac0694637c763029ecea1a2ec9e4e06ec2729bd21ba4d9c863eb7"
-
-[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1197,7 +1191,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]
@@ -1609,7 +1602,6 @@ dependencies = [
  "serde",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]
@@ -1645,7 +1637,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
@@ -1713,7 +1704,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
  "uuid 1.7.0",
  "validator",
 ]
@@ -1741,15 +1731,6 @@ name = "cpuid-bool"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
-
-[[package]]
-name = "crc"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
-dependencies = [
- "build_const",
-]
 
 [[package]]
 name = "crc"
@@ -3441,7 +3422,6 @@ dependencies = [
  "thiserror",
  "tracing",
  "typenum",
- "utils-db",
 ]
 
 [[package]]
@@ -3626,7 +3606,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
@@ -4087,12 +4066,6 @@ checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if",
 ]
-
-[[package]]
-name = "integer-encoding"
-version = "3.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "io-lifetimes"
@@ -6413,18 +6386,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
 
 [[package]]
-name = "rusty-leveldb"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3453f8c92d48f99810f59095444eda0622ae8485ac899ad97a574fd7cb9aa9c4"
-dependencies = [
- "crc 1.8.1",
- "integer-encoding",
- "rand 0.8.5",
- "snap",
-]
-
-[[package]]
 name = "rw-stream-sink"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7211,12 +7172,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snap"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
-
-[[package]]
 name = "snow"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7325,7 +7280,7 @@ dependencies = [
  "byteorder",
  "bytes 1.5.0",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "crossbeam-queue",
  "dotenvy",
  "either",
@@ -7413,7 +7368,7 @@ dependencies = [
  "byteorder",
  "bytes 1.5.0",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "digest 0.10.7",
  "dotenvy",
  "either",
@@ -7459,7 +7414,7 @@ dependencies = [
  "bitflags 2.4.2",
  "byteorder",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "dotenvy",
  "etcetera",
  "futures-channel",
@@ -8464,30 +8419,6 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
-
-[[package]]
-name = "utils-db"
-version = "0.3.0"
-dependencies = [
- "async-std",
- "async-trait",
- "bincode",
- "const_format",
- "futures-lite 1.13.0",
- "hex",
- "hex-literal",
- "hopr-platform",
- "hopr-primitive-types",
- "mockall",
- "pin-project-lite 0.2.13",
- "rusty-leveldb",
- "scopeguard",
- "serde",
- "sqlx",
- "tempfile",
- "thiserror",
- "tracing",
-]
 
 [[package]]
 name = "utoipa"

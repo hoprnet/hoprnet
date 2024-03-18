@@ -22,9 +22,6 @@ pub enum HoprLibError {
     ChainApi(#[from] chain_api::errors::HoprChainError),
 
     #[error(transparent)]
-    DbError(#[from] utils_db::errors::DbError),
-
-    #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
 }
 

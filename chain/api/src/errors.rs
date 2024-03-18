@@ -13,9 +13,6 @@ pub enum HoprChainError {
     #[error("indexer error: {0}")]
     Indexer(#[from] chain_indexer::errors::CoreEthereumIndexerError),
 
-    #[error("Db error: {0}")]
-    Db(#[from] utils_db::errors::DbError),
-
     #[error(transparent)]
     DbError(#[from] hopr_db_api::errors::DbError),
 }

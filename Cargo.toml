@@ -32,7 +32,6 @@ members = [
     "logic/strategy",
     "misc/metrics",
     "misc/platform",
-    "misc/utils-db",
     "transport/network",
     "transport/protocol",
     "transport/p2p",
@@ -113,7 +112,6 @@ hopr-primitive-types = { path = "common/primitive-types", default-features = fal
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
-utils-db = { path = "misc/utils-db", default-features = false, features = ['sqlite'] }
 
 # [build]
 # rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
