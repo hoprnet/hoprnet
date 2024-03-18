@@ -1544,6 +1544,7 @@ impl HoprDb {
                     )
                     .with_index(acknowledged_ticket.ticket.index);
 
+                    debug!("upserting ticket {acknowledged_ticket}");
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);
 
                     if let Some(ticket) = ticket::Entity::find()

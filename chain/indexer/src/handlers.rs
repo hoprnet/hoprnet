@@ -9,18 +9,15 @@ use bindings::{
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
 use chain_types::ContractAddresses;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
-use futures::TryStreamExt;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_api::errors::DbError;
-use hopr_db_api::errors::DbError::LogicalError;
 use hopr_db_api::info::DomainSeparator;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
-use hopr_db_entity::{account, chain_info, channel, ticket};
+use hopr_db_entity::{account, chain_info, channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -283,40 +280,27 @@ where
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry: ChannelEntry = (&channel).try_into()?;
-                    // TODO: ensure ticket index
-
                     // For channels that destination is us, it means that our ticket
                     // has been redeemed, so mark it in the DB as redeemed
                     let ack_ticket = match channel_entry.direction(&self.chain_key.public().to_address()) {
                         Some(ChannelDirection::Incoming) => {
                             // Filter all tickets in this channel and its current epoch
-                            let mut matching_tickets: Vec<ticket::Model> = ticket::Entity::find()
-                                .filter(ticket::Column::ChannelId.eq(&channel.channel_id))
-                                .filter(ticket::Column::ChannelEpoch.eq(channel.epoch.clone()))
-                                .stream(tx.as_ref())
+                            let mut matching_tickets = self.db.get_tickets(None, (&channel_entry).into())
                                 .await?
-                                .try_filter(|ticket| {
+                                .into_iter()
+                                .filter(|ticket| {
                                     // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
                                     // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
-                                    let ticket_idx = U256::from_be_bytes(&ticket.index).as_u64();
-                                    let ticket_off = ticket.index_offset as u64;
+                                    let ticket_idx = ticket.ticket.index;
+                                    let ticket_off = ticket.ticket.index_offset as u64;
 
-                                    futures::future::ready(ticket_idx + ticket_off == ticket_redeemed.new_ticket_index)
+                                    ticket_idx + ticket_off == ticket_redeemed.new_ticket_index
                                 })
-                                .try_collect()
-                                .await?;
+                                .collect::<Vec<_>>();
 
                             match matching_tickets.len().cmp(&1) {
                                 Ordering::Equal => {
-                                    let chain_info = self.db.get_indexer_data(Some(tx)).await?;
-                                    let redeemed_ticket = matching_tickets.pop().unwrap();
-                                    let ack_ticket = model_to_acknowledged_ticket(
-                                        &redeemed_ticket,
-                                        chain_info
-                                            .channels_dst
-                                            .ok_or(LogicalError("missing channels dst".into()))?,
-                                        &self.chain_key,
-                                    )?;
+                                    let ack_ticket = matching_tickets.pop().unwrap();
 
                                     self.db.mark_tickets_redeemed((&ack_ticket).into()).await?;
                                     info!("{ack_ticket} has been marked as redeemed");

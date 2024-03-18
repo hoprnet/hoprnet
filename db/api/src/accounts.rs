@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Related, Set};
+use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Related, Set};
 use sea_query::OnConflict;
 
 use hopr_db_entity::prelude::{Account, Announcement};
@@ -160,34 +160,36 @@ impl HoprDbAccountOperations for HoprDb {
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
+        let myself = self.clone();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let new_account = account::ActiveModel {
+                    match account::Entity::insert(account::ActiveModel {
                         chain_key: Set(account.chain_addr.to_hex()),
                         packet_key: Set(account.public_key.to_hex()),
                         ..Default::default()
+                    })
+                    .on_conflict(
+                        OnConflict::columns([account::Column::ChainKey, account::Column::PacketKey])
+                            .do_nothing()
+                            .to_owned()
+                    )
+                    .exec(tx.as_ref())
+                    .await {
+                        // Proceed if succeeded or already exists
+                        Ok(_) | Err(DbErr::RecordNotInserted) => {
+                            if let AccountType::Announced {
+                                multiaddr,
+                                updated_block,
+                            } = account.entry_type
+                            {
+                                myself.insert_announcement(Some(tx), account.chain_addr, multiaddr, updated_block).await?;
+                            }
+                            Ok::<(), DbError>(())
+                        },
+                        Err(e) => Err(e.into())
                     }
-                    .insert(tx.as_ref())
-                    .await?;
-
-                    if let AccountType::Announced {
-                        multiaddr,
-                        updated_block,
-                    } = account.entry_type
-                    {
-                        announcement::ActiveModel {
-                            account_id: Set(new_account.id),
-                            multiaddress: Set(multiaddr.to_string()),
-                            at_block: Set(updated_block as i32),
-                            ..Default::default()
-                        }
-                        .insert(tx.as_ref())
-                        .await?;
-                    }
-
-                    Ok::<(), DbError>(())
                 })
             })
             .await
@@ -539,6 +541,22 @@ mod tests {
             matches!(r, Err(MissingAccount)),
             "should not delete non-existing account"
         )
+    }
+
+    #[async_std::test]
+    async fn test_should_not_fail_on_duplicate_account_insert() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .expect("should not fail the second time");
     }
 
     #[async_std::test]
