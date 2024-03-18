@@ -9,7 +9,7 @@ use futures::{stream::BoxStream, TryStreamExt};
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-use sea_query::{Expr, Order, SimpleExpr};
+use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
 use tracing::{error, info, trace, warn};
 
@@ -100,27 +100,27 @@ impl PeerSelector {
     }
 }
 
-impl From<PeerSelector> for SimpleExpr {
-    fn from(value: PeerSelector) -> Self {
+impl IntoCondition for PeerSelector {
+    fn into_condition(self) -> Condition {
         let mut ret = Expr::value(1);
 
-        if let Some(last_seen_l) = value.last_seen.0 {
+        if let Some(last_seen_l) = self.last_seen.0 {
             ret = ret.and(network_peer::Column::LastSeen.gte(chrono::DateTime::<chrono::Utc>::from(last_seen_l)));
         }
 
-        if let Some(last_seen_u) = value.last_seen.1 {
+        if let Some(last_seen_u) = self.last_seen.1 {
             ret = ret.and(network_peer::Column::LastSeen.lte(chrono::DateTime::<chrono::Utc>::from(last_seen_u)));
         }
 
-        if let Some(quality_l) = value.quality.0 {
+        if let Some(quality_l) = self.quality.0 {
             ret = ret.and(network_peer::Column::Quality.gte(quality_l));
         }
 
-        if let Some(quality_u) = value.quality.1 {
+        if let Some(quality_u) = self.quality.1 {
             ret = ret.and(network_peer::Column::Quality.lte(quality_u));
         }
 
-        ret
+        ret.into_condition()
     }
 }
 
@@ -306,7 +306,7 @@ impl HoprDbPeersOperations for HoprDb {
     ) -> Result<BoxStream<'a, PeerStatus>> {
         let mut sub_stream = hopr_db_entity::network_peer::Entity::find()
             // .filter(hopr_db_entity::network_peer::Column::Ignored.is_not_null())
-            .filter(SimpleExpr::from(selector))
+            .filter(selector)
             .order_by(
                 network_peer::Column::LastSeen,
                 if sort_last_seen_asc { Order::Asc } else { Order::Desc },
