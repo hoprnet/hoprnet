@@ -1,11 +1,19 @@
-use futures::{future::BoxFuture, StreamExt};
-use sea_orm::{ActiveModelTrait, TransactionTrait};
+use futures::{future::BoxFuture, StreamExt, TryStreamExt};
+use hopr_db_entity::ticket;
+use hopr_primitive_types::{
+    primitives::{Balance, BalanceType},
+    traits::ToHex,
+};
+use moka::future::Cache;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+use sea_query::SimpleExpr;
 use std::sync::Arc;
 use tracing::error;
 
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 
-use crate::{errors::Result, OpenTransaction};
+use crate::{db::ExpiryNever, errors::Result, tickets::TicketSelector, OpenTransaction};
 
 pub type WinningTicketSender = futures::channel::mpsc::Sender<AcknowledgedTicket>;
 
@@ -27,10 +35,16 @@ pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
     pub(crate) incoming_ack_tickets_tx: futures::channel::mpsc::Sender<AcknowledgedTicket>,
+    pub(crate) unrealized_value: Cache<Hash, Balance>,
 }
 
 impl TicketManager {
     pub fn new(tickets_db: sea_orm::DatabaseConnection) -> Self {
+        let unrealized_value = Cache::builder()
+            .expire_after(ExpiryNever {})
+            .max_capacity(10_000)
+            .build();
+
         let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
 
         let mutex = Arc::new(async_lock::Mutex::new(()));
@@ -57,16 +71,67 @@ impl TicketManager {
             tickets_db,
             mutex,
             incoming_ack_tickets_tx: tx,
+            unrealized_value,
         }
     }
 
     /// Sends a new acknowledged ticket into the FIFO queue.
-    pub fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
+    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
+        let channel = ticket.ticket.channel_id;
+        let value = ticket.ticket.amount;
+
         self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
             crate::errors::DbError::LogicalError(format!(
                 "failed to enqueue acknowledged ticket processing into the DB: {e}"
             ))
-        })
+        })?;
+
+        let balance = ticket::Entity::find()
+            .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel.to_hex()))
+            .stream(&self.tickets_db)
+            .await
+            .map_err(crate::errors::DbError::from)?
+            .map_err(crate::errors::DbError::from)
+            .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
+                Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
+            })
+            .await?;
+
+        Ok(self.unrealized_value.insert(channel, balance + value).await)
+    }
+
+    /// Get unrealized value for a channel
+    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+        let transaction = OpenTransaction(
+            self.tickets_db
+                .begin_with_config(None, None)
+                .await
+                .map_err(crate::errors::DbError::BackendError)?,
+            crate::TargetDb::Tickets,
+        );
+
+        Ok(self
+            .unrealized_value
+            .get_with(selector.channel_id, async move {
+                transaction
+                    .perform(|tx| {
+                        Box::pin(async move {
+                            ticket::Entity::find()
+                                .filter(SimpleExpr::from(selector))
+                                .stream(tx.as_ref())
+                                .await
+                                .map_err(crate::errors::DbError::from)?
+                                .map_err(crate::errors::DbError::from)
+                                .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
+                                    Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
+                                })
+                                .await
+                        })
+                    })
+                    .await
+                    .unwrap_or(Balance::zero(BalanceType::HOPR))
+            })
+            .await)
     }
 
     /// Acquires write lock to the Ticket DB and starts a new transaction.

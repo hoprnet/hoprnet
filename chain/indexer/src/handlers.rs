@@ -615,7 +615,7 @@ where
         ]
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn on_event(&self, address: Address, block_number: u32, log: RawLog) -> Result<Option<ChainEventType>> {
         trace!("on_event - address: {address} - received log: {log:?}");
 

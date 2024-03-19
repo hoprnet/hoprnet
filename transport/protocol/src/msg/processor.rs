@@ -115,12 +115,23 @@ where
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
     ) -> Result<Self::Packet> {
-        Ok(self
+        match self
             .db
             .from_recv(data, self.cfg.chain_keypair.clone(), pkt_keypair, sender)
             .await
-            .map_err(|e| hopr_crypto_packet::errors::PacketError::PacketConstructionError(e.to_string()))?
-            .into())
+        {
+            Ok(v) => Ok(v.into()),
+            Err(e) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                if let hopr_db_api::errors::DbError::TicketValidationError(_) = e {
+                    METRIC_REJECTED_TICKETS_COUNT.increment();
+                }
+
+                Err(hopr_crypto_packet::errors::PacketError::PacketConstructionError(
+                    e.to_string(),
+                ))
+            }
+        }
     }
 }
 

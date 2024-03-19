@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::error;
 use tracing::info;
+use tracing::warn;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -1185,7 +1186,7 @@ impl HoprDbTicketOperations for HoprDb {
             .await?;
 
         if let AckResult::RelayerWinning(ack_ticket) = &result {
-            self.ticket_manager.insert_ticket(ack_ticket.clone())?;
+            self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
         }
 
         Ok(result)
@@ -1308,8 +1309,9 @@ impl HoprDbTicketOperations for HoprDb {
                 path_pos,
             } => {
                 let myself = self.clone();
+                let ticket_manager = self.ticket_manager.clone();
 
-                let t = self
+                let t = match self
                     .begin_transaction()
                     .await?
                     .perform(|tx| {
@@ -1347,12 +1349,16 @@ impl HoprDbTicketOperations for HoprDb {
                                     ))
                                 })?;
 
-                            let unrealized_balance = myself
-                                .unrealized_value
-                                .get(&channel.get_id())
-                                .await
-                                .map(|balance| balance.sub(channel.balance))
-                                .unwrap_or(channel.balance);
+                            let unrealized_value = myself
+                                .ticket_manager
+                                .unrealized_value((&channel).into())
+                                .await?
+                                .sub(channel.balance);
+
+                            warn!(
+                                "TODO: remove ====> got unrealized balance {unrealized_value} of the total balance: {}",
+                                channel.balance
+                            );
 
                             if let Err(e) = validate_unacknowledged_ticket(
                                 &ticket,
@@ -1360,18 +1366,12 @@ impl HoprDbTicketOperations for HoprDb {
                                 &previous_hop_addr,
                                 ticket_price,
                                 TICKET_WIN_PROB,
-                                Some(unrealized_balance),
+                                Some(unrealized_value),
                                 &domain_separator,
                             )
                             .await
                             {
-                                // TODO: move this outside to the from_recv caller
-
-                                // #[cfg(all(feature = "prometheus", not(test)))]
-                                // METRIC_REJECTED_TICKETS_COUNT.increment();
-
-                                myself.unacked_tickets.remove(&ack_challenge).await;
-                                return Err(crate::errors::DbError::TicketValidationError(e.to_string()));
+                                return Err(crate::errors::DbError::TicketValidationError((ticket, e.to_string())));
                             }
 
                             myself.increment_ticket_index(channel.get_id()).await?;
@@ -1421,7 +1421,45 @@ impl HoprDbTicketOperations for HoprDb {
                             Ok(ticket)
                         })
                     })
-                    .await?;
+                    .await
+                {
+                    Ok(ticket) => Ok(ticket),
+                    Err(crate::errors::DbError::TicketValidationError((t, e))) => {
+                        let rejected_value = t.amount;
+                        warn!("Encountered validation error during forwarding for ticket with value: {rejected_value}");
+
+                        ticket_manager
+                            .with_write_locked_db(|tx| {
+                                Box::pin(async move {
+                                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                                        .one(tx.as_ref())
+                                        .await?
+                                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+
+                                    let current_rejected_value = U256::from_be_bytes(stats.rejected_value.clone());
+                                    let current_rejected_count = stats.rejected_tickets;
+
+                                    let mut active_stats = stats.into_active_model();
+                                    active_stats.rejected_tickets = Set(current_rejected_count + 1 as i32);
+                                    active_stats.rejected_value =
+                                        Set((current_rejected_value + rejected_value.amount()).to_be_bytes().into());
+                                    active_stats.save(tx.as_ref()).await?;
+
+                                    Ok::<(), crate::errors::DbError>(())
+                                })
+                            })
+                            .await
+                            .map_err(|ei| {
+                                crate::errors::DbError::TicketValidationError((
+                                    t.clone(),
+                                    format!("during validation error '{e}' update another error occured: {ei}"),
+                                ))
+                            })?;
+
+                        Err(crate::errors::DbError::TicketValidationError((t, e)))
+                    }
+                    Err(e) => Err(e),
+                }?;
 
                 let ack = Acknowledgement::new(ack_key, pkt_keypair);
 
@@ -2473,13 +2511,6 @@ mod tests {
             .is_err());
 
         Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_aggregate_tickets() {
-        //let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
-
-        // TODO
     }
 
     // TODO: think about incorporating these tests

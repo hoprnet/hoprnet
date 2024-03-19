@@ -1,6 +1,6 @@
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
-use hopr_internal_types::errors::CoreTypesError;
+use hopr_internal_types::{channels::Ticket, errors::CoreTypesError};
 use sea_orm::TransactionError;
 use thiserror::Error;
 
@@ -31,8 +31,8 @@ pub enum DbError {
     #[error("ack validation error: {0}")]
     AcknowledgementValidationError(String),
 
-    #[error("ticket validation error: {0}")]
-    TicketValidationError(String),
+    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
+    TicketValidationError((Ticket, String)),
 
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),

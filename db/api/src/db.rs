@@ -50,7 +50,6 @@ pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
@@ -135,11 +134,6 @@ impl HoprDb {
             .max_capacity(1_000_000_000)
             .build();
 
-        let unrealized_value = Cache::builder()
-            .expire_after(ExpiryNever {})
-            .max_capacity(10_000)
-            .build();
-
         let ticket_index = Cache::builder()
             .expire_after(ExpiryNever {})
             .max_capacity(10_000)
@@ -162,7 +156,6 @@ impl HoprDb {
             db: index_db,
             peers_db,
             unacked_tickets,
-            unrealized_value,
             ticket_index,
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone())),
             tickets_db,
