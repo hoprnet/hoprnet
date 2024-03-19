@@ -14,6 +14,7 @@
   inputs.solc.url = github:hoprnet/solc.nix/tb/20240129-solc-0.8.24;
   inputs.pre-commit.url = github:cachix/pre-commit-hooks.nix;
   inputs.treefmt-nix.url = github:numtide/treefmt-nix;
+  inputs.flake-root.url = github:srid/flake-root;
 
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
@@ -22,9 +23,17 @@
   inputs.foundry.inputs.flake-utils.follows = "flake-utils";
   inputs.solc.inputs.nixpkgs.follows = "nixpkgs";
   inputs.solc.inputs.flake-utils.follows = "flake-utils";
+  inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
+  inputs.pre-commit.inputs.flake-utils.follows = "flake-utils";
 
-  outputs = { self, nixpkgs, flake-utils, flake-parts, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay, crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.treefmt-nix.flakeModule
+        inputs.flake-root.flakeModule
+      ];
       perSystem = { config, lib, self', inputs', system, ... }:
         let
           fs = lib.fileset;
@@ -78,6 +87,7 @@
           ];
           buildInputs = with pkgs; [
             foundry-bin
+            solcDefault
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
               CoreServices
@@ -111,7 +121,6 @@
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
           });
           rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // {
@@ -119,7 +128,6 @@
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
             # this ensures the tests are run as part of the build process
             doCheck = true;
@@ -276,7 +284,6 @@
             RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
             '';
             postBuild = ''
               ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
@@ -318,7 +325,8 @@
             '';
             doCheck = true;
           };
-          treefmt = treefmt-nix.lib.evalModule pkgs {
+          #treefmt = treefmt-nix.lib.evalModule pkgs {
+          treefmt.config = {
             projectRootFile = "flake.nix";
 
             programs.rustfmt.enable = true;
@@ -331,13 +339,11 @@
             src = ./.;
             hooks = {
               clippy.enable = true;
+              clippy.settings.denyWarnings = true;
               treefmt.enable = true;
+              treefmt.package = config.treefmt.build.wrapper;
             };
             tools = pkgs;
-            settings = {
-              clippy.denyWarnings = true;
-              treefmt.package = treefmt.config.build;
-            };
           };
           buildDevShell = extraPackages: craneLib.devShell {
             packages = with pkgs; [
@@ -365,9 +371,9 @@
               python39Packages.venvShellHook
 
               ## formatting
-              treefmt.config.build.wrapper
-              treefmt.config.build.programs
+              config.treefmt.build.wrapper
             ] ++ buildInputs ++ nativeBuildInputs ++
+            (lib.attrValues config.treefmt.build.programs) ++
             lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
             venvDir = "./.venv";
             postVenvCreation = ''
@@ -377,9 +383,6 @@
             '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               autoPatchelf ./.venv
             '';
-            preShellHook = ''
-              sed -i "s|solc = .*|solc = \"${solcDefault}/bin/solc\"|g" ethereum/contracts/foundry.toml
-            '';
             postShellHook = ''
               ${pre-commit-check.shellHook}
             '';
@@ -388,6 +391,16 @@
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
         in
         {
+          treefmt = {
+            inherit (config.flake-root) projectRootFile;
+            #projectRootFile = "flake.nix";
+
+            programs.rustfmt.enable = true;
+            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
+
+            programs.nixpkgs-fmt.enable = true;
+            settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
+          };
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
@@ -403,6 +416,7 @@
           };
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
+          formatter = config.treefmt.build.wrapper;
         };
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
     };
