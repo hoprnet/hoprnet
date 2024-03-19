@@ -325,21 +325,9 @@
             '';
             doCheck = true;
           };
-          #treefmt = treefmt-nix.lib.evalModule pkgs {
-          treefmt.config = {
-            projectRootFile = "flake.nix";
-
-            programs.rustfmt.enable = true;
-            settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
-
-            programs.nixpkgs-fmt.enable = true;
-            settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
-          };
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
-              clippy.enable = true;
-              clippy.settings.denyWarnings = true;
               treefmt.enable = true;
               treefmt.package = config.treefmt.build.wrapper;
             };
@@ -389,6 +377,14 @@
           };
           defaultDevShell = buildDevShell [ ];
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
+          lint = flake-utils.lib.mkApp {
+            # must unset rustc wrapper because sccache and clippy don't work
+            # together
+            drv = pkgs.writeShellScriptBin "lint" ''
+              set -eu
+              RUSTC_WRAPPER="" ${rustToolchain}/bin/cargo clippy -- -Dwarnings
+            '';
+          };
         in
         {
           treefmt = {
@@ -400,11 +396,32 @@
 
             programs.nixpkgs-fmt.enable = true;
             settings.formatter.nixpkgs-fmt.excludes = [ "./vendor/*" ];
+
+            programs.ruff.enable = true;
+            programs.ruff.format = true;
+            settings.formatter.ruff.excludes = [ "./vendor/*" ];
+
+            settings.formatter.solc = {
+              command = "sh";
+              options = [
+                "-euc"
+                ''
+                  for file in "$@"; do
+                    ${pkgs.foundry-bin}/bin/forge fmt $file --root ./ethereum/contracts;
+                  done
+                ''
+                "--"
+              ];
+              includes = [ "*.sol" ];
+              excludes = [ "./vendor/*" "./ethereum/contracts/src/static/*" ];
+            };
           };
+
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
+            inherit lint;
           };
           packages = {
             inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;

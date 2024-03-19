@@ -4,13 +4,6 @@
 space := $(subst ,, )
 mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
-
-# Gets all solidity files which can be modified
-SOLIDITY_SRC_FILES := $(shell find ./ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
-SOLIDITY_TEST_FILES := $(shell find ./ethereum/contracts/test -type f -name "*.sol")
-SOLIDITY_SCRIPT_FILES := $(shell find ./ethereum/contracts/script -type f -name "*.sol")
-SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
-
 # Set local cargo directory (for binaries)
 # note: $(mydir) ends with '/'
 CARGO_DIR := $(mydir).cargo
@@ -87,45 +80,6 @@ smoke-tests: ## run smoke tests
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
-
-.PHONY: lint
-lint: lint-python lint-sol lint-rust 
-lint:
-
-.PHONY: lint-sol
-lint-sol: ## run linter for Solidity
-	for f in $(SOLIDITY_FILES); do \
-		forge fmt --root ./ethereum/contracts --check $${f} || exit 1; \
-	done
-	# FIXME: disabled until all linter errors are resolved
-	# npx solhint $${f} || exit 1; \
-
-.PHONY: lint-rust
-lint-rust: ## run linter for Rust
-	cargo fmt --check
-	cargo clippy -- -Dwarnings
-
-.PHONY: lint-python
-lint-python: ## run linter for Python
-	source .venv/bin/activate && ruff --fix . && black --check tests/
-
-.PHONY: fmt
-fmt: fmt-rust fmt-python fmt-sol
-fmt: ## run code formatter for TS, Rust, Python, Solidity
-
-.PHONY: fmt-sol
-fmt-sol: ## run code formatter for Solidity
-	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f} --root ./ethereum/contracts; \
-	done
-
-.PHONY: fmt-rust
-fmt-rust: ## run code formatter for Rust
-	cargo fmt
-
-.PHONY: fmt-python
-fmt-python: ## run code formatter for Python
-	source .venv/bin/activate && black tests/
 
 .PHONY: run-anvil
 run-anvil: args=
@@ -409,10 +363,10 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the o
 generate-python-sdk:
 	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
 	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
-    
+
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	
+
 	swagger-codegen3 generate \
 		-l python \
 		-o hoprd-sdk-python \

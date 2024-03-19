@@ -293,6 +293,26 @@ development easier, to get the full list execute:. You may get the full list lik
 $ nix flake show
 ```
 
+#### Code Formatting
+
+All nix, rust, solidity and python code can be automatically formatted:
+
+```shell
+nix fmt
+```
+
+These formatters are also automatically run as a Git pre-commit check.
+
+#### Code Linting
+
+All linters can be executed via a Nix flake helper app:
+
+```shell
+nix run .#lint
+```
+
+This will in particular run `clippy` for the entire Rust codebase.
+
 ### Local node with safe staking service (local network)
 
 Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
