@@ -381,6 +381,12 @@ impl HoprDbTicketOperations for HoprDb {
                             active_stats.redeemed_value =
                                 Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
                             active_stats.save(tx.as_ref()).await?;
+
+                            myself
+                                .ticket_manager
+                                .unrealized_value
+                                .invalidate(&selector.channel_id)
+                                .await;
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {redeemed_count} ticket as redeemed"
@@ -423,6 +429,13 @@ impl HoprDbTicketOperations for HoprDb {
                                 .to_be_bytes()
                                 .into());
                             active_stats.save(tx.as_ref()).await?;
+
+                            // invalidating unrealized balance for the channel
+                            myself
+                                .ticket_manager
+                                .unrealized_value
+                                .invalidate(&selector.channel_id)
+                                .await;
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {neglectable_count} ticket as neglected"

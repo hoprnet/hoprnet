@@ -344,7 +344,10 @@ where
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Ok(None) => { finalizer.finalize(); None },
-                            Err(e) => panic!("We are here {e}"),
+                            Err(e) => {
+                                error!("An error occured when preparing the channel aggregation: {e}");
+                                None
+                            },
                         }
                     }
                 };

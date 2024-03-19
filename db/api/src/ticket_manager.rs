@@ -79,17 +79,9 @@ impl TicketManager {
     pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
         let channel = ticket.ticket.channel_id;
         let value = ticket.ticket.amount;
+        let epoch = ticket.ticket.channel_epoch;
 
-        let balance = ticket::Entity::find()
-            .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel.to_hex()))
-            .stream(&self.tickets_db)
-            .await
-            .map_err(crate::errors::DbError::from)?
-            .map_err(crate::errors::DbError::from)
-            .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
-                Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
-            })
-            .await?;
+        let unrealized_value = self.unrealized_value(TicketSelector::new(channel, epoch)).await?;
 
         self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
             crate::errors::DbError::LogicalError(format!(
@@ -97,7 +89,7 @@ impl TicketManager {
             ))
         })?;
 
-        Ok(self.unrealized_value.insert(channel, balance + value).await)
+        Ok(self.unrealized_value.insert(channel, unrealized_value + value).await)
     }
 
     /// Get unrealized value for a channel
@@ -117,7 +109,7 @@ impl TicketManager {
                     .perform(|tx| {
                         Box::pin(async move {
                             ticket::Entity::find()
-                                .filter(SimpleExpr::from(selector))
+                                .filter(selector)
                                 .stream(tx.as_ref())
                                 .await
                                 .map_err(crate::errors::DbError::from)?

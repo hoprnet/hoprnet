@@ -51,7 +51,7 @@ impl HoprDbChannelOperations for HoprDb {
                 Box::pin(async move {
                     Ok::<_, DbError>(
                         if let Some(model) = Channel::find()
-                            .filter(channel::Column::ChannelId.eq(id.to_string()))
+                            .filter(channel::Column::ChannelId.eq(id.to_hex()))
                             .one(tx.as_ref())
                             .await?
                         {
