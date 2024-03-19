@@ -91,12 +91,12 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Incoming, self.chain_key.public().to_address())
+        self.get_channels_via(tx, ChannelDirection::Incoming, self.me_onchain)
             .await
     }
 
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Outgoing, self.chain_key.public().to_address())
+        self.get_channels_via(tx, ChannelDirection::Outgoing, self.me_onchain)
             .await
     }
 

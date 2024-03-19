@@ -25,7 +25,7 @@ pub type WinningTicketSender = futures::channel::mpsc::Sender<AcknowledgedTicket
 /// numbers of concurrent read operations.
 ///
 /// The queue based mechanism also splits the storage of the ticket inside the database from the processing,
-/// effectively allowing the processing pipelines to be independent from a database write access.
+/// effectively allowing the processing pipelines to be independent of a database write access.
 #[derive(Debug, Clone)]
 pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
@@ -118,7 +118,7 @@ impl TicketManager {
                     })
                     .await
                     .unwrap_or_else(|e| {
-                        error!("Encountered an error fetching a cached unrealized ticket value: {e}");
+                        error!("encountered an error fetching a cached unrealized ticket value: {e}");
                         Balance::zero(BalanceType::HOPR)
                     })
             })

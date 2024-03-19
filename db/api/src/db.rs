@@ -50,10 +50,11 @@ pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
-    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
+    // TODO: move these caches to a separate object
+    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
 }
 

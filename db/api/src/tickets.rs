@@ -394,6 +394,10 @@ impl HoprDbTicketOperations for HoprDb {
                         }
                     }
 
+                    info!(
+                        "removed {redeemed_count} of redeemed tickets from channel {}",
+                        selector.channel_id
+                    );
                     Ok(redeemed_count)
                 })
             })
@@ -443,6 +447,10 @@ impl HoprDbTicketOperations for HoprDb {
                         }
                     }
 
+                    info!(
+                        "removed {neglectable_count} of neglected tickets from channel {}",
+                        selector.channel_id
+                    );
                     Ok(neglectable_count)
                 })
             })
@@ -1497,29 +1505,18 @@ impl HoprDb {
         path_pos: u8,
     ) -> Result<hopr_internal_types::channels::Ticket> {
         let myself = self.clone();
+        let channel_id = generate_channel_id(&me_onchain, &destination);
         let (channel, ticket_price): (ChannelEntry, U256) = self
             .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
-                        if let Some(model) = hopr_db_entity::channel::Entity::find()
-                            .filter(hopr_db_entity::channel::Column::Destination.eq(destination.to_string()))
-                            .one(tx.as_ref())
-                            .await?
-                        {
-                            let channel_id = Hash::from_str(&model.channel_id)?;
-
-                            let old_ticket_index = myself.increment_ticket_index(channel_id).await?;
-
+                        if let Some(channel) = myself.get_channel_by_id(Some(tx), channel_id).await? {
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
 
                             Some((
-                                {
-                                    let mut channel: ChannelEntry = model.try_into()?;
-                                    channel.ticket_index = old_ticket_index.into();
-                                    channel
-                                },
+                                channel,
                                 ticket_price
                                     .ok_or(DbError::LogicalError("missing ticket price".into()))?
                                     .amount(),
@@ -1544,10 +1541,12 @@ impl HoprDb {
             BalanceType::HOPR,
         );
 
+        debug!("channel {} has balance {}", channel.get_id(), channel.balance);
         if channel.balance.lt(&amount) {
             return Err(crate::errors::DbError::LogicalError(format!(
-                "out of funds: {} with counterparty {destination}",
-                channel.get_id()
+                "out of funds: {} with counterparty {destination} has balance {} < {amount}",
+                channel.get_id(),
+                channel.balance
             )));
         }
 
@@ -1555,7 +1554,7 @@ impl HoprDb {
             &me_onchain,
             &destination,
             &amount,
-            channel.ticket_index,
+            self.increment_ticket_index(channel_id).await?.into(),
             U256::one(), // unaggregated always have index_offset == 1
             TICKET_WIN_PROB,
             channel.channel_epoch,
