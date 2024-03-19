@@ -62,6 +62,12 @@ pub async fn validate_unacknowledged_ticket(
     if let Some(unrealized_balance) = unrealized_balance {
         // ensure sender has enough funds
         if ticket.amount.gt(&unrealized_balance) {
+            debug!(
+                ticket_amount = ticket.amount.to_string(),
+                available_balance = unrealized_balance.to_string(),
+                "Ticket value is higher than remaining unrealized balance for channel {}",
+                channel.get_id().to_string(),
+            );
             return Err(OutOfFunds(channel.get_id().to_string()));
         }
     }
