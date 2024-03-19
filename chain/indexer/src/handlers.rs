@@ -231,6 +231,14 @@ where
 
                 let maybe_channel = channel_model_from_id(tx, channel_id).await?;
                 let new_model = if let Some(channel) = maybe_channel {
+                    // Check that we're not receiving the Open event without the channel being Close prior
+                    if channel.status != u8::from(ChannelStatus::Closed) as i32 {
+                        return Err(CoreEthereumIndexerError::ProcessError(format!(
+                            "trying to re-open channel {} which is not closed",
+                            channel.channel_id
+                        )));
+                    }
+
                     trace!(
                         "on_channel_reopened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
                     );
@@ -1451,7 +1459,7 @@ pub mod tests {
             *COUNTERPARTY_CHAIN_ADDRESS,
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
-            ChannelStatus::Open,
+            ChannelStatus::Closed,
             3.into(),
         );
 
@@ -1484,6 +1492,38 @@ pub mod tests {
                 .unwrap()
                 .load(Ordering::Relaxed)
         );
+    }
+
+    #[async_std::test]
+    async fn on_channel_should_not_reopene_when_not_closed() {
+        let db = create_db().await;
+
+        let handlers = init_handlers(db.clone());
+
+        let channel = ChannelEntry::new(
+            *SELF_CHAIN_ADDRESS,
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            Balance::zero(BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            3.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let channel_opened_log = RawLog {
+            topics: vec![
+                ChannelOpenedFilter::signature(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
+            .await
+            .expect_err("should not re-open channel that is not Closed");
     }
 
     #[async_std::test]

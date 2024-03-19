@@ -176,9 +176,15 @@ impl IntoCondition for TicketSelector {
     }
 }
 
+/// Prerequisites for the ticket aggregator.
+/// The prerequisites are **independent** of each other.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AggregationPrerequisites {
+    /// Minimum number of tickets in the channel.
     pub min_ticket_count: usize,
+    /// Minimum ratio of balance of unaggregated messages and channel stake.
+    /// I.e. the condition is met if sum of unaggregated ticket amounts divided by
+    /// the total channel stake is greater than `min_unaggregated_ratio`.
     pub min_unaggregated_ratio: f64,
 }
 
@@ -883,9 +889,8 @@ impl HoprDbTicketOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     ticket::Entity::find()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
                         .filter(
-                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                            TicketSelector::from(&channel_entry).with_state(AcknowledgedTicketStatus::BeingAggregated),
                         )
                         .all(tx.as_ref())
                         .await
@@ -948,13 +953,8 @@ impl HoprDbTicketOperations for HoprDb {
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
                     let deleted = ticket::Entity::delete_many()
-                        .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel_entry.get_id().to_hex()))
                         .filter(
-                            hopr_db_entity::ticket::Column::ChannelEpoch
-                                .eq(channel_entry.channel_epoch.to_be_bytes().to_vec()),
-                        )
-                        .filter(
-                            hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8),
+                            TicketSelector::from(channel_entry).with_state(AcknowledgedTicketStatus::BeingAggregated),
                         )
                         .exec(tx.as_ref())
                         .await?;
