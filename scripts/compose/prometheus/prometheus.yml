@@ -1,9 +1,7 @@
 global:
   scrape_interval: 15s
-
   external_labels:
     monitor: 'hoprd'
-
 scrape_configs:
   - job_name: 'hoprd'
     scrape_interval: 15s
@@ -11,13 +9,11 @@ scrape_configs:
       type: Bearer
       # Replace the below credentials with an API token if changed in the hoprd-config
       credentials: "^Pr1vacyasafirstCLASSpr0ductfe4turemadeEASY^"
-
     static_configs:
       - targets: ['hoprd:3001']
         labels:
           group: 'hopr'
     metrics_path: /api/v3/node/metrics
-
   - job_name: 'cadvisor'
     scrape_interval: 10s
     metrics_path: '/metrics'
@@ -25,7 +21,6 @@ scrape_configs:
       - targets: ['cadvisor:8080']
         labels:
           group: 'cadvisor'
-
   - job_name: 'node'
     scrape_interval: 10s
     static_configs:

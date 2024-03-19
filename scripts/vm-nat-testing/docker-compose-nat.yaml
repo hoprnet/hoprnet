@@ -1,5 +1,4 @@
 version: '3.9'
-
 # Start an internal-only bridge network to simulate NAT with different address ranges
 networks:
   hoprd-local-network-1:
@@ -16,7 +15,6 @@ networks:
       config:
         - subnet: 172.24.0.0/24
           gateway: 172.24.0.1
-
 # Starts HOPRD behind NAT
 services:
   hoprd-nat-node-1:

@@ -1,14 +1,10 @@
----
 version: '3.8'
-
 networks:
   hopr-net:
     driver: bridge
-
 volumes:
   prometheus_data: {}
   grafana_data: {}
-
 services:
   admin:
     # NOTE: latest version from 28.11.2023, not compatible with hoprd v2.1 yet

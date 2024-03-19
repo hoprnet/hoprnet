@@ -1,10 +1,8 @@
 version: '3.9'
-
 networks:
   hoprd-isolated:
     name: 'hoprd-isolated'
     external: true
-
 services:
   hoprd-public-relay:
     build: docker-runner/

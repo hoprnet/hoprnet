@@ -385,11 +385,29 @@
               RUSTC_WRAPPER="" ${rustToolchain}/bin/cargo clippy -- -Dwarnings
             '';
           };
+          update-github-labels = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellScriptBin "lint" ''
+              set -eu
+              for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*"`; do
+              	env \
+              		name="crate:`yq '.package.name' $f`" \
+              		dir="`dirname $f`/**" \
+              		yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file"[0] = env(dir)' >> labeler.yml.new
+              done
+              yq ea '. as $item ireduce ({}; . * $item )' labeler.yml.new .github/labeler.yml > .github/labeler.yml.new
+              rm labeler.yml.new
+              mv .github/labeler.yml.new .github/labeler.yml
+            '';
+          };
         in
         {
           treefmt = {
             inherit (config.flake-root) projectRootFile;
             #projectRootFile = "flake.nix";
+
+            programs.yamlfmt.enable = true;
+            settings.formatter.yamlfmt.includes = [ "./.github/labeler.yml" "./.github/workflows/*.yaml" ];
+            settings.formatter.yamlfmt.excludes = [ "./vendor/*" ];
 
             programs.rustfmt.enable = true;
             settings.formatter.rustfmt.excludes = [ "./vendor/*" ];
@@ -421,7 +439,7 @@
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
-            inherit lint;
+            inherit lint update-github-labels;
           };
           packages = {
             inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;
