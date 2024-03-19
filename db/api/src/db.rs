@@ -6,7 +6,7 @@ use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_db_entity::ticket;
 use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-use hopr_primitive_types::primitives::{Address, Balance};
+use hopr_primitive_types::primitives::Address;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use moka::{future::Cache, Expiry};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};

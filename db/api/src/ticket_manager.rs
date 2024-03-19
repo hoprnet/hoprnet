@@ -1,12 +1,8 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
-use hopr_primitive_types::{
-    primitives::{Balance, BalanceType},
-    traits::ToHex,
-};
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 use moka::future::Cache;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
-use sea_query::SimpleExpr;
+use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
