@@ -1349,16 +1349,9 @@ impl HoprDbTicketOperations for HoprDb {
                                     ))
                                 })?;
 
-                            let unrealized_value = myself
-                                .ticket_manager
-                                .unrealized_value((&channel).into())
-                                .await?
-                                .sub(channel.balance);
-
-                            warn!(
-                                "TODO: remove ====> got unrealized balance {unrealized_value} of the total balance: {}",
-                                channel.balance
-                            );
+                            let remaining_balance = channel
+                                .balance
+                                .sub(myself.ticket_manager.unrealized_value((&channel).into()).await?);
 
                             if let Err(e) = validate_unacknowledged_ticket(
                                 &ticket,
@@ -1366,7 +1359,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 &previous_hop_addr,
                                 ticket_price,
                                 TICKET_WIN_PROB,
-                                Some(unrealized_value),
+                                Some(remaining_balance),
                                 &domain_separator,
                             )
                             .await

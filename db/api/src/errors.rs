@@ -31,7 +31,7 @@ pub enum DbError {
     #[error("ack validation error: {0}")]
     AcknowledgementValidationError(String),
 
-    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
+    #[error("ticket validation error for {0:?}")]
     TicketValidationError((Ticket, String)),
 
     #[error(transparent)]

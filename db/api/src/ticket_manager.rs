@@ -80,12 +80,6 @@ impl TicketManager {
         let channel = ticket.ticket.channel_id;
         let value = ticket.ticket.amount;
 
-        self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
-            crate::errors::DbError::LogicalError(format!(
-                "failed to enqueue acknowledged ticket processing into the DB: {e}"
-            ))
-        })?;
-
         let balance = ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::ChannelId.eq(channel.to_hex()))
             .stream(&self.tickets_db)
@@ -96,6 +90,12 @@ impl TicketManager {
                 Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
             })
             .await?;
+
+        self.incoming_ack_tickets_tx.clone().try_send(ticket).map_err(|e| {
+            crate::errors::DbError::LogicalError(format!(
+                "failed to enqueue acknowledged ticket processing into the DB: {e}"
+            ))
+        })?;
 
         Ok(self.unrealized_value.insert(channel, balance + value).await)
     }
@@ -129,7 +129,10 @@ impl TicketManager {
                         })
                     })
                     .await
-                    .unwrap_or(Balance::zero(BalanceType::HOPR))
+                    .unwrap_or_else(|e| {
+                        error!("Encountered an error fetching a cached unrealized ticket value: {e}");
+                        Balance::zero(BalanceType::HOPR)
+                    })
             })
             .await)
     }
@@ -153,5 +156,115 @@ impl TicketManager {
         );
 
         transaction.perform(f).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hex_literal::hex;
+    use hopr_crypto_types::prelude::*;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
+
+    use crate::accounts::HoprDbAccountOperations;
+    use crate::channels::HoprDbChannelOperations;
+    use crate::db::HoprDb;
+    use crate::info::{DomainSeparator, HoprDbInfoOperations};
+
+    lazy_static::lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+    }
+
+    lazy_static::lazy_static! {
+        static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
+        static ref BOB_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
+    }
+
+    const TICKET_VALUE: u64 = 100_000;
+
+    async fn add_peer_mappings(db: &HoprDb, peers: Vec<(OffchainKeypair, ChainKeypair)>) -> crate::errors::Result<()> {
+        for (peer_offchain, peer_onchain) in peers.into_iter() {
+            db.insert_account(
+                None,
+                AccountEntry {
+                    public_key: *peer_offchain.public(),
+                    chain_addr: peer_onchain.public().to_address(),
+                    entry_type: AccountType::NotAnnounced,
+                },
+            )
+            .await?
+        }
+
+        Ok(())
+    }
+
+    fn generate_random_ack_ticket(index: u32) -> AcknowledgedTicket {
+        let hk1 = HalfKey::random();
+        let hk2 = HalfKey::random();
+
+        let cp1: CurvePoint = hk1.to_challenge().into();
+        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+
+        let ticket = Ticket::new(
+            &ALICE.public().to_address(),
+            &BalanceType::HOPR.balance(TICKET_VALUE),
+            index.into(),
+            1_u32.into(),
+            1.0f64,
+            4u64.into(),
+            Challenge::from(cp_sum).to_ethereum_challenge(),
+            &BOB,
+            &Hash::default(),
+        )
+        .unwrap();
+
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
+        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+    }
+
+    #[async_std::test]
+    async fn test_insert_ticket_properly_resolves_the_cached_value(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await?;
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await?;
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            1.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel.clone()).await.unwrap();
+
+        assert_eq!(
+            Balance::zero(BalanceType::HOPR),
+            db.ticket_manager.unrealized_value((&channel).into()).await?
+        );
+
+        let ticket = generate_random_ack_ticket(1);
+        let ticket_value = ticket.ticket.amount;
+
+        db.ticket_manager.insert_ticket(ticket).await?;
+
+        assert_eq!(
+            ticket_value,
+            db.ticket_manager.unrealized_value((&channel).into()).await?
+        );
+
+        Ok(())
     }
 }
