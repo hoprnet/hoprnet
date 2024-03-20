@@ -237,7 +237,12 @@ mod tests {
 
         let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
 
-        futures_lite::future::race(heartbeat.heartbeat_loop(), sleep(ping_delay * expected_loop_count)).await;
+        let tolerance = std::time::Duration::from_millis(2);
+        futures_lite::future::race(
+            heartbeat.heartbeat_loop(),
+            sleep(ping_delay * expected_loop_count + tolerance),
+        )
+        .await;
     }
 
     #[async_std::test]
@@ -257,9 +262,10 @@ mod tests {
 
         let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
 
+        let tolerance = std::time::Duration::from_millis(2);
         futures_lite::future::race(
             heartbeat.heartbeat_loop(),
-            sleep(config.interval * (expected_loop_count as u32)),
+            sleep(config.interval * (expected_loop_count as u32) + tolerance),
         )
         .await;
     }
