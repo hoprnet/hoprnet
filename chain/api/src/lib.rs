@@ -25,7 +25,7 @@ use crate::errors::{HoprChainError, Result};
 use async_std::task::sleep;
 use chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use hopr_db_api::HoprDbAllOperations;
-use hopr_internal_types::prelude::{generate_channel_id, ChannelDirection};
+use hopr_internal_types::prelude::ChannelDirection;
 
 /// The default HTTP request engine
 ///
@@ -175,9 +175,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
-        let channel_id = generate_channel_id(src, dest);
         self.db
-            .get_channel_by_id(None, channel_id)
+            .get_channel_by_parties(None, *src, *dest)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {

@@ -19,6 +19,14 @@ pub trait HoprDbChannelOperations {
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
 
+    /// Retrieves the channel by source and destination.
+    async fn get_channel_by_parties<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        src: Address,
+        dst: Address,
+    ) -> Result<Option<ChannelEntry>>;
+
     /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
     async fn get_channels_via<'a>(
         &'a self,
@@ -52,6 +60,33 @@ impl HoprDbChannelOperations for HoprDb {
                     Ok::<_, DbError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::ChannelId.eq(id.to_hex()))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            Some(model.try_into()?)
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await
+    }
+
+    async fn get_channel_by_parties<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        src: Address,
+        dst: Address,
+    ) -> Result<Option<ChannelEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbError>(
+                        if let Some(model) = Channel::find()
+                            .filter(channel::Column::Source.eq(src.to_hex()))
+                            .filter(channel::Column::Destination.eq(dst.to_hex()))
                             .one(tx.as_ref())
                             .await?
                         {
@@ -144,6 +179,7 @@ mod tests {
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
     use crate::HoprDbGeneralModelOperations;
+    use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::channels::ChannelStatus;
@@ -151,7 +187,7 @@ mod tests {
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
     #[async_std::test]
-    async fn test_insert_get() {
+    async fn test_insert_get_by_id() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let ce = ChannelEntry::new(
@@ -166,6 +202,32 @@ mod tests {
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
             .get_channel_by_id(None, ce.get_id())
+            .await
+            .expect("must get channel")
+            .expect("channel must be present");
+
+        assert_eq!(ce, from_db, "channels must be equal");
+    }
+
+    #[async_std::test]
+    async fn test_insert_get_by_parties() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let a = Address::from(random_bytes());
+        let b = Address::from(random_bytes());
+
+        let ce = ChannelEntry::new(
+            a,
+            b,
+            BalanceType::HOPR.zero(),
+            0_u32.into(),
+            ChannelStatus::Open,
+            0_u32.into(),
+        );
+
+        db.upsert_channel(None, ce).await.expect("must insert channel");
+        let from_db = db
+            .get_channel_by_parties(None, a, b)
             .await
             .expect("must get channel")
             .expect("channel must be present");

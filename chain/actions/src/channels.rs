@@ -94,8 +94,9 @@ where
                         return Err(PeerAccessDenied);
                     }
 
-                    let channel_id = generate_channel_id(&self_addr, &destination);
-                    let maybe_channel = db_clone.get_channel_by_id(Some(tx), channel_id).await?;
+                    let maybe_channel = db_clone
+                        .get_channel_by_parties(Some(tx), self_addr, destination)
+                        .await?;
                     if let Some(channel) = maybe_channel {
                         debug!("already found existing {channel}");
                         if channel.status != ChannelStatus::Closed {
@@ -162,12 +163,18 @@ where
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
-        let channel_id = match direction {
-            ChannelDirection::Incoming => generate_channel_id(&counterparty, &self.self_address()),
-            ChannelDirection::Outgoing => generate_channel_id(&self.self_address(), &counterparty),
+        let maybe_channel = match direction {
+            ChannelDirection::Incoming => {
+                self.db
+                    .get_channel_by_parties(None, counterparty, self.self_address())
+                    .await?
+            }
+            ChannelDirection::Outgoing => {
+                self.db
+                    .get_channel_by_parties(None, self.self_address(), counterparty)
+                    .await?
+            }
         };
-
-        let maybe_channel = self.db.get_channel_by_id(None, channel_id).await?;
 
         match maybe_channel {
             Some(channel) => {

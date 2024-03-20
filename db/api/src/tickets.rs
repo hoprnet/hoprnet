@@ -707,7 +707,7 @@ impl HoprDbTicketOperations for HoprDb {
         let myself = self.clone();
         let chain_keypair = self.chain_key.clone();
 
-        let channel = *channel;
+        let channel_id = *channel;
 
         let (channel_entry, peer, ds) =
             self.nest_transaction_in_db(None, TargetDb::Index)
@@ -715,14 +715,14 @@ impl HoprDbTicketOperations for HoprDb {
                 .perform(|tx| {
                     Box::pin(async move {
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel)
+                            .get_channel_by_id(Some(tx), channel_id)
                             .await?
-                            .ok_or(DbError::ChannelNotFound(channel))?;
+                            .ok_or(DbError::ChannelNotFound(channel_id))?;
 
                         if entry.status == ChannelStatus::Closed {
-                            return Err(DbError::LogicalError(format!("channel '{channel}' is closed")));
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
                         } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Incoming) {
-                            return Err(DbError::LogicalError(format!("channel '{channel}' is not incoming")));
+                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not incoming")));
                         }
 
                         let pk = myself
@@ -1008,13 +1008,6 @@ impl HoprDbTicketOperations for HoprDb {
                         .exec(tx.as_ref())
                         .await?;
 
-                    // TODO: is this necessary for an incoming channel?
-                    // self.db
-                    //     .write()
-                    //     .await
-                    //     .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
-                    //     .await?;
-
                     Ok::<(), DbError>(())
                 })
             })
@@ -1050,39 +1043,39 @@ impl HoprDbTicketOperations for HoprDb {
 
         let myself = self.clone();
 
-        let (channel_entry, destination, domain_separator) =
-            self.nest_transaction_in_db(None, TargetDb::Index)
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let address = myself
-                            .resolve_chain_key(&destination)
-                            .await?
-                            .ok_or(DbError::LogicalError(format!(
-                                "peer '{}' has no chain key record",
-                                destination.to_peerid_str()
-                            )))?;
+        let (channel_entry, destination, domain_separator) = self
+            .nest_transaction_in_db(None, TargetDb::Index)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let address = myself
+                        .resolve_chain_key(&destination)
+                        .await?
+                        .ok_or(DbError::LogicalError(format!(
+                            "peer '{}' has no chain key record",
+                            destination.to_peerid_str()
+                        )))?;
 
-                        let channel_id = generate_channel_id(&myself.me_onchain, &address);
-                        let entry = myself
-                            .get_channel_by_id(Some(tx), channel_id)
-                            .await?
-                            .ok_or(DbError::ChannelNotFound(channel_id))?;
+                    let entry = myself
+                        .get_channel_by_parties(Some(tx), myself.me_onchain, address)
+                        .await?
+                        .ok_or_else(|| DbError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address)))?;
 
-                        if entry.status == ChannelStatus::Closed {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is closed")));
-                        } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Outgoing) {
-                            return Err(DbError::LogicalError(format!("channel '{channel_id}' is not outgoing")));
-                        }
-                        let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("domain separator missing".into())
-                            })?;
+                    if entry.status == ChannelStatus::Closed {
+                        return Err(DbError::LogicalError(format!("{entry} is closed")));
+                    } else if entry.direction(&myself.me_onchain) != Some(ChannelDirection::Outgoing) {
+                        return Err(DbError::LogicalError(format!("{entry} is not outgoing")));
+                    }
+                    let domain_separator = myself
+                        .get_indexer_data(Some(tx))
+                        .await?
+                        .channels_dst
+                        .ok_or_else(|| crate::errors::DbError::LogicalError("domain separator missing".into()))?;
 
-                        Ok((entry, address, domain_separator))
-                    })
+                    Ok((entry, address, domain_separator))
                 })
-                .await?;
+            })
+            .await?;
 
         let channel_balance = channel_entry.balance;
         let channel_epoch = channel_entry.channel_epoch;
@@ -1191,7 +1184,7 @@ impl HoprDbTicketOperations for HoprDb {
                             })?;
 
                             if myself
-                                .get_channel_by_id(Some(tx), generate_channel_id(&unacknowledged.signer, &me_onchain))
+                                .get_channel_by_parties(Some(tx), unacknowledged.signer, me_onchain)
                                 .await?
                                 .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
                             {
@@ -1377,7 +1370,7 @@ impl HoprDbTicketOperations for HoprDb {
                             })?;
 
                             let channel = myself
-                                .get_channel_by_id(Some(tx), generate_channel_id(&previous_hop_addr, &me_onchain))
+                                .get_channel_by_parties(Some(tx), previous_hop_addr, me_onchain)
                                 .await?
                                 .ok_or_else(|| {
                                     crate::errors::DbError::LogicalError(format!(
@@ -1524,14 +1517,13 @@ impl HoprDb {
         path_pos: u8,
     ) -> Result<hopr_internal_types::channels::Ticket> {
         let myself = self.clone();
-        let channel_id = generate_channel_id(&me_onchain, &destination);
         let (channel, ticket_price): (ChannelEntry, U256) = self
             .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
-                        if let Some(channel) = myself.get_channel_by_id(Some(tx), channel_id).await? {
+                        if let Some(channel) = myself.get_channel_by_parties(Some(tx), me_onchain, destination).await? {
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
 
                             Some((
@@ -1548,7 +1540,7 @@ impl HoprDb {
             })
             .await?
             .ok_or(crate::errors::DbError::LogicalError(format!(
-                "channel '{destination}' not found",
+                "channel to '{destination}' not found",
             )))?;
 
         let amount = Balance::new(
@@ -1560,7 +1552,6 @@ impl HoprDb {
             BalanceType::HOPR,
         );
 
-        debug!("channel {} has balance {}", channel.get_id(), channel.balance);
         if channel.balance.lt(&amount) {
             return Err(crate::errors::DbError::LogicalError(format!(
                 "out of funds: {} with counterparty {destination} has balance {} < {amount}",
@@ -1573,7 +1564,7 @@ impl HoprDb {
             &me_onchain,
             &destination,
             &amount,
-            self.increment_ticket_index(channel_id).await?.into(),
+            self.increment_ticket_index(channel.get_id()).await?.into(),
             U256::one(), // unaggregated always have index_offset == 1
             TICKET_WIN_PROB,
             channel.channel_epoch,

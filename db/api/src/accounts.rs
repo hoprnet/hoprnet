@@ -3,7 +3,9 @@ use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Related, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Related, Set,
+};
 use sea_query::OnConflict;
 
 use hopr_db_entity::prelude::{Account, Announcement};
@@ -226,37 +228,32 @@ impl HoprDbAccountOperations for HoprDb {
                         .pop()
                         .ok_or(MissingAccount)?;
 
-                    let new_announcement = announcement::ActiveModel {
-                        account_id: Set(existing_account.id),
-                        multiaddress: Set(multiaddr.to_string()),
-                        at_block: Set(at_block as i32),
-                        ..Default::default()
-                    };
-
-                    match announcement::Entity::insert(new_announcement)
-                        .on_conflict(
-                            OnConflict::columns([announcement::Column::AccountId, announcement::Column::Multiaddress])
-                                .update_column(announcement::Column::AtBlock)
-                                .to_owned(),
-                        )
-                        .exec(tx.as_ref())
-                        .await
+                    if let Some((index, _)) = existing_announcements
+                        .iter()
+                        .enumerate()
+                        .find(|(_, announcement)| announcement.multiaddress == multiaddr.to_string())
                     {
-                        Ok(m) => {
-                            let new_announcement = announcement::Entity::find_by_id(m.last_insert_id)
-                                .one(tx.as_ref())
-                                .await?
-                                .ok_or(DbError::LogicalError("failed to fetch inserted announcement".into()))?;
+                        let mut existing_announcement = existing_announcements.remove(index).into_active_model();
+                        existing_announcement.at_block = Set(at_block as i32);
+                        let updated_announcement = existing_announcement.update(tx.as_ref()).await?;
 
-                            // Insert at the first position, since this is the latest announcement
-                            existing_announcements.insert(0, new_announcement);
-                            Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
+                        // To maintain the sort order, insert at the original location
+                        existing_announcements.insert(index, updated_announcement);
+                    } else {
+                        let new_announcement = announcement::ActiveModel {
+                            account_id: Set(existing_account.id),
+                            multiaddress: Set(multiaddr.to_string()),
+                            at_block: Set(at_block as i32),
+                            ..Default::default()
                         }
-                        Err(DbErr::RecordNotInserted) => {
-                            Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
-                        }
-                        Err(e) => Err(e.into()),
+                        .insert(tx.as_ref())
+                        .await?;
+
+                        // Assuming this is the latest announcement, so prepend it
+                        existing_announcements.insert(0, new_announcement);
                     }
+
+                    Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
                 })
             })
             .await
