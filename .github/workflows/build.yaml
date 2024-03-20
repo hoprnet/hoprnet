@@ -150,6 +150,7 @@ jobs:
 
       - name: "Restart deployments"
         run: |
+          set -x
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
@@ -162,7 +163,6 @@ jobs:
           fi
           namespace=core-team
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
-          sleep 99999999
           # Get list of deployments to restart
           export deployments=($(kubectl get deployments -n ${namespace} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
           for deployment in "${deployments[@]}"; do
