@@ -143,14 +143,23 @@ jobs:
           project_id: hopr-staging
           install_components: beta
 
-      - name: Setup Kubectl
-        uses: tale/kubectl-action@v1
+      - name: Get credentials
+        id: get-credentials
+        uses: google-github-actions/get-gke-credentials@v2
         with:
-          base64-kube-config: ${{ secrets.GKE_STAGING_KUBE_CONFIG }}
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
+
+      # - name: Setup Kubectl
+      #   uses: tale/kubectl-action@v1
+      #   with:
+      #     base64-kube-config: ${{ secrets.GKE_STAGING_KUBE_CONFIG }}
 
       - name: "Restart deployments"
         run: |
           set -x
+          kubectl get nodes
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
