@@ -223,6 +223,7 @@ impl HoprDbAccountOperations for HoprDb {
                                 account::Column::PacketKey.eq(packet_key.to_hex())
                             }
                         })
+                        .order_by_desc(announcement::Column::AtBlock)
                         .all(tx.as_ref())
                         .await?
                         .pop()
@@ -253,7 +254,7 @@ impl HoprDbAccountOperations for HoprDb {
                         existing_announcements.insert(0, new_announcement);
                     }
 
-                    Ok::<_, DbError>(model_to_account_entry(existing_account, existing_announcements)?)
+                    model_to_account_entry(existing_account, existing_announcements)
                 })
             })
             .await
