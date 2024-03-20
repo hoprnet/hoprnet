@@ -29,13 +29,13 @@ serde_json = "1.0"
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = "1.36.0"
-tonic = { version = "^0.8", features = ["transport","tls","tls-roots","tls-webpki-roots"] }
+# tonic = { version = "^0.8", features = ["transport","tls-webpki-roots"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 validator = { workspace = true }
 
 opentelemetry = { version = "0.22" }
-opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "grpc-tonic"] }
+opentelemetry-otlp = { version = "0.15", default-features = false, features = ["trace", "reqwest-client", "tls-roots", "http-proto", "grpc-tonic"] }
 opentelemetry_sdk = { version = "0.22", features = ["rt-async-std"] }
 tracing-opentelemetry = "0.23"
 

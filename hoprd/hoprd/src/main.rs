@@ -51,10 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .tracing()
             .with_exporter(
                 opentelemetry_otlp::new_exporter()
-                    .tonic()
-                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                    .with_timeout(std::time::Duration::from_secs(5))
-                    .with_endpoint(format!("{}{}", telemetry_url, "/v1/traces")),
+                    .http()
+                    .with_endpoint(telemetry_url)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(std::time::Duration::from_secs(5)),
             )
             .with_trace_config(
                 opentelemetry_sdk::trace::config()
@@ -66,8 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         env!("CARGO_PKG_NAME"),
                     )])),
             )
-            .install_batch(opentelemetry_sdk::runtime::AsyncStd)
-            .expect("creating exporter");
+            .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
 
         tracing::subscriber::set_global_default(
             tracing_subscriber::Registry::default()
