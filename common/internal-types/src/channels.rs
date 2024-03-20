@@ -118,6 +118,7 @@ impl ChannelEntry {
 
     /// Checks if the closure time of this channel has passed.
     /// Also returns `false` if the channel closure has not been initiated (it is in `Open` state).
+    /// Returns also `true`, if the channel is in `Closed` state.
     pub fn closure_time_passed(&self, current_time: SystemTime) -> bool {
         match self.status {
             ChannelStatus::Open => false,

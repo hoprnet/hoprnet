@@ -37,13 +37,12 @@ use hopr_internal_types::prelude::*;
 use async_lock::RwLock;
 use async_std::task::JoinHandle;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::serde_as;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
-    time::Duration,
 };
 use tracing::{debug, error, info, trace, warn};
 use validator::Validate;
@@ -58,6 +57,8 @@ lazy_static::lazy_static! {
     static ref METRIC_COUNT_AGGREGATIONS: SimpleCounter =
         SimpleCounter::new("hopr_strategy_aggregating_aggregation_count", "Count of initiated automatic aggregations").unwrap();
 }
+
+use hopr_platform::time::native::current_time;
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -83,15 +84,6 @@ pub struct AggregatingStrategyConfig {
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     #[default(Some(0.9))]
     pub unrealized_balance_ratio: Option<f32>,
-
-    /// Maximum time to wait for the ticket aggregation to complete.
-    ///
-    /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
-    ///
-    /// Default is 60 seconds.
-    #[serde_as(as = "DurationSeconds<u64>")]
-    #[default(Duration::from_secs(60))]
-    pub aggregation_timeout: Duration,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
     /// to the `PendingToClose` state.
@@ -243,6 +235,7 @@ where
             .get_incoming_channels(None)
             .await?
             .into_iter()
+            .filter(|c| !c.closure_time_passed(current_time()))
             .map(|c| c.get_id());
 
         let criteria = AggregationPrerequisites {
@@ -524,7 +517,6 @@ mod tests {
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: Some(5),
             unrealized_balance_ratio: None,
-            aggregation_timeout: std::time::Duration::from_secs(5),
             aggregate_on_channel_close: false,
         };
 
@@ -568,7 +560,6 @@ mod tests {
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
             unrealized_balance_ratio: Some(0.75),
-            aggregation_timeout: Duration::from_secs(5),
             aggregate_on_channel_close: false,
         };
 
@@ -626,7 +617,6 @@ mod tests {
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
             unrealized_balance_ratio: Some(0.75),
-            aggregation_timeout: Duration::from_secs(5),
             aggregate_on_channel_close: false,
         };
 
@@ -660,7 +650,6 @@ mod tests {
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
             unrealized_balance_ratio: None,
-            aggregation_timeout: Duration::from_secs(5),
             aggregate_on_channel_close: true,
         };
 
