@@ -41,6 +41,7 @@
           pkgs = import nixpkgs {
             inherit system overlays;
           };
+          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           rustNightly = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -55,7 +56,6 @@
             version = pkgs.lib.strings.concatStringsSep "."
               (pkgs.lib.lists.take 3 (builtins.splitVersion hoprdCrateInfoOriginal.version));
           };
-          solcDefault = with pkgs; (solc.mkDefault pkgs solc_0_8_19);
           depsSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
@@ -82,12 +82,12 @@
             ];
           };
           nativeBuildInputs = with pkgs; [
-            pkg-config
-            openssl # required to build curl rust bindings
-          ];
-          buildInputs = with pkgs; [
             foundry-bin
             solcDefault
+          ];
+          buildInputs = with pkgs; [
+            pkg-config
+            openssl # required to build curl rust bindings
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with darwin.apple_sdk.frameworks; [
               CoreServices
@@ -97,6 +97,7 @@
           commonArgs = {
             inherit buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
+            FOUNDRY_SOLC = "${solcDefault}/bin/solc";
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
@@ -132,6 +133,14 @@
             # this ensures the tests are run as part of the build process
             doCheck = true;
           });
+          rustPackageClippy = { pname, version, cargoArtifacts }: craneLib.cargoClippy (commonArgs // {
+            inherit pname version cargoArtifacts src;
+            cargoExtraArgs = "--offline -p ${pname}";
+            cargoClippyExtraArgs = "-- -Dwarnings";
+            preConfigure = ''
+              echo "# placeholder" > vendor/cargo/config.toml
+            '';
+          });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
             cargoArtifacts = rustPackageDeps (hoprdCrateInfo // {
@@ -139,9 +148,17 @@
             });
             CARGO_PROFILE = "dev";
           });
-          hopli = rustPackage (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
           hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hoprd-clippy = rustPackageClippy (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
+          hopli = rustPackage (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hopli-debug = rustPackage (hopliCrateInfo // {
+            cargoArtifacts = rustPackageDeps (hopliCrateInfo // {
+              CARGO_PROFILE = "dev";
+            });
+            CARGO_PROFILE = "dev";
+          });
           hopli-test = rustPackageTest (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hopli-clippy = rustPackageClippy (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -377,16 +394,8 @@
           };
           defaultDevShell = buildDevShell [ ];
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
-          lint = flake-utils.lib.mkApp {
-            # must unset rustc wrapper because sccache and clippy don't work
-            # together
-            drv = pkgs.writeShellScriptBin "lint" ''
-              set -eu
-              RUSTC_WRAPPER="" ${rustToolchain}/bin/cargo clippy -- -Dwarnings
-            '';
-          };
           update-github-labels = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellScriptBin "lint" ''
+            drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
               # remove existing crate entries (to remove old crates)
               yq 'with_entries(select(.key != "crate:*"))' .github/labeler.yml > labeler.yml.new
@@ -439,22 +448,29 @@
             };
           };
 
+          checks = {
+            inherit hoprd-clippy hopli-clippy;
+          };
+
           apps = {
             inherit hoprd-docker-build-and-upload;
             inherit hoprd-debug-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
-            inherit lint update-github-labels;
+            inherit update-github-labels;
           };
+
           packages = {
             inherit hoprd hoprd-debug hoprd-test hoprd-docker hoprd-debug-docker;
-            inherit hopli hopli-test hopli-docker;
+            inherit hopli hopli-debug hopli-test hopli-docker;
             inherit anvil-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             default = hoprd;
           };
+
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
+
           formatter = config.treefmt.build.wrapper;
         };
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
