@@ -85,7 +85,8 @@ impl TicketManager {
             ))
         })?;
 
-        Ok(self.unrealized_value.insert(channel, unrealized_value + value).await)
+        self.unrealized_value.insert(channel, unrealized_value + value).await;
+        Ok(())
     }
 
     /// Get unrealized value for a channel

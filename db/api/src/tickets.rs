@@ -1,21 +1,17 @@
 use async_stream::stream;
 use std::fmt::{Display, Formatter};
-use std::ops::Add;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::error;
-use tracing::info;
-use tracing::warn;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
 use sea_query::{Condition, Expr, IntoCondition};
-use tracing::{debug, instrument, trace};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
 use hopr_crypto_types::prelude::*;
@@ -1404,7 +1400,10 @@ impl HoprDbTicketOperations for HoprDb {
                             )
                             .await
                             {
-                                return Err(crate::errors::DbError::TicketValidationError((ticket, e.to_string())));
+                                return Err(crate::errors::DbError::TicketValidationError(Box::new((
+                                    ticket,
+                                    e.to_string(),
+                                ))));
                             }
 
                             myself.increment_ticket_index(channel.get_id()).await?;
@@ -1457,7 +1456,8 @@ impl HoprDbTicketOperations for HoprDb {
                     .await
                 {
                     Ok(ticket) => Ok(ticket),
-                    Err(crate::errors::DbError::TicketValidationError((t, e))) => {
+                    Err(crate::errors::DbError::TicketValidationError(boxed_error)) => {
+                        let (t, e) = *boxed_error;
                         let rejected_value = t.amount;
                         warn!("Encountered validation error during forwarding for ticket with value: {rejected_value}");
 
@@ -1473,7 +1473,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     let current_rejected_count = stats.rejected_tickets;
 
                                     let mut active_stats = stats.into_active_model();
-                                    active_stats.rejected_tickets = Set(current_rejected_count + 1 as i32);
+                                    active_stats.rejected_tickets = Set(current_rejected_count + 1i32);
                                     active_stats.rejected_value =
                                         Set((current_rejected_value + rejected_value.amount()).to_be_bytes().into());
                                     active_stats.save(tx.as_ref()).await?;
@@ -1483,13 +1483,13 @@ impl HoprDbTicketOperations for HoprDb {
                             })
                             .await
                             .map_err(|ei| {
-                                crate::errors::DbError::TicketValidationError((
+                                crate::errors::DbError::TicketValidationError(Box::new((
                                     t.clone(),
                                     format!("during validation error '{e}' update another error occured: {ei}"),
-                                ))
+                                )))
                             })?;
 
-                        Err(crate::errors::DbError::TicketValidationError((t, e)))
+                        Err(crate::errors::DbError::TicketValidationError(Box::new((t, e))))
                     }
                     Err(e) => Err(e),
                 }?;

@@ -19,6 +19,9 @@ pub enum DbError {
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 
+    #[error("ticket validation error for {0:?}")]
+    TicketValidationError(Box<(Ticket, String)>),
+
     #[error("transaction error: {0}")]
     TransactionError(Box<dyn std::error::Error + Send + Sync>),
 
@@ -30,9 +33,6 @@ pub enum DbError {
 
     #[error("ack validation error: {0}")]
     AcknowledgementValidationError(String),
-
-    #[error("ticket validation error for {0:?}")]
-    TicketValidationError((Ticket, String)),
 
     #[error(transparent)]
     BackendError(#[from] sea_orm::DbErr),
