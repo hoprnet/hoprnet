@@ -117,12 +117,17 @@ jobs:
       - tag
     steps:
 
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          repository: hoprnet/hoprnet-ci
+
       - name: Set up Google Cloud Credentials
         id: auth
         uses: google-github-actions/auth@v1
         with:
           token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPR_STAGING_TERRAFORM_SERVICE_ACCOUNT_FILE }}
+          credentials_json: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -130,10 +135,13 @@ jobs:
           project_id: hopr-staging
           install_components: beta
 
-      - name: "Set GKE credentials"
-        run: |
-          gcloud container clusters get-credentials cluster-staging --region europe-west3 --project hopr-staging
-          kubectl get nodes
+      - name: Get credentials
+        id: get-credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: cluster-staging
+          location: europe-west3
+          project_id: hopr-staging
 
       - name: "Restart deployments"
         run: |
