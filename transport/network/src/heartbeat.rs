@@ -227,7 +227,7 @@ mod tests {
     async fn test_heartbeat_should_loop_multiple_times() {
         let config = simple_heartbeat_config();
 
-        let ping_delay = std::time::Duration::from_millis(5u64);
+        let ping_delay = config.interval / 2;
         let expected_loop_count = 2u32;
 
         let mut mock = MockHeartbeatExternalApi::new();
@@ -237,12 +237,7 @@ mod tests {
 
         let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
 
-        let tolerance = std::time::Duration::from_millis(2);
-        futures_lite::future::race(
-            heartbeat.heartbeat_loop(),
-            sleep(ping_delay * expected_loop_count + tolerance),
-        )
-        .await;
+        futures_lite::future::race(heartbeat.heartbeat_loop(), sleep(config.interval * expected_loop_count)).await;
     }
 
     #[async_std::test]
