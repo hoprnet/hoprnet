@@ -388,26 +388,30 @@
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "lint" ''
               set -eu
+              # remove existing crate entries (to remove old crates)
+              yq 'with_entries(select(.key != "crate:*"))' .github/labeler.yml > labeler.yml.new
+              # add new crate entries for known crates
               for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*"`; do
               	env \
               		name="crate:`yq '.package.name' $f`" \
               		dir="`dirname $f`/**" \
               		yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file"[0] = env(dir)' >> labeler.yml.new
               done
-              yq ea '. as $item ireduce ({}; . * $item )' labeler.yml.new .github/labeler.yml > .github/labeler.yml.new
-              rm labeler.yml.new
-              mv .github/labeler.yml.new .github/labeler.yml
+              mv labeler.yml.new .github/labeler.yml
             '';
           };
         in
         {
           treefmt = {
             inherit (config.flake-root) projectRootFile;
-            #projectRootFile = "flake.nix";
 
             programs.yamlfmt.enable = true;
             settings.formatter.yamlfmt.includes = [ "./.github/labeler.yml" "./.github/workflows/*.yaml" ];
             settings.formatter.yamlfmt.excludes = [ "./vendor/*" ];
+
+            programs.prettier.enable = true;
+            settings.formatter.prettier.includes = [ "*.md" "*.json" ];
+            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" ];
 
             programs.rustfmt.enable = true;
             settings.formatter.rustfmt.excludes = [ "./vendor/*" ];

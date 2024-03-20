@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 # Start an internal-only bridge network to simulate NAT with different address ranges
 networks:
   hoprd-local-network-1:
@@ -29,13 +29,13 @@ services:
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-nat-node1.id
     volumes:
-      - '/var/hopr/identities:/var/hopr/identities'
+      - "/var/hopr/identities:/var/hopr/identities"
     networks:
-      - 'hoprd-local-network-1'
+      - "hoprd-local-network-1"
     ports:
-      - '3011:3001'
+      - "3011:3001"
     environment:
-      - 'DEBUG=hopr*'
+      - "DEBUG=hopr*"
   hoprd-nat-node-2:
     build: docker-runner/
     command:
@@ -48,10 +48,10 @@ services:
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-nat-node2.id
     volumes:
-      - '/var/hopr/identities:/var/hopr/identities'
+      - "/var/hopr/identities:/var/hopr/identities"
     networks:
-      - 'hoprd-local-network-2'
+      - "hoprd-local-network-2"
     ports:
-      - '3021:3001'
+      - "3021:3001"
     environment:
-      - 'DEBUG=hopr*'
+      - "DEBUG=hopr*"

@@ -4,7 +4,7 @@ identity:
   # A new identity file will be created if it does not exist
   file: path/to/identity.file
   # Password for the identity file
-  password: 'change_me'
+  password: "change_me"
   # If specified, the above identity file is ignored and the node
   # directly uses the provided private key.
   # private_key: ''
@@ -50,9 +50,9 @@ hopr:
     # Such as https://safe-transaction.prod.hoprtech.net/
     safe_transaction_service_provider: https:://provider.com/
     # Node's safe address, this must be provided by the user
-    safe_address: '0x0000000000000000000000000000000000000000'
+    safe_address: "0x0000000000000000000000000000000000000000"
     # Node's safe module address, this must be provided by the user
-    module_address: '0x0000000000000000000000000000000000000000'
+    module_address: "0x0000000000000000000000000000000000000000"
   # Configuration of HOPR channel strategies.
   strategy:
     # Will not continue executing the next strategy in the chain
@@ -216,7 +216,7 @@ hopr:
         anvil-localhost:
           chain: anvil
           environment_type: local
-          version_range: '*'
+          version_range: "*"
           indexer_start_block_number: 5
           tags: []
           addresses:

@@ -17,12 +17,12 @@ datasources:
     withCredentials:
     isDefault: true
     jsonData:
-      graphiteVersion: '1.1'
+      graphiteVersion: "1.1"
       tlsAuth: false
       tlsAuthWithCACert: false
     secureJsonData:
-      tlsCACert: '...'
-      tlsClientCert: '...'
-      tlsClientKey: '...'
+      tlsCACert: "..."
+      tlsClientCert: "..."
+      tlsClientKey: "..."
     version: 1
     editable: false
