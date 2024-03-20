@@ -288,14 +288,18 @@ where
 
                 if let Some(channel) = maybe_channel {
                     let channel_entry: ChannelEntry = (&channel).try_into()?;
-                    // For channels that destination is us, it means that our ticket
-                    // has been redeemed, so mark it in the DB as redeemed
                     let ack_ticket = match channel_entry.direction(&self.chain_key.public().to_address()) {
+                        // For channels where destination is us, it means that our ticket
+                        // has been redeemed, so mark it in the DB as redeemed
                         Some(ChannelDirection::Incoming) => {
-                            // Filter all tickets in this channel and its current epoch
+                            // Filter all BeingRedeemed tickets in this channel and its current epoch
                             let mut matching_tickets = self
                                 .db
-                                .get_tickets(None, (&channel_entry).into())
+                                .get_tickets(
+                                    None,
+                                    TicketSelector::from(&channel_entry)
+                                        .with_state(AcknowledgedTicketStatus::BeingRedeemed),
+                                )
                                 .await?
                                 .into_iter()
                                 .filter(|ticket| {
@@ -318,14 +322,14 @@ where
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        "could not find acknowledged ticket with idx {} in {channel_entry}",
+                                        "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {channel_entry}",
                                         ticket_redeemed.new_ticket_index - 1
                                     );
                                     None
                                 }
                                 Ordering::Greater => {
                                     error!(
-                                        "found {} tickets matching redeemed index {} in {channel_entry}",
+                                        "found {} tickets matching 'BeingRedeemed' index {} in {channel_entry}",
                                         matching_tickets.len(),
                                         ticket_redeemed.new_ticket_index - 1
                                     );
@@ -333,16 +337,22 @@ where
                                 }
                             }
                         }
+                        // For channel where the source is us, it means a ticket that we
+                        // issue has been redeemed, so we just need to be sure our outgoing ticket
+                        // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
+                            debug!("observed redeem event on an outgoing {channel_entry}");
                             self.db
                                 .compare_and_set_ticket_index(channel_entry.get_id(), ticket_redeemed.new_ticket_index)
                                 .await?;
                             None
                         }
+                        // For channel where neither source nor destination is us, we don't care
                         None => {
+                            // Not our redeem event
                             debug!("observed redeem event on a foreign {channel_entry}");
-                            None // Not our redeem event
+                            None
                         }
                     };
 
@@ -353,6 +363,7 @@ where
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel_entry, ack_ticket)))
                 } else {
+                    error!("observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }

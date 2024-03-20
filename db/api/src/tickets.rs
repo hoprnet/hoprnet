@@ -1,4 +1,5 @@
 use async_stream::stream;
+use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::ops::Sub;
 use std::str::FromStr;
@@ -81,6 +82,22 @@ pub struct TicketSelector {
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
     pub only_aggregated: bool,
+}
+
+impl Display for TicketSelector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ticket selector in {} epoch {}{}{}{}",
+            self.channel_id,
+            self.epoch,
+            self.index.map(|idx| format!(" with index {idx}")).unwrap_or("".into()),
+            self.state
+                .map(|state| format!(" in state {state}"))
+                .unwrap_or("".into()),
+            if self.only_aggregated { " only aggregated" } else { "" }
+        )
+    }
 }
 
 impl TicketSelector {
@@ -336,6 +353,8 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .channels_dst
             .ok_or(LogicalError("missing channel dst".into()))?;
+
+        debug!("fetching tickets via {selector}");
 
         let ckp = self.chain_key.clone();
         self.nest_transaction_in_db(tx, TargetDb::Tickets)

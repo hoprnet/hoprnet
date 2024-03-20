@@ -26,7 +26,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-
 #[cfg(feature = "simple_log")]
 fn init_logger() {
     env_logger::init();
@@ -34,13 +33,14 @@ fn init_logger() {
 
 #[cfg(not(feature = "simple_log"))]
 fn init_logger() {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::filter::EnvFilter::new("info")
-        .add_directive("libp2p_mplex=info".parse().unwrap())
-        .add_directive("multistream_select=info".parse().unwrap())
-        .add_directive("isahc::handler=error".parse().unwrap())
-        .add_directive("isahc::client=error".parse().unwrap())
-        .add_directive("surf::middleware::logger::native=error".parse().unwrap()));
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        tracing_subscriber::filter::EnvFilter::new("info")
+            .add_directive("libp2p_mplex=info".parse().unwrap())
+            .add_directive("multistream_select=info".parse().unwrap())
+            .add_directive("isahc::handler=error".parse().unwrap())
+            .add_directive("isahc::client=error".parse().unwrap())
+            .add_directive("surf::middleware::logger::native=error".parse().unwrap())
+    });
 
     let format = tracing_subscriber::fmt::layer()
         .with_level(true)
