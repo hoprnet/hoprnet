@@ -1,3 +1,4 @@
+---
 # Main node's identity that defined the on-chain and off-chain keys
 identity:
   # Path to the identity file
