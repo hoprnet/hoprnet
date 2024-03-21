@@ -1090,8 +1090,8 @@ impl Hopr {
 
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
-    pub async fn channel_from_hash(&self, channel: &Hash) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_by_id(None, *channel).await?)
+    pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
+        Ok(self.db.get_channel_by_id(None, channel_id).await?)
     }
 
     /// Get the channel entry between source and destination node.
@@ -1242,10 +1242,10 @@ impl Hopr {
         Ok(())
     }
 
-    pub async fn redeem_tickets_in_channel(&self, channel: &Hash, only_aggregated: bool) -> errors::Result<usize> {
+    pub async fn redeem_tickets_in_channel(&self, channel_id: &Hash, only_aggregated: bool) -> errors::Result<usize> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel = self.db.get_channel_by_id(None, *channel).await?;
+        let channel = self.db.get_channel_by_id(None, channel_id).await?;
         let mut redeem_count = 0;
 
         if let Some(channel) = channel {

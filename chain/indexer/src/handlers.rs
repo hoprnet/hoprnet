@@ -1298,7 +1298,7 @@ pub mod tests {
 
         assert_eq!(
             solidity_balance,
-            db.get_channel_by_id(None, channel.get_id())
+            db.get_channel_by_id(None, &channel.get_id())
                 .await
                 .unwrap()
                 .unwrap()
@@ -1367,7 +1367,7 @@ pub mod tests {
 
         assert_eq!(
             solidity_balance,
-            db.get_channel_by_id(None, channel.get_id())
+            db.get_channel_by_id(None, &channel.get_id())
                 .await
                 .unwrap()
                 .unwrap()
@@ -1408,7 +1408,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let closed_channel = db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap();
+        let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());
@@ -1445,7 +1445,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel_by_id(None, channel_id).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 1u64.into());
@@ -1490,7 +1490,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 4u64.into());
@@ -1569,7 +1569,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
         assert_eq!(channel.ticket_index, ticket_index);
 
@@ -1616,7 +1616,7 @@ pub mod tests {
 
         // TODO: check for Vec<ChainEventType> content here
 
-        let channel = db.get_channel_by_id(None, channel.get_id()).await.unwrap().unwrap();
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::PendingToClose(timestamp));
     }

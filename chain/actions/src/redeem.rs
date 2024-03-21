@@ -75,7 +75,7 @@ where
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self
             .db
-            .get_channels_via(None, ChannelDirection::Incoming, self.self_address())
+            .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
             .await?;
         debug!(
             "starting to redeem all tickets in {} incoming channels to us.",
@@ -112,7 +112,7 @@ where
     ) -> Result<Vec<PendingAction>> {
         let maybe_channel = self
             .db
-            .get_channel_by_parties(None, *counterparty, self.self_address())
+            .get_channel_by_parties(None, counterparty, &self.self_address())
             .await?;
         if let Some(channel) = maybe_channel {
             self.redeem_tickets_in_channel(&channel, only_aggregated).await
@@ -175,7 +175,7 @@ where
     /// Otherwise, the transaction hash of the on-chain redemption is returned.
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
-        if let Some(channel) = self.db.get_channel_by_id(None, ack_ticket.ticket.channel_id).await? {
+        if let Some(channel) = self.db.get_channel_by_id(None, &ack_ticket.ticket.channel_id).await? {
             let selector = TicketSelector::from(&channel)
                 .with_index(ack_ticket.ticket.index)
                 .with_state(AcknowledgedTicketStatus::Untouched);

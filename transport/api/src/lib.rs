@@ -469,10 +469,10 @@ where
         }
     }
 
-    pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
+    pub async fn aggregate_tickets(&self, channel_id: &Hash) -> errors::Result<()> {
         let entry = self
             .db
-            .get_channel_by_id(None, *channel)
+            .get_channel_by_id(None, channel_id)
             .await
             .map_err(errors::HoprTransportError::from)
             .and_then(|c| {
@@ -630,8 +630,8 @@ where
         })
     }
 
-    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
-        if let Some(channel) = self.db.get_channel_by_id(None, *channel).await? {
+    pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+        if let Some(channel) = self.db.get_channel_by_id(None, channel_id).await? {
             if channel.destination == self.me_onchain {
                 Ok(Some(self.db.get_tickets(None, (&channel).into()).await?))
             } else {

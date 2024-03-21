@@ -176,7 +176,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
         self.db
-            .get_channel_by_parties(None, *src, *dest)
+            .get_channel_by_parties(None, src, dest)
             .await
             .map_err(HoprChainError::from)
             .and_then(|v| {
@@ -188,14 +188,11 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self.db.get_channels_via(None, ChannelDirection::Outgoing, *src).await?)
+        Ok(self.db.get_channels_via(None, ChannelDirection::Outgoing, src).await?)
     }
 
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
-        Ok(self
-            .db
-            .get_channels_via(None, ChannelDirection::Incoming, *dest)
-            .await?)
+        Ok(self.db.get_channels_via(None, ChannelDirection::Incoming, dest).await?)
     }
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {

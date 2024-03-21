@@ -715,7 +715,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .perform(|tx| {
                     Box::pin(async move {
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel_id)
+                            .get_channel_by_id(Some(tx), &channel_id)
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
@@ -857,7 +857,7 @@ impl HoprDbTicketOperations for HoprDb {
 
     async fn rollback_aggregation_in_channel(&self, channel: Hash) -> Result<()> {
         let channel_entry = self
-            .get_channel_by_id(None, channel)
+            .get_channel_by_id(None, &channel)
             .await?
             .ok_or(DbError::ChannelNotFound(channel))?;
 
@@ -900,7 +900,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .perform(|tx| {
                     Box::pin(async move {
                         let entry = myself
-                            .get_channel_by_id(Some(tx), channel_id)
+                            .get_channel_by_id(Some(tx), &channel_id)
                             .await?
                             .ok_or(DbError::ChannelNotFound(channel_id))?;
 
@@ -1057,7 +1057,7 @@ impl HoprDbTicketOperations for HoprDb {
                         )))?;
 
                     let entry = myself
-                        .get_channel_by_parties(Some(tx), myself.me_onchain, address)
+                        .get_channel_by_parties(Some(tx), &myself.me_onchain, &address)
                         .await?
                         .ok_or_else(|| DbError::ChannelNotFound(generate_channel_id(&myself.me_onchain, &address)))?;
 
@@ -1184,7 +1184,7 @@ impl HoprDbTicketOperations for HoprDb {
                             })?;
 
                             if myself
-                                .get_channel_by_parties(Some(tx), unacknowledged.signer, me_onchain)
+                                .get_channel_by_parties(Some(tx), &unacknowledged.signer, &me_onchain)
                                 .await?
                                 .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
                             {
@@ -1370,7 +1370,7 @@ impl HoprDbTicketOperations for HoprDb {
                             })?;
 
                             let channel = myself
-                                .get_channel_by_parties(Some(tx), previous_hop_addr, me_onchain)
+                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &me_onchain)
                                 .await?
                                 .ok_or_else(|| {
                                     crate::errors::DbError::LogicalError(format!(
@@ -1523,7 +1523,10 @@ impl HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
-                        if let Some(channel) = myself.get_channel_by_parties(Some(tx), me_onchain, destination).await? {
+                        if let Some(channel) = myself
+                            .get_channel_by_parties(Some(tx), &me_onchain, &destination)
+                            .await?
+                        {
                             let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
 
                             Some((

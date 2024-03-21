@@ -435,7 +435,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),
@@ -491,7 +491,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),
@@ -504,7 +504,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),
@@ -555,7 +555,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &bob_chain_key.public().to_address(),
                 &alice_chain_key.public().to_address(),
             ),
@@ -583,7 +583,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),
@@ -672,7 +672,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &bob_chain_key.public().to_address(),
                 &alice_chain_key.public().to_address(),
             ),
@@ -685,7 +685,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),
@@ -744,7 +744,7 @@ async fn integration_test_indexer() {
                 .db
                 .get_channel_by_id(
                     None,
-                    generate_channel_id(
+                    &generate_channel_id(
                         &alice_chain_key.public().to_address(),
                         &bob_chain_key.public().to_address(),
                     ),
@@ -766,7 +766,7 @@ async fn integration_test_indexer() {
         .db
         .get_channel_by_id(
             None,
-            generate_channel_id(
+            &generate_channel_id(
                 &alice_chain_key.public().to_address(),
                 &bob_chain_key.public().to_address(),
             ),

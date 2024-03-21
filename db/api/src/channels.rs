@@ -17,14 +17,14 @@ pub trait HoprDbChannelOperations {
     /// Retrieves channel by its channel ID hash.
     ///
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
-    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>>;
+    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
 
     /// Retrieves the channel by source and destination.
     async fn get_channel_by_parties<'a>(
         &'a self,
         tx: OptTx<'a>,
-        src: Address,
-        dst: Address,
+        src: &Address,
+        dst: &Address,
     ) -> Result<Option<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
@@ -32,7 +32,7 @@ pub trait HoprDbChannelOperations {
         &'a self,
         tx: OptTx<'a>,
         direction: ChannelDirection,
-        target: Address,
+        target: &Address,
     ) -> Result<Vec<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to this node.
@@ -52,14 +52,15 @@ pub trait HoprDbChannelOperations {
 
 #[async_trait]
 impl HoprDbChannelOperations for HoprDb {
-    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: Hash) -> Result<Option<ChannelEntry>> {
+    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>> {
+        let id_hex = id.to_hex();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
                         if let Some(model) = Channel::find()
-                            .filter(channel::Column::ChannelId.eq(id.to_hex()))
+                            .filter(channel::Column::ChannelId.eq(id_hex))
                             .one(tx.as_ref())
                             .await?
                         {
@@ -76,17 +77,19 @@ impl HoprDbChannelOperations for HoprDb {
     async fn get_channel_by_parties<'a>(
         &'a self,
         tx: OptTx<'a>,
-        src: Address,
-        dst: Address,
+        src: &Address,
+        dst: &Address,
     ) -> Result<Option<ChannelEntry>> {
+        let src_hex = src.to_hex();
+        let dst_hex = dst.to_hex();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbError>(
                         if let Some(model) = Channel::find()
-                            .filter(channel::Column::Source.eq(src.to_hex()))
-                            .filter(channel::Column::Destination.eq(dst.to_hex()))
+                            .filter(channel::Column::Source.eq(src_hex))
+                            .filter(channel::Column::Destination.eq(dst_hex))
                             .one(tx.as_ref())
                             .await?
                         {
@@ -104,16 +107,17 @@ impl HoprDbChannelOperations for HoprDb {
         &'a self,
         tx: OptTx<'a>,
         direction: ChannelDirection,
-        target: Address,
+        target: &Address,
     ) -> Result<Vec<ChannelEntry>> {
+        let target_hex = target.to_hex();
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     Channel::find()
                         .filter(match direction {
-                            ChannelDirection::Incoming => channel::Column::Destination.eq(target.to_string()),
-                            ChannelDirection::Outgoing => channel::Column::Source.eq(target.to_string()),
+                            ChannelDirection::Incoming => channel::Column::Destination.eq(target_hex),
+                            ChannelDirection::Outgoing => channel::Column::Source.eq(target_hex),
                         })
                         .all(tx.as_ref())
                         .await?
@@ -126,12 +130,12 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Incoming, self.me_onchain)
+        self.get_channels_via(tx, ChannelDirection::Incoming, &self.me_onchain)
             .await
     }
 
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Outgoing, self.me_onchain)
+        self.get_channels_via(tx, ChannelDirection::Outgoing, &self.me_onchain)
             .await
     }
 
@@ -201,7 +205,7 @@ mod tests {
 
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
-            .get_channel_by_id(None, ce.get_id())
+            .get_channel_by_id(None, &ce.get_id())
             .await
             .expect("must get channel")
             .expect("channel must be present");
@@ -227,7 +231,7 @@ mod tests {
 
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
-            .get_channel_by_parties(None, a, b)
+            .get_channel_by_parties(None, &a, &b)
             .await
             .expect("must get channel")
             .expect("channel must be present");
@@ -240,7 +244,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         let from_db = db
-            .get_channels_via(None, ChannelDirection::Incoming, Address::default())
+            .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
             .await
             .expect("db should not fail")
             .first()
@@ -266,7 +270,7 @@ mod tests {
 
         db.upsert_channel(None, ce).await.expect("must insert channel");
         let from_db = db
-            .get_channels_via(None, ChannelDirection::Incoming, Address::default())
+            .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
             .await
             .expect("db should not fail")
             .first()
