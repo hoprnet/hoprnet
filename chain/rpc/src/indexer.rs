@@ -162,7 +162,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                         from_block = current_block_log.block_id;
                                         continue 'outer;
                                     } else {
-                                        panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors. 
+                                        panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
 
                                         The RPC provider does not seem to be working correctly. 
                                         
