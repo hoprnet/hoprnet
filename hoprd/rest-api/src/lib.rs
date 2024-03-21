@@ -1996,7 +1996,7 @@ mod tickets {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -2031,7 +2031,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
