@@ -137,7 +137,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.push(log);
+                                    current_block_log.logs.insert(log);
                                 },
                                 Ok(None) => {
                                     trace!("done processing batch #{from_block} - #{latest_block}");

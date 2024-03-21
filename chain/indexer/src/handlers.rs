@@ -6,9 +6,10 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents,
 };
-use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
+use chain_rpc::{BlockWithLogs, Log};
+use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use chain_types::ContractAddresses;
-use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use ethers::contract::EthLogDecode;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
@@ -24,6 +25,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::ops::{Add, Sub};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 
@@ -36,7 +38,7 @@ use tracing::{debug, error, info, trace, warn};
 pub struct ContractEventHandlers<Db: Clone> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
-    addresses: ContractAddresses,
+    addresses: Arc<ContractAddresses>,
     /// Safe on-chain address which we are monitoring
     safe_address: Address,
     /// own address, aka message sender
@@ -68,7 +70,7 @@ where
 {
     pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: ChainKeypair, db: Db) -> Self {
         Self {
-            addresses,
+            addresses: Arc::new(addresses),
             safe_address,
             chain_key,
             db,
@@ -607,12 +609,47 @@ where
         }
         Ok(None)
     }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn process_log_event(&self, tx: &OpenTransaction, log: Log) -> Result<Option<ChainEventType>> {
+        trace!("processing events in {log}");
+
+        if log.address.eq(&self.addresses.announcements) {
+            let bn = log.block_number as u32;
+            let event = HoprAnnouncementsEvents::decode_log(&log.into())?;
+            self.on_announcement_event(tx, event, bn).await
+        } else if log.address.eq(&self.addresses.channels) {
+            let event = HoprChannelsEvents::decode_log(&log.into())?;
+            self.on_channel_event(tx, event).await
+        } else if log.address.eq(&self.addresses.network_registry) {
+            let event = HoprNetworkRegistryEvents::decode_log(&log.into())?;
+            self.on_network_registry_event(tx, event).await
+        } else if log.address.eq(&self.addresses.token) {
+            let event = HoprTokenEvents::decode_log(&log.into())?;
+            self.on_token_event(tx, event).await
+        } else if log.address.eq(&self.addresses.safe_registry) {
+            let event = HoprNodeSafeRegistryEvents::decode_log(&log.into())?;
+            self.on_node_safe_registry_event(tx, event).await
+        } else if log.address.eq(&self.addresses.module_implementation) {
+            let event = HoprNodeManagementModuleEvents::decode_log(&log.into())?;
+            self.on_node_management_module_event(tx, event).await
+        } else if log.address.eq(&self.addresses.price_oracle) {
+            let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
+            self.on_ticket_price_oracle_event(tx, event).await
+        } else {
+            error!(
+                "on_event error - unknown contract address: {} - received log: {log:?}",
+                log.address
+            );
+            return Err(CoreEthereumIndexerError::UnknownContract(log.address));
+        }
+    }
 }
 
 #[async_trait]
 impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync,
+    Db: HoprDbAllOperations + Clone + Send + Sync + 'static,
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -626,45 +663,37 @@ where
         ]
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn on_event(&self, address: Address, block_number: u32, log: RawLog) -> Result<Option<ChainEventType>> {
-        trace!("on_event - address: {address} - received log: {log:?}");
+    async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>> {
+        let myself = self.clone();
+        self.db
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    // In the worst case, each log contains a single event
+                    let mut ret = Vec::with_capacity(block_with_logs.logs.len());
 
-        // Enclose all operations inside transaction
-        // Cannot use `.transaction(|tx| {...})` due to impossible lifetimes.
-        let tx = self.db.begin_transaction().await?;
+                    // Process all logs in the block
+                    for log in block_with_logs.logs {
+                        let tx_hash = log.tx_hash;
 
-        let res = if address.eq(&self.addresses.announcements) {
-            let event = HoprAnnouncementsEvents::decode_log(&log)?;
-            self.on_announcement_event(&tx, event, block_number).await
-        } else if address.eq(&self.addresses.channels) {
-            let event = HoprChannelsEvents::decode_log(&log)?;
-            self.on_channel_event(&tx, event).await
-        } else if address.eq(&self.addresses.network_registry) {
-            let event = HoprNetworkRegistryEvents::decode_log(&log)?;
-            self.on_network_registry_event(&tx, event).await
-        } else if address.eq(&self.addresses.token) {
-            let event = HoprTokenEvents::decode_log(&log)?;
-            self.on_token_event(&tx, event).await
-        } else if address.eq(&self.addresses.safe_registry) {
-            let event = HoprNodeSafeRegistryEvents::decode_log(&log)?;
-            self.on_node_safe_registry_event(&tx, event).await
-        } else if address.eq(&self.addresses.module_implementation) {
-            let event = HoprNodeManagementModuleEvents::decode_log(&log)?;
-            self.on_node_management_module_event(&tx, event).await
-        } else if address.eq(&self.addresses.price_oracle) {
-            let event = HoprTicketPriceOracleEvents::decode_log(&log)?;
-            self.on_ticket_price_oracle_event(&tx, event).await
-        } else {
-            error!("on_event error - unknown contract address: {address} - received log: {log:?}");
-            Err(CoreEthereumIndexerError::UnknownContract(address))
-        };
+                        // If a significant chain event can be extracted from the log, push it
+                        if let Some(event_type) = myself.process_log_event(tx, log).await? {
+                            let significant_event = SignificantChainEvent { tx_hash, event_type };
+                            debug!("indexer got {significant_event}");
+                            ret.push(significant_event);
+                        }
+                    }
 
-        if res.is_ok() {
-            tx.commit().await?;
-        }
-
-        res
+                    // Once we're done with the block, update the DB
+                    myself
+                        .db
+                        .set_last_indexed_block(Some(tx), block_with_logs.block_id as u32)
+                        .await?;
+                    Ok(ret)
+                })
+            })
+            .await
     }
 }
 
@@ -691,6 +720,7 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
+    use chain_rpc::Log;
     use chain_types::ContractAddresses;
     use ethers::contract::EthEvent;
     use ethers::{
@@ -1690,16 +1720,22 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let log = RawLog {
+        let log = ethers::prelude::Log {
             topics: vec![TicketPriceUpdatedFilter::signature()],
-            data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]),
+            data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
+            block_number: Some(0.into()),
+            ..Default::default()
         };
 
         assert_eq!(db.get_indexer_data(None).await.unwrap().ticket_price, None);
 
-        handlers
-            .on_event(handlers.addresses.price_oracle, 0u32, log)
+        let cet = db
+            .begin_transaction()
             .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, log.into()).await }))
+            .await
+            .unwrap()
             .unwrap();
 
         // TODO: check for Vec<ChainEventType> content here
