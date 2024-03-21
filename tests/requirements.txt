@@ -7,4 +7,4 @@ ruff==0.0.261
 waiting==1.4.1
 websocket-client==1.5.1
 websockets==11.0.1
-hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python@kauki/type-renaming-2.1
+hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python@kauki/2.1.0-rc.3-updates
