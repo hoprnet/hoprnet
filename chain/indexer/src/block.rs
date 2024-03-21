@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use async_lock::RwLock;
 use async_std::task::spawn;
 use futures::{stream, StreamExt};
 use tracing::{debug, error, info, trace};
 
-use chain_db::traits::HoprCoreEthereumDbActions;
 use chain_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_primitive_types::prelude::*;
+use hopr_db_api::info::HoprDbInfoOperations;
+use hopr_db_api::HoprDbGeneralModelOperations;
 
 use crate::{errors::CoreEthereumIndexerError, traits::ChainLogHandler, IndexerConfig};
 
@@ -48,39 +47,39 @@ fn log_comparator(left: &Log, right: &Log) -> std::cmp::Ordering {
 ///
 /// Accepts the RPC operational functionality [chain_rpc::HoprIndexerRpcOperations]
 /// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
-/// streamed outside of the indexer by the unbounded channel.
+/// streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
-/// 1. prime the RPC endpoinnt
+/// 1. prime the RPC endpoint
 /// 2. request an RPC stream of changes to process
 /// 3. process block and log stream
 /// 4. ensure finalization by postponing processing until the head is far enough
 /// 5. store relevant data into the DB
 /// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
-pub struct Indexer<T, U, V>
+pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
-    db: Arc<RwLock<V>>,
+    db: Db,
     cfg: IndexerConfig,
     egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
 }
 
-impl<T, U, V> Indexer<T, U, V>
+impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    V: HoprCoreEthereumDbActions + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
         db_processor: U,
-        db: Arc<RwLock<V>>,
+        db: Db,
         cfg: IndexerConfig,
         egress: futures::channel::mpsc::UnboundedSender<SignificantChainEvent>,
     ) -> Self {
@@ -97,7 +96,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        V: HoprCoreEthereumDbActions + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -109,12 +108,11 @@ where
 
         let rpc = self.rpc.take().expect("rpc should be present");
         let db_processor = self.db_processor.take().expect("db_processor should be present");
-        let db = self.db.clone();
         let tx_significant_events = self.egress.clone();
 
-        let db_latest_block = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
+        let db_latest_block = self.db.get_indexer_data(None).await?.last_indexed_block as u64;
 
-        let latest_block_in_db = db_latest_block.unwrap_or(self.cfg.start_block_number);
+        let latest_block_in_db = self.cfg.start_block_number.max(db_latest_block);
 
         info!(
             "DB latest block: {:?}, Latest block {:?}",
@@ -139,6 +137,7 @@ where
         info!("Building indexer background process");
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
+        let db = self.db.clone();
         spawn(async move {
             let is_synced = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -192,12 +191,7 @@ where
                     }
                 })
                 .then(|block_with_logs| async {
-                    if let Err(error) = db
-                        .write()
-                        .await
-                        .update_latest_block_number(block_with_logs.block_id as u32)
-                        .await
-                    {
+                    if let Err(error) = db.set_last_indexed_block(None, block_with_logs.block_id as u32).await {
                         error!("failed to write the latest block number into the database: {error}");
                     }
 
@@ -210,16 +204,10 @@ where
                     stream::iter(block_with_logs.logs)
                 })
                 .then(|log| async {
-                    let snapshot = Snapshot::new(
-                        U256::from(log.block_number),
-                        U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                        log.log_index,
-                    );
-
                     let tx_hash = log.tx_hash;
 
                     db_processor
-                        .on_event(log.address, log.block_number as u32, log.into(), snapshot)
+                        .on_event(log.address, log.block_number as u32, log.into())
                         .await
                         .map(|v| {
                             v.map(|event_type| {
@@ -273,7 +261,6 @@ pub mod tests {
 
     use async_trait::async_trait;
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_db::db::CoreEthereumDb;
     use chain_rpc::BlockWithLogs;
     use chain_types::chain_events::ChainEventType;
     use ethers::{
@@ -283,17 +270,20 @@ pub mod tests {
     use futures::{join, Stream};
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::prelude::ChainKeypair;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::info::HoprDbInfoOperations;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
     use multiaddr::Multiaddr;
-    use utils_db::{db::DB, CurrentDbShim};
 
     use crate::traits::MockChainLogHandler;
 
     use super::*;
 
     lazy_static::lazy_static! {
-        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHRIS: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
 
@@ -304,11 +294,8 @@ pub mod tests {
         };
     }
 
-    async fn create_stub_db() -> Arc<RwLock<CoreEthereumDb<CurrentDbShim>>> {
-        Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )))
+    async fn create_stub_db() -> HoprDb {
+        HoprDb::new_in_memory(ChainKeypair::random()).await
     }
 
     fn build_announcement_logs(address: Address, size: usize, block_number: u64, log_index: U256) -> Vec<Log> {
@@ -389,12 +376,7 @@ pub mod tests {
 
         let head_block = 1000;
         let latest_block = 15u64;
-        assert!(db
-            .write()
-            .await
-            .update_latest_block_number(latest_block as u32)
-            .await
-            .is_ok());
+        db.set_last_indexed_block(None, latest_block as u32).await.unwrap();
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
@@ -487,7 +469,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(finalized_block.logs.len())
-            .returning(|_, _, _, _| Ok(None));
+            .returning(|_, _, _| Ok(None));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -542,7 +524,7 @@ pub mod tests {
         handlers
             .expect_on_event()
             .times(blocks.len())
-            .returning(|_, _, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
+            .returning(|_, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());

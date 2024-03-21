@@ -1,7 +1,6 @@
 use chain_rpc::errors::RpcError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
 
 /// Enumerates all Chain Actions related errors.
 #[derive(Debug, Error)]
@@ -55,7 +54,7 @@ pub enum ChainActionsError {
     MissingDomainSeparator,
 
     #[error(transparent)]
-    DbError(#[from] DbError),
+    DbError(#[from] hopr_db_api::errors::DbError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),

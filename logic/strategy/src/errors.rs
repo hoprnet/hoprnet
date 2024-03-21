@@ -1,7 +1,7 @@
 use chain_actions::errors::ChainActionsError;
+use hopr_db_api::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
-use utils_db::errors::DbError;
 
 /// Enumerates all errors in this crate.
 #[derive(Debug, Error)]
@@ -14,6 +14,9 @@ pub enum StrategyError {
 
     #[error(transparent)]
     DbError(#[from] DbError),
+
+    #[error(transparent)]
+    ProtocolError(#[from] core_protocol::errors::ProtocolError),
 
     #[error(transparent)]
     ActionsError(#[from] ChainActionsError),
