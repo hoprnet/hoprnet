@@ -175,12 +175,9 @@ where
                         block_with_logs
                     }
                 })
-                .then(|block_with_logs| async {
+                .filter_map(|block_with_logs| async {
                     debug!("processing events in {block_with_logs} ...");
-                    db_processor.collect_block_events(block_with_logs).await
-                })
-                .filter_map(|maybe_events| async {
-                    match maybe_events {
+                    match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
                             debug!("processed {} significant chain events", events.len());
                             Some(events)
