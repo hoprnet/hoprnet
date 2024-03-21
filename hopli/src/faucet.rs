@@ -20,7 +20,8 @@
 //!     --identity-directory "./test" --identity-prefix node_ \
 //!     --password-path "./test/pwd" \
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-//!     --hopr-amount 10 --native-amount 0.1
+//!     --hopr-amount 10 --native-amount 0.1 \
+//!     --provider-url "http://localhost:8545"
 //! ```
 use crate::{
     environment_config::NetworkProviderArgs,

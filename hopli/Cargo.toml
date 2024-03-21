@@ -23,6 +23,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 chain-rpc = {workspace = true}
 chain-api = {workspace = true}
+hopr-lib = { workspace = true }
 chain-types = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }

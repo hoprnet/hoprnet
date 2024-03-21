@@ -3398,6 +3398,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
  "serde",

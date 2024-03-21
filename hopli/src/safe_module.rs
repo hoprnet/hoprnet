@@ -38,7 +38,8 @@
 //!     --hopr-amount 10 \
 //!     --native-amount 0.1 \
 //!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+//!     --provider-url "http://localhost:8545"
 //!```
 //!
 //! - Migrate nodes and safe to a new network
@@ -51,7 +52,8 @@
 //!     --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
 //!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
 //!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+//!     --provider-url "http://localhost:8545"
 //! ```
 //!
 //! - Move registered nodes to a different set of safe and module
@@ -64,7 +66,8 @@
 //!     --new-module-address 0x3086c20265cf742b169b05cd0eae1941455e4e9f \
 //!     --node-address 0x93a50B0fFF7b4ED36A3C6445e280E72AC2AEFc51,0x58033D3074D001a32bF379801eaf8969817fFfCf,0xeEDaab91158928647a9270Fe290897eBB1230250 \
 //!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+//!     --provider-url "http://localhost:8545"
 //! ```
 use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
 use crate::{

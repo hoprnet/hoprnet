@@ -24,7 +24,7 @@ pub mod errors;
 mod helpers;
 
 pub use {
-    chain::{Network as ChainNetwork, ProtocolsConfig},
+    chain::{Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::ChainActionsError,
     core_strategy::Strategy,
     core_transport::{
