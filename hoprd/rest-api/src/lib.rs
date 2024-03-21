@@ -2511,7 +2511,7 @@ mod node {
                     hopr_node_safe_registry: chain_config.node_safe_registry,
                     hopr_management_module: chain_config.module_implementation,
                     hopr_node_safe: safe_config.safe_address,
-                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
                     connectivity_status: hopr.network_health().await,
                     channel_closure_period: channel_closure_notice_period.as_secs(),
                 };
@@ -2563,7 +2563,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await?,
                         },
                     );
                 }

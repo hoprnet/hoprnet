@@ -14,6 +14,5 @@ pub trait ChainLogHandler {
         address: Address,
         block_number: u32,
         log: RawLog,
-        snapshot: Snapshot,
     ) -> crate::errors::Result<Option<ChainEventType>>;
 }

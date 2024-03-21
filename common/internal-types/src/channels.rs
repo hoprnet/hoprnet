@@ -38,6 +38,17 @@ pub enum ChannelStatus {
     PendingToClose(SystemTime),
 }
 
+// Cannot use #[repr(u8)] due to PendingToClose
+impl From<ChannelStatus> for u8 {
+    fn from(value: ChannelStatus) -> Self {
+        match value {
+            ChannelStatus::Closed => 0,
+            ChannelStatus::Open => 1,
+            ChannelStatus::PendingToClose(_) => 2,
+        }
+    }
+}
+
 // Manual implementation of PartialEq, because we need only precision up to seconds in PendingToClose
 impl PartialEq for ChannelStatus {
     fn eq(&self, other: &Self) -> bool {
@@ -107,6 +118,7 @@ impl ChannelEntry {
 
     /// Checks if the closure time of this channel has passed.
     /// Also returns `false` if the channel closure has not been initiated (it is in `Open` state).
+    /// Returns also `true`, if the channel is in `Closed` state.
     pub fn closure_time_passed(&self, current_time: SystemTime) -> bool {
         match self.status {
             ChannelStatus::Open => false,

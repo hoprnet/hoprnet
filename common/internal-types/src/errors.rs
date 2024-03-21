@@ -14,7 +14,7 @@ pub enum CoreTypesError {
     #[error("Arithmetic error: {0}")]
     ArithmeticError(String),
 
-    #[error("Ticket seems to be destined for a different node")]
+    #[error("Invalid ticket signature or wrong ticket recipient")]
     InvalidTicketRecipient,
 
     #[error("Cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]

@@ -40,7 +40,6 @@
 
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use strum::{Display, EnumString, EnumVariantNames};
 
 use crate::aggregating::AggregatingStrategyConfig;
@@ -97,7 +96,6 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             Aggregating(AggregatingStrategyConfig {
                 aggregation_threshold: Some(100),
                 unrealized_balance_ratio: Some(0.9),
-                aggregation_timeout: Duration::from_secs(60),
                 aggregate_on_channel_close: true,
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
