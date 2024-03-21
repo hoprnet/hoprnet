@@ -10,6 +10,7 @@ use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -58,9 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .with_trace_config(
                 opentelemetry_sdk::trace::config()
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(RandomIdGenerator::default())
                     .with_max_events_per_span(64)
                     .with_max_attributes_per_span(16)
-                    .with_max_events_per_span(16)
                     .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
                         "service.name",
                         env!("CARGO_PKG_NAME"),
