@@ -637,6 +637,7 @@ impl HoprTransport {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         let db = self.db.read().await;
 
