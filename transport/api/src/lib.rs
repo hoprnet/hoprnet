@@ -651,7 +651,6 @@ where
         } else {
             Ok(None)
         }
-        å
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
