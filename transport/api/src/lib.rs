@@ -643,18 +643,6 @@ where
     }
 
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
-        todo!()
-        /*Ok(self
-        .db
-        .read()
-        .await
-        .get_acknowledged_tickets(None)
-        .await
-        .map(|tickets| {
-            tickets
-                .into_iter()
-                .map(|acked_ticket| acked_ticket.ticket)
-                .collect::<Vec<_>>()
-        })?)*/
+        Ok(self.db.get_all_tickets().await?.into_iter().map(|v| v.ticket).collect())
     }
 }
