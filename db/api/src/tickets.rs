@@ -220,6 +220,10 @@ pub trait HoprDbTicketOperations {
     /// Returns the number of tickets that were neglected.
     async fn mark_tickets_neglected(&self, selector: TicketSelector) -> Result<usize>;
 
+    /// Updates the ticket statistics according to the fact that the given ticket has
+    /// been rejected by the packet processing pipeline.
+    async fn mark_ticket_rejected(&self, ticket_value: Balance) -> Result<()>;
+
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
     /// Returns the updated tickets in the new state.
     async fn update_ticket_states_and_fetch<'a>(
@@ -487,6 +491,30 @@ impl HoprDbTicketOperations for HoprDb {
                         selector.channel_id
                     );
                     Ok(neglectable_count)
+                })
+            })
+            .await
+    }
+
+    async fn mark_ticket_rejected(&self, ticket_value: Balance) -> Result<()> {
+        self.ticket_manager
+            .with_write_locked_db(|tx| {
+                Box::pin(async move {
+                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+
+                    let current_rejected_value = U256::from_be_bytes(stats.rejected_value.clone());
+                    let current_rejected_count = stats.rejected_tickets;
+
+                    let mut active_stats = stats.into_active_model();
+                    active_stats.rejected_tickets = Set(current_rejected_count + 1i32);
+                    active_stats.rejected_value =
+                        Set((current_rejected_value + ticket_value.amount()).to_be_bytes().into());
+                    active_stats.save(tx.as_ref()).await?;
+
+                    Ok::<(), crate::errors::DbError>(())
                 })
             })
             .await
@@ -1361,7 +1389,6 @@ impl HoprDbTicketOperations for HoprDb {
                 path_pos,
             } => {
                 let myself = self.clone();
-                let ticket_manager = self.ticket_manager.clone();
 
                 let t = match self
                     .begin_transaction()
@@ -1475,39 +1502,21 @@ impl HoprDbTicketOperations for HoprDb {
                 {
                     Ok(ticket) => Ok(ticket),
                     Err(crate::errors::DbError::TicketValidationError(boxed_error)) => {
-                        let (t, e) = *boxed_error;
-                        let rejected_value = t.amount;
-                        warn!("Encountered validation error during forwarding for ticket with value: {rejected_value}");
+                        let (rejected_ticket, error) = *boxed_error;
+                        let rejected_value = rejected_ticket.amount;
+                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
 
-                        ticket_manager
-                            .with_write_locked_db(|tx| {
-                                Box::pin(async move {
-                                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                                        .one(tx.as_ref())
-                                        .await?
-                                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+                        self.mark_ticket_rejected(rejected_value).await.map_err(|e| {
+                            crate::errors::DbError::TicketValidationError(Box::new((
+                                rejected_ticket.clone(),
+                                format!("during validation error '{error}' update another error occurred: {e}"),
+                            )))
+                        })?;
 
-                                    let current_rejected_value = U256::from_be_bytes(stats.rejected_value.clone());
-                                    let current_rejected_count = stats.rejected_tickets;
-
-                                    let mut active_stats = stats.into_active_model();
-                                    active_stats.rejected_tickets = Set(current_rejected_count + 1i32);
-                                    active_stats.rejected_value =
-                                        Set((current_rejected_value + rejected_value.amount()).to_be_bytes().into());
-                                    active_stats.save(tx.as_ref()).await?;
-
-                                    Ok::<(), crate::errors::DbError>(())
-                                })
-                            })
-                            .await
-                            .map_err(|ei| {
-                                crate::errors::DbError::TicketValidationError(Box::new((
-                                    t.clone(),
-                                    format!("during validation error '{e}' update another error occured: {ei}"),
-                                )))
-                            })?;
-
-                        Err(crate::errors::DbError::TicketValidationError(Box::new((t, e))))
+                        Err(crate::errors::DbError::TicketValidationError(Box::new((
+                            rejected_ticket,
+                            error,
+                        ))))
                     }
                     Err(e) => Err(e),
                 }?;
@@ -1902,6 +1911,22 @@ mod tests {
             stats.neglected_value,
             "there must be a neglected value"
         );
+    }
+
+    #[async_std::test]
+    async fn test_mark_ticket_rejected() {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await;
+
+        let stats = db.get_ticket_statistics(None).await.unwrap();
+        assert_eq!(0, stats.rejected_tickets);
+        assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
+
+        let value = BalanceType::HOPR.balance(10);
+        db.mark_ticket_rejected(value).await.unwrap();
+
+        let stats = db.get_ticket_statistics(None).await.unwrap();
+        assert_eq!(1, stats.rejected_tickets);
+        assert_eq!(value, stats.rejected_value);
     }
 
     #[async_std::test]
