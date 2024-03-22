@@ -223,28 +223,18 @@ impl ChainNetworkConfig {
     }
 }
 
-// TODO: parts to be replaced by chain_types::ContractAddresses
-#[derive(Debug, Serialize, Clone)]
-pub struct SmartContractConfig {
-    pub hopr_announcements_address: Address,
-    pub hopr_token_address: Address,
-    pub hopr_channels_address: Address,
-    pub hopr_network_registry_address: Address,
-    pub hopr_node_safe_registry_address: Address,
-    pub hopr_ticket_price_oracle_address: Address,
-    pub indexer_start_block_number: u32,
-}
-
-impl From<&ChainNetworkConfig> for SmartContractConfig {
+impl From<&ChainNetworkConfig> for ContractAddresses {
     fn from(network: &ChainNetworkConfig) -> Self {
         Self {
-            hopr_announcements_address: network.announcements,
-            hopr_token_address: network.token,
-            hopr_channels_address: network.channels,
-            hopr_network_registry_address: network.network_registry,
-            hopr_node_safe_registry_address: network.node_safe_registry,
-            hopr_ticket_price_oracle_address: network.ticket_price_oracle,
-            indexer_start_block_number: network.channel_contract_deploy_block,
+            token: network.token,
+            channels: network.channels,
+            announcements: network.announcements,
+            network_registry: network.network_registry,
+            network_registry_proxy: network.network_registry_proxy,
+            safe_registry: network.node_safe_registry,
+            price_oracle: network.ticket_price_oracle,
+            stake_factory: network.node_stake_v2_factory,
+            module_implementation: network.module_implementation,
         }
     }
 }
