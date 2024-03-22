@@ -205,7 +205,11 @@ where
                 }
             }
 
-            panic!("Indexer event stream has been terminated, cannot proceed further!");
+            panic!(
+                "Indexer event stream has been terminated, cannot proceed further!\n\
+                This error indicates that an issue has occurred at the RPC provider!\n\
+                The node cannot function without a good RPC connection."
+            );
         });
 
         if std::future::poll_fn(|cx| futures::Stream::poll_next(std::pin::Pin::new(&mut rx), cx))
