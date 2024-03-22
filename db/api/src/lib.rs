@@ -186,6 +186,7 @@ pub trait HoprDbAllOperations:
 
 #[doc(hidden)]
 pub mod prelude {
+    pub use super::*;
     pub use crate::accounts::*;
     pub use crate::channels::*;
     pub use crate::db::*;

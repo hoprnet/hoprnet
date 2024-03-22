@@ -728,6 +728,7 @@ pub mod tests {
     use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
+    use hopr_db_api::prelude::HoprDbResolverOperations;
     use hopr_db_api::registry::HoprDbRegistryOperations;
     use hopr_db_api::tickets::HoprDbTicketOperations;
     use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations};
@@ -937,6 +938,18 @@ pub mod tests {
             announced_account_entry
         );
 
+        assert_eq!(
+            Some(*SELF_CHAIN_ADDRESS),
+            db.resolve_chain_key(SELF_PRIV_KEY.public()).await.unwrap(),
+            "must resolve correct chain key"
+        );
+
+        assert_eq!(
+            Some(*SELF_PRIV_KEY.public()),
+            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await.unwrap(),
+            "must resolve correct packet key"
+        );
+
         let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
 
         let address_announcement_dns_log = ethers::prelude::Log {
@@ -985,6 +998,18 @@ pub mod tests {
                 .unwrap()
                 .unwrap(),
             announced_dns_account_entry
+        );
+
+        assert_eq!(
+            Some(*SELF_CHAIN_ADDRESS),
+            db.resolve_chain_key(SELF_PRIV_KEY.public()).await.unwrap(),
+            "must resolve correct chain key"
+        );
+
+        assert_eq!(
+            Some(*SELF_PRIV_KEY.public()),
+            db.resolve_packet_key(&SELF_CHAIN_ADDRESS).await.unwrap(),
+            "must resolve correct packet key"
         );
     }
 
