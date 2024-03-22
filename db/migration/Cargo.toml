@@ -16,4 +16,5 @@ path = "src/lib.rs"
 [dependencies]
 async-std = { workspace = true, features = ["attributes", "tokio1"] }
 sea-orm-migration = { workspace = true }
+hopr-primitive-types = { workspace = true }
 

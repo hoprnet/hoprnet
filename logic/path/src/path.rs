@@ -1,16 +1,16 @@
+use std::collections::{hash_map::RandomState, HashSet};
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
+
 use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::protocol::PeerAddressResolver;
-use hopr_primitive_types::primitives::Address;
-use hopr_primitive_types::traits::ToHex;
 use libp2p_identity::PeerId;
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::hash::Hash;
+
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::{primitives::Address, traits::ToHex};
 
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
@@ -108,14 +108,18 @@ impl ChannelPath {
     /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
     /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
-    pub async fn into_path<R: PeerAddressResolver>(self, resolver: &R, destination: Address) -> Result<TransportPath> {
+    pub async fn into_path<R: HoprDbResolverOperations>(
+        self,
+        resolver: &R,
+        destination: Address,
+    ) -> Result<TransportPath> {
         let mut hops = self
             .hops
             .iter()
             .map(|addr| {
                 resolver
                     .resolve_packet_key(addr)
-                    .map(move |opt| opt.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
+                    .map(move |opt| opt?.map(PeerId::from).ok_or(InvalidPeer(addr.to_string())))
             })
             .collect::<FuturesOrdered<_>>()
             .try_collect::<Vec<PeerId>>()
@@ -123,7 +127,7 @@ impl ChannelPath {
 
         let last_hop = resolver
             .resolve_packet_key(&destination)
-            .await
+            .await?
             .ok_or(InvalidPeer(destination.to_string()))?;
 
         hops.push(last_hop.into());
@@ -169,7 +173,7 @@ impl TransportPath {
     /// To do an inverse resolution, from [Addresses](Address) to `PeerId`s, construct the [ChannelPath] and use its `to_path()` method to resolve the
     /// on-chain path.
     /// The given [resolver](PeerAddressResolver) is used for the mapping between `PeerId`s and `Address`es.
-    pub async fn resolve<R: PeerAddressResolver>(
+    pub async fn resolve<R: HoprDbResolverOperations>(
         peers: Vec<PeerId>,
         resolver: &R,
         graph: &ChannelGraph,
@@ -185,7 +189,7 @@ impl TransportPath {
                     let key = OffchainPublicKey::try_from(peer)?;
                     resolver
                         .resolve_chain_key(&key)
-                        .await
+                        .await?
                         .map(|addr| (addr, peer))
                         .ok_or(InvalidPeer(peer.to_string()))
                 })
@@ -406,13 +410,19 @@ mod tests {
     struct TestResolver(Vec<(OffchainPublicKey, Address)>);
 
     #[async_trait]
-    impl PeerAddressResolver for TestResolver {
-        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-            self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk)
+    impl HoprDbResolverOperations for TestResolver {
+        async fn resolve_packet_key(
+            &self,
+            onchain_key: &Address,
+        ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
+            Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
         }
 
-        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-            self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+        async fn resolve_chain_key(
+            &self,
+            offchain_key: &OffchainPublicKey,
+        ) -> hopr_db_api::errors::Result<Option<Address>> {
+            Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
         }
     }
 

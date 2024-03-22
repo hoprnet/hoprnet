@@ -31,7 +31,7 @@ impl Acknowledgement {
     }
 
     /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
-    /// any operations with the deserialized acknowledgment will panic.
+    /// any operations with the deserialized acknowledgement will panic.
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature
@@ -76,20 +76,33 @@ impl BinarySerializable for Acknowledgement {
 
 /// Status of the acknowledged ticket.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display, strum::EnumString)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    num_enum::IntoPrimitive,
+    num_enum::TryFromPrimitive,
+)]
 #[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
     #[default]
-    Untouched,
-    /// Ticket is currently being redeemed in and on-going redemption process
-    BeingRedeemed,
-    /// Ticket is currently being aggregated in and on-going aggregation process
-    BeingAggregated,
+    Untouched = 0,
+    /// Ticket is currently being redeemed in and ongoing redemption process
+    BeingRedeemed = 1,
+    /// Ticket is currently being aggregated in and ongoing aggregation process
+    BeingAggregated = 2,
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -98,6 +111,17 @@ pub struct AcknowledgedTicket {
     pub vrf_params: VrfParameters,
     pub signer: Address,
 }
+
+impl PartialEq for AcknowledgedTicket {
+    fn eq(&self, other: &Self) -> bool {
+        self.status == other.status
+            && self.ticket == other.ticket
+            && self.response == other.response
+            && self.signer == other.signer
+    }
+}
+
+impl Eq for AcknowledgedTicket {}
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

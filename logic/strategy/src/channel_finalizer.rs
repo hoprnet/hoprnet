@@ -1,16 +1,15 @@
-use async_lock::RwLock;
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
-use chain_db::traits::HoprCoreEthereumDbActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use hopr_db_api::accounts::HoprDbAccountOperations;
+use hopr_db_api::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
 use std::ops::Sub;
-use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use validator::Validate;
@@ -47,28 +46,28 @@ pub struct ClosureFinalizerStrategyConfig {
 /// which have elapsed the grace period.
 pub struct ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
-    db: Arc<RwLock<Db>>,
+    db: Db,
     cfg: ClosureFinalizerStrategyConfig,
     chain_actions: A,
 }
 
 impl<Db, A> ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
     /// Constructs the strategy.
-    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Arc<RwLock<Db>>, chain_actions: A) -> Self {
+    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Db, chain_actions: A) -> Self {
         Self { db, chain_actions, cfg }
     }
 }
 
 impl<Db, A> Display for ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + Clone + Send + Sync,
     A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -79,13 +78,13 @@ where
 #[async_trait]
 impl<Db, A> SingularStrategy for ClosureFinalizerStrategy<Db, A>
 where
-    Db: HoprCoreEthereumDbActions + Clone + Send + Sync,
+    Db: HoprDbChannelOperations + HoprDbAccountOperations + Clone + Send + Sync,
     A: ChannelActions + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
+        let outgoing_channels = self.db.get_outgoing_channels(None).await?;
 
         let to_close = outgoing_channels
             .iter()
@@ -124,7 +123,6 @@ where
 mod tests {
     use super::*;
     use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_db::db::CoreEthereumDb;
     use chain_types::actions::Action;
     use chain_types::chain_events::ChainEventType;
     use futures::future::ok;
@@ -132,16 +130,20 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_api::db::HoprDb;
+    use hopr_db_api::HoprDbGeneralModelOperations;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
     use std::ops::Add;
     use std::time::SystemTime;
-    use utils_db::db::DB;
-    use utils_db::CurrentDbShim;
 
     lazy_static! {
-        static ref ALICE: Address = hex!("bcc0c23fb7f4cdbdd9ff68b59456ab5613b858f8").into();
+        static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
+        static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
@@ -174,10 +176,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() {
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(CurrentDbShim::new_in_memory().await),
-            *ALICE,
-        )));
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
 
         let max_closure_overdue = Duration::from_secs(600);
 
@@ -190,11 +189,6 @@ mod tests {
             ChannelStatus::Open,
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&c_open.get_id(), &c_open, &Default::default())
-            .await
-            .unwrap();
 
         // Should leave this unfinalized, because the channel closure period has not yet elapsed
         let c_pending = ChannelEntry::new(
@@ -205,11 +199,6 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&c_pending.get_id(), &c_pending, &Default::default())
-            .await
-            .unwrap();
 
         // Should finalize closure of this channel
         let c_pending_elapsed = ChannelEntry::new(
@@ -220,11 +209,6 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
             0.into(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&c_pending_elapsed.get_id(), &c_pending_elapsed, &Default::default())
-            .await
-            .unwrap();
 
         // Should leave this unfinalized, because the channel closure is long overdue
         let c_pending_overdue = ChannelEntry::new(
@@ -235,9 +219,19 @@ mod tests {
             ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
             0.into(),
         );
-        db.write()
+
+        let db_clone = db.clone();
+        db.begin_transaction()
             .await
-            .update_channel_and_snapshot(&c_pending_overdue.get_id(), &c_pending_overdue, &Default::default())
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone.upsert_channel(Some(tx), c_open).await?;
+                    db_clone.upsert_channel(Some(tx), c_pending).await?;
+                    db_clone.upsert_channel(Some(tx), c_pending_elapsed).await?;
+                    db_clone.upsert_channel(Some(tx), c_pending_overdue).await
+                })
+            })
             .await
             .unwrap();
 

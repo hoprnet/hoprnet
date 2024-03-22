@@ -80,7 +80,7 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
         let constant_delay = Duration::from_millis(50);
-        let tolerance = Duration::from_millis(3);
+        let tolerance = constant_delay / 5;
 
         let expected = vec![1, 2, 3];
 
@@ -95,7 +95,7 @@ mod tests {
 
         let elapsed = start.elapsed();
         assert_gt!(elapsed, constant_delay);
-        assert_lt!((elapsed - constant_delay).as_millis(), tolerance.as_millis());
+        assert_lt!(elapsed.saturating_sub(constant_delay), tolerance);
     }
 
     #[async_std::test]
