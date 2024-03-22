@@ -53,6 +53,11 @@ fn init_logger() {
     let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+}
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_logger();
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
