@@ -460,6 +460,7 @@ impl HoprTransport {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
         let entry = self
             .db
@@ -488,6 +489,7 @@ impl HoprTransport {
             .await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
         let db = self.db.read().await;
 
@@ -510,6 +512,7 @@ impl HoprTransport {
         Ok(public_nodes)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> bool {
         let db = self.db.read().await;
 
@@ -522,6 +525,7 @@ impl HoprTransport {
         false
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         // TODO: can fail with the Result?
         self.network
@@ -532,6 +536,7 @@ impl HoprTransport {
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
         let mut mas = self
             .local_multiaddresses()
@@ -564,6 +569,7 @@ impl HoprTransport {
         self.my_multiaddresses.clone()
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -573,6 +579,7 @@ impl HoprTransport {
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -582,18 +589,22 @@ impl HoprTransport {
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_health(&self) -> Health {
         self.network.health().await
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
         Ok(self.network.peer_filter(|peer| async move { Some(peer.id) }).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
         Ok(self.network.get(peer).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
         let db = self.db.read().await;
 
@@ -642,6 +653,7 @@ impl HoprTransport {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
         Ok(self
             .db

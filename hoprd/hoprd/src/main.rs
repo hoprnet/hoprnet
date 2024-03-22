@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_level(true)
         .with_target(true)
         .with_thread_ids(true)
-        .with_thread_names(true)
+        .with_thread_names(true);
 
     if let Ok(telemetry_url) = std::env::var("OPENTELEMETRY_COLLECTOR_URL") {
         let tracer = opentelemetry_otlp::new_pipeline()

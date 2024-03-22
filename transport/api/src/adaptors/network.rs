@@ -16,6 +16,7 @@ impl ExternalNetworkInteractions {
 }
 
 impl NetworkExternalActions for ExternalNetworkInteractions {
+    #[tracing::instrument(level = "debug", skip(self))]
     fn emit(&self, event: NetworkEvent) {
         if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)

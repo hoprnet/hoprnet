@@ -29,6 +29,7 @@ impl HeartbeatExternalApi for HeartbeatExternalInteractions {
     /// Get all peers considered by the `Network` to be pingable.
     ///
     /// After a duration of non-pinging based specified by the configurable threshold.
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<PeerId> {
         self.network
             .find_peers_to_ping(from_timestamp)
