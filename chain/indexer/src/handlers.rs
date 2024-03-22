@@ -86,13 +86,17 @@ where
         match event {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 trace!(
-                    "on_announcement_event - multiaddr: {:?} - node: {:?}",
+                    "on_announcement_event - multiaddr: {} - node: {}",
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
                 );
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.base_multiaddr.is_empty() {
-                    return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
+                    warn!(
+                        "encountered empty multiaddress announcement for account {}",
+                        address_announcement.node
+                    );
+                    return Ok(None);
                 }
                 let node_address: Address = address_announcement.node.into();
 
@@ -447,7 +451,7 @@ where
                     &self.safe_address, approved.value
                 );
 
-                // if approval is for tokens on Safe contract to be spend by HoprChannels
+                // if approval is for tokens on Safe contract to be spent by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
                     self.db
                         .set_safe_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
@@ -519,13 +523,9 @@ where
                     .await?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    network_registry_enabled: Set(enabled.is_enabled),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db
+                    .set_network_registry_enabled(Some(tx), enabled.is_enabled)
+                    .await?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -700,9 +700,8 @@ where
 #[cfg(test)]
 pub mod tests {
     use std::sync::atomic::Ordering;
+    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    use crate::traits::ChainLogHandler;
 
     use super::ContractEventHandlers;
     use async_std;
@@ -720,11 +719,11 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use chain_rpc::Log;
+    use chain_types::chain_events::ChainEventType;
     use chain_types::ContractAddresses;
     use ethers::contract::EthEvent;
     use ethers::{
-        abi::{encode, Address as EthereumAddress, RawLog, Token},
+        abi::{encode, Address as EthereumAddress, Token},
         types::U256 as EthU256,
     };
     use hex_literal::hex;
@@ -735,14 +734,12 @@ pub mod tests {
     use hopr_db_api::info::HoprDbInfoOperations;
     use hopr_db_api::registry::HoprDbRegistryOperations;
     use hopr_db_api::tickets::HoprDbTicketOperations;
-    use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations, SINGULAR_TABLE_FIXED_ID};
-    use hopr_db_entity::chain_info;
+    use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations};
     use hopr_internal_types::prelude::*;
     use hopr_internal_types::ChainOrPacketKey;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use sea_orm::{ActiveModelTrait, Set};
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -766,7 +763,7 @@ pub mod tests {
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
         ContractEventHandlers {
-            addresses: ContractAddresses {
+            addresses: Arc::new(ContractAddresses {
                 channels: *CHANNELS_ADDR,
                 token: *TOKEN_ADDR,
                 network_registry: *NETWORK_REGISTRY_ADDR,
@@ -776,10 +773,26 @@ pub mod tests {
                 module_implementation: *SAFE_MANAGEMENT_MODULE_ADDR,
                 price_oracle: *TICKET_PRICE_ORACLE_ADDR,
                 stake_factory: Default::default(),
-            },
+            }),
             chain_key: SELF_CHAIN_KEY.clone(),
             safe_address: SELF_CHAIN_KEY.public().to_address(),
             db,
+        }
+    }
+
+    fn test_log() -> ethers::prelude::Log {
+        ethers::prelude::Log {
+            address: Default::default(),
+            topics: vec![],
+            data: Default::default(),
+            block_hash: Some(H256::zero()),
+            block_number: Some(0.into()),
+            transaction_hash: Some(H256::zero()),
+            transaction_index: Some(0.into()),
+            log_index: Some(0.into()),
+            transaction_log_index: None,
+            log_type: None,
+            removed: None,
         }
     }
 
@@ -791,7 +804,8 @@ pub mod tests {
 
         let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
-        let keybinding_log = RawLog {
+        let keybinding_log = ethers::prelude::Log {
+            address: handlers.addresses.announcements.into(),
             topics: vec![KeyBindingFilter::signature()],
             data: encode(&[
                 Token::FixedBytes(Vec::from(keybinding.signature.to_bytes())),
@@ -799,15 +813,22 @@ pub mod tests {
                 Token::Address(EthereumAddress::from_slice(
                     &SELF_CHAIN_KEY.public().to_address().to_bytes(),
                 )),
-            ]),
+            ])
+            .into(),
+            ..test_log()
         };
 
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
-        handlers
-            .on_event(handlers.addresses.announcements, 0u32, keybinding_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, keybinding_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "keybinding does not have a chain event type");
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -830,18 +851,36 @@ pub mod tests {
 
         let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
 
-        let address_announcement_empty_log = RawLog {
+        let address_announcement_empty_log = ethers::prelude::Log {
+            address: handlers.addresses.announcements.into(),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
                 Token::String(test_multiaddr_empty.to_string()),
-            ]),
+            ])
+            .into(),
+            ..test_log()
         };
 
-        let _error = handlers
-            .on_event(handlers.addresses.announcements, 0u32, address_announcement_empty_log)
+        let handlers_clone = handlers.clone();
+        let event_type = db
+            .begin_transaction()
             .await
-            .unwrap_err();
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    handlers_clone
+                        .process_log_event(tx, address_announcement_empty_log.into())
+                        .await
+                })
+            })
+            .await
+            .unwrap();
+
+        assert!(
+            event_type.is_none(),
+            "announcement of empty multiaddresses must pass through"
+        );
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -853,12 +892,16 @@ pub mod tests {
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
-        let address_announcement_log = RawLog {
+        let address_announcement_log = ethers::prelude::Log {
+            address: handlers.addresses.announcements.into(),
+            block_number: Some(1.into()),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
                 Token::String(test_multiaddr.to_string()),
-            ]),
+            ])
+            .into(),
+            ..test_log()
         };
 
         let announced_account_entry = AccountEntry::new(
@@ -870,10 +913,22 @@ pub mod tests {
             },
         );
 
-        handlers
-            .on_event(handlers.addresses.announcements, 1u32, address_announcement_log)
+        let handlers_clone = handlers.clone();
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    handlers_clone
+                        .process_log_event(tx, address_announcement_log.into())
+                        .await
+                })
+            })
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::Announcement { .. })));
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -885,12 +940,16 @@ pub mod tests {
 
         let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
 
-        let address_announcement_dns_log = RawLog {
+        let address_announcement_dns_log = ethers::prelude::Log {
+            address: handlers.addresses.announcements.into(),
+            block_number: Some(2.into()),
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
                 Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
                 Token::String(test_multiaddr_dns.to_string()),
-            ]),
+            ])
+            .into(),
+            ..test_log()
         };
 
         let announced_dns_account_entry = AccountEntry::new(
@@ -902,10 +961,21 @@ pub mod tests {
             },
         );
 
-        handlers
-            .on_event(handlers.addresses.announcements, 2u32, address_announcement_dns_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    handlers
+                        .process_log_event(tx, address_announcement_dns_log.into())
+                        .await
+                })
+            })
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::Announcement { .. })));
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -934,19 +1004,30 @@ pub mod tests {
         );
         db.insert_account(None, announced_account_entry).await.unwrap();
 
-        let revoke_announcement_log = RawLog {
+        let revoke_announcement_log = ethers::prelude::Log {
+            address: handlers.addresses.announcements.into(),
             topics: vec![RevokeAnnouncementFilter::signature()],
             data: encode(&[Token::Address(EthereumAddress::from_slice(
                 &SELF_CHAIN_ADDRESS.to_bytes(),
-            ))]),
+            ))])
+            .into(),
+            ..test_log()
         };
 
         let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
 
-        handlers
-            .on_event(handlers.addresses.announcements, 0u32, revoke_announcement_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, revoke_announcement_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(
+            event_type.is_none(),
+            "revoke announcement does not have chain event type"
+        );
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -965,19 +1046,26 @@ pub mod tests {
 
         let value = U256::max_value();
 
-        let transferred_log = RawLog {
+        let transferred_log = ethers::prelude::Log {
+            address: handlers.addresses.token.into(),
             topics: vec![
                 TransferFilter::signature(),
                 H256::from_slice(&Address::default().to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
+            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.token, 0u32, transferred_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "token transfer does not have chain event type");
 
         assert_eq!(
             db.get_safe_balance(None).await.unwrap(),
@@ -997,19 +1085,26 @@ pub mod tests {
             .await
             .unwrap();
 
-        let transferred_log = RawLog {
+        let transferred_log = ethers::prelude::Log {
+            address: handlers.addresses.token.into(),
             topics: vec![
                 TransferFilter::signature(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&Address::default().to_bytes32()),
             ],
-            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
+            data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.token, 0u32, transferred_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "token transfer does not have chain event type");
 
         assert_eq!(db.get_safe_balance(None).await.unwrap(), BalanceType::HOPR.zero())
     }
@@ -1020,13 +1115,15 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let log = RawLog {
+        let approval_log = ethers::prelude::Log {
+            address: handlers.addresses.token.into(),
             topics: vec![
                 ApprovalFilter::signature(),
                 H256::from_slice(&handlers.safe_address.to_bytes32()),
                 H256::from_slice(&handlers.addresses.channels.to_bytes32()),
             ],
-            data: encode(&[Token::Uint(EthU256::from(1000u64))]),
+            data: encode(&[Token::Uint(EthU256::from(1000u64))]).into(),
+            ..test_log()
         };
 
         assert_eq!(
@@ -1034,10 +1131,19 @@ pub mod tests {
             Balance::new(U256::from(0u64), BalanceType::HOPR)
         );
 
-        handlers
-            .on_event(handlers.addresses.token, 0u32, log.clone())
+        let approval_log_clone = approval_log.clone();
+        let handlers_clone = handlers.clone();
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move { handlers_clone.process_log_event(tx, approval_log_clone.into()).await })
+            })
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
             db.get_safe_allowance(None).await.unwrap(),
@@ -1053,7 +1159,16 @@ pub mod tests {
             Balance::new(U256::from(10u64), BalanceType::HOPR)
         );
 
-        handlers.on_event(handlers.addresses.token, 0u32, log).await.unwrap();
+        let handlers_clone = handlers.clone();
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log.into()).await }))
+            .await
+            .unwrap();
+
+        assert!(event_type.is_none(), "token approval does not have chain event type");
 
         assert_eq!(
             db.get_safe_allowance(None).await.unwrap(),
@@ -1067,13 +1182,15 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let registered_log = RawLog {
+        let registered_log = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 RegisteredFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
         assert!(!db
@@ -1081,10 +1198,15 @@ pub mod tests {
             .await
             .unwrap());
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
 
         assert!(db
             .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
@@ -1098,13 +1220,15 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let registered_log = RawLog {
+        let registered_log = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 RegisteredByManagerFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
         assert!(!db
@@ -1112,10 +1236,15 @@ pub mod tests {
             .await
             .unwrap());
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
 
         assert!(db
             .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
@@ -1133,13 +1262,15 @@ pub mod tests {
             .await
             .unwrap();
 
-        let registered_log = RawLog {
+        let registered_log = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 DeregisteredFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
         assert!(db
@@ -1147,10 +1278,15 @@ pub mod tests {
             .await
             .unwrap());
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
 
         assert!(!db
             .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
@@ -1168,13 +1304,15 @@ pub mod tests {
             .await
             .unwrap();
 
-        let registered_log = RawLog {
+        let registered_log = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 DeregisteredByManagerFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
         assert!(db
@@ -1182,10 +1320,15 @@ pub mod tests {
             .await
             .unwrap());
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
 
         assert!(!db
             .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
@@ -1199,18 +1342,25 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let nr_enabled = RawLog {
+        let nr_enabled = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 NetworkRegistryStatusUpdatedFilter::signature(),
                 H256::from_low_u64_be(1),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, nr_enabled)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_enabled.into()).await }))
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "there's no chain event type for nr disable");
 
         assert!(db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
@@ -1221,27 +1371,27 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        chain_info::ActiveModel {
-            id: Set(SINGULAR_TABLE_FIXED_ID),
-            network_registry_enabled: Set(true),
-            ..Default::default()
-        }
-        .save(db.conn(Default::default()))
-        .await
-        .unwrap();
+        db.set_network_registry_enabled(None, true).await.unwrap();
 
-        let nr_disabled = RawLog {
+        let nr_disabled = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 NetworkRegistryStatusUpdatedFilter::signature(),
                 H256::from_low_u64_be(0),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, nr_disabled)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_disabled.into()).await }))
             .await
             .unwrap();
+
+        assert!(event_type.is_none(), "there's no chain event type for nr enable");
 
         assert!(!db.get_indexer_data(None).await.unwrap().nr_enabled);
     }
@@ -1252,19 +1402,29 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let set_eligible = RawLog {
+        let set_eligible = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 EligibilityUpdatedFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_low_u64_be(1),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, set_eligible)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible.into()).await }))
             .await
             .unwrap();
+
+        assert!(
+            event_type.is_none(),
+            "there's no chain event type for setting nr eligibility"
+        );
 
         assert!(db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
     }
@@ -1277,19 +1437,29 @@ pub mod tests {
 
         db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await.unwrap();
 
-        let set_eligible = RawLog {
+        let set_eligible = ethers::prelude::Log {
+            address: handlers.addresses.network_registry.into(),
             topics: vec![
                 EligibilityUpdatedFilter::signature(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_low_u64_be(0),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.network_registry, 0u32, set_eligible)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible.into()).await }))
             .await
             .unwrap();
+
+        assert!(
+            event_type.is_none(),
+            "there's no chain event type for unsetting nr eligibility"
+        );
 
         assert!(!db.is_safe_eligible(None, *STAKE_ADDRESS).await.unwrap())
     }
@@ -1313,18 +1483,28 @@ pub mod tests {
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
-        let balance_increased_log = RawLog {
+        let balance_increased_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelBalanceIncreasedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(solidity_balance.to_bytes()),
+            data: Vec::from(solidity_balance.to_bytes()).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, balance_increased_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(
+            event_type,
+            Some(ChainEventType::ChannelBalanceIncreased(_, _))
+        ));
 
         assert_eq!(
             solidity_balance,
@@ -1343,19 +1523,32 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let separator = Hash::default();
+        let separator = Hash::from(hopr_crypto_random::random_bytes());
 
-        let log = RawLog {
+        let channels_dst_updated = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 DomainSeparatorUpdatedFilter::signature(),
                 H256::from_slice(&separator.to_bytes()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
         assert!(db.get_indexer_data(None).await.unwrap().channels_dst.is_none());
 
-        handlers.on_event(handlers.addresses.channels, 0u32, log).await.unwrap();
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channels_dst_updated.into()).await }))
+            .await
+            .unwrap();
+
+        assert!(
+            event_type.is_none(),
+            "there's no chain event type for channel dst update"
+        );
 
         assert_eq!(
             separator,
@@ -1382,18 +1575,28 @@ pub mod tests {
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
 
-        let balance_increased_log = RawLog {
+        let balance_decreased_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelBalanceDecreasedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(solidity_balance.to_bytes()),
+            data: Vec::from(solidity_balance.to_bytes()).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, balance_increased_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_decreased_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(
+            event_type,
+            Some(ChainEventType::ChannelBalanceDecreased(_, _))
+        ));
 
         assert_eq!(
             solidity_balance,
@@ -1425,18 +1628,25 @@ pub mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let channel_closed_log = RawLog {
+        let channel_closed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelClosedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, channel_closed_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::ChannelClosed(_))));
 
         let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
@@ -1461,19 +1671,26 @@ pub mod tests {
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
-        let channel_opened_log = RawLog {
+        let channel_opened_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelOpenedFilter::signature(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::ChannelOpened(_))));
 
         let channel = db.get_channel_by_id(None, &channel_id).await.unwrap().unwrap();
 
@@ -1506,19 +1723,26 @@ pub mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let channel_opened_log = RawLog {
+        let channel_opened_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelOpenedFilter::signature(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::ChannelOpened(_))));
 
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
@@ -1536,7 +1760,7 @@ pub mod tests {
     }
 
     #[async_std::test]
-    async fn on_channel_should_not_reopene_when_not_closed() {
+    async fn on_channel_should_not_reopen_when_not_closed() {
         let db = create_db().await;
 
         let handlers = init_handlers(db.clone());
@@ -1552,17 +1776,21 @@ pub mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let channel_opened_log = RawLog {
+        let channel_opened_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 ChannelOpenedFilter::signature(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, channel_opened_log)
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log.into()).await }))
             .await
             .expect_err("should not re-open channel that is not Closed");
     }
@@ -1586,18 +1814,25 @@ pub mod tests {
 
         let ticket_index = U256::from((1u128 << 48) - 1);
 
-        let ticket_redeemed_log = RawLog {
+        let ticket_redeemed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 TicketRedeemedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(ticket_index.to_bytes()),
+            data: Vec::from(ticket_index.to_bytes()).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, ticket_redeemed_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
             .await
             .unwrap();
+
+        assert!(matches!(event_type, Some(ChainEventType::TicketRedeemed(_, _))));
 
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
@@ -1629,22 +1864,26 @@ pub mod tests {
         db.upsert_channel(None, channel).await.unwrap();
 
         let timestamp = SystemTime::now();
-        //let timestamp = U256::from((1u64 << 32) - 1);
 
-        let closure_initiated_log = RawLog {
+        let closure_initiated_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
             topics: vec![
                 OutgoingChannelClosureInitiatedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_bytes()),
+            data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_bytes()).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.channels, 0u32, closure_initiated_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, closure_initiated_log.into()).await }))
             .await
             .unwrap();
 
-        // TODO: check for Vec<ChainEventType> content here
+        assert!(matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(_))));
 
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
@@ -1657,21 +1896,26 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let safe_registered_log = RawLog {
+        let safe_registered_log = ethers::prelude::Log {
+            address: handlers.addresses.safe_registry.into(),
             topics: vec![
                 RegisteredNodeSafeFilter::signature(),
                 H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.safe_registry, 0u32, safe_registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log.into()).await }))
             .await
             .unwrap();
 
-        // TODO: check for Vec<ChainEventType> content here
+        assert!(matches!(event_type, Some(ChainEventType::NodeSafeRegistered(_))));
 
         // Nothing to check in the DB here, since we do not track this
         /*assert_eq!(
@@ -1694,21 +1938,29 @@ pub mod tests {
           .unwrap();
         */
 
-        let safe_registered_log = RawLog {
+        let safe_registered_log = ethers::prelude::Log {
+            address: handlers.addresses.safe_registry.into(),
             topics: vec![
                 DergisteredNodeSafeFilter::signature(),
                 H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
-            data: encode(&[]),
+            data: encode(&[]).into(),
+            ..test_log()
         };
 
-        handlers
-            .on_event(handlers.addresses.safe_registry, 0u32, safe_registered_log)
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log.into()).await }))
             .await
             .unwrap();
 
-        // TODO: check for Vec<ChainEventType> content here
+        assert!(
+            event_type.is_none(),
+            "there's no associated chain event type with safe deregistration"
+        );
 
         // Nothing to check in the DB here, since we do not track this
         // assert_eq!(db.read().await.is_mfa_protected().await.unwrap(), None);
@@ -1720,25 +1972,27 @@ pub mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let log = ethers::prelude::Log {
+        let price_change_log = ethers::prelude::Log {
+            address: handlers.addresses.price_oracle.into(),
             topics: vec![TicketPriceUpdatedFilter::signature()],
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
-            block_number: Some(0.into()),
-            ..Default::default()
+            ..test_log()
         };
 
         assert_eq!(db.get_indexer_data(None).await.unwrap().ticket_price, None);
 
-        let cet = db
+        let event_type = db
             .begin_transaction()
             .await
             .unwrap()
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, log.into()).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, price_change_log.into()).await }))
             .await
-            .unwrap()
             .unwrap();
 
-        // TODO: check for Vec<ChainEventType> content here
+        assert!(
+            event_type.is_none(),
+            "there's no associated chain event type with price oracle"
+        );
 
         assert_eq!(
             db.get_indexer_data(None)

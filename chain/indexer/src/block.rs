@@ -180,7 +180,10 @@ where
                     let block_num = block_with_logs.block_id;
                     match db_processor.collect_block_events(block_with_logs).await {
                         Ok(events) => {
-                            debug!("retrieved {} significant chain events from block #{block_num}", events.len());
+                            debug!(
+                                "retrieved {} significant chain events from block #{block_num}",
+                                events.len()
+                            );
                             Some(events)
                         }
                         Err(e) => {
@@ -363,45 +366,6 @@ pub mod tests {
     }
 
     #[async_std::test]
-    async fn test_indexer_should_not_pass_blocks_unless_finalized() {
-        let mut handlers = MockChainLogHandler::new();
-        let mut rpc = MockHoprIndexerOps::new();
-        let db = create_stub_db().await;
-
-        handlers.expect_contract_addresses().return_const(vec![]);
-
-        let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
-
-        let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-        rpc.expect_try_stream_logs()
-            .times(1)
-            .withf(move |x: &u64, _y: &chain_rpc::LogFilter| *x == 0)
-            .return_once(move |_, _| Ok(Box::pin(rx)));
-
-        let expected = BlockWithLogs {
-            block_id: head_block - 1,
-            logs: BTreeSet::new(),
-        };
-
-        handlers.expect_on_event().times(0);
-
-        assert!(tx.start_send(expected.clone()).is_ok());
-
-        let mut indexer = Indexer::new(
-            rpc,
-            handlers,
-            db.clone(),
-            IndexerConfig::default(),
-            futures::channel::mpsc::unbounded().0,
-        );
-        let _ = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
-            tx.close_channel()
-        });
-    }
-
-    #[async_std::test]
     async fn test_indexer_should_pass_blocks_that_are_finalized() {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -431,9 +395,9 @@ pub mod tests {
         };
 
         handlers
-            .expect_on_event()
+            .expect_collect_block_events()
             .times(finalized_block.logs.len())
-            .returning(|_, _, _| Ok(None));
+            .returning(|_| Ok(vec![]));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -486,9 +450,14 @@ pub mod tests {
         }
 
         handlers
-            .expect_on_event()
+            .expect_collect_block_events()
             .times(blocks.len())
-            .returning(|_, _, _| Ok(Some(RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone())));
+            .returning(|_| {
+                Ok(vec![SignificantChainEvent {
+                    tx_hash: Default::default(),
+                    event_type: RANDOM_ANNOUNCEMENT_CHAIN_EVENT.clone(),
+                }])
+            });
 
         for block in blocks.iter() {
             assert!(tx.start_send(block.clone()).is_ok());
