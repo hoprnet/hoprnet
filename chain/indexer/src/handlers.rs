@@ -728,7 +728,7 @@ pub mod tests {
     };
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::accounts::HoprDbAccountOperations;
+    use hopr_db_api::accounts::{HoprDbAccountOperations, ChainOrPacketKey};
     use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
@@ -736,7 +736,6 @@ pub mod tests {
     use hopr_db_api::tickets::HoprDbTicketOperations;
     use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations};
     use hopr_internal_types::prelude::*;
-    use hopr_internal_types::ChainOrPacketKey;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
     use primitive_types::H256;

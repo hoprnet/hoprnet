@@ -2,19 +2,15 @@ use std::sync::Arc;
 
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_crypto_types::types::{HalfKeyChallenge, Hash};
 use hopr_db_entity::ticket;
-use hopr_internal_types::acknowledgement::PendingAcknowledgement;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-use moka::{future::Cache, Expiry};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
-use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use tracing::log::LevelFilter;
 use crate::cache::DbCaches;
@@ -31,21 +27,6 @@ pub struct HoprDbConfig {
     pub log_slow_queries: Duration,
 }
 
-pub struct ExpiryNever;
-
-impl<K, V> Expiry<K, V> for ExpiryNever {
-    fn expire_after_create(&self, _key: &K, _value: &V, _current_time: std::time::Instant) -> Option<Duration> {
-        None
-    }
-}
-
-// TODO: hide these behind a single Arc to simplify the clone process on the HoprDb object
-// pub struct DbCaches {
-//     pub(crate) unrealized_value: Cache<Hash, Balance>,
-//     pub(crate) ticket_index: Cache<Hash, std::sync::Arc<AtomicUsize>>,
-//     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-// }
-
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) db: sea_orm::DatabaseConnection,
@@ -55,9 +36,6 @@ pub struct HoprDb {
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
     pub(crate) caches: Arc<DbCaches>,
-    // TODO: move these caches to a separate object
-    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-    pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -132,16 +110,6 @@ impl HoprDb {
             .await
             .expect("cannot apply database migration");
 
-        let unacked_tickets = Cache::builder()
-            .time_to_idle(std::time::Duration::from_secs(30))
-            .max_capacity(1_000_000_000)
-            .build();
-
-        let ticket_index = Cache::builder()
-            .expire_after(ExpiryNever {})
-            .max_capacity(10_000)
-            .build();
-
         // Reset all BeingAggregated ticket states to Untouched
         ticket::Entity::update_many()
             .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -153,16 +121,16 @@ impl HoprDb {
             .await
             .expect("must reset ticket state on init");
 
+        let caches = Arc::new(DbCaches::default());
+
         Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
             db: index_db,
             peers_db,
-            unacked_tickets,
-            ticket_index,
-            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone())),
+            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
-            caches: Arc::new(Default::default()),
+            caches,
         }
     }
 }

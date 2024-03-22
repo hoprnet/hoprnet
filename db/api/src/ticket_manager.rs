@@ -1,15 +1,14 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
-use moka::future::Cache;
 use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 
-use crate::{db::ExpiryNever, errors::Result, tickets::TicketSelector, OpenTransaction};
+use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
+use crate::cache::DbCaches;
 
 pub type WinningTicketSender = futures::channel::mpsc::Sender<AcknowledgedTicket>;
 
@@ -31,16 +30,11 @@ pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
     pub(crate) incoming_ack_tickets_tx: futures::channel::mpsc::Sender<AcknowledgedTicket>,
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
+    caches: Arc<DbCaches>
 }
 
 impl TicketManager {
-    pub fn new(tickets_db: sea_orm::DatabaseConnection) -> Self {
-        let unrealized_value = Cache::builder()
-            .expire_after(ExpiryNever {})
-            .max_capacity(10_000)
-            .build();
-
+    pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<DbCaches>) -> Self {
         let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
 
         let mutex = Arc::new(async_lock::Mutex::new(()));
@@ -67,7 +61,7 @@ impl TicketManager {
             tickets_db,
             mutex,
             incoming_ack_tickets_tx: tx,
-            unrealized_value,
+            caches,
         }
     }
 
@@ -85,7 +79,7 @@ impl TicketManager {
             ))
         })?;
 
-        self.unrealized_value.insert(channel, unrealized_value + value).await;
+        self.caches.unrealized_value.insert(channel, unrealized_value + value).await;
         Ok(())
     }
 
@@ -100,6 +94,7 @@ impl TicketManager {
         );
 
         Ok(self
+            .caches
             .unrealized_value
             .get_with(selector.channel_id, async move {
                 transaction

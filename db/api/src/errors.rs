@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::{channels::Ticket, errors::CoreTypesError};
@@ -45,6 +46,9 @@ pub enum DbError {
 
     #[error(transparent)]
     EntityError(#[from] DbEntityError),
+
+    #[error("error while inserting into cache: {0}")]
+    CacheError(#[from] Arc<Self>),
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),

@@ -426,7 +426,7 @@ impl HoprDbTicketOperations for HoprDb {
                             active_stats.save(tx.as_ref()).await?;
 
                             myself
-                                .ticket_manager
+                                .caches
                                 .unrealized_value
                                 .invalidate(&selector.channel_id)
                                 .await;
@@ -479,7 +479,7 @@ impl HoprDbTicketOperations for HoprDb {
 
                             // invalidating unrealized balance for the channel
                             myself
-                                .ticket_manager
+                                .caches
                                 .unrealized_value
                                 .invalidate(&selector.channel_id)
                                 .await;
@@ -657,7 +657,8 @@ impl HoprDbTicketOperations for HoprDb {
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
         let tkt_manager = self.ticket_manager.clone();
 
-        self.ticket_index
+        self.caches
+            .ticket_index
             .try_get_with(channel_id, async move {
                 let maybe_index = outgoing_ticket_index::Entity::find()
                     .filter(outgoing_ticket_index::Column::ChannelId.eq(channel_id.to_hex()))
@@ -695,7 +696,7 @@ impl HoprDbTicketOperations for HoprDb {
         for index_model in outgoing_indices {
             let channel_id = Hash::from_hex(&index_model.channel_id)?;
             let db_index = U256::from_be_bytes(&index_model.index).as_u64();
-            if let Some(cached_index) = self.ticket_index.get(&channel_id).await {
+            if let Some(cached_index) = self.caches.ticket_index.get(&channel_id).await {
                 // Note that the persisted value is always lagging behind the cache,
                 // so the fact that the cached index can change between this load
                 // storing it in the DB is allowed.
@@ -1187,6 +1188,7 @@ impl HoprDbTicketOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     match myself
+                        .caches
                         .unacked_tickets
                         .remove(&ack.ack_challenge())
                         .await
@@ -1308,7 +1310,8 @@ impl HoprDbTicketOperations for HoprDb {
                 next_hop,
                 ack_challenge,
             } => {
-                self.unacked_tickets
+                self.caches
+                    .unacked_tickets
                     .insert(ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await;
 
@@ -1430,6 +1433,7 @@ impl HoprDbTicketOperations for HoprDb {
                             myself.increment_ticket_index(channel.get_id()).await?;
 
                             myself
+                                .caches
                                 .unacked_tickets
                                 .insert(
                                     ack_challenge,
