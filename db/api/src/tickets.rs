@@ -1392,6 +1392,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 ))
                             })?;
 
+                            // TODO: cache this DB call too, or use the channel graph
                             let channel = myself
                                 .get_channel_by_parties(Some(tx), &previous_hop_addr, &me_onchain)
                                 .await?
