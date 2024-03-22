@@ -16,7 +16,6 @@ pub enum DbError {
     #[error("missing fixed entry in table {0}")]
     MissingFixedTableEntry(String),
 
-    // TODO: use this for TA related issues
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 

@@ -8,15 +8,17 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::info::IndexerData;
+use crate::info::{IndexerData, SafeInfo};
 
 /// Enumerates all singular data that can be cached and
-/// cannot be represented by a key.
+/// cannot be represented by a key. These values can be cached for long term.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
     /// Cached [IndexerData].
     IndexerDataCache(IndexerData),
+    /// Cached [SafeInfo].
+    SafeInfoCache(Option<SafeInfo>),
 }
 
 impl TryFrom<CachedValue> for IndexerData {
@@ -25,12 +27,23 @@ impl TryFrom<CachedValue> for IndexerData {
     fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
         match value {
             CachedValue::IndexerDataCache(data) => Ok(data),
-            //_ => Err(DbError::DecodingError)
+            _ => Err(DbError::DecodingError),
         }
     }
 }
 
-pub struct ExpiryNever;
+impl TryFrom<CachedValue> for Option<SafeInfo> {
+    type Error = DbError;
+
+    fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
+        match value {
+            CachedValue::SafeInfoCache(data) => Ok(data),
+            _ => Err(DbError::DecodingError),
+        }
+    }
+}
+
+struct ExpiryNever;
 
 impl<K, V> Expiry<K, V> for ExpiryNever {
     fn expire_after_create(&self, _key: &K, _value: &V, _current_time: std::time::Instant) -> Option<Duration> {

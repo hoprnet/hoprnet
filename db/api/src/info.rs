@@ -181,28 +181,39 @@ impl HoprDbInfoOperations for HoprDb {
     }
 
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>> {
-        let addrs = self
-            .nest_transaction(tx)
+        let myself = self.clone();
+        Ok(self
+            .caches
+            .single_values
+            .try_get_with_by_ref(&CachedValueDiscriminants::SafeInfoCache, async move {
+                myself
+                    .nest_transaction(tx)
+                    .and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                                    .one(tx.as_ref())
+                                    .await?
+                                    .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
+                                Ok::<_, DbError>(info.safe_address.zip(info.module_address))
+                            })
+                        })
+                    })
+                    .await
+                    .and_then(|addrs| {
+                        if let Some((safe_address, module_address)) = addrs {
+                            Ok(Some(SafeInfo {
+                                safe_address: safe_address.parse()?,
+                                module_address: module_address.parse()?,
+                            }))
+                        } else {
+                            Ok(None)
+                        }
+                    })
+                    .map(CachedValue::SafeInfoCache)
+            })
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
-                    Ok::<_, DbError>(info.safe_address.zip(info.module_address))
-                })
-            })
-            .await?;
-
-        Ok(if let Some((safe_address, module_address)) = addrs {
-            Some(SafeInfo {
-                safe_address: safe_address.parse()?,
-                module_address: module_address.parse()?,
-            })
-        } else {
-            None
-        })
+            .try_into()?)
     }
 
     async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()> {
@@ -221,7 +232,15 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<_, DbError>(())
                 })
             })
-            .await
+            .await?;
+        self.caches
+            .single_values
+            .insert(
+                CachedValueDiscriminants::SafeInfoCache,
+                CachedValue::SafeInfoCache(Some(safe_info)),
+            )
+            .await;
+        Ok(())
     }
 
     async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData> {
@@ -498,6 +517,37 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_set_get_indexer_data() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let data = db.get_indexer_data(None).await.unwrap();
+        assert_eq!(data.ticket_price, None);
+
+        let price = BalanceType::HOPR.balance(10);
+        db.update_ticket_price(None, price).await.unwrap();
+
+        let data = db.get_indexer_data(None).await.unwrap();
+
+        assert_eq!(data.ticket_price, Some(price));
+    }
+
+    #[async_std::test]
+    async fn test_set_get_safe_info_with_cache() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        assert_eq!(None, db.get_safe_info(None).await.unwrap());
+
+        let safe_info = SafeInfo {
+            safe_address: *ADDR_1,
+            module_address: *ADDR_2,
+        };
+
+        db.set_safe_info(None, safe_info).await.unwrap();
+
+        assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
+    }
+
+    #[async_std::test]
     async fn test_set_get_safe_info() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
@@ -509,6 +559,7 @@ mod tests {
         };
 
         db.set_safe_info(None, safe_info).await.unwrap();
+        db.caches.single_values.invalidate_all();
 
         assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
     }
