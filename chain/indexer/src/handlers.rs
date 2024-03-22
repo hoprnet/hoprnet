@@ -170,9 +170,9 @@ where
 
                     let mut updated = channel.into_active_model();
                     updated.balance = Set(new_balance.amount().to_bytes().to_vec());
-                    updated.save(tx.as_ref()).await?;
+                    let channel = updated.update(tx.as_ref()).await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel_entry, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.try_into()?, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -187,9 +187,9 @@ where
 
                     let mut updated = channel.into_active_model();
                     updated.balance = Set(new_balance.amount().to_bytes().to_vec());
-                    updated.save(tx.as_ref()).await?;
+                    let channel = updated.update(tx.as_ref()).await?;
 
-                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel_entry, diff)))
+                    Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.try_into()?, diff)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -216,7 +216,7 @@ where
                     active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_bytes().to_vec());
                     active_channel.ticket_index = Set(U256::zero().to_bytes().to_vec());
                     active_channel.set_status(ChannelStatus::Closed);
-                    active_channel.save(tx.as_ref()).await?;
+                    let channel = active_channel.update(tx.as_ref()).await?;
 
                     if channel_entry.source == self.chain_key.public().to_address()
                         || channel_entry.destination == self.chain_key.public().to_address()
@@ -225,7 +225,7 @@ where
                         self.db.reset_ticket_index(channel_closed.channel_id.into()).await?;
                     }
 
-                    Ok(Some(ChainEventType::ChannelClosed(channel_entry)))
+                    Ok(Some(ChainEventType::ChannelClosed(channel.try_into()?)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -267,7 +267,7 @@ where
                     existing_channel.ticket_index = Set(U256::zero().to_be_bytes().into());
                     existing_channel.epoch = Set(current_epoch.add(1).to_be_bytes().into());
                     existing_channel.set_status(ChannelStatus::Open);
-                    channel::Entity::update(existing_channel).exec(tx.as_ref()).await?
+                    existing_channel.update(tx.as_ref()).await?
                 } else {
                     trace!(
                         "on_channel_opened_event - source: {source} - destination: {destination} - channel_id: {channel_id}"
@@ -389,9 +389,9 @@ where
 
                     let mut active_channel = channel.into_active_model();
                     active_channel.set_status(channel_entry.status);
-                    active_channel.save(tx.as_ref()).await?;
+                    let channel = active_channel.update(tx.as_ref()).await?;
 
-                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel_entry)))
+                    Ok(Some(ChainEventType::ChannelClosureInitiated(channel.try_into()?)))
                 } else {
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
@@ -532,12 +532,7 @@ where
                     .set_network_registry_enabled(Some(tx), enabled.is_enabled)
                     .await?;
             }
-            HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
-                // TODO: implement this
-            }
-            _ => {
-                // don't care. Not important to HOPR
-            }
+            _ => {} // Not important to at the moment
         };
 
         Ok(None)
@@ -724,7 +719,7 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use chain_types::chain_events::ChainEventType;
+    use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
     use chain_types::ContractAddresses;
     use ethers::contract::EthEvent;
     use ethers::{
@@ -914,7 +909,7 @@ pub mod tests {
             *SELF_PRIV_KEY.public(),
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
-                multiaddr: test_multiaddr,
+                multiaddr: test_multiaddr.clone(),
                 updated_block: 1,
             },
         );
@@ -934,7 +929,10 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::Announcement { .. })));
+        assert!(
+            matches!(event_type, Some(ChainEventType::Announcement { multiaddresses,.. }) if multiaddresses == vec![test_multiaddr]),
+            "must return the latest announce multiaddress"
+        );
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -962,7 +960,7 @@ pub mod tests {
             *SELF_PRIV_KEY.public(),
             *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
-                multiaddr: test_multiaddr_dns,
+                multiaddr: test_multiaddr_dns.clone(),
                 updated_block: 2,
             },
         );
@@ -981,7 +979,10 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::Announcement { .. })));
+        assert!(
+            matches!(event_type, Some(ChainEventType::Announcement { multiaddresses,.. }) if multiaddresses == vec![test_multiaddr_dns]),
+            "must return the latest announce multiaddress"
+        );
 
         assert_eq!(
             db.get_account(None, ChainOrPacketKey::ChainKey(*SELF_CHAIN_ADDRESS))
@@ -1212,12 +1213,17 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
+        assert!(
+            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
+            "must return correct NR update"
+        );
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(
+            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+                .await
+                .unwrap(),
+            "must be allowed in NR"
+        );
     }
 
     #[async_std::test]
@@ -1250,12 +1256,17 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
+        assert!(
+            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
+            "must return correct NR update"
+        );
 
-        assert!(db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(
+            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+                .await
+                .unwrap(),
+            "must be allowed in NR"
+        );
     }
 
     #[async_std::test]
@@ -1292,12 +1303,17 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
+        assert!(
+            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
+            "must return correct NR update"
+        );
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(
+            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+                .await
+                .unwrap(),
+            "must not be allowed in NR"
+        );
     }
 
     #[async_std::test]
@@ -1334,12 +1350,17 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(_, _))));
+        assert!(
+            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
+            "must return correct NR update"
+        );
 
-        assert!(!db
-            .is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
-            .await
-            .unwrap());
+        assert!(
+            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS)
+                .await
+                .unwrap(),
+            "must not be allowed in NR"
+        );
     }
 
     #[async_std::test]
@@ -1487,7 +1508,8 @@ pub mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let solidity_balance = U256::from((1u128 << 96) - 1);
+        let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1));
+        let diff = solidity_balance - channel.balance;
 
         let balance_increased_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1495,7 +1517,7 @@ pub mod tests {
                 ChannelBalanceIncreasedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(solidity_balance.to_bytes()).into(),
+            data: Vec::from(solidity_balance.amount().to_bytes()).into(),
             ..test_log()
         };
 
@@ -1507,20 +1529,14 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(
-            event_type,
-            Some(ChainEventType::ChannelBalanceIncreased(_, _))
-        ));
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
-        assert_eq!(
-            solidity_balance,
-            db.get_channel_by_id(None, &channel.get_id())
-                .await
-                .unwrap()
-                .unwrap()
-                .balance
-                .amount()
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelBalanceIncreased(c, b)) if c == channel && b == diff),
+            "must return updated channel entry and balance diff"
         );
+
+        assert_eq!(solidity_balance, channel.balance, "balance must be updated");
     }
 
     #[async_std::test]
@@ -1558,7 +1574,8 @@ pub mod tests {
 
         assert_eq!(
             separator,
-            db.get_indexer_data(None).await.unwrap().channels_dst.unwrap()
+            db.get_indexer_data(None).await.unwrap().channels_dst.unwrap(),
+            "separator must be updated"
         );
     }
 
@@ -1579,7 +1596,8 @@ pub mod tests {
 
         db.upsert_channel(None, channel).await.unwrap();
 
-        let solidity_balance = U256::from((1u128 << 96) - 1);
+        let solidity_balance = U256::from((1u128 << 96) - 2);
+        let diff = channel.balance - solidity_balance;
 
         let balance_decreased_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1599,20 +1617,14 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(
-            event_type,
-            Some(ChainEventType::ChannelBalanceDecreased(_, _))
-        ));
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
-        assert_eq!(
-            solidity_balance,
-            db.get_channel_by_id(None, &channel.get_id())
-                .await
-                .unwrap()
-                .unwrap()
-                .balance
-                .amount()
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelBalanceDecreased(c, b)) if c == channel && b == diff),
+            "must return updated channel entry and balance diff"
         );
+
+        assert_eq!(solidity_balance, channel.balance.amount(), "balance must be updated");
     }
 
     #[async_std::test]
@@ -1652,9 +1664,12 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::ChannelClosed(_))));
-
         let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelClosed(c)) if c == closed_channel),
+            "must return the updated channel entry"
+        );
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());
@@ -1696,9 +1711,12 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::ChannelOpened(_))));
-
         let channel = db.get_channel_by_id(None, &channel_id).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
+            "must return the updated channel entry"
+        );
 
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 1u64.into());
@@ -1748,9 +1766,12 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::ChannelOpened(_))));
-
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelOpened(c)) if c == channel),
+            "must return the updated channel entry"
+        );
 
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 4u64.into());
@@ -2120,13 +2141,18 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(
-            matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(c)) if c.get_id() == channel.get_id() && c.status != ChannelStatus::Open)
-        );
-
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
-        assert_eq!(channel.status, ChannelStatus::PendingToClose(timestamp));
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(c)) if c == channel),
+            "must return updated channel entry"
+        );
+
+        assert_eq!(
+            channel.status,
+            ChannelStatus::PendingToClose(timestamp),
+            "channel status must match"
+        );
     }
 
     #[async_std::test]
