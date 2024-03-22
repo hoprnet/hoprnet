@@ -13,7 +13,6 @@ use tracing::{error, info, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
-use tracing_subscriber::layer::SubscriberExt;
 
 const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
@@ -27,17 +26,21 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[async_std::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
-        Ok(filter) => filter,
-        Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
-            .add_directive("libp2p_mplex=info".parse()?)
-            .add_directive("multistream_select=info".parse()?)
-            .add_directive("isahc::handler=error".parse()?)
-            .add_directive("isahc::client=error".parse()?)
-            .add_directive("surf::middleware::logger::native=error".parse()?),
-    };
+#[cfg(feature = "simple_log")]
+fn init_logger() {
+    env_logger::init();
+}
+
+#[cfg(not(feature = "simple_log"))]
+fn init_logger() {
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        tracing_subscriber::filter::EnvFilter::new("info")
+            .add_directive("libp2p_mplex=info".parse().unwrap())
+            .add_directive("multistream_select=info".parse().unwrap())
+            .add_directive("isahc::handler=error".parse().unwrap())
+            .add_directive("isahc::client=error".parse().unwrap())
+            .add_directive("surf::middleware::logger::native=error".parse().unwrap())
+    });
 
     let format = tracing_subscriber::fmt::layer()
         .with_level(true)
@@ -45,9 +48,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(false);
 
-    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+    use tracing_subscriber::layer::SubscriberExt;
 
+    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+}
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_logger();
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
@@ -200,7 +209,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let my_peer_id = (*hopr_lib::Keypair::public(&hopr_keys.packet_key)).into();
         let version = hopr_lib::constants::APP_VERSION;
 
-        while !hopr_clone.is_allowed_to_access_network(&my_peer_id).await {
+        while !hopr_clone
+            .is_allowed_to_access_network(&my_peer_id)
+            .await
+            .unwrap_or(false)
+        {
             info!("
                 Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
             ");

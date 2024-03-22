@@ -12,13 +12,13 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-use core_network::network::{Network, NetworkEvent, PeerOrigin};
+use core_network::network::{Network, NetworkTriggeredEvent, PeerOrigin};
 pub use core_p2p::api;
 use core_p2p::{
     libp2p::request_response::ResponseChannel, libp2p::swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_protocol::{
-    ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
+    ack::processor::{AckProcessed, AckResult, AcknowledgementInteraction},
     config::ProtocolConfig,
     msg::processor::{MsgProcessed, PacketInteraction},
     ticket_aggregation::processor::{
@@ -46,7 +46,7 @@ lazy_static::lazy_static! {
 pub enum Inputs {
     Heartbeat(api::HeartbeatChallenge),
     ManualPing(api::ManualPingChallenge),
-    NetworkUpdate(NetworkEvent),
+    NetworkUpdate(NetworkTriggeredEvent),
     Message(MsgProcessed),
     TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>),
     Acknowledgement(AckProcessed),
@@ -65,8 +65,8 @@ impl From<api::ManualPingChallenge> for Inputs {
     }
 }
 
-impl From<NetworkEvent> for Inputs {
-    fn from(value: NetworkEvent) -> Self {
+impl From<NetworkTriggeredEvent> for Inputs {
+    fn from(value: NetworkTriggeredEvent) -> Self {
         Self::NetworkUpdate(value)
     }
 }
@@ -160,11 +160,11 @@ fn resolve_dns_if_any(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multia
 ///
 /// This future can only be resolved by an unrecoverable error or a panic.
 #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-pub async fn p2p_loop(
+pub async fn p2p_loop<T>(
     version: String,
     me: libp2p::identity::Keypair,
-    network: Arc<Network<crate::adaptors::network::ExternalNetworkInteractions>>,
-    network_update_input: Receiver<NetworkEvent>,
+    network: Arc<Network<T>>,
+    network_update_input: Receiver<NetworkTriggeredEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
@@ -180,7 +180,9 @@ pub async fn p2p_loop(
     protocol_cfg: ProtocolConfig,
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
-) {
+) where
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+{
     let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
         .await
@@ -263,29 +265,30 @@ pub async fn p2p_loop(
                     active_manual_pings.insert(req_id);
                 },
                 Inputs::NetworkUpdate(event) => match event {
-                    NetworkEvent::CloseConnection(peer) => {
+                    NetworkTriggeredEvent::CloseConnection(peer) => {
                         debug!("transport input - network event - closing connection to '{peer}' (reason: low ping connection quality)");
                         if swarm.is_connected(&peer) {
                             let _ = swarm.disconnect_peer_id(peer);
                         }
                     },
+                    NetworkTriggeredEvent::UpdateQuality(_, _) => {}
                 },
                 Inputs::Acknowledgement(task) => match task {
                     AckProcessed::Receive(peer, reply) => {
                         debug!("transport input - ack - received an acknowledgement from '{peer}'");
                         if let Ok(reply) = reply {
                             match reply {
-                                Reply::Sender(half_key_challenge) => {
+                                AckResult::Sender(half_key_challenge) => {
                                     if let Err(e) = on_transport_output.unbounded_send(TransportOutput::Sent(half_key_challenge)) {
                                         error!("transport input - ack - failed to emit received acknowledgement: {e}")
                                     }
                                 },
-                                Reply::RelayerWinning(acknowledged_ticket) => {
+                                AckResult::RelayerWinning(acknowledged_ticket) => {
                                     if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
                                         error!("transport input - ack -failed to emit acknowledged ticket: {e}");
                                     }
                                 }
-                                Reply::RelayerLosing => {}
+                                AckResult::RelayerLosing => {}
                             }
                         }
                     },

@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 default = ["prometheus"]
 prometheus = [
     "dep:lazy_static", "dep:hopr-metrics",
-    "core-network/prometheus", "core-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
+    "core-network/prometheus", "hopr-crypto-packet/prometheus", "core-path/prometheus", "core-protocol/prometheus"
 ]
 
 [dependencies]
@@ -29,19 +29,18 @@ proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4",  "fast-rng"] }
 validator = { workspace = true }
 
 core-network = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-db = { workspace = true }
 chain-types = { workspace = true }
 core-path = { workspace = true }
 core-p2p = { workspace = true }
-core-packet = { workspace = true }
+hopr-crypto-packet = { workspace = true }
 core-protocol = { workspace = true }
-utils-db = { workspace = true}
-tracing = { workspace = true }
+hopr-db-api = { workspace = true, features = ["peers", "resolver"]}
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }

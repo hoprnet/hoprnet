@@ -483,7 +483,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
-        # we should see last the message as rejected
+        # we should see the last message as rejected
         await asyncio.wait_for(check_rejected_tickets(swarm7[dest], 1), 120.0)
 
         await asyncio.sleep(10)  # wait for aggregation to finish

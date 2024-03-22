@@ -1,6 +1,6 @@
 [package]
 name = "core-strategy"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -31,22 +31,22 @@ hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-transport = { workspace = true }
-chain-db = { workspace = true }
 chain-actions = { workspace = true }
-utils-db = { workspace = true }
 tracing = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-db-api = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true }
 chain-types = { workspace = true }
-env_logger = "0.10.0"
+env_logger = { workspace = true }
 mockall = "0.11.4"
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
+hopr-db-api = { workspace = true, features = ["peers"] }
 futures = "0.3.28"
 
 

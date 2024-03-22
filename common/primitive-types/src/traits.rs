@@ -84,6 +84,18 @@ pub trait UnitaryFloatOps: Sized {
     fn div_f64(&self, rhs: f64) -> Result<Self>;
 }
 
+/// Extension trait for fixed size numbers to allow conversion to/from endian representations.
+pub trait IntoEndian<const N: usize> {
+    /// Create instance from Big Endian bytes. Should panic if size is more than `N`.
+    fn from_be_bytes<T: AsRef<[u8]>>(bytes: T) -> Self;
+    /// Create instance from Little Endian bytes. Should panic if size is more than `N`.
+    fn from_le_bytes<T: AsRef<[u8]>>(bytes: T) -> Self;
+    /// Convert instance to Little Endian bytes.
+    fn to_le_bytes(self) -> [u8; N];
+    /// Convert instance to Big Endian bytes.
+    fn to_be_bytes(self) -> [u8; N];
+}
+
 /// A trait that adds extension method to represent a time object as `Duration` since Unix epoch.
 pub trait AsUnixTimestamp {
     /// Represents self as `Duration` since Unix epoch.

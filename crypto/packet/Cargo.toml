@@ -1,0 +1,41 @@
+[package]
+name = "hopr-crypto-packet"
+version = "0.7.0"
+description = "Contains high-level HOPR protocol building blocks for packet interaction"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+async-std = { workspace = true }
+async-lock = { workspace = true }
+hex = { workspace = true }
+lazy_static = { workspace = true }
+thiserror = "1.0"
+tracing = { workspace = true }
+typenum = "1.16"
+
+hopr-crypto-sphinx = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+async-trait = "0.1.73"
+core-path = { workspace = true }
+hex-literal = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-sphinx = { workspace = true, features = ["ed25519", "secp256k1", "x25519"] }
+hopr-db-api = { workspace = true }
+libp2p-identity = { workspace = true }
+mockall = "0.11.4"
+parameterized = "1.0"
+
+[features]
+default = [ "prometheus" ]
+prometheus = []
