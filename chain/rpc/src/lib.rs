@@ -7,6 +7,8 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
@@ -36,7 +38,7 @@ pub mod rpc;
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
 /// This is further restricted to already mined blocks.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Log {
     /// Contract address
     pub address: Address,
@@ -86,6 +88,28 @@ impl Display for Log {
             self.address,
             self.topics.len()
         )
+    }
+}
+
+impl Ord for Log {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let blocks = self.block_number.cmp(&other.block_number);
+        if blocks == Ordering::Equal {
+            let tx_indices = self.tx_index.cmp(&other.tx_index);
+            if tx_indices == Ordering::Equal {
+                self.log_index.cmp(&other.log_index)
+            } else {
+                tx_indices
+            }
+        } else {
+            blocks
+        }
+    }
+}
+
+impl PartialOrd<Self> for Log {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -281,7 +305,7 @@ pub struct BlockWithLogs {
     /// Block number
     pub block_id: u64,
     /// Filtered logs belonging to this block.
-    pub logs: Vec<Log>,
+    pub logs: BTreeSet<Log>,
 }
 
 impl Display for BlockWithLogs {
