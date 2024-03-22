@@ -14,8 +14,7 @@ async-lock = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "tokio1"] }
 clap = { workspace = true }
 chrono = "0.4.26"
-ethabi = "18.0.0"
-fern = "0.6.2"
+env_logger = { workspace = true, optional = true }
 futures = { workspace = true }
 hex = { workspace = true }
 home = "0.5"
@@ -56,3 +55,4 @@ prometheus = [
     "hopr-lib/prometheus",
     "hoprd-api/prometheus"
 ]
+simple_log = ["dep:env_logger"]

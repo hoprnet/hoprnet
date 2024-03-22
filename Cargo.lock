@@ -192,9 +192,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.4"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7079075b41f533b8c61d2a4d073c4676e1f8b249ff94a393b0595db304e0dd87"
+checksum = "8901269c6307e8d93993578286ac0edf7f195079ffff5ebdeea6a59ffb7e36bc"
 
 [[package]]
 name = "anstyle-parse"
@@ -988,12 +988,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "build_const"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ae4235e6dac0694637c763029ecea1a2ec9e4e06ec2729bd21ba4d9c863eb7"
-
-[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1026,6 +1020,12 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "bytecount"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1e5f035d16fc623ae5f74981db80a439803888314e3a555fd6f04acd51a3205"
 
 [[package]]
 name = "byteorder"
@@ -1085,6 +1085,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ceed8ef69d8518a5dda55c07425450b58a4e1946f4951eab6d7191ee86c2443d"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4acbb09d9ee8e23699b9634375c72795d095bf268439da88562cf9b501f181fa"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.21",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1172,22 +1185,22 @@ dependencies = [
 
 [[package]]
 name = "chain-actions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "bindings",
- "chain-db",
  "chain-rpc",
  "chain-types",
- "env_logger",
+ "env_logger 0.11.3",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1199,7 +1212,7 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
+ "tracing-test",
 ]
 
 [[package]]
@@ -1210,37 +1223,19 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-actions",
- "chain-db",
  "chain-indexer",
  "chain-rpc",
  "chain-types",
  "core-path",
  "futures",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-primitive-types",
  "serde",
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
-]
-
-[[package]]
-name = "chain-db"
-version = "0.4.0"
-dependencies = [
- "async-std",
- "async-trait",
- "env_logger",
- "hex-literal",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "tracing",
- "utils-db",
 ]
 
 [[package]]
@@ -1251,13 +1246,14 @@ dependencies = [
  "async-std",
  "async-trait",
  "bindings",
- "chain-db",
  "chain-rpc",
  "chain-types",
  "ethers",
  "futures",
  "hex-literal",
  "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-entity",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1265,10 +1261,10 @@ dependencies = [
  "mockall",
  "multiaddr",
  "primitive-types",
+ "sea-orm",
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]
@@ -1280,7 +1276,7 @@ dependencies = [
  "async-trait",
  "bindings",
  "chain-types",
- "env_logger",
+ "env_logger 0.11.3",
  "ethers",
  "futures",
  "futures-timer",
@@ -1584,16 +1580,15 @@ name = "core-network"
 version = "0.5.0"
 dependencies = [
  "async-std",
- "async-stream",
  "async-trait",
- "atomic_enum",
- "bincode",
  "chrono",
  "futures",
  "futures-lite 1.13.0",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-entity",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
@@ -1602,13 +1597,10 @@ dependencies = [
  "mockall",
  "more-asserts",
  "multiaddr",
- "num_enum",
  "sea-query",
- "sea-query-binder",
  "serde",
  "serde_with",
  "smart-default",
- "sqlx",
  "strum 0.25.0",
  "thiserror",
  "tracing",
@@ -1634,42 +1626,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-packet"
-version = "0.7.0"
-dependencies = [
- "async-lock 3.3.0",
- "async-std",
- "async-trait",
- "chain-db",
- "core-path",
- "hex",
- "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-sphinx",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "parameterized",
- "thiserror",
- "tracing",
- "typenum",
- "utils-db",
-]
-
-[[package]]
 name = "core-path"
 version = "0.3.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
- "chain-db",
  "futures",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
@@ -1680,7 +1647,6 @@ dependencies = [
  "serde",
  "thiserror",
  "tracing",
- "utils-db",
 ]
 
 [[package]]
@@ -1690,16 +1656,16 @@ dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
- "chain-db",
- "core-packet",
  "core-path",
- "env_logger",
+ "env_logger 0.11.3",
  "futures",
  "futures-lite 1.13.0",
  "hex-literal",
+ "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1716,28 +1682,27 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
 [[package]]
 name = "core-strategy"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
  "chain-actions",
- "chain-db",
  "chain-types",
  "core-network",
  "core-protocol",
  "core-transport",
- "env_logger",
+ "env_logger 0.11.3",
  "futures",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1752,7 +1717,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
@@ -1763,16 +1727,16 @@ dependencies = [
  "async-lock 3.3.0",
  "async-std",
  "async-trait",
- "chain-db",
  "chain-types",
  "core-network",
  "core-p2p",
- "core-packet",
  "core-path",
  "core-protocol",
  "futures",
  "futures-concurrency",
+ "hopr-crypto-packet",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -1785,7 +1749,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "utils-db",
  "uuid 1.7.0",
  "validator",
 ]
@@ -1816,15 +1779,6 @@ checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 
 [[package]]
 name = "crc"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
-dependencies = [
- "build_const",
-]
-
-[[package]]
-name = "crc"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86ec7a15cbe22e59248fc7eadb1907dab5ba09372595da4d73dd805ed4417dfe"
@@ -1852,6 +1806,15 @@ name = "crossbeam-channel"
 version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab3db02a9c5b5121e1e42fbdb1aeb65f5e02624cc58c43f2884c6ccac0b82f95"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -2432,16 +2395,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
 dependencies = [
- "humantime",
- "is-terminal",
  "log",
- "regex",
- "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
 ]
 
 [[package]]
@@ -2467,6 +2449,15 @@ checksum = "a258e46cdc063eb8519c00b9fc845fc47bcfca4130e2f08e88665ceda8474245"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "error-chain"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]
@@ -2816,15 +2807,6 @@ name = "fastrand"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
-
-[[package]]
-name = "fern"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f0c14694cbd524c8720dd69b0e3179344f04ebb5f90f2e4a440c6ea3b2f1ee"
-dependencies = [
- "log",
-]
 
 [[package]]
 name = "ff"
@@ -3454,6 +3436,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-crypto-packet"
+version = "0.7.0"
+dependencies = [
+ "async-lock 3.3.0",
+ "async-std",
+ "async-trait",
+ "core-path",
+ "hex",
+ "hex-literal",
+ "hopr-crypto-random",
+ "hopr-crypto-sphinx",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "mockall",
+ "parameterized",
+ "thiserror",
+ "tracing",
+ "typenum",
+]
+
+[[package]]
 name = "hopr-crypto-random"
 version = "0.1.0"
 dependencies = [
@@ -3518,9 +3525,36 @@ dependencies = [
 name = "hopr-db-api"
 version = "0.1.0"
 dependencies = [
+ "async-lock 3.3.0",
+ "async-std",
+ "async-stream",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "env_logger 0.11.3",
+ "futures",
+ "hex-literal",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
  "hopr-db-entity",
  "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "moka",
+ "multiaddr",
+ "num_enum",
+ "sea-orm",
+ "sea-query",
+ "sea-query-binder",
+ "smart-default",
  "sqlx",
+ "strum 0.25.0",
+ "thiserror",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -3528,11 +3562,16 @@ name = "hopr-db-entity"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "chrono",
  "clap",
+ "hopr-crypto-types",
  "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-primitive-types",
  "sea-orm",
  "sea-orm-cli",
  "sea-orm-migration",
+ "thiserror",
 ]
 
 [[package]]
@@ -3540,6 +3579,7 @@ name = "hopr-db-migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "hopr-primitive-types",
  "sea-orm-migration",
 ]
 
@@ -3558,6 +3598,7 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "multiaddr",
+ "num_enum",
  "serde",
  "serde_bytes",
  "serde_repr",
@@ -3576,7 +3617,6 @@ dependencies = [
  "atomic_enum",
  "chain-actions",
  "chain-api",
- "chain-db",
  "chain-indexer",
  "chain-rpc",
  "chain-types",
@@ -3584,9 +3624,11 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-transport",
+ "env_logger 0.11.3",
  "ethers",
  "futures",
  "hopr-crypto-types",
+ "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -3601,7 +3643,6 @@ dependencies = [
  "strum 0.25.0",
  "thiserror",
  "tracing",
- "utils-db",
  "validator",
 ]
 
@@ -3650,8 +3691,7 @@ dependencies = [
  "async-std",
  "chrono",
  "clap",
- "ethabi",
- "fern",
+ "env_logger 0.11.3",
  "futures",
  "hex",
  "home",
@@ -4084,12 +4124,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "integer-encoding"
-version = "3.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
-
-[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4117,17 +4151,6 @@ name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
-
-[[package]]
-name = "is-terminal"
-version = "0.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bad00257d07be169d870ab665980b06cdb366d792ad690bf2e76876dc503455"
-dependencies = [
- "hermit-abi 0.3.4",
- "rustix 0.38.30",
- "windows-sys 0.52.0",
-]
 
 [[package]]
 name = "is_executable"
@@ -4655,9 +4678,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.20"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
+checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 dependencies = [
  "value-bag",
 ]
@@ -4794,6 +4817,30 @@ dependencies = [
  "serde_urlencoded",
  "similar",
  "tokio",
+]
+
+[[package]]
+name = "moka"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1911e88d5831f748a4097a43862d129e3c6fca831eecac9b8db6d01d93c9de2"
+dependencies = [
+ "async-lock 2.8.0",
+ "async-trait",
+ "crossbeam-channel",
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "futures-util",
+ "once_cell",
+ "parking_lot",
+ "quanta",
+ "rustc_version 0.4.0",
+ "skeptic",
+ "smallvec",
+ "tagptr",
+ "thiserror",
+ "triomphe",
+ "uuid 1.7.0",
 ]
 
 [[package]]
@@ -5880,6 +5927,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57206b407293d2bcd3af849ce869d52068623f19e1b5ff8e8778e3309439682b"
+dependencies = [
+ "bitflags 2.4.2",
+ "memchr",
+ "unicase",
+]
+
+[[package]]
+name = "quanta"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ca0b7bac0b97248c40bb77288fc52029cf1459c0461ea1b05ee32ccf011de2c"
+dependencies = [
+ "crossbeam-utils",
+ "libc",
+ "once_cell",
+ "raw-cpuid",
+ "wasi 0.11.0+wasi-snapshot-preview1",
+ "web-sys",
+ "winapi",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6037,6 +6110,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
+dependencies = [
+ "bitflags 2.4.2",
 ]
 
 [[package]]
@@ -6538,18 +6620,6 @@ name = "rustversion"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
-
-[[package]]
-name = "rusty-leveldb"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3453f8c92d48f99810f59095444eda0622ae8485ac899ad97a574fd7cb9aa9c4"
-dependencies = [
- "crc 1.8.1",
- "integer-encoding",
- "rand 0.8.5",
- "snap",
-]
 
 [[package]]
 name = "rw-stream-sink"
@@ -7269,6 +7339,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "skeptic"
+version = "0.13.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16d23b015676c90a0f01c197bfdc786c20342c73a0afdda9025adb0bc42940a8"
+dependencies = [
+ "bytecount",
+ "cargo_metadata 0.14.2",
+ "error-chain",
+ "glob",
+ "pulldown-cmark",
+ "tempfile",
+ "walkdir",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7321,12 +7406,6 @@ dependencies = [
  "blocking",
  "futures-lite 1.13.0",
 ]
-
-[[package]]
-name = "snap"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "snow"
@@ -7437,7 +7516,7 @@ dependencies = [
  "byteorder",
  "bytes 1.5.0",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "crossbeam-queue",
  "dotenvy",
  "either",
@@ -7525,7 +7604,7 @@ dependencies = [
  "byteorder",
  "bytes 1.5.0",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "digest 0.10.7",
  "dotenvy",
  "either",
@@ -7571,7 +7650,7 @@ dependencies = [
  "bitflags 2.4.2",
  "byteorder",
  "chrono",
- "crc 3.0.1",
+ "crc",
  "dotenvy",
  "etcetera",
  "futures-channel",
@@ -7931,6 +8010,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "tagptr"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b2093cf4c8eb1e67749a6762251bc9cd836b6fc171623bd0a9d324d37af2417"
 
 [[package]]
 name = "tap"
@@ -8450,6 +8535,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-test"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a2c0ff408fe918a94c428a3f2ad04e4afd5c95bbc08fcf868eff750c15728a4"
+dependencies = [
+ "lazy_static",
+ "tracing-core",
+ "tracing-subscriber",
+ "tracing-test-macro",
+]
+
+[[package]]
+name = "tracing-test-macro"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "258bc1c4f8e2e73a977812ab339d503e6feeb92700f6d07a6de4d321522d5c08"
+dependencies = [
+ "lazy_static",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "triomphe"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859eb650cfee7434994602c3a68b25d77ad9e68c8a6cd491616ef86661382eb3"
+
+[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8656,30 +8770,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
-name = "utils-db"
-version = "0.3.0"
-dependencies = [
- "async-std",
- "async-trait",
- "bincode",
- "const_format",
- "futures-lite 1.13.0",
- "hex",
- "hex-literal",
- "hopr-platform",
- "hopr-primitive-types",
- "mockall",
- "pin-project-lite 0.2.13",
- "rusty-leveldb",
- "scopeguard",
- "serde",
- "sqlx",
- "tempfile",
- "thiserror",
- "tracing",
-]
-
-[[package]]
 name = "utoipa"
 version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8789,9 +8879,9 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "value-bag"
-version = "1.6.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cdbaf5e132e593e9fc1de6a15bbec912395b11fb9719e061cf64f804524c503"
+checksum = "8fec26a25bd6fca441cdd0f769fd7f891bae119f996de31f86a5eddccef54c1d"
 dependencies = [
  "value-bag-serde1",
  "value-bag-sval2",
@@ -8799,9 +8889,9 @@ dependencies = [
 
 [[package]]
 name = "value-bag-serde1"
-version = "1.6.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92cad98b1b18d06b6f38b3cd04347a9d7a3a0111441a061f71377fb6740437e4"
+checksum = "ead5b693d906686203f19a49e88c477fb8c15798b68cf72f60b4b5521b4ad891"
 dependencies = [
  "erased-serde",
  "serde",
@@ -8810,9 +8900,9 @@ dependencies = [
 
 [[package]]
 name = "value-bag-sval2"
-version = "1.6.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dc7271d6b3bf58dd2e610a601c0e159f271ffdb7fbb21517c40b52138d64f8e"
+checksum = "3b9d0f4a816370c3a0d7d82d603b62198af17675b12fe5e91de6b47ceb505882"
 dependencies = [
  "sval",
  "sval_buffer",
@@ -8998,7 +9088,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "env_logger",
+ "env_logger 0.10.2",
  "glob",
  "human-panic",
  "log",

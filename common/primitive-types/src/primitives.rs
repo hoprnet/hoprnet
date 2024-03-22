@@ -6,7 +6,7 @@ use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex, UnitaryFloatOps};
+use crate::traits::{BinarySerializable, IntoEndian, ToHex, UnitaryFloatOps};
 
 pub type U256 = primitive_types::U256;
 
@@ -85,6 +85,12 @@ impl From<[u8; Address::SIZE]> for Address {
     }
 }
 
+impl From<Address> for [u8; Address::SIZE] {
+    fn from(value: Address) -> Self {
+        value.0
+    }
+}
+
 impl From<primitive_types::H160> for Address {
     fn from(value: primitive_types::H160) -> Self {
         Self(value.0)
@@ -128,6 +134,13 @@ impl BalanceType {
     /// Creates [Balance] of the given `amount` of this type.
     pub fn balance<T: Into<U256>>(self, amount: T) -> Balance {
         Balance::new(amount, self)
+    }
+
+    /// Deserializes the given amount and creates a new [Balance] instance.
+    /// The bytes are assumed to be in Big Endian order.
+    /// The method panics if more than 32 `bytes` were given.
+    pub fn balance_bytes<T: AsRef<[u8]>>(self, bytes: T) -> Balance {
+        Balance::new(U256::from_be_bytes(bytes), self)
     }
 }
 
@@ -425,6 +438,28 @@ impl BinarySerializable for U256 {
     }
 }
 
+impl IntoEndian<32> for U256 {
+    fn from_be_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        U256::from_big_endian(bytes.as_ref())
+    }
+
+    fn from_le_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        U256::from_little_endian(bytes.as_ref())
+    }
+
+    fn to_le_bytes(self) -> [u8; 32] {
+        let mut ret = [0u8; 32];
+        self.to_little_endian(&mut ret);
+        ret
+    }
+
+    fn to_be_bytes(self) -> [u8; 32] {
+        let mut ret = [0u8; 32];
+        self.to_big_endian(&mut ret);
+        ret
+    }
+}
+
 impl UnitaryFloatOps for U256 {
     fn mul_f64(&self, rhs: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&rhs) {
@@ -466,6 +501,7 @@ impl UnitaryFloatOps for U256 {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use primitive_types::U256;
     use std::cmp::Ordering;
     use std::str::FromStr;
 
@@ -601,5 +637,31 @@ mod tests {
         // bad examples
         assert!(U256::one().div_f64(0.0).is_err());
         assert!(U256::one().div_f64(1.1).is_err());
+    }
+
+    #[test]
+    fn u256_endianness() {
+        let num: U256 = 123456789000_u128.into();
+
+        let be_bytes = num.to_be_bytes();
+        let le_bytes = num.to_le_bytes();
+
+        assert_ne!(
+            be_bytes, le_bytes,
+            "sanity check: input number must have different endianness"
+        );
+        assert_eq!(
+            num.to_bytes().as_ref(),
+            be_bytes.as_ref(),
+            "to_bytes must yield big endian"
+        );
+
+        let expected_be = hex!("0000000000000000000000000000000000000000000000000000001CBE991A08");
+        assert_eq!(expected_be, be_bytes);
+        assert_eq!(U256::from_be_bytes(expected_be), num);
+
+        let expected_le = hex!("081A99BE1C000000000000000000000000000000000000000000000000000000");
+        assert_eq!(expected_le, le_bytes);
+        assert_eq!(U256::from_le_bytes(expected_le), num);
     }
 }

@@ -9,14 +9,12 @@ use async_lock::RwLock;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use futures::StreamExt;
 use futures_concurrency::stream::Merge;
-use hopr_lib::TransportOutput;
 use libp2p_identity::PeerId;
 use serde_json::json;
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use tide::http::headers::HeaderValue;
 use tide::{
     http::{
-        headers::{HeaderName, AUTHORIZATION},
+        headers::{HeaderName, HeaderValue, AUTHORIZATION},
         mime, Mime,
     },
     security::{CorsMiddleware, Origin},
@@ -30,11 +28,12 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::Config;
 
-use crate::config::Auth;
 use hopr_lib::{
     errors::HoprLibError,
-    {Address, Balance, BalanceType, Hopr},
+    TransportOutput, {Address, Balance, BalanceType, Hopr},
 };
+
+use crate::config::Auth;
 
 pub const BASE_PATH: &str = "/api/v3";
 pub const API_VERSION: &str = "3.0.0";
@@ -130,7 +129,7 @@ pub struct InternalState {
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -592,7 +591,7 @@ mod alias {
         let aliases = req.state().aliases.clone();
 
         aliases.write().await.insert(args.alias, args.peer_id);
-        Ok(Response::builder(200)
+        Ok(Response::builder(201)
             .body(json!(PeerIdResponse { peer_id: args.peer_id }))
             .build())
     }
@@ -1779,7 +1778,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/pop-all"),
         request_body(
             content = TagQueryRequest,
-            description = "Tag of message queue to pop from",
+            description = "Tag of message queue to pop from. When an empty object or an object with a `tag: 0` is provided, it lists and removes all the messages.",
             content_type = "application/json"
         ),
         responses(
@@ -1863,7 +1862,7 @@ mod messages {
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
         request_body(
             content = GetMessageBodyRequest,
-            description = "Tag of message queue and optionally a timestamp since from to start peeking",
+            description = "Tag of message queue and optionally a timestamp since from to start peeking. When an empty object or an object with a `tag: 0` is provided, it fetches all the messages.",
             content_type = "application/json"
         ),
         responses(
@@ -1997,7 +1996,7 @@ mod tickets {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -2032,7 +2031,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -2264,7 +2263,7 @@ mod node {
         pub quality: Option<f64>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[derive(Debug, Default, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct HeartbeatInfo {
         pub sent: u64,
@@ -2293,11 +2292,23 @@ mod node {
         pub reported_version: String,
     }
 
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct AnnouncedPeer {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_id: PeerId,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_address: Address,
+    }
+
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersResponse {
         pub connected: Vec<PeerInfo>,
-        pub announced: Vec<PeerInfo>,
+        pub announced: Vec<AnnouncedPeer>,
     }
 
     /// Lists information for `connected peers` and `announced peers`.
@@ -2380,9 +2391,19 @@ mod node {
             .collect::<Vec<_>>()
             .await;
 
+        let announced_peers = hopr
+            .accounts_announced_on_chain()
+            .await?
+            .into_iter()
+            .map(|announced| AnnouncedPeer {
+                peer_id: announced.public_key.into(),
+                peer_address: announced.chain_addr,
+            })
+            .collect::<Vec<_>>();
+
         let body = NodePeersResponse {
-            connected: all_network_peers.clone(),
-            announced: all_network_peers, // TODO: currently these are the same, since everybody has to announce
+            connected: all_network_peers,
+            announced: announced_peers,
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
@@ -2512,7 +2533,7 @@ mod node {
                     hopr_node_safe_registry: chain_config.node_safe_registry,
                     hopr_management_module: chain_config.module_implementation,
                     hopr_node_safe: safe_config.safe_address,
-                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await,
+                    is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
                     connectivity_status: hopr.network_health().await,
                     channel_closure_period: channel_closure_notice_period.as_secs(),
                 };
@@ -2564,7 +2585,7 @@ mod node {
                         address.to_string(),
                         EntryNode {
                             multiaddrs: mas,
-                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await,
+                            is_eligible: hopr.is_allowed_to_access_network(&peer_id).await?,
                         },
                     );
                 }
