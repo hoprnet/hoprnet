@@ -74,6 +74,7 @@
               ./README.md
               ./hopr/hopr-lib/data
               ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.toml.in
               ./ethereum/contracts/remappings.txt
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
@@ -97,7 +98,6 @@
           commonArgs = {
             inherit buildInputs nativeBuildInputs;
             CARGO_HOME = ".cargo";
-            FOUNDRY_SOLC = "${solcDefault}/bin/solc";
             cargoVendorDir = "vendor/cargo";
             # disable running tests automatically for now
             doCheck = false;
@@ -113,7 +113,7 @@
             cargoExtraArgs = "--offline -p ${pname}";
             extraDummyScript = ''
               mkdir -p $out/vendor/cargo
-              cp -r --no-preserve=mode,ownership ${src}/vendor/cargo $out/vendor/
+              cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
@@ -122,6 +122,9 @@
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
             '';
           });
           rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // {
@@ -129,6 +132,9 @@
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
             '';
             # this ensures the tests are run as part of the build process
             doCheck = true;
@@ -301,6 +307,9 @@
             RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
             '';
             postBuild = ''
               ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
@@ -318,7 +327,7 @@
                 (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
-                ./ethereum/contracts/foundry.toml
+                ./ethereum/contracts/foundry.toml.in
                 ./ethereum/contracts/remappings.txt
               ];
             };
@@ -387,6 +396,11 @@
               pip install -r tests/requirements.txt
             '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               autoPatchelf ./.venv
+            '';
+            preShellHook = ''
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
             '';
             postShellHook = ''
               ${pre-commit-check.shellHook}
