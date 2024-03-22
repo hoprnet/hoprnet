@@ -145,6 +145,9 @@
             cargoClippyExtraArgs = "-- -Dwarnings";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
             '';
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
@@ -451,8 +454,15 @@
               options = [
                 "-euc"
                 ''
+                  # must generate the foundry.toml here, since this step could
+                  # be executed in isolation
+                  sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                    ./ethereum/contracts/foundry.toml.in > \
+                    ./ethereum/contracts/foundry.toml
+
                   for file in "$@"; do
-                    ${pkgs.foundry-bin}/bin/forge fmt $file --root ./ethereum/contracts;
+                    ${pkgs.foundry-bin}/bin/forge fmt $file \
+                      --root ./ethereum/contracts;
                   done
                 ''
                 "--"
