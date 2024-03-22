@@ -20,25 +20,31 @@ impl HoprDbResolverOperations for HoprDb {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
         let myself = self.clone();
         let target = *onchain_key;
-        Ok(self.caches.chain_to_offchain.try_get_with_by_ref(onchain_key, async move {
+        Ok(self
+            .caches
+            .chain_to_offchain
+            .try_get_with_by_ref(onchain_key, async move {
                 myself
                     .translate_key(None, target)
                     .await
                     .map(|r| r.map(|k| k.try_into().unwrap()))
-            }
-        ).await?)
+            })
+            .await?)
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
         let myself = self.clone();
         let target = *offchain_key;
-        Ok(self.caches.offchain_to_chain.try_get_with_by_ref(offchain_key, async move {
-            myself
-                .translate_key(None, target)
-                .await
-                .map(|r| r.map(|k| k.try_into().unwrap()))
-        }
-        ).await?)
+        Ok(self
+            .caches
+            .offchain_to_chain
+            .try_get_with_by_ref(offchain_key, async move {
+                myself
+                    .translate_key(None, target)
+                    .await
+                    .map(|r| r.map(|k| k.try_into().unwrap()))
+            })
+            .await?)
     }
 }
 
@@ -46,6 +52,7 @@ impl HoprDbResolverOperations for HoprDb {
 mod tests {
     use super::*;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::ToHex;
     use sea_orm::{EntityTrait, Set};
 
@@ -73,6 +80,8 @@ mod tests {
     async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
+        // Inserting to the table directly to avoid cache
+
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
         let account_1 = hopr_db_entity::account::ActiveModel {
@@ -99,8 +108,32 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists_with_cache() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        // Inserting to the table via API to insert into cache as well
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = OffchainKeypair::random().public().clone();
+        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let actual_ck = db.resolve_chain_key(&packet_1).await.expect("must succeed");
+        assert_eq!(actual_ck, Some(chain_1), "chain keys must match");
+    }
+
+    #[async_std::test]
     async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        // Inserting to the table directly to avoid cache
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = OffchainKeypair::random().public().clone();
@@ -122,6 +155,29 @@ mod tests {
             .exec(&db.db)
             .await
             .expect("insert must succeed");
+
+        let actual_pk = db.resolve_packet_key(&chain_2).await.expect("must succeed");
+
+        assert_eq!(actual_pk, Some(packet_2), "packet keys must match");
+    }
+
+    #[async_std::test]
+    async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists_with_cache() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        // Inserting to the table via API to insert into cache as well
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
+            .await
+            .unwrap();
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = OffchainKeypair::random().public().clone();
+        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
+            .await
+            .unwrap();
 
         let actual_pk = db.resolve_packet_key(&chain_2).await.expect("must succeed");
 

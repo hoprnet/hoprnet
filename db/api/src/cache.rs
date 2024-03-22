@@ -1,18 +1,21 @@
-use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
-use std::time::Duration;
-use moka::Expiry;
-use moka::future::Cache;
+use crate::errors::DbError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance};
-use crate::errors::DbError;
+use moka::future::Cache;
+use moka::Expiry;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::info::IndexerData;
 
+/// Enumerates all singular data that can be cached and
+/// cannot be represented by a key.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
+    /// Cached [IndexerData].
     IndexerDataCache(IndexerData),
 }
 
@@ -35,8 +38,9 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
     }
 }
 
+/// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug, Clone)]
-pub struct DbCaches {
+pub struct HoprDbCaches {
     pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
@@ -45,26 +49,18 @@ pub struct DbCaches {
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
 }
 
-impl Default  for DbCaches {
+impl Default for HoprDbCaches {
     fn default() -> Self {
-        let single_values = Cache::builder()
-            .time_to_idle(Duration::from_secs(1800))
-            .build();
+        let single_values = Cache::builder().time_to_idle(Duration::from_secs(1800)).build();
 
         let unacked_tickets = Cache::builder()
             .time_to_live(Duration::from_secs(30))
             .max_capacity(1_000_000_000)
             .build();
 
-        let ticket_index = Cache::builder()
-            .expire_after(ExpiryNever)
-            .max_capacity(10_000)
-            .build();
+        let ticket_index = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
 
-        let unrealized_value = Cache::builder()
-            .expire_after(ExpiryNever)
-            .max_capacity(10_000)
-            .build();
+        let unrealized_value = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
 
         let chain_to_offchain = Cache::builder()
             .time_to_live(Duration::from_secs(600))
@@ -82,18 +78,7 @@ impl Default  for DbCaches {
             ticket_index,
             unrealized_value,
             chain_to_offchain,
-            offchain_to_chain
+            offchain_to_chain,
         }
-    }
-}
-
-impl DbCaches {
-    pub fn invalidate_all(&self) {
-        self.single_values.invalidate_all();
-        self.unacked_tickets.invalidate_all();
-        self.ticket_index.invalidate_all();
-        self.unrealized_value.invalidate_all();
-        self.chain_to_offchain.invalidate_all();
-        self.offchain_to_chain.invalidate_all();
     }
 }

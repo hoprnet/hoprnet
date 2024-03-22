@@ -3,7 +3,10 @@ use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
+    Set,
+};
 use sea_query::{Condition, IntoCondition, OnConflict};
 
 use hopr_db_entity::prelude::{Account, Announcement};
@@ -229,8 +232,16 @@ impl HoprDbAccountOperations for HoprDb {
                     {
                         // Proceed if succeeded or already exists
                         Ok(_) | Err(DbErr::RecordNotInserted) => {
-                            myself.caches.chain_to_offchain.insert(account.chain_addr, Some(account.public_key)).await;
-                            myself.caches.offchain_to_chain.insert(account.public_key, Some(account.chain_addr)).await;
+                            myself
+                                .caches
+                                .chain_to_offchain
+                                .insert(account.chain_addr, Some(account.public_key))
+                                .await;
+                            myself
+                                .caches
+                                .offchain_to_chain
+                                .insert(account.public_key, Some(account.chain_addr))
+                                .await;
 
                             if let AccountType::Announced {
                                 multiaddr,
@@ -347,15 +358,20 @@ impl HoprDbAccountOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    if let Some(entry) = account::Entity::find()
-                        .filter(cpk)
-                        .one(tx.as_ref())
-                        .await? {
+                    if let Some(entry) = account::Entity::find().filter(cpk).one(tx.as_ref()).await? {
                         let account_entry = model_to_account_entry(entry.clone(), vec![])?;
                         entry.delete(tx.as_ref()).await?;
 
-                        myself.caches.chain_to_offchain.invalidate(&account_entry.chain_addr).await;
-                        myself.caches.offchain_to_chain.invalidate(&account_entry.public_key).await;
+                        myself
+                            .caches
+                            .chain_to_offchain
+                            .invalidate(&account_entry.chain_addr)
+                            .await;
+                        myself
+                            .caches
+                            .offchain_to_chain
+                            .invalidate(&account_entry.public_key)
+                            .await;
                         Ok::<_, DbError>(())
                     } else {
                         Err(MissingAccount)

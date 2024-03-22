@@ -7,9 +7,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 
 use crate::db::HoprDb;
 
+use crate::cache::{CachedValue, CachedValueDiscriminants};
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
-use crate::cache::{CachedValue, CachedValueDiscriminants};
 
 /// Contains various on-chain information collected by Indexer,
 /// such as domain separators, ticket price, Network Registry status...etc.
@@ -226,7 +226,10 @@ impl HoprDbInfoOperations for HoprDb {
 
     async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData> {
         let myself = self.clone();
-        Ok(self.caches.single_values.try_get_with_by_ref(&CachedValueDiscriminants::IndexerDataCache, async move {
+        Ok(self
+            .caches
+            .single_values
+            .try_get_with_by_ref(&CachedValueDiscriminants::IndexerDataCache, async move {
                 myself
                     .nest_transaction(tx)
                     .and_then(|op| {
@@ -266,7 +269,9 @@ impl HoprDbInfoOperations for HoprDb {
                         })
                     })
                     .await
-        }).await?.try_into()?)
+            })
+            .await?
+            .try_into()?)
     }
 
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()> {
@@ -298,7 +303,10 @@ impl HoprDbInfoOperations for HoprDb {
             })
             .await?;
 
-        self.caches.single_values.invalidate(&CachedValueDiscriminants::IndexerDataCache).await;
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
         Ok(())
     }
 
@@ -320,7 +328,10 @@ impl HoprDbInfoOperations for HoprDb {
             })
             .await?;
 
-        self.caches.single_values.invalidate(&CachedValueDiscriminants::IndexerDataCache).await;
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
         Ok(())
     }
 
@@ -374,7 +385,10 @@ impl HoprDbInfoOperations for HoprDb {
             })
             .await?;
 
-        self.caches.single_values.invalidate(&CachedValueDiscriminants::IndexerDataCache).await;
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
         Ok(())
     }
 

@@ -16,9 +16,9 @@ use hopr_crypto_types::types::OffchainSignature;
 use hopr_db_api::errors::DbError;
 use hopr_db_api::info::DomainSeparator;
 use hopr_db_api::tickets::TicketSelector;
-use hopr_db_api::{HoprDbAllOperations, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
+use hopr_db_api::{HoprDbAllOperations, OpenTransaction};
+use hopr_db_entity::channel;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::{chain_info, channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -593,13 +593,9 @@ where
                     update.1.to_string()
                 );
 
-                chain_info::ActiveModel {
-                    id: Set(SINGULAR_TABLE_FIXED_ID),
-                    ticket_price: Set(Some(update.1.to_be_bytes().into())),
-                    ..Default::default()
-                }
-                .update(tx.as_ref())
-                .await?;
+                self.db
+                    .update_ticket_price(Some(tx), BalanceType::HOPR.balance(update.1))
+                    .await?;
 
                 info!("ticket price has been set to {}", update.1);
             }
@@ -728,7 +724,7 @@ pub mod tests {
     };
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::accounts::{HoprDbAccountOperations, ChainOrPacketKey};
+    use hopr_db_api::accounts::{ChainOrPacketKey, HoprDbAccountOperations};
     use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
     use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};

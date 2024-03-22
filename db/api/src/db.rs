@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::cache::HoprDbCaches;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_db_entity::ticket;
@@ -13,7 +14,6 @@ use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
 use tracing::log::LevelFilter;
-use crate::cache::DbCaches;
 
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
@@ -35,7 +35,7 @@ pub struct HoprDb {
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
-    pub(crate) caches: Arc<DbCaches>,
+    pub(crate) caches: Arc<HoprDbCaches>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -121,7 +121,7 @@ impl HoprDb {
             .await
             .expect("must reset ticket state on init");
 
-        let caches = Arc::new(DbCaches::default());
+        let caches = Arc::new(HoprDbCaches::default());
 
         Self {
             me_onchain: chain_key.public().to_address(),

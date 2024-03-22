@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
 use hopr_internal_types::{channels::Ticket, errors::CoreTypesError};
 use sea_orm::TransactionError;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
