@@ -206,6 +206,10 @@ pub struct AggregationPrerequisites {
 pub trait HoprDbTicketOperations {
     /// Retrieve acknowledged winning tickets according to the given `selector`.
     /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
+    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>>;
+
+    /// Retrieve acknowledged winning tickets according to the given `selector`.
+    /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
 
     /// Marks tickets as redeemed (removing them from the DB) and updating the statistics.
@@ -343,6 +347,30 @@ pub struct AllTicketStatistics {
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
+    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>> {
+        let channel_dst = self
+            .get_indexer_data(None)
+            .await?
+            .channels_dst
+            .ok_or(LogicalError("missing channel dst".into()))?;
+
+        let ckp = self.chain_key.clone();
+
+        self.nest_transaction_in_db(None, TargetDb::Tickets)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    ticket::Entity::find()
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
+                        .collect::<Result<Vec<_>>>()
+                })
+            })
+            .await
+    }
+
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
         let channel_dst = self
             .get_indexer_data(tx)

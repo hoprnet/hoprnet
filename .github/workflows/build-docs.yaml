@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Build and publish rust documentation 
+# Build and publish rust documentation
 #################################################################################
 name: "Build docs"
 
@@ -19,7 +19,9 @@ concurrency:
 jobs:
   rust:
     name: Rust docs
-    runs-on: self-hosted-hoprnet-small
+    # big runner is needed because building docs involves building Rust code
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

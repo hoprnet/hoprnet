@@ -129,7 +129,7 @@ pub struct InternalState {
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
             network::TicketPriceResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::NodePeersResponse, node::NodeVersionResponse
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -1996,7 +1996,7 @@ mod tickets {
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -2031,7 +2031,7 @@ mod tickets {
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
         responses(
-            (status = 200, description = "Channel funded successfully", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -2263,7 +2263,7 @@ mod node {
         pub quality: Option<f64>,
     }
 
-    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[derive(Debug, Default, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct HeartbeatInfo {
         pub sent: u64,
@@ -2292,11 +2292,23 @@ mod node {
         pub reported_version: String,
     }
 
+    #[serde_as]
+    #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct AnnouncedPeer {
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_id: PeerId,
+        #[serde_as(as = "DisplayFromStr")]
+        #[schema(value_type = String)]
+        pub peer_address: Address,
+    }
+
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct NodePeersResponse {
         pub connected: Vec<PeerInfo>,
-        pub announced: Vec<PeerInfo>,
+        pub announced: Vec<AnnouncedPeer>,
     }
 
     /// Lists information for `connected peers` and `announced peers`.
@@ -2379,9 +2391,19 @@ mod node {
             .collect::<Vec<_>>()
             .await;
 
+        let announced_peers = hopr
+            .accounts_announced_on_chain()
+            .await?
+            .into_iter()
+            .map(|announced| AnnouncedPeer {
+                peer_id: announced.public_key.into(),
+                peer_address: announced.chain_addr,
+            })
+            .collect::<Vec<_>>();
+
         let body = NodePeersResponse {
-            connected: all_network_peers.clone(),
-            announced: all_network_peers, // TODO: currently these are the same, since everybody has to announce
+            connected: all_network_peers,
+            announced: announced_peers,
         };
 
         Ok(Response::builder(200).body(json!(body)).build())
