@@ -12,6 +12,7 @@ use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
 use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler};
 use tracing::{error, info, warn};
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleHistogram;
@@ -34,7 +35,7 @@ fn init_logger() {
 }
 
 #[cfg(not(feature = "simple_log"))]
-fn init_logger() {
+fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
@@ -85,11 +86,13 @@ fn init_logger() {
         tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
             .expect("Failed to set tracing subscriber");
     };
+
+    Ok(())
 }
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_logger();
+    let _ = init_logger();
 
     info!("This is HOPRd {}", hopr_lib::constants::APP_VERSION);
     let args = <CliArgs as clap::Parser>::parse();
