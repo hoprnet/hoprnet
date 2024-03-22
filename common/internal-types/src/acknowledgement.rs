@@ -136,6 +136,7 @@ impl Ord for AcknowledgedTicket {
 }
 
 impl AcknowledgedTicket {
+    /// Creates an acknowledged ticket out of a plain ticket.
     pub fn new(
         ticket: Ticket,
         response: Response,
@@ -323,7 +324,7 @@ impl UnacknowledgedTicket {
     }
 
     /// Turn an unacknowledged ticket into an acknowledged ticket by adding
-    /// VRF output (requires private key) and the received acknowledgement
+    /// VRF output (requires private key) and the received acknowledgement of the forwarded packet.
     pub fn acknowledge(
         self,
         acknowledgement: &HalfKey,

@@ -331,6 +331,8 @@ where
                                         "could not find acknowledged 'BeingRedeemed' ticket with idx {} in {channel_entry}",
                                         ticket_redeemed.new_ticket_index - 1
                                     );
+                                    // This is not an error, because the ticket might've become neglected before
+                                    // the ticket redemption could finish
                                     None
                                 }
                                 Ordering::Greater => {
@@ -339,7 +341,10 @@ where
                                         matching_tickets.len(),
                                         ticket_redeemed.new_ticket_index - 1
                                     );
-                                    None
+                                    return Err(CoreEthereumIndexerError::ProcessError(format!(
+                                        "multiple tickets matching idx {} found in {channel_entry}",
+                                        ticket_redeemed.new_ticket_index - 1
+                                    )));
                                 }
                             }
                         }
@@ -362,12 +367,12 @@ where
                         }
                     };
 
-                    // Update ticket index on the Channel entry
+                    // Update ticket index on the Channel entry and get the updated model
                     let mut active_channel = channel.into_active_model();
                     active_channel.ticket_index = Set(ticket_redeemed.new_ticket_index.to_be_bytes().into());
-                    active_channel.save(tx.as_ref()).await?;
+                    let channel = active_channel.update(tx.as_ref()).await?;
 
-                    Ok(Some(ChainEventType::TicketRedeemed(channel_entry, ack_ticket)))
+                    Ok(Some(ChainEventType::TicketRedeemed(channel.try_into()?, ack_ticket)))
                 } else {
                     error!("observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
@@ -731,7 +736,7 @@ pub mod tests {
     use hopr_db_api::accounts::HoprDbAccountOperations;
     use hopr_db_api::channels::HoprDbChannelOperations;
     use hopr_db_api::db::HoprDb;
-    use hopr_db_api::info::HoprDbInfoOperations;
+    use hopr_db_api::info::{DomainSeparator, HoprDbInfoOperations};
     use hopr_db_api::registry::HoprDbRegistryOperations;
     use hopr_db_api::tickets::HoprDbTicketOperations;
     use hopr_db_api::{HoprDbAllOperations, HoprDbGeneralModelOperations};
@@ -743,8 +748,9 @@ pub mod tests {
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
-        static ref COUNTERPARTY_CHAIN_ADDRESS: Address = Address::from_bytes(&hex!("f1a73ef496c45e260924a9279d2d9752ae378812")).unwrap();
-        static ref SELF_CHAIN_KEY: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref COUNTERPARTY_CHAIN_KEY: ChainKeypair = ChainKeypair::random();
+        static ref COUNTERPARTY_CHAIN_ADDRESS: Address = COUNTERPARTY_CHAIN_KEY.public().to_address();
+        static ref SELF_CHAIN_KEY: ChainKeypair = ChainKeypair::random();
         static ref SELF_CHAIN_ADDRESS: Address = SELF_CHAIN_KEY.public().to_address();
         static ref STAKE_ADDRESS: Address = Address::from_bytes(&hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3")).unwrap();
         static ref CHANNELS_ADDR: Address = Address::from_bytes(&hex!("bab20aea98368220baa4e3b7f151273ee71df93b")).unwrap(); // just a dummy
@@ -1795,9 +1801,121 @@ pub mod tests {
             .expect_err("should not re-open channel that is not Closed");
     }
 
+    fn mock_acknowledged_ticket(signer: &ChainKeypair, destination: &ChainKeypair, index: u64) -> AcknowledgedTicket {
+        let price_per_packet: U256 = 20_u32.into();
+        let ticket_win_prob = 1.0f64;
+
+        let channel_id = generate_channel_id(&signer.into(), &destination.into());
+
+        let channel_epoch = 1u64;
+        let domain_separator = Hash::default();
+
+        let response = Response::new(
+            &Hash::create(&[
+                &channel_id.to_bytes(),
+                &channel_epoch.to_be_bytes(),
+                &index.to_be_bytes(),
+            ])
+            .to_bytes(),
+        );
+
+        let ticket = Ticket::new(
+            &destination.into(),
+            &Balance::new(price_per_packet.div_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
+            index.into(),
+            1u64.into(),
+            ticket_win_prob,
+            1u64.into(),
+            response.to_challenge().into(),
+            signer,
+            &domain_separator,
+        )
+        .unwrap();
+
+        AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
+    }
+
     #[async_std::test]
-    async fn on_channel_ticket_redeemed() {
+    async fn on_channel_ticket_redeemed_incoming_channel() {
         let db = create_db().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await
+            .unwrap();
+
+        let handlers = init_handlers(db.clone());
+
+        let channel = ChannelEntry::new(
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            *SELF_CHAIN_ADDRESS,
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        let ticket_index = U256::from((1u128 << 48) - 1);
+        let next_ticket_index = ticket_index + 1;
+
+        let mut ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64());
+        ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
+
+        db.upsert_channel(None, channel).await.unwrap();
+        db.upsert_ticket(None, ticket.clone()).await.unwrap();
+
+        let ticket_redeemed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
+            topics: vec![
+                TicketRedeemedFilter::signature(),
+                H256::from_slice(&channel.get_id().to_bytes()),
+            ],
+            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            ..test_log()
+        };
+
+        let outgoing_ticket_index_before = db
+            .get_ticket_index(channel.get_id())
+            .await
+            .expect("must get ticket index")
+            .load(Ordering::Relaxed);
+
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
+            .await
+            .unwrap();
+
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::TicketRedeemed(c, t)) if channel == c && t == Some(ticket)),
+            "must return the updated channel entry and the redeemed ticket"
+        );
+
+        assert_eq!(
+            channel.ticket_index, next_ticket_index,
+            "channel entry must contain next ticket index"
+        );
+
+        let outgoing_ticket_index_after = db
+            .get_ticket_index(channel.get_id())
+            .await
+            .expect("must get ticket index")
+            .load(Ordering::Relaxed);
+
+        assert_eq!(
+            outgoing_ticket_index_before, outgoing_ticket_index_after,
+            "outgoing ticket index must not change"
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_ticket_redeemed_outgoing_channel() {
+        let db = create_db().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await
+            .unwrap();
 
         let handlers = init_handlers(db.clone());
 
@@ -1810,9 +1928,10 @@ pub mod tests {
             U256::one(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
-
         let ticket_index = U256::from((1u128 << 48) - 1);
+        let next_ticket_index = ticket_index + 1;
+
+        db.upsert_channel(None, channel).await.unwrap();
 
         let ticket_redeemed_log = ethers::prelude::Log {
             address: handlers.addresses.channels.into(),
@@ -1820,7 +1939,7 @@ pub mod tests {
                 TicketRedeemedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(ticket_index.to_bytes()).into(),
+            data: Vec::from(next_ticket_index.to_bytes()).into(),
             ..test_log()
         };
 
@@ -1832,18 +1951,136 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::TicketRedeemed(_, _))));
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if channel == c),
+            "must return update channel entry and no ticket"
+        );
+
+        assert_eq!(
+            channel.ticket_index, next_ticket_index,
+            "channel entry must contain next ticket index"
+        );
+
+        let outgoing_ticket_index = db
+            .get_ticket_index(channel.get_id())
+            .await
+            .expect("must get ticket index")
+            .load(Ordering::Relaxed);
+
+        assert!(
+            outgoing_ticket_index >= ticket_index.as_u64(),
+            "outgoing idx {outgoing_ticket_index} must be greater or equal to {ticket_index}"
+        );
+        assert_eq!(
+            outgoing_ticket_index,
+            next_ticket_index.as_u64(),
+            "outgoing ticket index must be equal to next ticket index"
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() {
+        let db = create_db().await;
+        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
+            .await
+            .unwrap();
+
+        let handlers = init_handlers(db.clone());
+
+        let channel = ChannelEntry::new(
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            *SELF_CHAIN_ADDRESS,
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let next_ticket_index = U256::from((1u128 << 48) - 1);
+
+        let ticket_redeemed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
+            topics: vec![
+                TicketRedeemedFilter::signature(),
+                H256::from_slice(&channel.get_id().to_bytes()),
+            ],
+            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            ..test_log()
+        };
+
+        let event_type = db
+            .begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
+            .await
+            .unwrap();
 
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
-        assert_eq!(channel.ticket_index, ticket_index);
+        assert!(
+            matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
+            "must return updated channel entry and no ticket"
+        );
 
-        assert!(db
-            .get_ticket_index(channel.get_id())
+        assert_eq!(
+            channel.ticket_index, next_ticket_index,
+            "channel entry must contain next ticket index"
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() {
+        let db = create_db().await;
+
+        let handlers = init_handlers(db.clone());
+
+        let channel = ChannelEntry::new(
+            Address::from(hopr_crypto_random::random_bytes()),
+            Address::from(hopr_crypto_random::random_bytes()),
+            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let next_ticket_index = U256::from((1u128 << 48) - 1);
+
+        let ticket_redeemed_log = ethers::prelude::Log {
+            address: handlers.addresses.channels.into(),
+            topics: vec![
+                TicketRedeemedFilter::signature(),
+                H256::from_slice(&channel.get_id().to_bytes()),
+            ],
+            data: Vec::from(next_ticket_index.to_bytes()).into(),
+            ..test_log()
+        };
+
+        let event_type = db
+            .begin_transaction()
             .await
             .unwrap()
-            .load(Ordering::Relaxed)
-            .ge(&ticket_index.as_u64()));
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log.into()).await }))
+            .await
+            .unwrap();
+
+        let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::TicketRedeemed(c, None)) if c == channel),
+            "must return updated channel entry and no ticket"
+        );
+
+        assert_eq!(
+            channel.ticket_index, next_ticket_index,
+            "channel entry must contain next ticket index"
+        );
     }
 
     #[async_std::test]
@@ -1883,7 +2120,9 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(_))));
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelClosureInitiated(c)) if c.get_id() == channel.get_id() && c.status != ChannelStatus::Open)
+        );
 
         let channel = db.get_channel_by_id(None, &channel.get_id()).await.unwrap().unwrap();
 
@@ -1915,13 +2154,9 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(event_type, Some(ChainEventType::NodeSafeRegistered(_))));
+        assert!(matches!(event_type, Some(ChainEventType::NodeSafeRegistered(addr)) if addr == *SAFE_INSTANCE_ADDR));
 
         // Nothing to check in the DB here, since we do not track this
-        /*assert_eq!(
-            db.read().await.is_mfa_protected().await.unwrap(),
-            Some(*SAFE_INSTANCE_ADDR)
-        );*/
     }
 
     #[async_std::test]
@@ -1931,12 +2166,6 @@ pub mod tests {
         let handlers = init_handlers(db.clone());
 
         // Nothing to write to the DB here, since we do not track this
-        /*db.write()
-          .await
-          .set_mfa_protected_and_update_snapshot(Some(*SAFE_INSTANCE_ADDR), &Snapshot::default())
-          .await
-          .unwrap();
-        */
 
         let safe_registered_log = ethers::prelude::Log {
             address: handlers.addresses.safe_registry.into(),
@@ -1963,7 +2192,6 @@ pub mod tests {
         );
 
         // Nothing to check in the DB here, since we do not track this
-        // assert_eq!(db.read().await.is_mfa_protected().await.unwrap(), None);
     }
 
     #[async_std::test]
