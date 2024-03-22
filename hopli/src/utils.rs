@@ -1,6 +1,4 @@
 //! This module contains errors produced in this crate
-use chain_rpc::errors::RpcError;
-use ethers::signers::WalletError;
 // use ethers::providers::{Http, JsonRpcClient, ProviderError};
 use hoprd_keypair::errors::KeyPairError;
 use thiserror::Error;
@@ -90,11 +88,11 @@ pub enum HelperErrors {
 
     /// Error with HTTP Json RPC provider
     #[error(transparent)]
-    RpcError(#[from] RpcError),
+    RpcError(#[from] chain_rpc::errors::RpcError),
 
     /// Error with signer wallet error
     #[error(transparent)]
-    WalletError(#[from] WalletError),
+    WalletError(#[from] ethers::signers::WalletError),
 
     /// Fail to make a multicall
     #[error("multicall Error: {0}")]
@@ -115,6 +113,10 @@ pub enum HelperErrors {
     /// A required smart contract (Safe or module proxy instance) is not deployed
     #[error("contract not deployed: {0}")]
     ContractNotDeployed(String),
+
+    // encode packed error
+    #[error(transparent)]
+    EncodePackedError(#[from] ethers::abi::EncodePackedError),
 }
 
 /// Multicall3 deployer wallet

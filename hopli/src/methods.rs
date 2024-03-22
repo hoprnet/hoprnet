@@ -285,7 +285,7 @@ pub async fn send_safe_transaction_with_threshold_one<M: Middleware>(
     );
 
     // sign the transaction
-    let signature = wallet.sign_hash(transaction_hash.into()).unwrap();
+    let signature = wallet.sign_hash(transaction_hash.into())?;
     debug!("signature {:?}", hex::encode(signature.to_vec()));
 
     // execute the transaction
@@ -600,7 +600,7 @@ pub async fn register_safes_and_nodes_on_network_registry<M: Middleware>(
     let registered_safes =
         get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone())
             .await
-            .unwrap();
+            .map_err(|e| HelperErrors::MulticallError(e.to_string()))?;
 
     let mut nodes_to_remove: Vec<H160> = Vec::new();
     let mut safes_to_add: Vec<H160> = Vec::new();
@@ -664,7 +664,7 @@ pub async fn deregister_nodes_from_network_registry<M: Middleware>(
     let registered_safes =
         get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone())
             .await
-            .unwrap();
+            .map_err(|e| HelperErrors::MulticallError(e.to_string()))?;
 
     let mut nodes_to_remove: Vec<H160> = Vec::new();
 
@@ -818,8 +818,7 @@ pub fn prepare_safe_tx_from_owner_contract<M: Middleware>(
         ethers::abi::Token::Address(MULTICALL_ADDRESS),
         ethers::abi::Token::Bytes(hex!("0000000000000000000000000000000000000000000000000000000000000000").to_vec()),
         ethers::abi::Token::Bytes(hex!("01").to_vec()),
-    ])
-    .unwrap();
+    ])?;
 
     multicall.add_call(
         deployed_safe
@@ -907,13 +906,10 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         .get_transaction_count(caller, Some(ethers::types::BlockNumber::Pending.into()))
         .await
         .unwrap();
-    let nonce = keccak256(
-        ethers::abi::encode_packed(&[
-            ethers::abi::Token::Address(caller),
-            ethers::abi::Token::Uint(curr_nonce),
-        ])
-        .unwrap(),
-    );
+    let nonce = keccak256(ethers::abi::encode_packed(&[
+        ethers::abi::Token::Address(caller),
+        ethers::abi::Token::Uint(curr_nonce),
+    ])?);
 
     // predict module and safe address
     let module_address = predict_module_address(
@@ -969,8 +965,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         module_address,
         caller,
         scope_announcement_tx_payload,
-    )
-    .unwrap();
+    )?;
     info!("Announcement smart contract has been scoped as target");
 
     // approve token transfer to be done for the safe by channel contracts
@@ -986,8 +981,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         hopr_token_address,
         caller,
         approve_tx_payload,
-    )
-    .unwrap();
+    )?;
     info!("Token transfer allowance has been set for channel contract");
 
     // if node addresses are known, include nodes to the module by safe
@@ -1004,8 +998,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
                 module_address,
                 caller,
                 include_node_tx_payload,
-            )
-            .unwrap();
+            )?;
         }
         info!("Nodes have been included in the module");
     } else {
@@ -1026,11 +1019,16 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
         safe_address,
         caller,
         remove_owner_tx_payload,
-    )
-    .unwrap();
+    )?;
     info!("Admins and threshold have been set to provided values");
 
-    let receipt = multicall.send().await.unwrap().await.unwrap().unwrap();
+    let receipt = multicall
+        .send()
+        .await
+        .map_err(|e| HelperErrors::MulticallError(e.to_string()))?
+        .await
+        .unwrap()
+        .unwrap();
     info!("multicall receipt {:?}", receipt.transaction_hash);
 
     Ok((deployed_safe, deployed_module))
@@ -1087,7 +1085,7 @@ pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M: 
             // update counter
             nodes_to_remove_counter += 1;
             // get chain id and nonce
-            let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
+            let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await?;
 
             // for each safe, prepare a multisend transaction to dergister node from safe and remove node from module
             let multisend_txns: Vec<MultisendTransaction> = vec![
@@ -1124,8 +1122,7 @@ pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<M: 
                 chain_id,
                 safe_nonce,
             )
-            .await
-            .unwrap();
+            .await?;
         }
     }
 
@@ -1140,7 +1137,7 @@ pub async fn include_nodes_to_module<M: Middleware>(
     owner_chain_key: ChainKeypair,
 ) -> Result<(), HelperErrors> {
     // get chain id and nonce
-    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
+    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await?;
 
     // prepare a multisend transaction to include each node to the  module
     let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
@@ -1167,8 +1164,7 @@ pub async fn include_nodes_to_module<M: Middleware>(
         chain_id,
         safe_nonce,
     )
-    .await
-    .unwrap();
+    .await?;
 
     Ok(())
 }
@@ -1186,7 +1182,7 @@ pub async fn migrate_nodes<M: Middleware>(
     allowance: U256,
     owner_chain_key: ChainKeypair,
 ) -> Result<(), HelperErrors> {
-    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await.unwrap();
+    let (chain_id, safe_nonce) = get_chain_id_and_safe_nonce(safe.clone()).await?;
 
     let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
 
@@ -1242,8 +1238,7 @@ pub async fn migrate_nodes<M: Middleware>(
         chain_id,
         safe_nonce,
     )
-    .await
-    .unwrap();
+    .await?;
 
     Ok(())
 }
