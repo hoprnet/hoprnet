@@ -29,6 +29,7 @@ NODE_NAME_PREFIX = f"{FIXTURES_PREFIX}-node"
 
 NETWORK1 = "anvil-localhost"
 NETWORK2 = "anvil-localhost2"
+ANVIL_ENDPOINT = "localhost:8545"
 
 API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -251,6 +252,8 @@ def fund_nodes(private_key: str):
             "0.0",
             "--native-amount",
             "10.0",
+            "--provider-url",
+            ANVIL_ENDPOINT,
         ],
         env=os.environ | custom_env,
         check=True,

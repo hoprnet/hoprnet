@@ -34,12 +34,12 @@
 //!     --provider-url "http://localhost:8545"
 //! ````
 //!
-//! - Manager syncs the eligibility of nodes
+//! - Manager syncs the eligibility of safes
 //! ```text
 //! hopli -- network-registry manager-force-sync \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
-//!     --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+//!     --safe-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
 //!     --eligibility true \
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --provider-url "http://localhost:8545"

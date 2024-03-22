@@ -58,7 +58,7 @@
 //!
 //! - Move registered nodes to a different set of safe and module
 //! ```text
-//! hopli safe-module safe-module move \
+//! hopli safe-module move \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts"  \
 //!     --old-module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \

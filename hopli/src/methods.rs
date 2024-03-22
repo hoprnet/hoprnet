@@ -1030,7 +1030,8 @@ pub async fn deploy_safe_module_with_targets_and_nodes<M: Middleware>(
     .unwrap();
     info!("Admins and threshold have been set to provided values");
 
-    multicall.send().await.unwrap().await.unwrap();
+    let receipt = multicall.send().await.unwrap().await.unwrap().unwrap();
+    info!("multicall receipt {:?}", receipt.transaction_hash);
 
     Ok((deployed_safe, deployed_module))
 }

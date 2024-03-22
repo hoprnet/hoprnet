@@ -8,7 +8,7 @@
 //!
 //! Some sample commands:
 //!
-//! - To read identities
+//! - To create identities
 //! ```text
 //! hopli identity create \
 //!     --identity-directory "./test" \
@@ -17,7 +17,7 @@
 //!     --password-path "./test/pwd"
 //! ```
 //!
-//! - To create identities
+//! - To read identities
 //! ```text
 //! hopli identity read \
 //!     --identity-directory "./test" \

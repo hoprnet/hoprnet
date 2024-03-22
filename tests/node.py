@@ -60,13 +60,14 @@ class Node:
                 "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
                 "--manager-private-key",
                 "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+                "--provider-url",
+                "localhost:8545",
             ],
             env=os.environ | custom_env,
             check=True,
             capture_output=True,
             text=True,
         )
-
         for el in res.stdout.split("\n"):
             if el.startswith("safe 0x"):
                 self.safe_address = el.split()[-1]
