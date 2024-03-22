@@ -35,24 +35,56 @@ fn init_logger() {
 
 #[cfg(not(feature = "simple_log"))]
 fn init_logger() {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        tracing_subscriber::filter::EnvFilter::new("info")
-            .add_directive("libp2p_mplex=info".parse().unwrap())
-            .add_directive("multistream_select=info".parse().unwrap())
-            .add_directive("isahc::handler=error".parse().unwrap())
-            .add_directive("isahc::client=error".parse().unwrap())
-            .add_directive("surf::middleware::logger::native=error".parse().unwrap())
-    });
+    let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
+        Ok(filter) => filter,
+        Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
+            .add_directive("libp2p_mplex=info".parse()?)
+            .add_directive("multistream_select=info".parse()?)
+            .add_directive("isahc::handler=error".parse()?)
+            .add_directive("isahc::client=error".parse()?)
+            .add_directive("surf::middleware::logger::native=error".parse()?),
+    };
 
     let format = tracing_subscriber::fmt::layer()
         .with_level(true)
         .with_target(true)
         .with_thread_ids(true)
-        .with_thread_names(false);
+        .with_thread_names(true);
 
-    let subscriber = tracing_subscriber::Registry::default().with(env_filter).with(format);
+    if let Ok(telemetry_url) = std::env::var("OPENTELEMETRY_COLLECTOR_URL") {
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .http()
+                    .with_endpoint(telemetry_url)
+                    .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+                    .with_timeout(std::time::Duration::from_secs(5)),
+            )
+            .with_trace_config(
+                opentelemetry_sdk::trace::config()
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(RandomIdGenerator::default())
+                    .with_max_events_per_span(64)
+                    .with_max_attributes_per_span(16)
+                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                        "service.name",
+                        env!("CARGO_PKG_NAME"),
+                    )])),
+            )
+            .install_batch(opentelemetry_sdk::runtime::AsyncStd)?;
 
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::Registry::default()
+                .with(env_filter)
+                .with(format)
+                .with(tracing_opentelemetry::layer().with_tracer(tracer)),
+        )
+        .expect("Failed to set tracing subscriber");
+    } else {
+        tracing::subscriber::set_global_default(tracing_subscriber::Registry::default().with(env_filter).with(format))
+            .expect("Failed to set tracing subscriber");
+    };
 }
 
 #[async_std::main]
