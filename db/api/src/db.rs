@@ -17,6 +17,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use tracing::log::LevelFilter;
+use crate::cache::DbCaches;
 
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
@@ -53,6 +54,7 @@ pub struct HoprDb {
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) chain_key: ChainKeypair, // TODO: remove this once chain keypairs are not needed to reconstruct tickets
     pub(crate) me_onchain: Address,
+    pub(crate) caches: Arc<DbCaches>,
     // TODO: move these caches to a separate object
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
@@ -160,6 +162,7 @@ impl HoprDb {
             ticket_index,
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone())),
             tickets_db,
+            caches: Arc::new(Default::default()),
         }
     }
 }

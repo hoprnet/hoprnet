@@ -1,3 +1,4 @@
+#[cfg(feature = "channels")]
 pub mod channels;
 pub mod db;
 pub mod errors;
@@ -20,6 +21,7 @@ pub mod resolver;
 #[cfg(feature = "info")]
 pub mod info;
 pub mod ticket_manager;
+mod cache;
 
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
 
