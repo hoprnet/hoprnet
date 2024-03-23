@@ -425,11 +425,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
                             active_stats.save(tx.as_ref()).await?;
 
-                            myself
-                                .ticket_manager
-                                .unrealized_value
-                                .invalidate(&selector.channel_id)
-                                .await;
+                            myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {redeemed_count} ticket as redeemed"
@@ -478,11 +474,7 @@ impl HoprDbTicketOperations for HoprDb {
                             active_stats.save(tx.as_ref()).await?;
 
                             // invalidating unrealized balance for the channel
-                            myself
-                                .ticket_manager
-                                .unrealized_value
-                                .invalidate(&selector.channel_id)
-                                .await;
+                            myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
                             return Err(DbError::LogicalError(format!(
                                 "could not mark {neglectable_count} ticket as neglected"
@@ -657,7 +649,8 @@ impl HoprDbTicketOperations for HoprDb {
     async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
         let tkt_manager = self.ticket_manager.clone();
 
-        self.ticket_index
+        self.caches
+            .ticket_index
             .try_get_with(channel_id, async move {
                 let maybe_index = outgoing_ticket_index::Entity::find()
                     .filter(outgoing_ticket_index::Column::ChannelId.eq(channel_id.to_hex()))
@@ -695,7 +688,7 @@ impl HoprDbTicketOperations for HoprDb {
         for index_model in outgoing_indices {
             let channel_id = Hash::from_hex(&index_model.channel_id)?;
             let db_index = U256::from_be_bytes(&index_model.index).as_u64();
-            if let Some(cached_index) = self.ticket_index.get(&channel_id).await {
+            if let Some(cached_index) = self.caches.ticket_index.get(&channel_id).await {
                 // Note that the persisted value is always lagging behind the cache,
                 // so the fact that the cached index can change between this load
                 // storing it in the DB is allowed.
@@ -1187,6 +1180,7 @@ impl HoprDbTicketOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     match myself
+                        .caches
                         .unacked_tickets
                         .remove(&ack.ack_challenge())
                         .await
@@ -1308,7 +1302,8 @@ impl HoprDbTicketOperations for HoprDb {
                 next_hop,
                 ack_challenge,
             } => {
-                self.unacked_tickets
+                self.caches
+                    .unacked_tickets
                     .insert(ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await;
 
@@ -1397,6 +1392,7 @@ impl HoprDbTicketOperations for HoprDb {
                                 ))
                             })?;
 
+                            // TODO: cache this DB call too, or use the channel graph
                             let channel = myself
                                 .get_channel_by_parties(Some(tx), &previous_hop_addr, &me_onchain)
                                 .await?
@@ -1430,6 +1426,7 @@ impl HoprDbTicketOperations for HoprDb {
                             myself.increment_ticket_index(channel.get_id()).await?;
 
                             myself
+                                .caches
                                 .unacked_tickets
                                 .insert(
                                     ack_challenge,

@@ -1,17 +1,14 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
-use moka::future::Cache;
 use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 
-use crate::{db::ExpiryNever, errors::Result, tickets::TicketSelector, OpenTransaction};
-
-pub type WinningTicketSender = futures::channel::mpsc::Sender<AcknowledgedTicket>;
+use crate::cache::HoprDbCaches;
+use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -31,16 +28,11 @@ pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
     pub(crate) incoming_ack_tickets_tx: futures::channel::mpsc::Sender<AcknowledgedTicket>,
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
+    caches: Arc<HoprDbCaches>,
 }
 
 impl TicketManager {
-    pub fn new(tickets_db: sea_orm::DatabaseConnection) -> Self {
-        let unrealized_value = Cache::builder()
-            .expire_after(ExpiryNever {})
-            .max_capacity(10_000)
-            .build();
-
+    pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<HoprDbCaches>) -> Self {
         let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
 
         let mutex = Arc::new(async_lock::Mutex::new(()));
@@ -67,7 +59,7 @@ impl TicketManager {
             tickets_db,
             mutex,
             incoming_ack_tickets_tx: tx,
-            unrealized_value,
+            caches,
         }
     }
 
@@ -85,7 +77,10 @@ impl TicketManager {
             ))
         })?;
 
-        self.unrealized_value.insert(channel, unrealized_value + value).await;
+        self.caches
+            .unrealized_value
+            .insert(channel, unrealized_value + value)
+            .await;
         Ok(())
     }
 
@@ -100,8 +95,9 @@ impl TicketManager {
         );
 
         Ok(self
+            .caches
             .unrealized_value
-            .get_with(selector.channel_id, async move {
+            .try_get_with_by_ref(&selector.channel_id, async move {
                 transaction
                     .perform(|tx| {
                         Box::pin(async move {
@@ -118,12 +114,8 @@ impl TicketManager {
                         })
                     })
                     .await
-                    .unwrap_or_else(|e| {
-                        error!("encountered an error fetching a cached unrealized ticket value: {e}");
-                        Balance::zero(BalanceType::HOPR)
-                    })
             })
-            .await)
+            .await?)
     }
 
     /// Acquires write lock to the Ticket DB and starts a new transaction.

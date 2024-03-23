@@ -559,7 +559,7 @@ impl From<primitive_types::H256> for Hash {
 }
 
 /// Represents an Ed25519 public key.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
 }
