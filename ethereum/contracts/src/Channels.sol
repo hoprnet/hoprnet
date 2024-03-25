@@ -13,7 +13,7 @@ import { HoprLedger } from "./Ledger.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
-uint256 constant TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000; // in milliseconds
+uint256 constant TWENTY_FOUR_HOURS = 24 * 60 * 60; // in seconds
 
 uint256 constant INDEX_SNAPSHOT_INTERVAL = TWENTY_FOUR_HOURS;
 
