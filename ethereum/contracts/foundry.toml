@@ -4,7 +4,7 @@
 # Don't commit changes to this line which point to /nix/store/...
 # These are part of the `nix develop` shell setup.
 # This must be: 0.8.19
-solc = "0.8.19"
+solc = "/nix/store/g85vf2m9iiabpl9l65c712pky5q15bjd-solc-default/bin/solc"
 src = 'src'
 test = 'test'
 out = 'out'
