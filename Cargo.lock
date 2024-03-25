@@ -1553,7 +1553,6 @@ dependencies = [
  "mockall",
  "more-asserts",
  "multiaddr",
- "sea-query",
  "serde",
  "serde_with",
  "smart-default",
@@ -3479,7 +3478,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-lock 3.3.0",
  "async-std",

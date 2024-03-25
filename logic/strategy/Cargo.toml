@@ -46,7 +46,7 @@ env_logger = { workspace = true }
 mockall = "0.11.4"
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
-hopr-db-api = { workspace = true, features = ["peers"] }
+hopr-db-api = { workspace = true }
 futures = "0.3.28"
 
 
