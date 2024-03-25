@@ -68,6 +68,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
 #[derive(Clone)]
 pub struct InternalState {
+    pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
@@ -109,6 +110,7 @@ pub struct InternalState {
         tickets::redeem_tickets_in_channel,
         tickets::aggregate_tickets_in_channel,
         node::version,
+        node::configuration,
         node::peers,
         node::metrics,
         node::info,
@@ -268,6 +270,7 @@ enum WebSocketInput {
 
 pub async fn run_hopr_api(
     host: &str,
+    hoprd_cfg: String,
     cfg: &crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
@@ -306,6 +309,7 @@ pub async fn run_hopr_api(
     app.at(BASE_PATH).nest({
         let mut api = tide::with_state(InternalState {
             auth: Arc::new(cfg.auth.clone()),
+            hoprd_cfg,
             hopr: state.hopr.clone(),
             msg_encoder,
             inbox,
@@ -435,6 +439,7 @@ pub async fn run_hopr_api(
         api.at("/network/price").get(network::price);
 
         api.at("/node/version").get(node::version);
+        api.at("/node/configuration").get(node::configuration);
         api.at("/node/info").get(node::info);
         api.at("/node/peers").get(node::peers);
         api.at("/node/entryNodes").get(node::entry_nodes);
@@ -2254,6 +2259,24 @@ mod node {
         Ok(Response::builder(200)
             .body(json!(NodeVersionResponse { version }))
             .build())
+    }
+
+    /// Get the configuration of the running node.
+    #[utoipa::path(
+        get,
+        path = "/node/configuration",
+        responses(
+            (status = 200, description = "Fetched node configuration", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Configuration"
+    )]
+    pub(super) async fn configuration(req: Request<InternalState>) -> tide::Result<Response> {
+        Ok(Response::builder(200).body(req.state().hoprd_cfg.clone()).build())
     }
 
     #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
