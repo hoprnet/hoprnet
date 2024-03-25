@@ -290,6 +290,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             node_ingress,
             run_hopr_api(
                 &host_listen,
+                cfg.as_redacted_string()?,
                 &cfg.api,
                 node,
                 inbox.clone(),

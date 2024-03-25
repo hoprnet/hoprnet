@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::TryFutureExt;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_entity::{chain_info, global_settings, node_info};
 use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySerializable, IntoEndian, ToHex};
@@ -6,11 +7,13 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 
 use crate::db::HoprDb;
 
+use crate::cache::{CachedValue, CachedValueDiscriminants};
 use crate::errors::{DbError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID};
 
 /// Contains various on-chain information collected by Indexer,
-/// such as domain separators, ticket price Network Registry status and last indexed block number.
+/// such as domain separators, ticket price, Network Registry status...etc.
+/// All these members change very rarely and therefore can be cached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IndexerData {
     /// Ledger smart contract domain separator
@@ -23,8 +26,6 @@ pub struct IndexerData {
     pub ticket_price: Option<Balance>,
     /// Network registry state
     pub nr_enabled: bool,
-    /// Last block processed by the indexer
-    pub last_indexed_block: u32,
 }
 
 /// Contains information about node's safe.
@@ -68,25 +69,32 @@ pub trait HoprDbInfoOperations {
     /// Sets node's Safe addresses info.
     async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()>;
 
-    /// Gets stored Indexer data.
+    /// Gets stored Indexer data (either from the cache or from the DB).
+    ///
     /// To update information stored in [IndexerData], use the individual setter methods,
-    /// such as [`HoprDbInfoOperations::set_last_indexed_block`]... etc.
+    /// such as [`HoprDbInfoOperations::set_domain_separator`]... etc.
     async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData>;
 
     /// Sets a domain separator.
-    /// To retrieve stored domain separator info, use [`HoprDbInfoOperations::get_indexer_data`].
+    ///
+    /// To retrieve stored domain separator info, use [`HoprDbInfoOperations::get_indexer_data`],
+    /// note that this setter should invalidate the cache.
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()>;
 
     /// Updates the ticket price.
-    /// To retrieve stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`].
+    /// To retrieve stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
+    /// note that this setter should invalidate the cache.
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
 
-    /// Updates the last indexed block.
-    /// To retrieve stored last indexed block, use [`HoprDbInfoOperations::get_indexer_data`].
+    /// Retrieves the last indexed block number.
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32>;
+
+    /// Updates the last indexed block number.
     async fn set_last_indexed_block<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
 
     /// Updates the network registry state.
-    /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`].
+    /// To retrieve stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
+    /// note that this setter should invalidate the cache.
     async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()>;
 
     /// Gets global setting value with the given key.
@@ -173,28 +181,39 @@ impl HoprDbInfoOperations for HoprDb {
     }
 
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>> {
-        let addrs = self
-            .nest_transaction(tx)
+        let myself = self.clone();
+        Ok(self
+            .caches
+            .single_values
+            .try_get_with_by_ref(&CachedValueDiscriminants::SafeInfoCache, async move {
+                myself
+                    .nest_transaction(tx)
+                    .and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                                    .one(tx.as_ref())
+                                    .await?
+                                    .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
+                                Ok::<_, DbError>(info.safe_address.zip(info.module_address))
+                            })
+                        })
+                    })
+                    .await
+                    .and_then(|addrs| {
+                        if let Some((safe_address, module_address)) = addrs {
+                            Ok(Some(SafeInfo {
+                                safe_address: safe_address.parse()?,
+                                module_address: module_address.parse()?,
+                            }))
+                        } else {
+                            Ok(None)
+                        }
+                    })
+                    .map(CachedValue::SafeInfoCache)
+            })
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))?;
-                    Ok::<_, DbError>(info.safe_address.zip(info.module_address))
-                })
-            })
-            .await?;
-
-        Ok(if let Some((safe_address, module_address)) = addrs {
-            Some(SafeInfo {
-                safe_address: safe_address.parse()?,
-                module_address: module_address.parse()?,
-            })
-        } else {
-            None
-        })
+            .try_into()?)
     }
 
     async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()> {
@@ -213,48 +232,65 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<_, DbError>(())
                 })
             })
-            .await
+            .await?;
+        self.caches
+            .single_values
+            .insert(
+                CachedValueDiscriminants::SafeInfoCache,
+                CachedValue::SafeInfoCache(Some(safe_info)),
+            )
+            .await;
+        Ok(())
     }
 
     async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
+        let myself = self.clone();
+        Ok(self
+            .caches
+            .single_values
+            .try_get_with_by_ref(&CachedValueDiscriminants::IndexerDataCache, async move {
+                myself
+                    .nest_transaction(tx)
+                    .and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let model = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                                    .one(tx.as_ref())
+                                    .await?
+                                    .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
 
-                    let ledger_dst = if let Some(b) = model.ledger_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
+                                let ledger_dst = if let Some(b) = model.ledger_dst {
+                                    Some(Hash::from_bytes(&b)?)
+                                } else {
+                                    None
+                                };
 
-                    let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
+                                let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
+                                    Some(Hash::from_bytes(&b)?)
+                                } else {
+                                    None
+                                };
 
-                    let channels_dst = if let Some(b) = model.channels_dst {
-                        Some(Hash::from_bytes(&b)?)
-                    } else {
-                        None
-                    };
+                                let channels_dst = if let Some(b) = model.channels_dst {
+                                    Some(Hash::from_bytes(&b)?)
+                                } else {
+                                    None
+                                };
 
-                    Ok::<IndexerData, DbError>(IndexerData {
-                        ledger_dst,
-                        safe_registry_dst,
-                        channels_dst,
-                        ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
-                        nr_enabled: model.network_registry_enabled,
-                        last_indexed_block: model.last_indexed_block as u32,
+                                Ok::<_, DbError>(CachedValue::IndexerDataCache(IndexerData {
+                                    ledger_dst,
+                                    safe_registry_dst,
+                                    channels_dst,
+                                    ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
+                                    nr_enabled: model.network_registry_enabled,
+                                }))
+                            })
+                        })
                     })
-                })
+                    .await
             })
-            .await
+            .await?
+            .try_into()?)
     }
 
     async fn set_domain_separator<'a>(&'a self, tx: OptTx<'a>, dst_type: DomainSeparator, value: Hash) -> Result<()> {
@@ -284,7 +320,13 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<(), DbError>(())
                 })
             })
-            .await
+            .await?;
+
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
+        Ok(())
     }
 
     async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
@@ -301,6 +343,27 @@ impl HoprDbInfoOperations for HoprDb {
                     .await?;
 
                     Ok::<(), DbError>(())
+                })
+            })
+            .await?;
+
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
+        Ok(())
+    }
+
+    async fn get_last_indexed_block<'a>(&'a self, tx: OptTx<'a>) -> Result<u32> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .ok_or(DbError::MissingFixedTableEntry("node_info".into()))
+                        .map(|m| m.last_indexed_block as u32)
                 })
             })
             .await
@@ -339,7 +402,13 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<_, DbError>(())
                 })
             })
-            .await
+            .await?;
+
+        self.caches
+            .single_values
+            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
+            .await;
+        Ok(())
     }
 
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>> {
@@ -448,7 +517,22 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_set_get_safe_info() {
+    async fn test_set_get_indexer_data() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let data = db.get_indexer_data(None).await.unwrap();
+        assert_eq!(data.ticket_price, None);
+
+        let price = BalanceType::HOPR.balance(10);
+        db.update_ticket_price(None, price).await.unwrap();
+
+        let data = db.get_indexer_data(None).await.unwrap();
+
+        assert_eq!(data.ticket_price, Some(price));
+    }
+
+    #[async_std::test]
+    async fn test_set_get_safe_info_with_cache() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
         assert_eq!(None, db.get_safe_info(None).await.unwrap());
@@ -464,15 +548,32 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_set_get_safe_info() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        assert_eq!(None, db.get_safe_info(None).await.unwrap());
+
+        let safe_info = SafeInfo {
+            safe_address: *ADDR_1,
+            module_address: *ADDR_2,
+        };
+
+        db.set_safe_info(None, safe_info).await.unwrap();
+        db.caches.single_values.invalidate_all();
+
+        assert_eq!(Some(safe_info), db.get_safe_info(None).await.unwrap());
+    }
+
+    #[async_std::test]
     async fn test_set_last_indexed_block() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
 
-        assert_eq!(0, db.get_indexer_data(None).await.unwrap().last_indexed_block);
+        assert_eq!(0, db.get_last_indexed_block(None).await.unwrap());
 
         let block_num = 100000;
         db.set_last_indexed_block(None, block_num).await.unwrap();
 
-        assert_eq!(block_num, db.get_indexer_data(None).await.unwrap().last_indexed_block);
+        assert_eq!(block_num, db.get_last_indexed_block(None).await.unwrap());
     }
 
     #[async_std::test]
