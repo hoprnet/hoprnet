@@ -52,7 +52,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_thread_names(true);
 
-    if let Ok(telemetry_url) = std::env::var("OPENTELEMETRY_COLLECTOR_URL") {
+    if let Ok(telemetry_url) = std::env::var("HOPRD_OPENTELEMETRY_COLLECTOR_URL") {
         let tracer = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(
