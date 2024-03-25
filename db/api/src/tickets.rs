@@ -1,10 +1,9 @@
 use async_stream::stream;
+use hopr_db_entity::ticket_statistics;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
-use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -16,8 +15,6 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
-use hopr_db_entity::prelude::{Ticket, TicketStatistics};
-use hopr_db_entity::ticket_statistics;
 use hopr_db_entity::{outgoing_ticket_index, ticket};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -28,7 +25,7 @@ use crate::errors::DbError::LogicalError;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::resolver::HoprDbResolverOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
+use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 #[derive(Debug)]
@@ -222,7 +219,7 @@ pub trait HoprDbTicketOperations {
 
     /// Updates the ticket statistics according to the fact that the given ticket has
     /// been rejected by the packet processing pipeline.
-    async fn mark_ticket_rejected(&self, ticket_value: Balance) -> Result<()>;
+    async fn mark_ticket_rejected(&self, ticket: &hopr_internal_types::channels::Ticket) -> Result<()>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
     /// Returns the updated tickets in the new state.
@@ -239,10 +236,15 @@ pub trait HoprDbTicketOperations {
         new_state: AcknowledgedTicketStatus,
     ) -> Result<usize>;
 
-    /// Retrieves the ticket statistics.
+    /// Retrieves the ticket statistics for the given channel.
+    /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
     ///
     /// The optional transaction `tx` must be in the [tickets database](TargetDb::Tickets).
-    async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics>;
+    async fn get_ticket_statistics<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        channel_id: Option<Hash>,
+    ) -> Result<ChannelTicketStatistics>;
 
     /// Counts the tickets matching the given `selector` and their total value.
     ///
@@ -335,9 +337,9 @@ pub trait HoprDbTicketOperations {
     ) -> Result<TransportPacketWithChainData>;
 }
 
+/// Can contains ticket statistics for a channel or aggregate ticket statistics for all channels.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AllTicketStatistics {
-    pub last_updated: SystemTime,
+pub struct ChannelTicketStatistics {
     pub losing_tickets: u64,
     pub neglected_tickets: u64,
     pub neglected_value: Balance,
@@ -347,6 +349,41 @@ pub struct AllTicketStatistics {
     pub unredeemed_value: Balance,
     pub rejected_tickets: u64,
     pub rejected_value: Balance,
+}
+
+impl Default for ChannelTicketStatistics {
+    fn default() -> Self {
+        Self {
+            losing_tickets: 0,
+            neglected_tickets: 0,
+            neglected_value: BalanceType::HOPR.zero(),
+            redeemed_tickets: 0,
+            redeemed_value: BalanceType::HOPR.zero(),
+            unredeemed_tickets: 0,
+            unredeemed_value: BalanceType::HOPR.zero(),
+            rejected_tickets: 0,
+            rejected_value: BalanceType::HOPR.zero(),
+        }
+    }
+}
+
+async fn find_stats_for_channel(tx: &OpenTransaction, channel_id: &Hash) -> Result<ticket_statistics::Model> {
+    if let Some(model) = ticket_statistics::Entity::find()
+        .filter(ticket_statistics::Column::ChannelId.eq(channel_id.to_hex()))
+        .one(tx.as_ref())
+        .await?
+    {
+        Ok(model)
+    } else {
+        let new_stats = ticket_statistics::ActiveModel {
+            channel_id: Set(channel_id.to_hex()),
+            ..Default::default()
+        }
+        .insert(tx.as_ref())
+        .await?;
+
+        Ok(new_stats)
+    }
 }
 
 #[async_trait]
@@ -415,19 +452,16 @@ impl HoprDbTicketOperations for HoprDb {
 
                         // Update the stats if successful
                         if deleted.rows_affected == redeemed_count as u64 {
-                            let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                                .one(tx.as_ref())
-                                .await?
-                                .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+                            let current_stats = find_stats_for_channel(tx, &selector.channel_id).await?;
 
-                            let current_redeemed_value = U256::from_be_bytes(stats.redeemed_value.clone());
-                            let current_redeemed_count = stats.redeemed_tickets;
+                            let current_redeemed_value = U256::from_be_bytes(current_stats.redeemed_value.clone());
+                            let current_redeemed_count = current_stats.redeemed_tickets;
 
-                            let mut active_stats = stats.into_active_model();
-                            active_stats.redeemed_tickets = Set(current_redeemed_count + redeemed_count as i32);
-                            active_stats.redeemed_value =
+                            let mut new_stats = current_stats.into_active_model();
+                            new_stats.redeemed_tickets = Set(current_redeemed_count + redeemed_count as i32);
+                            new_stats.redeemed_value =
                                 Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
-                            active_stats.save(tx.as_ref()).await?;
+                            new_stats.save(tx.as_ref()).await?;
 
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
@@ -462,20 +496,17 @@ impl HoprDbTicketOperations for HoprDb {
 
                         // Update the stats if successful
                         if deleted.rows_affected == neglectable_count as u64 {
-                            let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                                .one(tx.as_ref())
-                                .await?
-                                .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+                            let current_status = find_stats_for_channel(tx, &selector.channel_id).await?;
 
-                            let current_neglected_value = U256::from_be_bytes(stats.neglected_value.clone());
-                            let current_neglected_count = stats.neglected_tickets;
+                            let current_neglected_value = U256::from_be_bytes(current_status.neglected_value.clone());
+                            let current_neglected_count = current_status.neglected_tickets;
 
-                            let mut active_stats = stats.into_active_model();
-                            active_stats.neglected_tickets = Set(current_neglected_count + neglectable_count as i32);
-                            active_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
+                            let mut new_stats = current_status.into_active_model();
+                            new_stats.neglected_tickets = Set(current_neglected_count + neglectable_count as i32);
+                            new_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
                                 .to_be_bytes()
                                 .into());
-                            active_stats.save(tx.as_ref()).await?;
+                            new_stats.save(tx.as_ref()).await?;
 
                             // invalidating unrealized balance for the channel
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
@@ -496,25 +527,23 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn mark_ticket_rejected(&self, ticket_value: Balance) -> Result<()> {
+    async fn mark_ticket_rejected(&self, ticket: &hopr_internal_types::channels::Ticket) -> Result<()> {
+        let channel_id = ticket.channel_id;
+        let amount = ticket.amount;
         self.ticket_manager
             .with_write_locked_db(|tx| {
                 Box::pin(async move {
-                    let stats = ticket_statistics::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+                    let stats = find_stats_for_channel(tx, &channel_id).await?;
 
                     let current_rejected_value = U256::from_be_bytes(stats.rejected_value.clone());
                     let current_rejected_count = stats.rejected_tickets;
 
                     let mut active_stats = stats.into_active_model();
                     active_stats.rejected_tickets = Set(current_rejected_count + 1i32);
-                    active_stats.rejected_value =
-                        Set((current_rejected_value + ticket_value.amount()).to_be_bytes().into());
+                    active_stats.rejected_value = Set((current_rejected_value + amount.amount()).to_be_bytes().into());
                     active_stats.save(tx.as_ref()).await?;
 
-                    Ok::<(), crate::errors::DbError>(())
+                    Ok::<(), DbError>(())
                 })
             })
             .await
@@ -587,41 +616,88 @@ impl HoprDbTicketOperations for HoprDb {
             .await
     }
 
-    async fn get_ticket_statistics<'a>(&'a self, tx: OptTx<'a>) -> Result<AllTicketStatistics> {
-        self.nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let stats = TicketStatistics::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                        .one(tx.as_ref())
-                        .await?
-                        .ok_or(DbError::MissingFixedTableEntry("ticket_statistics".into()))?;
+    async fn get_ticket_statistics<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        channel_id: Option<Hash>,
+    ) -> Result<ChannelTicketStatistics> {
+        match channel_id {
+            None => {
+                self.nest_transaction_in_db(tx, TargetDb::Tickets)
+                    .await?
+                    .perform(|tx| {
+                        Box::pin(async move {
+                            let (unredeemed_tickets, unredeemed_value) = ticket::Entity::find()
+                                .stream(tx.as_ref())
+                                .await?
+                                .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
+                                    Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+                                })
+                                .await?;
 
-                    let (unredeemed_tickets, unredeemed_value) = Ticket::find()
-                        .stream(tx.as_ref())
-                        .await?
-                        .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
-                            Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+                            let mut all_stats = ticket_statistics::Entity::find()
+                                .all(tx.as_ref())
+                                .await?
+                                .into_iter()
+                                .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
+                                    acc.losing_tickets += stats.losing_tickets as u64;
+                                    acc.neglected_tickets += stats.neglected_tickets as u64;
+                                    acc.neglected_value =
+                                        acc.neglected_value + BalanceType::HOPR.balance_bytes(stats.neglected_value);
+                                    acc.redeemed_tickets += stats.redeemed_tickets as u64;
+                                    acc.redeemed_value =
+                                        acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
+                                    acc.rejected_tickets += stats.rejected_tickets as u64;
+                                    acc.rejected_value =
+                                        acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    acc
+                                });
+
+                            all_stats.unredeemed_tickets = unredeemed_tickets;
+                            all_stats.unredeemed_value = BalanceType::HOPR.balance(unredeemed_value);
+
+                            Ok::<_, DbError>(all_stats)
                         })
-                        .await?;
-
-                    Ok::<AllTicketStatistics, DbError>(AllTicketStatistics {
-                        last_updated: chrono::DateTime::<chrono::Utc>::from_str(&stats.last_updated)
-                            .map_err(|_| DbError::DecodingError)?
-                            .into(),
-                        losing_tickets: stats.losing_tickets as u64,
-                        neglected_tickets: stats.neglected_tickets as u64,
-                        neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
-                        redeemed_tickets: stats.redeemed_tickets as u64,
-                        redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
-                        unredeemed_tickets,
-                        unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
-                        rejected_tickets: stats.rejected_tickets as u64,
-                        rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
                     })
-                })
-            })
-            .await
+                    .await
+            }
+            Some(channel) => {
+                // We need to make sure the channel exists, to avoid creating
+                // stats entry for a non-existing channel
+                if self.get_channel_by_id(None, &channel).await?.is_none() {
+                    return Err(DbError::ChannelNotFound(channel));
+                }
+
+                self.nest_transaction_in_db(tx, TargetDb::Tickets)
+                    .await?
+                    .perform(|tx| {
+                        Box::pin(async move {
+                            let stats = find_stats_for_channel(tx, &channel).await?;
+                            let (unredeemed_tickets, unredeemed_value) = ticket::Entity::find()
+                                .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
+                                .stream(tx.as_ref())
+                                .await?
+                                .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
+                                    Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+                                })
+                                .await?;
+
+                            Ok::<_, DbError>(ChannelTicketStatistics {
+                                losing_tickets: stats.losing_tickets as u64,
+                                neglected_tickets: stats.neglected_tickets as u64,
+                                neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
+                                redeemed_tickets: stats.redeemed_tickets as u64,
+                                redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
+                                unredeemed_tickets,
+                                unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
+                                rejected_tickets: stats.rejected_tickets as u64,
+                                rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
+                            })
+                        })
+                    })
+                    .await
+            }
+        }
     }
 
     async fn get_tickets_value<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
@@ -1506,7 +1582,7 @@ impl HoprDbTicketOperations for HoprDb {
                         let rejected_value = rejected_ticket.amount;
                         warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
 
-                        self.mark_ticket_rejected(rejected_value).await.map_err(|e| {
+                        self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
                             crate::errors::DbError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),
@@ -1657,12 +1733,14 @@ mod tests {
     use crate::db::HoprDb;
     use crate::errors::DbError;
     use crate::info::{DomainSeparator, HoprDbInfoOperations};
+    use crate::prelude::ChannelTicketStatistics;
     use crate::tickets::{AggregationPrerequisites, HoprDbTicketOperations, TicketSelector};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref CHANNEL_ID: Hash = generate_channel_id(&BOB.public().to_address(), &ALICE.public().to_address());
     }
 
     lazy_static::lazy_static! {
@@ -1688,7 +1766,7 @@ mod tests {
         Ok(())
     }
 
-    fn generate_random_ack_ticket(index: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(src: &ChainKeypair, dst: &ChainKeypair, index: u32) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -1697,20 +1775,20 @@ mod tests {
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = Ticket::new(
-            &ALICE.public().to_address(),
+            &dst.public().to_address(),
             &BalanceType::HOPR.balance(TICKET_VALUE),
             index.into(),
             1_u32.into(),
             1.0f64,
             4u64.into(),
             Challenge::from(cp_sum).to_ethereum_challenge(),
-            &BOB,
+            src,
             &Hash::default(),
         )
         .unwrap();
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
-        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, src.public().to_address());
+        unacked_ticket.acknowledge(&hk2, &dst, &Hash::default()).unwrap()
     }
 
     async fn init_db_with_tickets(db: &HoprDb, count_tickets: u64) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
@@ -1727,7 +1805,7 @@ mod tests {
 
         let tickets = (0..count_tickets)
             .into_iter()
-            .map(|i| generate_random_ack_ticket(i as u32))
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
             .collect::<Vec<_>>();
 
         let db_clone = db.clone();
@@ -1784,7 +1862,7 @@ mod tests {
 
         let (_, tickets) = init_db_with_tickets(&db, COUNT_TICKETS).await;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
             COUNT_TICKETS, stats.unredeemed_tickets,
             "must have {COUNT_TICKETS} unredeemed"
@@ -1799,6 +1877,12 @@ mod tests {
             BalanceType::HOPR.zero(),
             stats.redeemed_value,
             "there must be 0 redeemed value"
+        );
+
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
         );
 
         const TO_REDEEM: u64 = 2;
@@ -1818,7 +1902,7 @@ mod tests {
             .await
             .expect("tx must not fail");
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
             COUNT_TICKETS - TO_REDEEM,
             stats.unredeemed_tickets,
@@ -1837,6 +1921,12 @@ mod tests {
             BalanceType::HOPR.balance(TICKET_VALUE * TO_REDEEM),
             stats.redeemed_value,
             "there must be a redeemed value"
+        );
+
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
         );
     }
 
@@ -1874,7 +1964,7 @@ mod tests {
 
         let (channel, _) = init_db_with_tickets(&db, COUNT_TICKETS).await;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
             COUNT_TICKETS, stats.unredeemed_tickets,
             "must have {COUNT_TICKETS} unredeemed"
@@ -1891,11 +1981,17 @@ mod tests {
             "there must be 0 redeemed value"
         );
 
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
+        );
+
         db.mark_tickets_neglected((&channel).into())
             .await
             .expect("should mark as neglected");
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(0, stats.unredeemed_tickets, "must have 0 unredeemed");
         assert_eq!(
             BalanceType::HOPR.zero(),
@@ -1911,22 +2007,40 @@ mod tests {
             stats.neglected_value,
             "there must be a neglected value"
         );
+
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
+        );
     }
 
     #[async_std::test]
     async fn test_mark_ticket_rejected() {
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let (_, mut ticket) = init_db_with_tickets(&db, 1).await;
+        let ticket = ticket.pop().unwrap().ticket;
+
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(0, stats.rejected_tickets);
         assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
+        );
 
-        let value = BalanceType::HOPR.balance(10);
-        db.mark_ticket_rejected(value).await.unwrap();
+        db.mark_ticket_rejected(&ticket).await.unwrap();
 
-        let stats = db.get_ticket_statistics(None).await.unwrap();
+        let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(1, stats.rejected_tickets);
-        assert_eq!(value, stats.rejected_value);
+        assert_eq!(ticket.amount, stats.rejected_value);
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap(),
+            "per channel stats must be same"
+        );
     }
 
     #[async_std::test]
@@ -2015,6 +2129,150 @@ mod tests {
             .expect("index must exist");
 
         assert_eq!(0, U256::from_be_bytes(r.index).as_u64(), "index must be zero");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_stats_must_fail_for_non_existing_channel() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        db.get_ticket_statistics(None, Some(*CHANNEL_ID))
+            .await
+            .expect_err("must fail for non-existing channel");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_stats_must_be_zero_when_no_tickets() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            0.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let stats = db.get_ticket_statistics(None, Some(*CHANNEL_ID)).await.unwrap();
+
+        assert_eq!(
+            ChannelTicketStatistics::default(),
+            stats,
+            "must be equal to default which is all zeros"
+        );
+
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(None, None).await.unwrap(),
+            "per-channel stats must be the same as global stats"
+        )
+    }
+
+    #[async_std::test]
+    async fn test_ticket_stats_must_be_different_per_channel() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let channel_1 = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            0.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel_1).await.unwrap();
+
+        let channel_2 = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            0.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel_2).await.unwrap();
+
+        let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1);
+        let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1);
+
+        let value = t1.ticket.amount;
+
+        db.upsert_ticket(None, t1).await.unwrap();
+        db.upsert_ticket(None, t2).await.unwrap();
+
+        let stats_1 = db
+            .get_ticket_statistics(
+                None,
+                Some(generate_channel_id(
+                    &BOB.public().to_address(),
+                    &ALICE.public().to_address(),
+                )),
+            )
+            .await
+            .unwrap();
+
+        let stats_2 = db
+            .get_ticket_statistics(
+                None,
+                Some(generate_channel_id(
+                    &ALICE.public().to_address(),
+                    &BOB.public().to_address(),
+                )),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(1, stats_1.unredeemed_tickets);
+        assert_eq!(1, stats_2.unredeemed_tickets);
+
+        assert_eq!(0, stats_1.neglected_tickets);
+        assert_eq!(0, stats_2.neglected_tickets);
+
+        assert_eq!(value, stats_1.unredeemed_value);
+        assert_eq!(value, stats_2.unredeemed_value);
+
+        assert_eq!(BalanceType::HOPR.zero(), stats_1.neglected_value);
+        assert_eq!(BalanceType::HOPR.zero(), stats_2.neglected_value);
+
+        assert_eq!(stats_1, stats_2);
+
+        db.mark_tickets_neglected(channel_1.into()).await.unwrap();
+
+        let stats_1 = db
+            .get_ticket_statistics(
+                None,
+                Some(generate_channel_id(
+                    &BOB.public().to_address(),
+                    &ALICE.public().to_address(),
+                )),
+            )
+            .await
+            .unwrap();
+
+        let stats_2 = db
+            .get_ticket_statistics(
+                None,
+                Some(generate_channel_id(
+                    &ALICE.public().to_address(),
+                    &BOB.public().to_address(),
+                )),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(1, stats_1.neglected_tickets);
+        assert_eq!(0, stats_1.unredeemed_tickets);
+
+        assert_eq!(0, stats_2.neglected_tickets);
+
+        assert_eq!(BalanceType::HOPR.zero(), stats_1.unredeemed_value);
+        assert_eq!(value, stats_1.neglected_value);
+
+        assert_eq!(BalanceType::HOPR.zero(), stats_2.neglected_value);
     }
 
     #[async_std::test]

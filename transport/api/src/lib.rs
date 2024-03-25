@@ -609,7 +609,8 @@ where
     }
 
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
-        let ticket_stats = self.db.get_ticket_statistics(None).await?;
+        // TODO: add parameter to specify which channel are we interested in
+        let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
         let received_tickets = ticket_stats.unredeemed_tickets + ticket_stats.losing_tickets;
 
         Ok(TicketStatistics {
