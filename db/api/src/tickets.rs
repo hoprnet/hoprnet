@@ -2520,4 +2520,170 @@ mod tests {
 
         assert_eq!(tickets.pop().unwrap().ticket, aggregated);
     }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_on_closed_channel() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Closed,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on closed channel");
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_on_incoming_channel() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on incoming channel");
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_ids() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let mut tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        tickets[2] = generate_random_ack_ticket(&BOB, &ChainKeypair::random(), 2);
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on mismatching channel ids");
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_epoch() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            3_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on mismatching channel epoch");
+    }
 }
