@@ -1401,7 +1401,7 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
-            COUNT_TICKETS, stats.unredeemed_tickets,
+            COUNT_TICKETS, stats.unredeemed_tickets as u64,
             "must have {COUNT_TICKETS} unredeemed"
         );
         assert_eq!(
@@ -1442,7 +1442,7 @@ mod tests {
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
             COUNT_TICKETS - TO_REDEEM,
-            stats.unredeemed_tickets,
+            stats.unredeemed_tickets as u64,
             "must have {COUNT_TICKETS} unredeemed"
         );
         assert_eq!(
@@ -1451,7 +1451,7 @@ mod tests {
             "unredeemed balance must match"
         );
         assert_eq!(
-            TO_REDEEM, stats.redeemed_tickets,
+            TO_REDEEM, stats.redeemed_tickets as u64,
             "there must be {TO_REDEEM} redeemed tickets"
         );
         assert_eq!(
@@ -1503,7 +1503,7 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
-            COUNT_TICKETS, stats.unredeemed_tickets,
+            COUNT_TICKETS, stats.unredeemed_tickets as u64,
             "must have {COUNT_TICKETS} unredeemed"
         );
         assert_eq!(
@@ -1536,7 +1536,7 @@ mod tests {
             "unredeemed balance must be zero"
         );
         assert_eq!(
-            COUNT_TICKETS, stats.neglected_tickets,
+            COUNT_TICKETS, stats.neglected_tickets as u64,
             "there must be no redeemed tickets"
         );
         assert_eq!(
