@@ -270,6 +270,7 @@ pub trait HoprDbTicketOperations {
         chain_keypair: &ChainKeypair,
     ) -> Result<AcknowledgedTicket>;
 
+    /// Performs ticket aggregation as an issuing party of the given tickets.
     async fn aggregate_tickets(
         &self,
         destination: OffchainPublicKey,
