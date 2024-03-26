@@ -119,8 +119,8 @@ pub struct SimpleJsonRpcRetryPolicy {
     pub retryable_json_rpc_errors: Vec<i64>,
     /// List of HTTP errors that should be retried with backoff.
     ///
-    /// Default is \[429\]
-    #[default(_code = "vec![http_types::StatusCode::TooManyRequests]")]
+    /// Default is \[429, 504\]
+    #[default(_code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout]")]
     pub retryable_http_errors: Vec<http_types::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
     ///
