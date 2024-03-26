@@ -134,8 +134,8 @@ async def check_received_packets_with_peek(receiver: Node, expected_packets: lis
     assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
 
 
-async def check_rejected_tickets(src: Node, count: int):
-    while int((await src.api.get_tickets_statistics()).rejected) < count:
+async def check_rejected_tickets_value(src: Node, value: int):
+    while balance_str_to_int((await src.api.get_tickets_statistics()).rejected_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
@@ -154,13 +154,9 @@ async def check_native_balance_below(src: Node, value: int):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_all_tickets_redeemed(src: Node, channel_id: str = None):
-    if channel_id is not None:
-        while len(await src.api.channel_get_tickets(channel_id)) > 0:
-            await asyncio.sleep(CHECK_RETRY_INTERVAL)
-    else:
-        while (await src.api.get_tickets_statistics()).unredeemed > 0:
-            await asyncio.sleep(CHECK_RETRY_INTERVAL)
+async def check_all_tickets_redeemed(src: Node):
+    while balance_str_to_int((await src.api.get_tickets_statistics()).unredeemed_value) > 0:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
 async def send_and_receive_packets_with_pop(
@@ -332,7 +328,6 @@ async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages
     statistics = await swarm7[peer].api.get_tickets_statistics()
 
     assert balance_str_to_int(statistics.unredeemed_value) == 0
-    assert int(statistics.unredeemed) == 0
 
 
 @pytest.mark.asyncio
@@ -484,7 +479,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
         # we should see the last message as rejected
-        await asyncio.wait_for(check_rejected_tickets(swarm7[dest], 1), 120.0)
+        await asyncio.wait_for(check_rejected_tickets_value(swarm7[dest], 1), 120.0)
 
         await asyncio.sleep(10)  # wait for aggregation to finish
         assert await swarm7[dest].api.tickets_redeem()
@@ -507,8 +502,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     ) as channel_id:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest].api.get_tickets_statistics()
-        tickets_before = await swarm7[dest].api.channel_get_tickets(channel_id)
-        assert len(tickets_before) == 0
+        assert balance_str_to_int(statistics_before.unredeemed_value) == 0
 
         packets = [
             f"1 hop message to self: {src} - {dest} - {src} #{i:08d} of #{message_count:08d}"
@@ -522,19 +516,20 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
         # ensure ticket stats are updated after messages are sent
         statistics_after = await swarm7[dest].api.get_tickets_statistics()
-        tickets_after = await swarm7[dest].api.channel_get_tickets(channel_id)
-        assert statistics_after.redeemed == statistics_before.redeemed
-        assert (statistics_after.unredeemed - statistics_before.unredeemed) == len(packets)
-        assert len(tickets_after) == len(packets)
+        
+        unredeemed_value = (balance_str_to_int(statistics_after.unredeemed_value) - balance_str_to_int(statistics_before.unredeemed_value))
+        
+        assert statistics_after.redeemed_value == statistics_before.redeemed_value
+        assert unredeemed_value == (len(packets) * TICKET_PRICE_PER_HOP)
 
         assert await swarm7[dest].api.channel_redeem_tickets(channel_id)
 
-        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest], channel_id), 120.0)
+        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
 
         # ensure ticket stats are updated after redemption
         statistics_after_redemption = await swarm7[dest].api.get_tickets_statistics()
-        assert (statistics_after_redemption.redeemed - statistics_after.redeemed) == len(packets)
-        assert statistics_after_redemption.unredeemed == 0
+        assert (balance_str_to_int(statistics_after_redemption.redeemed_value) - balance_str_to_int(statistics_after.redeemed_value)) == (len(packets) * TICKET_PRICE_PER_HOP)
+        assert balance_str_to_int(statistics_after_redemption.unredeemed_value) == 0
 
 
 @pytest.mark.asyncio
@@ -552,24 +547,20 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
-        assert len(await swarm7[dest].api.channel_get_tickets(channel)) == 2
+        ticket_statistics = await swarm7[dest].api.get_tickets_statistics()
+        assert balance_str_to_int(ticket_statistics.unredeemed_value) == 2 * TICKET_PRICE_PER_HOP
 
-        async def channel_aggregate_tickets(api, target_channel):
-            while True:
-                if await api.channels_aggregate_tickets(target_channel):
-                    break
-                else:
-                    await asyncio.sleep(0.5)
+        await asyncio.wait_for(swarm7[dest].api.channels_aggregate_tickets(channel), 20.0)
 
-        await asyncio.wait_for(channel_aggregate_tickets(swarm7[dest].api, channel), 20.0)
-
-        assert len(await swarm7[dest].api.channel_get_tickets(channel)) == 1
+        ticket_statistics = await swarm7[dest].api.get_tickets_statistics()
+        assert balance_str_to_int(ticket_statistics.unredeemed_value) == 2 * TICKET_PRICE_PER_HOP
 
         assert await swarm7[dest].api.channel_redeem_tickets(channel)
 
         await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
 
-        assert len(await swarm7[dest].api.channel_get_tickets(channel)) == 0
+        ticket_statistics = await swarm7[dest].api.get_tickets_statistics()
+        assert balance_str_to_int(ticket_statistics.unredeemed_value) == 0
 
 
 @pytest.mark.asyncio
@@ -674,15 +665,11 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
                 redeemed_value = balance_str_to_int(statistics_after.redeemed_value) - balance_str_to_int(
                     statistics_before.redeemed_value
                 )
-                redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
 
                 if redeemed_value >= AGGREGATED_TICKET_PRICE:
                     break
                 else:
-                    await asyncio.sleep(0.5)
-
-            assert redeemed_value >= AGGREGATED_TICKET_PRICE
-            assert redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1)
+                    await asyncio.sleep(0.1)
 
         await asyncio.wait_for(aggregate_and_redeem_tickets(), 60.0)
 

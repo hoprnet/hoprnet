@@ -248,6 +248,7 @@ impl ChannelEventEmitter {
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
+    pub winning_count: u128,
     pub unredeemed_value: hopr_primitive_types::primitives::Balance,
     pub redeemed_value: hopr_primitive_types::primitives::Balance,
     pub neglected_value: hopr_primitive_types::primitives::Balance,
@@ -618,6 +619,7 @@ where
         let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
 
         Ok(TicketStatistics {
+            winning_count: ticket_stats.winning_tickets,
             unredeemed_value: ticket_stats.unredeemed_value,
             redeemed_value: ticket_stats.redeemed_value,
             neglected_value: ticket_stats.neglected_value,

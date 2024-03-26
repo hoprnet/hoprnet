@@ -2051,6 +2051,7 @@ mod tickets {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
+        "winning_count": "0",
         "neglectedValue": "0",
         "redeemedValue": "100",
         "rejectedValue": "0",
@@ -2059,6 +2060,7 @@ mod tickets {
     #[serde(rename_all = "camelCase")]
     // TODO: see if tide support u128 instead on the ticket counts
     pub(crate) struct NodeTicketStatisticsResponse {
+        pub winning_count: u64,
         pub unredeemed_value: String,
         pub redeemed_value: String,
         pub neglected_value: String,
@@ -2068,6 +2070,7 @@ mod tickets {
     impl From<TicketStatistics> for NodeTicketStatisticsResponse {
         fn from(value: TicketStatistics) -> Self {
             Self {
+                winning_count: value.winning_count as u64,
                 unredeemed_value: value.unredeemed_value.amount().to_string(),
                 redeemed_value: value.redeemed_value.amount().to_string(),
                 neglected_value: value.neglected_value.amount().to_string(),
