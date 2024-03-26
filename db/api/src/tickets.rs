@@ -2376,10 +2376,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
-    async fn test_aggregate_ticket_should_aggregate() {
-        const COUNT_TICKETS: usize = 5;
-
+    async fn init_db_with_channel(channel: ChannelEntry) -> HoprDb {
         let db = HoprDb::new_in_memory(BOB.clone()).await;
 
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -2396,6 +2393,15 @@ mod tests {
         .await
         .unwrap();
 
+        db.upsert_channel(None, channel).await.unwrap();
+
+        db
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_aggregate() {
+        const COUNT_TICKETS: usize = 5;
+
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -2405,7 +2411,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2481,22 +2487,6 @@ mod tests {
     async fn test_aggregate_ticket_should_aggregate_single_ticket_to_itself() {
         const COUNT_TICKETS: usize = 1;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -2506,7 +2496,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2525,22 +2515,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_on_closed_channel() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -2550,7 +2524,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2566,22 +2540,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_on_incoming_channel() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
@@ -2591,7 +2549,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2607,22 +2565,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_ids() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
@@ -2632,7 +2574,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2650,22 +2592,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_if_mismatching_channel_epoch() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
@@ -2675,7 +2601,7 @@ mod tests {
             3_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2691,22 +2617,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_if_ticket_indices_overlap() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
@@ -2716,7 +2626,7 @@ mod tests {
             3_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2735,22 +2645,6 @@ mod tests {
     async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_valid() {
         const COUNT_TICKETS: usize = 3;
 
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
@@ -2760,7 +2654,7 @@ mod tests {
             3_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
@@ -2775,25 +2669,9 @@ mod tests {
             .expect_err("should not aggregate on invalid tickets");
     }
 
-    /*#[async_std::test]
+    #[async_std::test]
     async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_winning() {
         const COUNT_TICKETS: usize = 3;
-
-        let db = HoprDb::new_in_memory(BOB.clone()).await;
-
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await
-            .unwrap();
-
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-            .await
-            .unwrap();
 
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
@@ -2804,18 +2682,19 @@ mod tests {
             3_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await.unwrap();
+        let db = init_db_with_channel(channel).await;
 
         let mut tickets = (0..COUNT_TICKETS)
             .into_iter()
             .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
             .collect::<Vec<_>>();
 
-        // Modify the ticket and do not sign it
-        tickets[1].is_winning_ticket()
+        // Set winning probability to zero and sign the ticket again
+        tickets[1].ticket.encoded_win_prob = [0u8; 7];
+        tickets[1].ticket.sign(&BOB, &Hash::default());
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
-            .expect_err("should not aggregate on invalid tickets");
-    }*/
+            .expect_err("should not aggregate non-winning tickets");
+    }
 }
