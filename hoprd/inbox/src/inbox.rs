@@ -99,6 +99,7 @@ where
 
     /// Push message into the inbox. Returns `true` if the message has been enqueued, `false` if it
     /// has been excluded based on the configured excluded tags.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn push(&self, payload: ApplicationData) -> bool {
         if self.is_excluded_tag(&payload.application_tag) {
             return false;
@@ -114,6 +115,7 @@ where
 
     /// Number of messages in the inbox with the given `tag`, or the total number of all messages
     /// if no `tag` is given.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn size(&self, tag: Option<Tag>) -> usize {
         if self.is_excluded_tag(&tag) {
             return 0;
@@ -129,6 +131,7 @@ where
     ///
     /// Returns `None` if there's no message with such `tag` (if given) in the inbox
     /// or if the whole inbox is empty (if no `tag` is given).
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn pop(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return None;
@@ -145,6 +148,7 @@ where
     ///
     /// Returns `None` if there's no message with such `tag` (if given) in the inbox
     /// or if the whole inbox is empty (if no `tag` is given).
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn peek(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return None;
@@ -158,6 +162,7 @@ where
 
     /// Peeks all the messages with the given `tag` (ordered oldest to latest) or
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn peek_all(&self, tag: Option<Tag>, timestamp: Option<Duration>) -> Vec<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return Vec::new();
@@ -170,6 +175,7 @@ where
 
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return Vec::new();

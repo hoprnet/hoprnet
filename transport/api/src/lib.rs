@@ -469,6 +469,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn aggregate_tickets(&self, channel_id: &Hash) -> errors::Result<()> {
         let entry = self
             .db
@@ -495,6 +496,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
         Ok(self
             .db
@@ -536,6 +538,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         // TODO: can fail with the Result?
         self.network
@@ -546,6 +549,7 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
         let mut mas = self
             .local_multiaddresses()
@@ -578,6 +582,7 @@ where
         self.my_multiaddresses.clone()
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -587,6 +592,7 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -596,18 +602,22 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_health(&self) -> Health {
         self.network.health().await
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
         Ok(self.network.peer_filter(|peer| async move { Some(peer.id) }).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
         Ok(self.network.get(peer).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
         // TODO: add parameter to specify which channel are we interested in
         let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
@@ -631,6 +641,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         if let Some(channel) = self.db.get_channel_by_id(None, channel_id).await? {
             if channel.destination == self.me_onchain {
@@ -643,6 +654,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
         Ok(self.db.get_all_tickets().await?.into_iter().map(|v| v.ticket).collect())
     }
