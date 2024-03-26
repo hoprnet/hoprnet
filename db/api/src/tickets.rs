@@ -10,7 +10,7 @@ use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
 use sea_query::{Condition, Expr, IntoCondition};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
@@ -763,8 +763,8 @@ impl HoprDbTicketOperations for HoprDb {
                 }
             } else {
                 // The value is not yet in the cache, meaning there's low traffic on this
-                // channel, so the value  has not been yet fetched.
-                debug!("channel {channel_id} is in the DB but not yet in the cache.");
+                // channel, so the value has not been yet fetched.
+                trace!("channel {channel_id} is in the DB but not yet in the cache.");
             }
         }
 
