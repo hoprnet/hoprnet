@@ -516,9 +516,11 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
         # ensure ticket stats are updated after messages are sent
         statistics_after = await swarm7[dest].api.get_tickets_statistics()
-        
-        unredeemed_value = (balance_str_to_int(statistics_after.unredeemed_value) - balance_str_to_int(statistics_before.unredeemed_value))
-        
+
+        unredeemed_value = balance_str_to_int(statistics_after.unredeemed_value) - balance_str_to_int(
+            statistics_before.unredeemed_value
+        )
+
         assert statistics_after.redeemed_value == statistics_before.redeemed_value
         assert unredeemed_value == (len(packets) * TICKET_PRICE_PER_HOP)
 
@@ -528,7 +530,10 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
         # ensure ticket stats are updated after redemption
         statistics_after_redemption = await swarm7[dest].api.get_tickets_statistics()
-        assert (balance_str_to_int(statistics_after_redemption.redeemed_value) - balance_str_to_int(statistics_after.redeemed_value)) == (len(packets) * TICKET_PRICE_PER_HOP)
+        assert (
+            balance_str_to_int(statistics_after_redemption.redeemed_value)
+            - balance_str_to_int(statistics_after.redeemed_value)
+        ) == (len(packets) * TICKET_PRICE_PER_HOP)
         assert balance_str_to_int(statistics_after_redemption.unredeemed_value) == 0
 
 
