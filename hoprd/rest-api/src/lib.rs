@@ -2058,7 +2058,6 @@ mod tickets {
         "unredeemedValue": "200",
     }))]
     #[serde(rename_all = "camelCase")]
-    // TODO: see if tide support u128 instead on the ticket counts
     pub(crate) struct NodeTicketStatisticsResponse {
         pub winning_count: u64,
         pub unredeemed_value: String,
