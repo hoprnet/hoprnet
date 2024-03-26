@@ -1159,6 +1159,17 @@ impl HoprDbTicketOperations for HoprDb {
         let mut final_value = Balance::zero(BalanceType::HOPR);
 
         for (i, acked_ticket) in acked_tickets.iter().enumerate() {
+            if acked_ticket
+                .verify(&(me).into(), &destination, &domain_separator)
+                .is_err()
+            {
+                return Err(DbError::LogicalError("Not a valid ticket".to_owned()));
+            }
+
+            if !acked_ticket.is_winning_ticket(&domain_separator) {
+                return Err(DbError::LogicalError("Not a winning ticket".to_owned()));
+            }
+
             if channel_id != acked_ticket.ticket.channel_id {
                 return Err(DbError::LogicalError(format!(
                     "aggregated ticket has an invalid channel id {}",
@@ -1177,17 +1188,6 @@ impl HoprDbTicketOperations for HoprDb {
                 return Err(DbError::LogicalError(
                     "Tickets with overlapping index intervals".to_owned(),
                 ));
-            }
-
-            if acked_ticket
-                .verify(&(me).into(), &destination, &domain_separator)
-                .is_err()
-            {
-                return Err(DbError::LogicalError("Not a valid ticket".to_owned()));
-            }
-
-            if !acked_ticket.is_winning_ticket(&domain_separator) {
-                return Err(DbError::LogicalError("Not a winning ticket".to_owned()));
             }
 
             final_value = final_value.add(&acked_ticket.ticket.amount);
@@ -2686,4 +2686,136 @@ mod tests {
             .await
             .expect_err("should not aggregate on mismatching channel epoch");
     }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_indices_overlap() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            3_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let mut tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        tickets[1].ticket.index_offset = 2;
+        tickets[1].ticket.sign(&BOB, &Hash::default());
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on overlapping ticket indices");
+    }
+
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_valid() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            3_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let mut tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        // Modify the ticket and do not sign it
+        tickets[1].ticket.amount = Balance::new(TICKET_VALUE - 10, BalanceType::HOPR);
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on invalid tickets");
+    }
+
+    /*#[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_if_ticket_is_not_winning() {
+        const COUNT_TICKETS: usize = 3;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+            .await
+            .unwrap();
+
+        let channel = ChannelEntry::new(
+            ALICE.public().to_address(),
+            BOB.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::Open,
+            3_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let mut tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        // Modify the ticket and do not sign it
+        tickets[1].is_winning_ticket()
+
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect_err("should not aggregate on invalid tickets");
+    }*/
 }
