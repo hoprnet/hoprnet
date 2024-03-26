@@ -2013,7 +2013,6 @@ mod tickets {
         ),
         tag = "Channels"
     )]
-    #[deprecated]
     pub(super) async fn show_channel_tickets(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
@@ -2045,7 +2044,6 @@ mod tickets {
         ),
         tag = "Tickets"
     )]
-    #[deprecated]
     pub(super) async fn show_all_tickets(_req: Request<InternalState>) -> tide::Result<Response> {
         let tickets: Vec<ChannelTicket> = vec![];
         Ok(Response::builder(200).body(json!(tickets)).build())
@@ -2053,44 +2051,26 @@ mod tickets {
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
     #[schema(example = json!({
-        "losingTickets": 0,
-        "neglected": 0,
         "neglectedValue": "0",
-        "redeemed": 1,
         "redeemedValue": "100",
-        "rejected": 0,
         "rejectedValue": "0",
-        "unredeemed": 2,
         "unredeemedValue": "200",
-        "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
     // TODO: see if tide support u128 instead on the ticket counts
     pub(crate) struct NodeTicketStatisticsResponse {
-        pub win_proportion: f64,
-        pub unredeemed: u64,
         pub unredeemed_value: String,
-        pub redeemed: u64,
         pub redeemed_value: String,
-        pub losing_tickets: u64,
-        pub neglected: u64,
         pub neglected_value: String,
-        pub rejected: u64,
         pub rejected_value: String,
     }
 
     impl From<TicketStatistics> for NodeTicketStatisticsResponse {
         fn from(value: TicketStatistics) -> Self {
             Self {
-                win_proportion: value.win_proportion,
-                unredeemed: value.unredeemed as u64,
                 unredeemed_value: value.unredeemed_value.amount().to_string(),
-                redeemed: value.redeemed as u64,
                 redeemed_value: value.redeemed_value.amount().to_string(),
-                losing_tickets: value.losing as u64,
-                neglected: value.neglected as u64,
                 neglected_value: value.neglected_value.amount().to_string(),
-                rejected: value.rejected as u64,
                 rejected_value: value.rejected_value.amount().to_string(),
             }
         }

@@ -76,6 +76,23 @@ pub enum TransportPacketWithChainData {
     },
 }
 
+#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
+enum ResolvedAcknowledgement {
+    Sending(HalfKeyChallenge),
+    RelayingWin(AcknowledgedTicket),
+    RelayingLoss(Hash),
+}
+
+impl From<ResolvedAcknowledgement> for AckResult {
+    fn from(value: ResolvedAcknowledgement) -> Self {
+        match value {
+            ResolvedAcknowledgement::Sending(ack_challenge) => AckResult::Sender(ack_challenge),
+            ResolvedAcknowledgement::RelayingWin(ack_ticket) => AckResult::RelayerWinning(ack_ticket),
+            ResolvedAcknowledgement::RelayingLoss(_) => AckResult::RelayerLosing,
+        }
+    }
+}
+
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self))]
@@ -103,7 +120,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         PendingAcknowledgement::WaitingAsSender => {
                             trace!("received acknowledgement as sender: first relayer has processed the packet.");
 
-                            Ok(AckResult::Sender(ack.ack_challenge()))
+                            Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
                         }
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
@@ -134,10 +151,10 @@ impl HoprDbProtocolOperations for HoprDb {
 
                             if ack_ticket.is_winning_ticket(&domain_separator) {
                                 debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
-                                Ok(AckResult::RelayerWinning(ack_ticket))
+                                Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                             } else {
                                 trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
-                                Ok(AckResult::RelayerLosing)
+                                Ok(ResolvedAcknowledgement::RelayingLoss(ack_ticket.ticket.channel_id))
                             }
                         }
                     }
@@ -145,11 +162,39 @@ impl HoprDbProtocolOperations for HoprDb {
             })
             .await?;
 
-        if let AckResult::RelayerWinning(ack_ticket) = &result {
-            self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
-        }
+        match &result {
+            ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
+                self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
 
-        Ok(result)
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    let channel = ack_ticket.ticket.channel_id.to_string();
+                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                        &[&channel, "unredeemed"],
+                        self.ticket_manager
+                            .unrealized_value(crate::tickets::TicketSelector::new(
+                                ack_ticket.ticket.channel_id,
+                                ack_ticket.ticket.channel_epoch,
+                            ))
+                            .await?
+                            .amount()
+                            .as_u128() as f64,
+                    );
+                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                        .increment(&[&channel, "winning_count"], 1.0f64);
+                }
+            }
+            ResolvedAcknowledgement::RelayingLoss(_channel) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                        .increment(&[&_channel.to_string(), "losing_count"], 1.0f64);
+                }
+            }
+            _ => {}
+        };
+
+        Ok(result.into())
     }
 
     #[instrument(level = "trace", skip(self))]
