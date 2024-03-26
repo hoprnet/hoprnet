@@ -18,33 +18,17 @@ pub trait HoprDbResolverOperations {
 #[async_trait]
 impl HoprDbResolverOperations for HoprDb {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
-        let myself = self.clone();
-        let target = *onchain_key;
         Ok(self
-            .caches
-            .chain_to_offchain
-            .try_get_with_by_ref(onchain_key, async move {
-                myself
-                    .translate_key(None, target)
-                    .await
-                    .map(|r| r.map(|k| k.try_into().unwrap()))
-            })
-            .await?)
+            .translate_key(None, *onchain_key)
+            .await?
+            .map(|k| k.try_into().unwrap()))
     }
 
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
-        let myself = self.clone();
-        let target = *offchain_key;
         Ok(self
-            .caches
-            .offchain_to_chain
-            .try_get_with_by_ref(offchain_key, async move {
-                myself
-                    .translate_key(None, target)
-                    .await
-                    .map(|r| r.map(|k| k.try_into().unwrap()))
-            })
-            .await?)
+            .translate_key(None, *offchain_key)
+            .await?
+            .map(|k| k.try_into().unwrap()))
     }
 }
 

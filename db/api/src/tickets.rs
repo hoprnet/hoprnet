@@ -10,9 +10,8 @@ use futures::stream::BoxStream;
 use futures::TryStreamExt;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
 use sea_query::{Condition, Expr, IntoCondition};
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info};
 
-use hopr_crypto_packet::{chain::ChainPacketComponents, validation::validate_unacknowledged_ticket};
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 use hopr_db_entity::{outgoing_ticket_index, ticket};
@@ -23,41 +22,9 @@ use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
 use crate::errors::DbError::LogicalError;
 use crate::errors::{DbError, Result};
-use crate::info::HoprDbInfoOperations;
+use crate::info::{DomainSeparator, HoprDbInfoOperations};
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
-
-#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
-#[derive(Debug)]
-pub enum AckResult {
-    Sender(HalfKeyChallenge),
-    RelayerWinning(AcknowledgedTicket),
-    RelayerLosing,
-}
-
-pub enum TransportPacketWithChainData {
-    /// Packet is intended for us
-    Final {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        plain_text: Box<[u8]>,
-        ack: Acknowledgement,
-    },
-    /// Packet must be forwarded
-    Forwarded {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        next_hop: OffchainPublicKey,
-        data: Box<[u8]>,
-        ack: Acknowledgement,
-    },
-    /// Packet that is being sent out by us
-    Outgoing {
-        next_hop: OffchainPublicKey,
-        ack_challenge: HalfKeyChallenge,
-        data: Box<[u8]>,
-    },
-}
 
 /// Allows to select multiple tickets (if `index` is `None`)
 /// or a single ticket (with given `index`) in the given channel and epoch.
@@ -256,23 +223,23 @@ pub trait HoprDbTicketOperations {
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
+    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
     /// Returns the old value before reset.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn reset_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64>;
 
     /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64>;
 
     /// Gets the current outgoing ticket index for the given channel id.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
+    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
 
     /// Compares outgoing ticket indices in the cache with the stored values
     /// and updates the stored value where changed.
@@ -309,45 +276,19 @@ pub trait HoprDbTicketOperations {
         acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
     ) -> Result<hopr_internal_types::channels::Ticket>;
-
-    /// Processes the acknowledgements for the pending tickets
-    ///
-    /// There are three cases:
-    /// 1. There is an unacknowledged ticket and we are awaiting a half key.
-    /// 2. We were the creator of the packet, hence we do not wait for any half key
-    /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> Result<AckResult>;
-
-    /// Process the data into an outgoing packet
-    async fn to_send(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
-    ) -> Result<TransportPacketWithChainData>;
-
-    /// Process the incoming packet into data
-    #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        pkt_keypair: &OffchainKeypair,
-        sender: OffchainPublicKey,
-    ) -> Result<TransportPacketWithChainData>;
 }
 
 /// Can contains ticket statistics for a channel or aggregate ticket statistics for all channels.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ChannelTicketStatistics {
-    pub losing_tickets: u64,
-    pub neglected_tickets: u64,
+    pub losing_tickets: u128,
+    pub neglected_tickets: u128,
     pub neglected_value: Balance,
-    pub redeemed_tickets: u64,
+    pub redeemed_tickets: u128,
     pub redeemed_value: Balance,
-    pub unredeemed_tickets: u64,
+    pub unredeemed_tickets: u128,
     pub unredeemed_value: Balance,
-    pub rejected_tickets: u64,
+    pub rejected_tickets: u128,
     pub rejected_value: Balance,
 }
 
@@ -630,7 +571,7 @@ impl HoprDbTicketOperations for HoprDb {
                             let (unredeemed_tickets, unredeemed_value) = ticket::Entity::find()
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
+                                .try_fold((0_u128, U256::zero()), |(count, amount), x| async move {
                                     Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
                                 })
                                 .await?;
@@ -640,14 +581,14 @@ impl HoprDbTicketOperations for HoprDb {
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    acc.losing_tickets += stats.losing_tickets as u64;
-                                    acc.neglected_tickets += stats.neglected_tickets as u64;
+                                    acc.losing_tickets += stats.losing_tickets as u128;
+                                    acc.neglected_tickets += stats.neglected_tickets as u128;
                                     acc.neglected_value =
                                         acc.neglected_value + BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.redeemed_tickets += stats.redeemed_tickets as u64;
+                                    acc.redeemed_tickets += stats.redeemed_tickets as u128;
                                     acc.redeemed_value =
                                         acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.rejected_tickets += stats.rejected_tickets as u64;
+                                    acc.rejected_tickets += stats.rejected_tickets as u128;
                                     acc.rejected_value =
                                         acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
                                     acc
@@ -677,20 +618,20 @@ impl HoprDbTicketOperations for HoprDb {
                                 .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold((0_u64, U256::zero()), |(count, amount), x| async move {
+                                .try_fold((0_u128, U256::zero()), |(count, amount), x| async move {
                                     Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
                                 })
                                 .await?;
 
                             Ok::<_, DbError>(ChannelTicketStatistics {
-                                losing_tickets: stats.losing_tickets as u64,
-                                neglected_tickets: stats.neglected_tickets as u64,
+                                losing_tickets: stats.losing_tickets as u128,
+                                neglected_tickets: stats.neglected_tickets as u128,
                                 neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
-                                redeemed_tickets: stats.redeemed_tickets as u64,
+                                redeemed_tickets: stats.redeemed_tickets as u128,
                                 redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
                                 unredeemed_tickets,
                                 unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
-                                rejected_tickets: stats.rejected_tickets as u64,
+                                rejected_tickets: stats.rejected_tickets as u128,
                                 rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
                             })
                         })
@@ -721,9 +662,9 @@ impl HoprDbTicketOperations for HoprDb {
             .await?)
     }
 
-    async fn compare_and_set_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64> {
+    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64> {
         let old_value = self
-            .get_ticket_index(channel_id)
+            .get_outgoing_ticket_index(channel_id)
             .await?
             .fetch_max(index, Ordering::SeqCst);
 
@@ -733,8 +674,11 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(old_value)
     }
 
-    async fn reset_ticket_index(&self, channel_id: Hash) -> Result<u64> {
-        let old_value = self.get_ticket_index(channel_id).await?.swap(0, Ordering::SeqCst);
+    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+        let old_value = self
+            .get_outgoing_ticket_index(channel_id)
+            .await?
+            .swap(0, Ordering::SeqCst);
 
         // TODO: should we hint the persisting mechanism to trigger the flush?
         // if old_value > 0 { }
@@ -742,15 +686,18 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(old_value)
     }
 
-    async fn increment_ticket_index(&self, channel_id: Hash) -> Result<u64> {
-        let old_value = self.get_ticket_index(channel_id).await?.fetch_add(1, Ordering::SeqCst);
+    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+        let old_value = self
+            .get_outgoing_ticket_index(channel_id)
+            .await?
+            .fetch_add(1, Ordering::SeqCst);
 
         // TODO: should we hint the persisting mechanism to trigger the flush?
 
         Ok(old_value)
     }
 
-    async fn get_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
+    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
         let tkt_manager = self.ticket_manager.clone();
 
         self.caches
@@ -1146,7 +1093,7 @@ impl HoprDbTicketOperations for HoprDb {
         destination: OffchainPublicKey,
         mut acked_tickets: Vec<AcknowledgedTicket>,
         me: &ChainKeypair,
-    ) -> Result<hopr_internal_types::channels::Ticket> {
+    ) -> Result<Ticket> {
         if me.public().to_address() != self.me_onchain {
             return Err(DbError::LogicalError(
                 "chain key for ticket aggregation does not match the DB public address".into(),
@@ -1160,7 +1107,10 @@ impl HoprDbTicketOperations for HoprDb {
         }
 
         if acked_tickets.len() == 1 {
-            return Ok(acked_tickets[0].ticket.clone());
+            let single = acked_tickets.pop().unwrap().ticket;
+            self.compare_and_set_outgoing_ticket_index(single.channel_id, single.index + 1)
+                .await?;
+            return Ok(single);
         }
 
         acked_tickets.sort();
@@ -1194,7 +1144,7 @@ impl HoprDbTicketOperations for HoprDb {
                     let domain_separator = myself
                         .get_indexer_data(Some(tx))
                         .await?
-                        .channels_dst
+                        .domain_separator(DomainSeparator::Channel)
                         .ok_or_else(|| crate::errors::DbError::LogicalError("domain separator missing".into()))?;
 
                     Ok((entry, address, domain_separator))
@@ -1256,10 +1206,10 @@ impl HoprDbTicketOperations for HoprDb {
 
         // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = last_acked_ticket.ticket.index + 1;
-        self.compare_and_set_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
+        self.compare_and_set_outgoing_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
             .await?;
 
-        hopr_internal_types::channels::Ticket::new(
+        Ticket::new(
             &destination,
             &final_value,
             first_acked_ticket.ticket.index.into(),
@@ -1272,424 +1222,9 @@ impl HoprDbTicketOperations for HoprDb {
         )
         .map_err(|e| e.into())
     }
-
-    #[instrument(level = "trace", skip(self))]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: ChainKeypair) -> Result<AckResult> {
-        let myself = self.clone();
-        let me_onchain = me.public().to_address();
-
-        let result = self
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    match myself
-                        .caches
-                        .unacked_tickets
-                        .remove(&ack.ack_challenge())
-                        .await
-                        .ok_or_else(|| {
-                            crate::errors::DbError::AcknowledgementValidationError(format!(
-                                "received unexpected acknowledgement for half key challenge {} - half key {}",
-                                ack.ack_challenge().to_hex(),
-                                ack.ack_key_share.to_hex()
-                            ))
-                        })? {
-                        PendingAcknowledgement::WaitingAsSender => {
-                            trace!("received acknowledgement as sender: first relayer has processed the packet.");
-
-                            Ok(AckResult::Sender(ack.ack_challenge()))
-                        }
-
-                        PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
-                            // Try to unlock the incentive
-                            unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
-                                crate::errors::DbError::AcknowledgementValidationError(format!(
-                                    "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
-                                ))
-                            })?;
-
-                            if myself
-                                .get_channel_by_parties(Some(tx), &unacknowledged.signer, &me_onchain)
-                                .await?
-                                .is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
-                            {
-                                return Err(crate::errors::DbError::LogicalError(format!(
-                                    "no channel found for  address '{}'",
-                                    unacknowledged.signer
-                                )));
-                            }
-
-                            let domain_separator =
-                                myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError("domain separator missing".into())
-                                })?;
-
-                            let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &me, &domain_separator)?;
-
-                            if ack_ticket.is_winning_ticket(&domain_separator) {
-                                debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
-                                Ok(AckResult::RelayerWinning(ack_ticket))
-                            } else {
-                                trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
-                                Ok(AckResult::RelayerLosing)
-                            }
-                        }
-                    }
-                })
-            })
-            .await?;
-
-        if let AckResult::RelayerWinning(ack_ticket) = &result {
-            self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
-        }
-
-        Ok(result)
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    async fn to_send(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
-    ) -> Result<TransportPacketWithChainData> {
-        let myself = self.clone();
-
-        let components = self
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
-                        crate::errors::DbError::LogicalError(format!(
-                            "failed to find channel key for packet key {} on previous hop",
-                            path[0].to_peerid_str()
-                        ))
-                    })?;
-
-                    let domain_separator = myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                        crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
-                    })?;
-
-                    // Decide whether to create 0-hop or multihop ticket
-                    let next_ticket = if path.len() == 1 {
-                        hopr_internal_types::channels::Ticket::new_zero_hop(&next_peer, &me, &domain_separator).map_err(
-                            |e| {
-                                crate::errors::DbError::LogicalError(format!("failed to construct a 0 hop ticket: {e}"))
-                            },
-                        )
-                    } else {
-                        myself
-                            .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
-                            .await
-                    }?;
-
-                    ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
-                        |e| {
-                            crate::errors::DbError::LogicalError(format!(
-                                "failed to construct chain components for a packet: {e}"
-                            ))
-                        },
-                    )
-                })
-            })
-            .await?;
-
-        match components {
-            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => Err(
-                crate::errors::DbError::LogicalError("Must contain an outgoing packet type".into()),
-            ),
-            ChainPacketComponents::Outgoing {
-                packet,
-                ticket,
-                next_hop,
-                ack_challenge,
-            } => {
-                self.caches
-                    .unacked_tickets
-                    .insert(ack_challenge, PendingAcknowledgement::WaitingAsSender)
-                    .await;
-
-                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                payload.extend_from_slice(packet.as_ref());
-                payload.extend_from_slice(&ticket.to_bytes());
-
-                Ok(TransportPacketWithChainData::Outgoing {
-                    next_hop,
-                    ack_challenge,
-                    data: payload.into_boxed_slice(),
-                })
-            }
-        }
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    async fn from_recv(
-        &self,
-        data: Box<[u8]>,
-        me: ChainKeypair,
-        pkt_keypair: &OffchainKeypair,
-        sender: OffchainPublicKey,
-    ) -> Result<TransportPacketWithChainData> {
-        let me_onchain = me.public().to_address();
-        match ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)
-            .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct an incoming packet: {e}")))?
-        {
-            ChainPacketComponents::Final {
-                packet_tag,
-                ack_key,
-                previous_hop,
-                plain_text,
-                ..
-            } => {
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
-
-                Ok(TransportPacketWithChainData::Final {
-                    packet_tag,
-                    previous_hop,
-                    plain_text,
-                    ack,
-                })
-            }
-            ChainPacketComponents::Forwarded {
-                packet,
-                ticket,
-                ack_challenge,
-                packet_tag,
-                ack_key,
-                previous_hop,
-                own_key,
-                next_hop,
-                next_challenge,
-                path_pos,
-            } => {
-                let myself = self.clone();
-
-                let t = match self
-                    .begin_transaction()
-                    .await?
-                    .perform(|tx| {
-                        Box::pin(async move {
-                            let chain_data = myself.get_indexer_data(Some(tx)).await?;
-
-                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("failed to fetch the domain separator".into())
-                            })?;
-                            let ticket_price = chain_data.ticket_price.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError("failed to fetch the ticket price".into())
-                            })?;
-
-                            let previous_hop_addr =
-                                myself.resolve_chain_key(&previous_hop).await?.ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError(format!(
-                                        "failed to find channel key for packet key {} on previous hop",
-                                        previous_hop.to_peerid_str()
-                                    ))
-                                })?;
-
-                            let next_hop_addr = myself.resolve_chain_key(&next_hop).await?.ok_or_else(|| {
-                                crate::errors::DbError::LogicalError(format!(
-                                    "failed to find channel key for packet key {} on next hop",
-                                    next_hop.to_peerid_str()
-                                ))
-                            })?;
-
-                            // TODO: cache this DB call too, or use the channel graph
-                            let channel = myself
-                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &me_onchain)
-                                .await?
-                                .ok_or_else(|| {
-                                    crate::errors::DbError::LogicalError(format!(
-                                        "no channel found for previous hop address '{previous_hop_addr}'"
-                                    ))
-                                })?;
-
-                            let remaining_balance = channel
-                                .balance
-                                .sub(myself.ticket_manager.unrealized_value((&channel).into()).await?);
-
-                            if let Err(e) = validate_unacknowledged_ticket(
-                                &ticket,
-                                &channel,
-                                &previous_hop_addr,
-                                ticket_price,
-                                TICKET_WIN_PROB,
-                                Some(remaining_balance),
-                                &domain_separator,
-                            )
-                            .await
-                            {
-                                return Err(crate::errors::DbError::TicketValidationError(Box::new((
-                                    ticket,
-                                    e.to_string(),
-                                ))));
-                            }
-
-                            myself.increment_ticket_index(channel.get_id()).await?;
-
-                            myself
-                                .caches
-                                .unacked_tickets
-                                .insert(
-                                    ack_challenge,
-                                    PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
-                                        ticket.clone(),
-                                        own_key.clone(),
-                                        previous_hop_addr,
-                                    )),
-                                )
-                                .await;
-
-                            // Check that the calculated path position from the ticket matches value from the packet header
-                            let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
-                            if !ticket_path_pos.eq(&path_pos) {
-                                return Err(crate::errors::DbError::LogicalError(format!(
-                                    "path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}"
-                                )));
-                            }
-
-                            // Create next ticket for the packet
-                            let mut ticket = if ticket_path_pos == 1 {
-                                Ok(hopr_internal_types::channels::Ticket::new_zero_hop(
-                                    &next_hop_addr,
-                                    &me,
-                                    &domain_separator,
-                                )?)
-                            } else {
-                                myself
-                                    .create_multihop_ticket(
-                                        Some(tx),
-                                        me.public().to_address(),
-                                        next_hop_addr,
-                                        ticket_path_pos,
-                                    )
-                                    .await
-                            }?;
-
-                            // forward packet
-                            ticket.challenge = next_challenge.to_ethereum_challenge();
-                            ticket.sign(&me, &domain_separator);
-
-                            Ok(ticket)
-                        })
-                    })
-                    .await
-                {
-                    Ok(ticket) => Ok(ticket),
-                    Err(crate::errors::DbError::TicketValidationError(boxed_error)) => {
-                        let (rejected_ticket, error) = *boxed_error;
-                        let rejected_value = rejected_ticket.amount;
-                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
-
-                        self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
-                            crate::errors::DbError::TicketValidationError(Box::new((
-                                rejected_ticket.clone(),
-                                format!("during validation error '{error}' update another error occurred: {e}"),
-                            )))
-                        })?;
-
-                        Err(crate::errors::DbError::TicketValidationError(Box::new((
-                            rejected_ticket,
-                            error,
-                        ))))
-                    }
-                    Err(e) => Err(e),
-                }?;
-
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
-
-                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                payload.extend_from_slice(packet.as_ref());
-                payload.extend_from_slice(&t.to_bytes());
-
-                Ok(TransportPacketWithChainData::Forwarded {
-                    packet_tag,
-                    previous_hop,
-                    next_hop,
-                    data: payload.into_boxed_slice(),
-                    ack,
-                })
-            }
-            ChainPacketComponents::Outgoing { .. } => Err(crate::errors::DbError::LogicalError(
-                "Cannot receive an outgoing packet".into(),
-            )),
-        }
-    }
 }
 
 impl HoprDb {
-    async fn create_multihop_ticket<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        me_onchain: Address,
-        destination: Address,
-        path_pos: u8,
-    ) -> Result<hopr_internal_types::channels::Ticket> {
-        let myself = self.clone();
-        let (channel, ticket_price): (ChannelEntry, U256) = self
-            .nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbError>(
-                        if let Some(channel) = myself
-                            .get_channel_by_parties(Some(tx), &me_onchain, &destination)
-                            .await?
-                        {
-                            let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
-
-                            Some((
-                                channel,
-                                ticket_price
-                                    .ok_or(DbError::LogicalError("missing ticket price".into()))?
-                                    .amount(),
-                            ))
-                        } else {
-                            None
-                        },
-                    )
-                })
-            })
-            .await?
-            .ok_or(crate::errors::DbError::LogicalError(format!(
-                "channel to '{destination}' not found",
-            )))?;
-
-        let amount = Balance::new(
-            ticket_price.div_f64(TICKET_WIN_PROB).map_err(|e| {
-                crate::errors::DbError::LogicalError(format!(
-                    "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
-                ))
-            })? * U256::from(path_pos - 1),
-            BalanceType::HOPR,
-        );
-
-        if channel.balance.lt(&amount) {
-            return Err(crate::errors::DbError::LogicalError(format!(
-                "out of funds: {} with counterparty {destination} has balance {} < {amount}",
-                channel.get_id(),
-                channel.balance
-            )));
-        }
-
-        let ticket = hopr_internal_types::channels::Ticket::new_partial(
-            &me_onchain,
-            &destination,
-            &amount,
-            self.increment_ticket_index(channel.get_id()).await?.into(),
-            U256::one(), // unaggregated always have index_offset == 1
-            TICKET_WIN_PROB,
-            channel.channel_epoch,
-        )
-        .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
-
-        //         #[cfg(all(feature = "prometheus", not(test)))]
-        //         METRIC_TICKETS_COUNT.increment();
-
-        Ok(ticket)
-    }
-
     /// Used only by non-SQLite code and tests.
     pub async fn upsert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
         self.nest_transaction_in_db(tx, TargetDb::Tickets)
@@ -1726,7 +1261,9 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+    use std::ops::Add;
     use std::sync::atomic::Ordering;
+    use std::time::{Duration, SystemTime};
 
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
@@ -2118,7 +1655,7 @@ mod tests {
 
         let hash = Hash::default();
 
-        let idx = db.get_ticket_index(hash).await.unwrap();
+        let idx = db.get_outgoing_ticket_index(hash).await.unwrap();
         assert_eq!(0, idx.load(Ordering::SeqCst), "initial index must be zero");
 
         let r = hopr_db_entity::outgoing_ticket_index::Entity::find()
@@ -2281,16 +1818,16 @@ mod tests {
 
         let hash = Hash::default();
 
-        let old_idx = db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
         assert_eq!(0, old_idx, "old value must be 0");
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.increment_ticket_index(hash).await.unwrap();
+        let old_idx = db.increment_outgoing_ticket_index(hash).await.unwrap();
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(2, new_idx, "new value must be 2");
     }
 
@@ -2300,19 +1837,19 @@ mod tests {
 
         let hash = Hash::default();
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_ticket_index(hash, 0).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 0).await.unwrap();
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
     }
@@ -2323,18 +1860,18 @@ mod tests {
 
         let hash = Hash::default();
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_ticket_index(hash, 1).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash, 1).await.unwrap();
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.reset_ticket_index(hash).await.unwrap();
+        let old_idx = db.reset_outgoing_ticket_index(hash).await.unwrap();
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(hash).await.unwrap().load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "new value must be 0");
     }
 
@@ -2345,8 +1882,8 @@ mod tests {
         let hash_1 = Hash::default();
         let hash_2 = Hash::from(hopr_crypto_random::random_bytes());
 
-        db.get_ticket_index(hash_1).await.unwrap();
-        db.compare_and_set_ticket_index(hash_2, 10).await.unwrap();
+        db.get_outgoing_ticket_index(hash_1).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash_2, 10).await.unwrap();
 
         let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
         assert_eq!(1, persisted);
@@ -2366,8 +1903,8 @@ mod tests {
         assert_eq!(0, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 0");
         assert_eq!(10, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 10");
 
-        db.compare_and_set_ticket_index(hash_1, 3).await.unwrap();
-        db.increment_ticket_index(hash_2).await.unwrap();
+        db.compare_and_set_outgoing_ticket_index(hash_1, 3).await.unwrap();
+        db.increment_outgoing_ticket_index(hash_2).await.unwrap();
 
         let persisted = db.persist_outgoing_ticket_indices().await.unwrap();
         assert_eq!(2, persisted);
@@ -2839,117 +2376,148 @@ mod tests {
         Ok(())
     }
 
-    // TODO: think about incorporating these tests
-    // #[async_std::test]
-    // async fn test_ticket_workflow() {
-    //     let mut db = CoreEthereumDb::new(
-    //         DB::new(CurrentDbShim::new_in_memory().await),
-    //         SENDER_PRIV_KEY.public().to_address(),
-    //     );
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_aggregate() {
+        const COUNT_TICKETS: usize = 5;
 
-    //     let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
-    //     let unack = UnacknowledgedTicket::new(
-    //         create_valid_ticket(),
-    //         HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-    //         SENDER_PRIV_KEY.public().to_address(),
-    //     );
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
 
-    //     db.store_pending_acknowledgment(hkc, PendingAcknowledgement::WaitingAsRelayer(unack))
-    //         .await
-    //         .unwrap();
-    //     let num_tickets = db.get_tickets(None).await.unwrap();
-    //     assert_eq!(1, num_tickets.len(), "db should find one ticket");
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
 
-    //     let pending = db
-    //         .get_pending_acknowledgement(&hkc)
-    //         .await
-    //         .unwrap()
-    //         .expect("db should contain pending ack");
-    //     match pending {
-    //         PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
-    //         PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-    //             let ack = ticket
-    //                 .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
-    //                 .unwrap();
-    //             db.replace_unack_with_ack(&hkc, ack).await.unwrap();
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
 
-    //             let num_tickets = db.get_tickets(None).await.unwrap().len();
-    //             let num_unack = db.get_unacknowledged_tickets(None).await.unwrap().len();
-    //             let num_ack = db.get_acknowledged_tickets(None).await.unwrap().len();
-    //             assert_eq!(1, num_tickets, "db should find one ticket");
-    //             assert_eq!(0, num_unack, "db should not contain any unacknowledged tickets");
-    //             assert_eq!(1, num_ack, "db should contain exactly one acknowledged ticket");
-    //         }
-    //     }
-    // }
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
+            4_u32.into(),
+        );
 
-    // #[async_std::test]
-    // async fn test_db_should_store_ticket_index() {
-    //     let mut db = CoreEthereumDb::new(
-    //         DB::new(CurrentDbShim::new_in_memory().await),
-    //         SENDER_PRIV_KEY.public().to_address(),
-    //     );
+        db.upsert_channel(None, channel).await.unwrap();
 
-    //     let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-    //     let dummy_index = U256::one();
+        let tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
 
-    //     db.set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
-    //     let idx = db
-    //         .get_current_ticket_index(&dummy_channel)
-    //         .await
-    //         .unwrap()
-    //         .expect("db must contain ticket index");
+        let sum_value = tickets
+            .iter()
+            .fold(BalanceType::HOPR.zero(), |acc, x| acc + x.ticket.amount);
+        let min_idx = tickets.iter().map(|t| t.ticket.index).min().unwrap();
+        let max_idx = tickets.iter().map(|t| t.ticket.index).max().unwrap();
 
-    //     assert_eq!(dummy_index, idx, "ticket index mismatch");
-    // }
+        let aggregated = db
+            .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets, &BOB)
+            .await
+            .expect("should aggregate");
 
-    // #[async_std::test]
-    // async fn test_db_should_increase_ticket_index() {
-    //     let mut db = CoreEthereumDb::new(
-    //         DB::new(CurrentDbShim::new_in_memory().await),
-    //         SENDER_PRIV_KEY.public().to_address(),
-    //     );
+        aggregated
+            .verify(&BOB.public().to_address(), &Hash::default())
+            .expect("ticket must be valid");
+        assert_eq!(
+            BOB.public().to_address(),
+            aggregated.recover_signer(&Hash::default()).unwrap().to_address(),
+            "must have correct signer"
+        );
 
-    //     let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
+        assert!(aggregated.is_aggregated(), "must be aggregated");
 
-    //     // increase current ticket index of a non-existing channel, the result should be 1
-    //     db.increase_current_ticket_index(&dummy_channel).await.unwrap();
-    //     let idx = db
-    //         .get_current_ticket_index(&dummy_channel)
-    //         .await
-    //         .unwrap()
-    //         .expect("db must contain ticket index");
-    //     assert_eq!(idx, U256::one(), "ticket index mismatch. Expecting 1");
+        assert_eq!(
+            COUNT_TICKETS, aggregated.index_offset as usize,
+            "aggregated ticket must have correct offset"
+        );
+        assert_eq!(
+            sum_value, aggregated.amount,
+            "aggregated ticket token amount must be sum of individual tickets"
+        );
+        assert_eq!(
+            1.0,
+            aggregated.win_prob(),
+            "aggregated ticket must have winning probability 1"
+        );
+        assert_eq!(min_idx, aggregated.index, "aggregated ticket must have correct index");
+        assert_eq!(
+            channel.get_id(),
+            aggregated.channel_id,
+            "aggregated ticket must have correct channel id"
+        );
+        assert_eq!(
+            channel.channel_epoch.as_u32(),
+            aggregated.channel_epoch,
+            "aggregated ticket must have correct channel epoch"
+        );
 
-    //     // increase current ticket index of an existing channel where previous value is 1, the result should be 2
-    //     db.increase_current_ticket_index(&dummy_channel).await.unwrap();
-    //     let idx = db
-    //         .get_current_ticket_index(&dummy_channel)
-    //         .await
-    //         .unwrap()
-    //         .expect("db must contain ticket index");
-    //     assert_eq!(idx, 2_u32.into(), "ticket index mismatch. Expecting 2");
-    // }
+        assert_eq!(
+            max_idx + 1,
+            db.get_outgoing_ticket_index(channel.get_id())
+                .await
+                .unwrap()
+                .load(Ordering::SeqCst)
+        );
+    }
 
-    // #[async_std::test]
-    // async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
-    //     let mut db = CoreEthereumDb::new(
-    //         DB::new(CurrentDbShim::new_in_memory().await),
-    //         SENDER_PRIV_KEY.public().to_address(),
-    //     );
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_not_aggregate_zero_tickets() {
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
 
-    //     let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
-    //     let dummy_index = 123_u32.into();
+        db.aggregate_tickets(*ALICE_OFFCHAIN.public(), vec![], &BOB)
+            .await
+            .expect_err("should not aggregate empty ticket list");
+    }
 
-    //     // the ticket index should be equal or greater than the given dummy index
-    //     db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)
-    //         .await
-    //         .unwrap();
-    //     let idx = db
-    //         .get_current_ticket_index(&dummy_channel)
-    //         .await
-    //         .unwrap()
-    //         .expect("db must contain ticket index");
-    //     assert_eq!(idx, dummy_index, "ticket index mismatch. Expecting 2");
-    // }
+    #[async_std::test]
+    async fn test_aggregate_ticket_should_aggregate_single_ticket_to_itself() {
+        const COUNT_TICKETS: usize = 1;
+
+        let db = HoprDb::new_in_memory(BOB.clone()).await;
+
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await
+            .unwrap();
+
+        add_peer_mappings(
+            &db,
+            vec![
+                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
+                (BOB_OFFCHAIN.clone(), BOB.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            (COUNT_TICKETS + 1).into(),
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
+            4_u32.into(),
+        );
+
+        db.upsert_channel(None, channel).await.unwrap();
+
+        let mut tickets = (0..COUNT_TICKETS)
+            .into_iter()
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i as u32))
+            .collect::<Vec<_>>();
+
+        let aggregated = db
+            .aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
+            .await
+            .expect("should aggregate");
+
+        assert_eq!(tickets.pop().unwrap().ticket, aggregated);
+    }
 }

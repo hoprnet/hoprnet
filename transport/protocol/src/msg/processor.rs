@@ -15,7 +15,7 @@ use hopr_crypto_packet::errors::{
     Result,
 };
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -86,7 +86,7 @@ pub enum MsgProcessed {
 #[derive(Debug, Clone)]
 pub struct PacketProcessor<Db>
 where
-    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     db: Db,
     cfg: PacketInteractionConfig,
@@ -95,7 +95,7 @@ where
 #[async_trait::async_trait]
 impl<Db> crate::msg::packet::PacketConstructing for PacketProcessor<Db>
 where
-    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     type Input = ApplicationData;
     type Packet = TransportPacket;
@@ -137,7 +137,7 @@ where
 
 impl<Db> PacketProcessor<Db>
 where
-    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone,
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
@@ -327,7 +327,7 @@ impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new<Db>(db: Db, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self
     where
-        Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
+        Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
     {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);

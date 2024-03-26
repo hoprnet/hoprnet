@@ -8,6 +8,7 @@ pub mod db;
 pub mod errors;
 pub mod info;
 pub mod peers;
+pub mod protocol;
 pub mod registry;
 pub mod resolver;
 mod ticket_manager;
@@ -26,6 +27,7 @@ use crate::db::HoprDb;
 use crate::errors::{DbError, Result};
 use crate::info::HoprDbInfoOperations;
 use crate::peers::HoprDbPeersOperations;
+use crate::protocol::HoprDbProtocolOperations;
 use crate::registry::HoprDbRegistryOperations;
 use crate::resolver::HoprDbResolverOperations;
 use crate::tickets::HoprDbTicketOperations;
@@ -181,6 +183,7 @@ pub trait HoprDbAllOperations:
     + HoprDbTicketOperations
     + HoprDbPeersOperations
     + HoprDbResolverOperations
+    + HoprDbProtocolOperations
 {
 }
 
@@ -193,6 +196,7 @@ pub mod prelude {
     pub use crate::errors::*;
     pub use crate::info::*;
     pub use crate::peers::*;
+    pub use crate::protocol::*;
     pub use crate::registry::*;
     pub use crate::resolver::*;
     pub use crate::tickets::*;
