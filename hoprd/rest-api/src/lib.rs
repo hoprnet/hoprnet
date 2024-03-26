@@ -2013,17 +2013,16 @@ mod tickets {
         ),
         tag = "Channels"
     )]
+    #[deprecated]
     pub(super) async fn show_channel_tickets(req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
         match Hash::from_hex(req.param("channelId")?) {
             Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
-                Ok(Some(tickets)) => Ok(Response::builder(200)
-                    .body(json!(tickets
-                        .into_iter()
-                        .map(|t| ChannelTicket::from(t.ticket))
-                        .collect::<Vec<_>>()))
-                    .build()),
+                Ok(Some(_tickets)) => {
+                    let tickets: Vec<ChannelTicket> = vec![];
+                    Ok(Response::builder(200).body(json!(tickets)).build())
+                }
                 Ok(None) => Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build()),
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
@@ -2046,14 +2045,10 @@ mod tickets {
         ),
         tag = "Tickets"
     )]
-    pub(super) async fn show_all_tickets(req: Request<InternalState>) -> tide::Result<Response> {
-        let hopr = req.state().hopr.clone();
-        match hopr.all_tickets().await {
-            Ok(tickets) => Ok(Response::builder(200)
-                .body(json!(tickets.into_iter().map(ChannelTicket::from).collect::<Vec<_>>()))
-                .build()),
-            Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
-        }
+    #[deprecated]
+    pub(super) async fn show_all_tickets(_req: Request<InternalState>) -> tide::Result<Response> {
+        let tickets: Vec<ChannelTicket> = vec![];
+        Ok(Response::builder(200).body(json!(tickets)).build())
     }
 
     #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
