@@ -2070,6 +2070,7 @@ mod tickets {
         "winProportion": 1
     }))]
     #[serde(rename_all = "camelCase")]
+    // TODO: see if tide support u128 instead on the ticket counts
     pub(crate) struct NodeTicketStatisticsResponse {
         pub win_proportion: f64,
         pub unredeemed: u64,
@@ -2087,14 +2088,14 @@ mod tickets {
         fn from(value: TicketStatistics) -> Self {
             Self {
                 win_proportion: value.win_proportion,
-                unredeemed: value.unredeemed,
+                unredeemed: value.unredeemed as u64,
                 unredeemed_value: value.unredeemed_value.amount().to_string(),
-                redeemed: value.redeemed,
+                redeemed: value.redeemed as u64,
                 redeemed_value: value.redeemed_value.amount().to_string(),
-                losing_tickets: value.losing,
-                neglected: value.neglected,
+                losing_tickets: value.losing as u64,
+                neglected: value.neglected as u64,
                 neglected_value: value.neglected_value.amount().to_string(),
-                rejected: value.rejected,
+                rejected: value.rejected as u64,
                 rejected_value: value.rejected_value.amount().to_string(),
             }
         }

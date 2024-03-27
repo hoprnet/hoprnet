@@ -95,3 +95,14 @@ impl Default for HoprDbCaches {
         }
     }
 }
+
+impl HoprDbCaches {
+    /// Invalidates all caches.
+    pub fn invalidate_all(&self) {
+        self.single_values.invalidate_all();
+        self.unacked_tickets.invalidate_all();
+        self.unrealized_value.invalidate_all();
+        self.chain_to_offchain.invalidate_all();
+        self.offchain_to_chain.invalidate_all();
+    }
+}

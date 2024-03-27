@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::TryFutureExt;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
@@ -386,38 +387,54 @@ impl HoprDbAccountOperations for HoprDb {
         tx: OptTx<'a>,
         key: T,
     ) -> Result<Option<ChainOrPacketKey>> {
-        let cpk = key.into();
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbError>(match cpk {
-                        ChainOrPacketKey::ChainKey(chain_key) => {
-                            let maybe_model = Account::find()
-                                .filter(account::Column::ChainKey.eq(chain_key.to_string()))
-                                .one(tx.as_ref())
-                                .await?;
-                            if let Some(m) = maybe_model {
-                                Some(OffchainPublicKey::from_hex(&m.packet_key)?.into())
-                            } else {
-                                None
-                            }
-                        }
-                        ChainOrPacketKey::PacketKey(packet_key) => {
-                            let maybe_model = Account::find()
-                                .filter(account::Column::PacketKey.eq(packet_key.to_string()))
-                                .one(tx.as_ref())
-                                .await?;
-                            if let Some(m) = maybe_model {
-                                Some(Address::from_hex(&m.chain_key)?.into())
-                            } else {
-                                None
-                            }
-                        }
-                    })
-                })
-            })
-            .await
+        Ok(match key.into() {
+            ChainOrPacketKey::ChainKey(chain_key) => self
+                .caches
+                .chain_to_offchain
+                .try_get_with_by_ref(
+                    &chain_key,
+                    self.nest_transaction(tx).and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let maybe_model = Account::find()
+                                    .filter(account::Column::ChainKey.eq(chain_key.to_string()))
+                                    .one(tx.as_ref())
+                                    .await?;
+                                if let Some(m) = maybe_model {
+                                    Ok(Some(OffchainPublicKey::from_hex(&m.packet_key)?))
+                                } else {
+                                    Ok(None)
+                                }
+                            })
+                        })
+                    }),
+                )
+                .await?
+                .map(ChainOrPacketKey::PacketKey),
+            ChainOrPacketKey::PacketKey(packey_key) => self
+                .caches
+                .offchain_to_chain
+                .try_get_with_by_ref(
+                    &packey_key,
+                    self.nest_transaction(tx).and_then(|op| {
+                        op.perform(|tx| {
+                            Box::pin(async move {
+                                let maybe_model = Account::find()
+                                    .filter(account::Column::PacketKey.eq(packey_key.to_string()))
+                                    .one(tx.as_ref())
+                                    .await?;
+                                if let Some(m) = maybe_model {
+                                    Ok(Some(Address::from_hex(&m.chain_key)?))
+                                } else {
+                                    Ok(None)
+                                }
+                            })
+                        })
+                    }),
+                )
+                .await?
+                .map(ChainOrPacketKey::ChainKey),
+        })
     }
 }
 
@@ -691,6 +708,62 @@ mod tests {
             })
             .await
             .expect("tx should not fail");
+
+        let a: Address = db
+            .translate_key(None, packet_1)
+            .await
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
+
+        let b: OffchainPublicKey = db
+            .translate_key(None, chain_2)
+            .await
+            .expect("must translate")
+            .expect("must contain key")
+            .try_into()
+            .expect("must be chain key");
+
+        assert_eq!(chain_1, a, "chain keys must match");
+        assert_eq!(packet_2, b, "chain keys must match");
+    }
+
+    #[async_std::test]
+    async fn test_translate_key_no_cache() {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = OffchainKeypair::random().public().clone();
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = OffchainKeypair::random().public().clone();
+
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await
+            .unwrap()
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    db_clone
+                        .insert_account(
+                            Some(tx),
+                            AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced),
+                        )
+                        .await?;
+                    Ok::<(), DbError>(())
+                })
+            })
+            .await
+            .expect("tx should not fail");
+
+        db.caches.invalidate_all();
 
         let a: Address = db
             .translate_key(None, packet_1)

@@ -18,6 +18,7 @@ ringbuffer = "0.15.0"
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
+tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-internal-types = { workspace = true }

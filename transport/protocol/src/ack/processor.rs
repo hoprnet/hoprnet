@@ -11,8 +11,8 @@ use tracing::{error, trace, warn};
 use hopr_crypto_packet::errors::PacketError::{Retry, TransportError};
 use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
-pub use hopr_db_api::tickets::AckResult;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use hopr_db_api::prelude::HoprDbProtocolOperations;
+pub use hopr_db_api::protocol::AckResult;
 use hopr_internal_types::prelude::*;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -53,12 +53,12 @@ pub enum AckProcessed {
 
 /// Implements protocol acknowledgement logic for acknowledgements
 #[derive(Clone)]
-pub struct AcknowledgementProcessor<Db: HoprDbTicketOperations> {
+pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
     db: Db,
     chain_key: ChainKeypair,
 }
 
-impl<Db: HoprDbTicketOperations> AcknowledgementProcessor<Db> {
+impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
     pub fn new(db: Db, chain_key: &ChainKeypair) -> Self {
         Self {
             db,
@@ -123,7 +123,7 @@ pub struct AcknowledgementInteraction {
 
 impl AcknowledgementInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprDbTicketOperations + Send + Sync + Clone + 'static>(db: Db, chain_key: &ChainKeypair) -> Self {
+    pub fn new<Db: HoprDbProtocolOperations + Send + Sync + Clone + 'static>(db: Db, chain_key: &ChainKeypair) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
 

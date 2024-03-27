@@ -222,7 +222,9 @@ where
                         || channel_entry.destination == self.chain_key.public().to_address()
                     {
                         // Reset the current_ticket_index to zero
-                        self.db.reset_ticket_index(channel_closed.channel_id.into()).await?;
+                        self.db
+                            .reset_outgoing_ticket_index(channel_closed.channel_id.into())
+                            .await?;
                     }
 
                     Ok(Some(ChainEventType::ChannelClosed(channel.try_into()?)))
@@ -259,7 +261,7 @@ where
                             .mark_tickets_neglected(TicketSelector::new(channel_id, current_epoch))
                             .await?;
 
-                        self.db.reset_ticket_index(channel_id).await?;
+                        self.db.reset_outgoing_ticket_index(channel_id).await?;
                     }
 
                     // set all channel fields like we do on-chain on close
@@ -355,7 +357,10 @@ where
                             // We need to ensure the outgoing ticket index is at least this new value
                             debug!("observed redeem event on an outgoing {channel_entry}");
                             self.db
-                                .compare_and_set_ticket_index(channel_entry.get_id(), ticket_redeemed.new_ticket_index)
+                                .compare_and_set_outgoing_ticket_index(
+                                    channel_entry.get_id(),
+                                    ticket_redeemed.new_ticket_index,
+                                )
                                 .await?;
                             None
                         }
@@ -1695,7 +1700,7 @@ pub mod tests {
         assert_eq!(closed_channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_ticket_index(closed_channel.get_id())
+            db.get_outgoing_ticket_index(closed_channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1743,7 +1748,7 @@ pub mod tests {
         assert_eq!(channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_ticket_index(channel.get_id())
+            db.get_outgoing_ticket_index(channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1799,7 +1804,7 @@ pub mod tests {
 
         assert_eq!(
             0,
-            db.get_ticket_index(channel.get_id())
+            db.get_outgoing_ticket_index(channel.get_id())
                 .await
                 .unwrap()
                 .load(Ordering::Relaxed)
@@ -1914,7 +1919,7 @@ pub mod tests {
         };
 
         let outgoing_ticket_index_before = db
-            .get_ticket_index(channel.get_id())
+            .get_outgoing_ticket_index(channel.get_id())
             .await
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
@@ -1940,7 +1945,7 @@ pub mod tests {
         );
 
         let outgoing_ticket_index_after = db
-            .get_ticket_index(channel.get_id())
+            .get_outgoing_ticket_index(channel.get_id())
             .await
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
@@ -2005,7 +2010,7 @@ pub mod tests {
         );
 
         let outgoing_ticket_index = db
-            .get_ticket_index(channel.get_id())
+            .get_outgoing_ticket_index(channel.get_id())
             .await
             .expect("must get ticket index")
             .load(Ordering::Relaxed);
