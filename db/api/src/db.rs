@@ -122,6 +122,7 @@ impl HoprDb {
             .expect("must reset ticket state on init");
 
         let caches = Arc::new(HoprDbCaches::default());
+        caches.invalidate_all();
 
         Self {
             me_onchain: chain_key.public().to_address(),

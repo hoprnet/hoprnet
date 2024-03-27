@@ -28,6 +28,17 @@ pub struct IndexerData {
     pub nr_enabled: bool,
 }
 
+impl IndexerData {
+    /// Convenience method to retrieve domain separator according to the [DomainSeparator] enum.
+    pub fn domain_separator(&self, dst_type: DomainSeparator) -> Option<Hash> {
+        match dst_type {
+            DomainSeparator::Ledger => self.ledger_dst,
+            DomainSeparator::SafeRegistry => self.safe_registry_dst,
+            DomainSeparator::Channel => self.channels_dst,
+        }
+    }
+}
+
 /// Contains information about node's safe.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SafeInfo {

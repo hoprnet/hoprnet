@@ -212,7 +212,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
@@ -248,15 +248,15 @@ impl ChannelEventEmitter {
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub losing: u64,
+    pub losing: u128,
     pub win_proportion: f64,
-    pub unredeemed: u64,
+    pub unredeemed: u128,
     pub unredeemed_value: hopr_primitive_types::primitives::Balance,
-    pub redeemed: u64,
+    pub redeemed: u128,
     pub redeemed_value: hopr_primitive_types::primitives::Balance,
-    pub neglected: u64,
+    pub neglected: u128,
     pub neglected_value: hopr_primitive_types::primitives::Balance,
-    pub rejected: u64,
+    pub rejected: u128,
     pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
@@ -274,6 +274,7 @@ use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_db_api::errors::DbError;
+use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
