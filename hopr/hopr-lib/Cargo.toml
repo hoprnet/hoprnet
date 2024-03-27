@@ -51,4 +51,4 @@ ethers = { workspace = true }
 
 [features]
 default = ["prometheus"]
-prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus",  ]
+prometheus = ["dep:hopr-metrics", "core-transport/prometheus", "chain-api/prometheus", "chain-indexer/prometheus", "chain-rpc/prometheus", "hopr-db-api/prometheus" ]

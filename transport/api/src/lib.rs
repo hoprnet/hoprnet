@@ -212,7 +212,7 @@ pub fn build_packet_actions<Db>(
     tbf: Arc<RwLock<TagBloomFilter>>,
 ) -> (PacketInteraction, AcknowledgementInteraction)
 where
-    Db: HoprDbTicketOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
+    Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone + 'static,
 {
     (
         PacketInteraction::new(db.clone(), tbf, PacketInteractionConfig::new(me, me_onchain)),
@@ -248,15 +248,10 @@ impl ChannelEventEmitter {
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub losing: u64,
-    pub win_proportion: f64,
-    pub unredeemed: u64,
+    pub winning_count: u128,
     pub unredeemed_value: hopr_primitive_types::primitives::Balance,
-    pub redeemed: u64,
     pub redeemed_value: hopr_primitive_types::primitives::Balance,
-    pub neglected: u64,
     pub neglected_value: hopr_primitive_types::primitives::Balance,
-    pub rejected: u64,
     pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
@@ -274,6 +269,7 @@ use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_db_api::errors::DbError;
+use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
@@ -469,6 +465,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn aggregate_tickets(&self, channel_id: &Hash) -> errors::Result<()> {
         let entry = self
             .db
@@ -495,6 +492,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
         Ok(self
             .db
@@ -536,6 +534,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn listening_multiaddresses(&self) -> Vec<Multiaddr> {
         // TODO: can fail with the Result?
         self.network
@@ -546,6 +545,7 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn announceable_multiaddresses(&self) -> Vec<Multiaddr> {
         let mut mas = self
             .local_multiaddresses()
@@ -578,6 +578,7 @@ where
         self.my_multiaddresses.clone()
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn multiaddresses_announced_to_dht(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -587,6 +588,7 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_observed_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
         self.network
             .get(peer)
@@ -596,41 +598,36 @@ where
             .unwrap_or(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_health(&self) -> Health {
         self.network.health().await
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_connected_peers(&self) -> errors::Result<Vec<PeerId>> {
         Ok(self.network.peer_filter(|peer| async move { Some(peer.id) }).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn network_peer_info(&self, peer: &PeerId) -> errors::Result<Option<PeerStatus>> {
         Ok(self.network.get(peer).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
         // TODO: add parameter to specify which channel are we interested in
         let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
-        let received_tickets = ticket_stats.unredeemed_tickets + ticket_stats.losing_tickets;
 
         Ok(TicketStatistics {
-            win_proportion: if received_tickets > 0 {
-                ticket_stats.unredeemed_tickets as f64 / received_tickets as f64
-            } else {
-                0f64
-            },
-            losing: ticket_stats.losing_tickets,
-            unredeemed: ticket_stats.unredeemed_tickets,
+            winning_count: ticket_stats.winning_tickets,
             unredeemed_value: ticket_stats.unredeemed_value,
-            redeemed: ticket_stats.redeemed_tickets,
             redeemed_value: ticket_stats.redeemed_value,
-            neglected: ticket_stats.neglected_tickets,
             neglected_value: ticket_stats.neglected_value,
-            rejected: ticket_stats.rejected_tickets,
             rejected_value: ticket_stats.rejected_value,
         })
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         if let Some(channel) = self.db.get_channel_by_id(None, channel_id).await? {
             if channel.destination == self.me_onchain {
@@ -643,6 +640,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
         Ok(self.db.get_all_tickets().await?.into_iter().map(|v| v.ticket).collect())
     }
