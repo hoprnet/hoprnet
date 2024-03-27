@@ -120,7 +120,7 @@ where
         let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
         if let Err(e) = awaiter.consume_and_wait(self.agg_timeout).await {
-            error!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
+            warn!("Error occured on ticket aggregation for '{channel}', performing a rollback: {e}");
             self.db.rollback_aggregation_in_channel(*channel).await?;
         }
 
