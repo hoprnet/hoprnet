@@ -248,15 +248,10 @@ impl ChannelEventEmitter {
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub losing: u128,
-    pub win_proportion: f64,
-    pub unredeemed: u128,
+    pub winning_count: u128,
     pub unredeemed_value: hopr_primitive_types::primitives::Balance,
-    pub redeemed: u128,
     pub redeemed_value: hopr_primitive_types::primitives::Balance,
-    pub neglected: u128,
     pub neglected_value: hopr_primitive_types::primitives::Balance,
-    pub rejected: u128,
     pub rejected_value: hopr_primitive_types::primitives::Balance,
 }
 
@@ -622,22 +617,12 @@ where
     pub async fn ticket_statistics(&self) -> errors::Result<TicketStatistics> {
         // TODO: add parameter to specify which channel are we interested in
         let ticket_stats = self.db.get_ticket_statistics(None, None).await?;
-        let received_tickets = ticket_stats.unredeemed_tickets + ticket_stats.losing_tickets;
 
         Ok(TicketStatistics {
-            win_proportion: if received_tickets > 0 {
-                ticket_stats.unredeemed_tickets as f64 / received_tickets as f64
-            } else {
-                0f64
-            },
-            losing: ticket_stats.losing_tickets,
-            unredeemed: ticket_stats.unredeemed_tickets,
+            winning_count: ticket_stats.winning_tickets,
             unredeemed_value: ticket_stats.unredeemed_value,
-            redeemed: ticket_stats.redeemed_tickets,
             redeemed_value: ticket_stats.redeemed_value,
-            neglected: ticket_stats.neglected_tickets,
             neglected_value: ticket_stats.neglected_value,
-            rejected: ticket_stats.rejected_tickets,
             rejected_value: ticket_stats.rejected_value,
         })
     }

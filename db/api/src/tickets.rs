@@ -26,6 +26,18 @@ use crate::info::{DomainSeparator, HoprDbInfoOperations};
 use crate::resolver::HoprDbResolverOperations;
 use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::MultiGauge;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: MultiGauge = MultiGauge::new(
+        "hopr_tickets_incoming_statistics",
+        "Ticket statistics for channels with incoming tickets.",
+        &["channel", "statistic"]
+    ).unwrap();
+}
+
 /// Allows to select multiple tickets (if `index` is `None`)
 /// or a single ticket (with given `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
@@ -282,28 +294,20 @@ pub trait HoprDbTicketOperations {
 /// Can contains ticket statistics for a channel or aggregate ticket statistics for all channels.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ChannelTicketStatistics {
-    pub losing_tickets: u128,
-    pub neglected_tickets: u128,
+    pub winning_tickets: u128,
     pub neglected_value: Balance,
-    pub redeemed_tickets: u128,
     pub redeemed_value: Balance,
-    pub unredeemed_tickets: u128,
     pub unredeemed_value: Balance,
-    pub rejected_tickets: u128,
     pub rejected_value: Balance,
 }
 
 impl Default for ChannelTicketStatistics {
     fn default() -> Self {
         Self {
-            losing_tickets: 0,
-            neglected_tickets: 0,
+            winning_tickets: 0,
             neglected_value: BalanceType::HOPR.zero(),
-            redeemed_tickets: 0,
             redeemed_value: BalanceType::HOPR.zero(),
-            unredeemed_tickets: 0,
             unredeemed_value: BalanceType::HOPR.zero(),
-            rejected_tickets: 0,
             rejected_value: BalanceType::HOPR.zero(),
         }
     }
@@ -397,13 +401,19 @@ impl HoprDbTicketOperations for HoprDb {
                             let current_stats = find_stats_for_channel(tx, &selector.channel_id).await?;
 
                             let current_redeemed_value = U256::from_be_bytes(current_stats.redeemed_value.clone());
-                            let current_redeemed_count = current_stats.redeemed_tickets;
 
                             let mut new_stats = current_stats.into_active_model();
-                            new_stats.redeemed_tickets = Set(current_redeemed_count + redeemed_count as i32);
                             new_stats.redeemed_value =
                                 Set((current_redeemed_value + redeemed_value.amount()).to_be_bytes().into());
                             new_stats.save(tx.as_ref()).await?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&selector.channel_id.to_string(), "redeemed"],
+                                    (current_redeemed_value + redeemed_value.amount()).as_u128() as f64,
+                                );
+                            }
 
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
                         } else {
@@ -441,14 +451,20 @@ impl HoprDbTicketOperations for HoprDb {
                             let current_status = find_stats_for_channel(tx, &selector.channel_id).await?;
 
                             let current_neglected_value = U256::from_be_bytes(current_status.neglected_value.clone());
-                            let current_neglected_count = current_status.neglected_tickets;
 
                             let mut new_stats = current_status.into_active_model();
-                            new_stats.neglected_tickets = Set(current_neglected_count + neglectable_count as i32);
                             new_stats.neglected_value = Set((current_neglected_value + neglectable_value.amount())
                                 .to_be_bytes()
                                 .into());
                             new_stats.save(tx.as_ref()).await?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                                    &[&selector.channel_id.to_string(), "neglected"],
+                                    (current_neglected_value + neglectable_value.amount()).as_u128() as f64,
+                                );
+                            }
 
                             // invalidating unrealized balance for the channel
                             myself.caches.unrealized_value.invalidate(&selector.channel_id).await;
@@ -478,12 +494,18 @@ impl HoprDbTicketOperations for HoprDb {
                     let stats = find_stats_for_channel(tx, &channel_id).await?;
 
                     let current_rejected_value = U256::from_be_bytes(stats.rejected_value.clone());
-                    let current_rejected_count = stats.rejected_tickets;
 
                     let mut active_stats = stats.into_active_model();
-                    active_stats.rejected_tickets = Set(current_rejected_count + 1i32);
                     active_stats.rejected_value = Set((current_rejected_value + amount.amount()).to_be_bytes().into());
                     active_stats.save(tx.as_ref()).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                            &[&channel_id.to_string(), "rejected"],
+                            (current_rejected_value + amount.amount()).as_u128() as f64,
+                        );
+                    }
 
                     Ok::<(), DbError>(())
                 })
@@ -569,11 +591,11 @@ impl HoprDbTicketOperations for HoprDb {
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
-                            let (unredeemed_tickets, unredeemed_value) = ticket::Entity::find()
+                            let unredeemed_value = ticket::Entity::find()
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold((0_u128, U256::zero()), |(count, amount), x| async move {
-                                    Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+                                .try_fold(U256::zero(), |amount, x| async move {
+                                    Ok(amount + U256::from_be_bytes(x.amount))
                                 })
                                 .await?;
 
@@ -582,20 +604,15 @@ impl HoprDbTicketOperations for HoprDb {
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    acc.losing_tickets += stats.losing_tickets as u128;
-                                    acc.neglected_tickets += stats.neglected_tickets as u128;
                                     acc.neglected_value =
                                         acc.neglected_value + BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.redeemed_tickets += stats.redeemed_tickets as u128;
                                     acc.redeemed_value =
                                         acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.rejected_tickets += stats.rejected_tickets as u128;
                                     acc.rejected_value =
                                         acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
                                     acc
                                 });
 
-                            all_stats.unredeemed_tickets = unredeemed_tickets;
                             all_stats.unredeemed_value = BalanceType::HOPR.balance(unredeemed_value);
 
                             Ok::<_, DbError>(all_stats)
@@ -615,24 +632,20 @@ impl HoprDbTicketOperations for HoprDb {
                     .perform(|tx| {
                         Box::pin(async move {
                             let stats = find_stats_for_channel(tx, &channel).await?;
-                            let (unredeemed_tickets, unredeemed_value) = ticket::Entity::find()
+                            let unredeemed_value = ticket::Entity::find()
                                 .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
                                 .stream(tx.as_ref())
                                 .await?
-                                .try_fold((0_u128, U256::zero()), |(count, amount), x| async move {
-                                    Ok((count + 1, amount + U256::from_be_bytes(x.amount)))
+                                .try_fold(U256::zero(), |amount, x| async move {
+                                    Ok(amount + U256::from_be_bytes(x.amount))
                                 })
                                 .await?;
 
                             Ok::<_, DbError>(ChannelTicketStatistics {
-                                losing_tickets: stats.losing_tickets as u128,
-                                neglected_tickets: stats.neglected_tickets as u128,
+                                winning_tickets: stats.winning_tickets as u128,
                                 neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
-                                redeemed_tickets: stats.redeemed_tickets as u128,
                                 redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
-                                unredeemed_tickets,
                                 unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
-                                rejected_tickets: stats.rejected_tickets as u128,
                                 rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
                             })
                         })
@@ -1402,15 +1415,10 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
-            COUNT_TICKETS, stats.unredeemed_tickets as u64,
-            "must have {COUNT_TICKETS} unredeemed"
-        );
-        assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
             "unredeemed balance must match"
         );
-        assert_eq!(0, stats.redeemed_tickets, "there must be no redeemed tickets");
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.redeemed_value,
@@ -1442,18 +1450,9 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
-            COUNT_TICKETS - TO_REDEEM,
-            stats.unredeemed_tickets as u64,
-            "must have {COUNT_TICKETS} unredeemed"
-        );
-        assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
             stats.unredeemed_value,
             "unredeemed balance must match"
-        );
-        assert_eq!(
-            TO_REDEEM, stats.redeemed_tickets as u64,
-            "there must be {TO_REDEEM} redeemed tickets"
         );
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * TO_REDEEM),
@@ -1504,15 +1503,10 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
         assert_eq!(
-            COUNT_TICKETS, stats.unredeemed_tickets as u64,
-            "must have {COUNT_TICKETS} unredeemed"
-        );
-        assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
             "unredeemed balance must match"
         );
-        assert_eq!(0, stats.neglected_tickets, "there must be no redeemed tickets");
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.neglected_value,
@@ -1530,15 +1524,10 @@ mod tests {
             .expect("should mark as neglected");
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
-        assert_eq!(0, stats.unredeemed_tickets, "must have 0 unredeemed");
         assert_eq!(
             BalanceType::HOPR.zero(),
             stats.unredeemed_value,
             "unredeemed balance must be zero"
-        );
-        assert_eq!(
-            COUNT_TICKETS, stats.neglected_tickets as u64,
-            "there must be no redeemed tickets"
         );
         assert_eq!(
             BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
@@ -1561,7 +1550,6 @@ mod tests {
         let ticket = ticket.pop().unwrap().ticket;
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
-        assert_eq!(0, stats.rejected_tickets);
         assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
         assert_eq!(
             stats,
@@ -1572,7 +1560,6 @@ mod tests {
         db.mark_ticket_rejected(&ticket).await.unwrap();
 
         let stats = db.get_ticket_statistics(None, None).await.unwrap();
-        assert_eq!(1, stats.rejected_tickets);
         assert_eq!(ticket.amount, stats.rejected_value);
         assert_eq!(
             stats,
@@ -1764,12 +1751,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, stats_1.unredeemed_tickets);
-        assert_eq!(1, stats_2.unredeemed_tickets);
-
-        assert_eq!(0, stats_1.neglected_tickets);
-        assert_eq!(0, stats_2.neglected_tickets);
-
         assert_eq!(value, stats_1.unredeemed_value);
         assert_eq!(value, stats_2.unredeemed_value);
 
@@ -1801,11 +1782,6 @@ mod tests {
             )
             .await
             .unwrap();
-
-        assert_eq!(1, stats_1.neglected_tickets);
-        assert_eq!(0, stats_1.unredeemed_tickets);
-
-        assert_eq!(0, stats_2.neglected_tickets);
 
         assert_eq!(BalanceType::HOPR.zero(), stats_1.unredeemed_value);
         assert_eq!(value, stats_1.neglected_value);
