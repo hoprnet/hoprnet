@@ -62,6 +62,7 @@ lazy_static::lazy_static! {
 /// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
 ///
 /// The policy will make up to `max_retries` once a JSON RPC request fails.
+/// The minimum number of retries `min_retries` can be also specified and applies to any type of error regardless.
 /// Each retry `k > 0` will be separated by a delay of `initial_backoff * (1 + backoff_coefficient)^(k - 1)`,
 /// namely all the JSON RPC error codes specified in `retryable_json_rpc_errors` and all the HTTP errors
 /// specified in `retryable_http_errors`.
@@ -76,6 +77,13 @@ lazy_static::lazy_static! {
 /// requests being retried has reached `max_retry_queue_size`.
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
+    /// Minimum number of retries of any error, regardless the error code.
+    ///
+    /// Default is 0.
+    #[validate(range(min = 0))]
+    #[default(Some(0))]
+    pub min_retries: Option<u32>,
+
     /// Maximum number of retries.
     ///
     /// If `None` is given, will keep retrying indefinitely.
@@ -119,8 +127,10 @@ pub struct SimpleJsonRpcRetryPolicy {
     pub retryable_json_rpc_errors: Vec<i64>,
     /// List of HTTP errors that should be retried with backoff.
     ///
-    /// Default is \[429, 504\]
-    #[default(_code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout]")]
+    /// Default is \[429, 504, 503\]
+    #[default(
+        _code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout,http_types::StatusCode::ServiceUnavailable]"
+    )]
     pub retryable_http_errors: Vec<http_types::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
     ///
@@ -167,6 +177,12 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             .initial_backoff
             .mul_f64(f64::powi(1.0 + self.backoff_coefficient, (num_retries - 1) as i32))
             .min(self.max_backoff);
+
+        // Retry if a global minimum of number of retries was given and wasn't yet attained
+        if self.min_retries.is_some_and(|min| num_retries <= min) {
+            debug!("retrying because {num_retries} is not yet minimum number of retries");
+            return RetryAfter(backoff);
+        }
 
         match err {
             // Retryable JSON RPC errors are retries with backoff
@@ -762,6 +778,53 @@ pub mod tests {
             &server.url(),
             SurfRequestor::default(),
             SimpleJsonRpcRetryPolicy {
+                max_retries: Some(2),
+                retryable_json_rpc_errors: vec![],
+                initial_backoff: Duration::from_millis(100),
+                ..SimpleJsonRpcRetryPolicy::default()
+            },
+        );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_client_should_retry_on_nonretryable_json_rpc_error_if_min_retries_is_given() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(
+                r#"{
+              "jsonrpc": "2.0",
+              "id": 1,
+              "error": {
+                "message": "some message",
+                "code": -32000
+              }
+            }"#,
+            )
+            .expect(2)
+            .create();
+
+        let client = JsonRpcProviderClient::new(
+            &server.url(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy {
+                min_retries: Some(1),
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![],
                 initial_backoff: Duration::from_millis(100),
