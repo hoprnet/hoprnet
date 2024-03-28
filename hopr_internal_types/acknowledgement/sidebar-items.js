@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AcknowledgedTicketStatus","PendingAcknowledgement"],"struct":["AcknowledgedTicket","Acknowledgement","UnacknowledgedTicket"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ChannelChange","ChannelDirection","ChannelStatus"],"fn":["f64_to_win_prob","generate_channel_id","win_prob_to_f64"],"struct":["ChannelEntry","Ticket"],"type":["EncodedWinProb"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SINGULAR_TABLE_FIXED_ID"],"enum":["DatabaseConnection","TargetDb"],"mod":["accounts","channels","db","errors","info","peers","protocol","registry","resolver","tickets"],"struct":["DatabaseTransaction","OpenTransaction"],"trait":["HoprDbAllOperations","HoprDbGeneralModelOperations"],"type":["DbTimestamp","OptTx"]};

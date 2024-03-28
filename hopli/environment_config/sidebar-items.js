@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["EnvironmentType"],"fn":["ensure_environment_and_network_are_set","get_environment_type_from_name"],"struct":["Addresses","NetworkConfig","NetworkDetail"]};

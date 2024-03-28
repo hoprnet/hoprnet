@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MsgProcessed","MsgToProcess"],"struct":["PacketActions","PacketInteraction","PacketInteractionConfig","PacketMetadata","PacketProcessor","PacketSendAwaiter","PacketSendFinalizer"]};

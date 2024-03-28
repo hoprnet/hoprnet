@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprNetworkRegistryEventsEvents"],"static":["HOPRNETWORKREGISTRYEVENTS_ABI"],"struct":["DeregisteredByManagerFilter","DeregisteredFilter","EligibilityUpdatedFilter","HoprNetworkRegistryEvents","NetworkRegistryStatusUpdatedFilter","RegisteredByManagerFilter","RegisteredFilter","RequirementUpdatedFilter"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["API_VERSION","BASE_PATH"],"fn":["run_hopr_api"],"mod":["config"],"struct":["ApiDoc","InternalState","SecurityAddon","State"],"type":["MessageEncoder"]};

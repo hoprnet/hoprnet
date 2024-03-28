@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ConnAcquireErr","DbErr","RuntimeErr","SqlErr"],"struct":["ColumnFromStrErr"]};

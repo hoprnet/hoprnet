@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprMultiSigErrors"],"static":["HOPRMULTISIG_ABI"],"struct":["AlreadyInitialized","ContractNotResponsible","HoprMultiSig","InvalidSafeAddress","MultiSigUninitialized"]};

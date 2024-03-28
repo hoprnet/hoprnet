@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"hopli":[["impl ValueEnum for <a class=\"enum\" href=\"hopli/identity/enum.IdentityActionType.html\" title=\"enum hopli::identity::IdentityActionType\">IdentityActionType</a>"],["impl ValueEnum for <a class=\"enum\" href=\"hopli/sync_network_registry/enum.SyncNetworkRegistryType.html\" title=\"enum hopli::sync_network_registry::SyncNetworkRegistryType\">SyncNetworkRegistryType</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

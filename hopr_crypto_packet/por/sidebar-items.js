@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["POR_SECRET_LENGTH"],"fn":["pre_verify","validate_por_half_keys","validate_por_hint","validate_por_response"],"struct":["ProofOfRelayOutput","ProofOfRelayString","ProofOfRelayValues"]};

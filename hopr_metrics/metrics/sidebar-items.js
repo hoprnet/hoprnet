@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["gather_all_metrics"],"struct":["MultiCounter","MultiGauge","MultiHistogram","SimpleCounter","SimpleGauge","SimpleHistogram","SimpleTimer"]};

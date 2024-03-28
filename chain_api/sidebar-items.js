@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["can_register_with_safe","wait_for_funds"],"mod":["errors","executors"],"struct":["ChannelEntry","HoprChain","SignificantChainEvent"],"type":["DefaultHttpPostRequestor","JsonRpcClient"]};

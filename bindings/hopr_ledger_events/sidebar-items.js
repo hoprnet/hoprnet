@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["hopr_ledger_events"],"static":["HOPRLEDGEREVENTS_ABI"],"struct":["HoprLedgerEvents","LedgerDomainSeparatorUpdatedFilter"]};

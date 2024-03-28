@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["hopr_ticket_price_oracle_events"],"static":["HOPRTICKETPRICEORACLEEVENTS_ABI"],"struct":["HoprTicketPriceOracleEvents","TicketPriceUpdatedFilter"]};

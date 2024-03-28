@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["HeartbeatChallenge","HeartbeatRequester","HeartbeatResponder","ManualPingChallenge","ManualPingRequester"],"type":["HeartbeaRequestRx","HeartbeatResponseTx"]};
