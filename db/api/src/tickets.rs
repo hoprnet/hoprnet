@@ -1147,6 +1147,7 @@ impl HoprDbTicketOperations for HoprDb {
             })
             .await?;
 
+        info!("successfully processed received aggregated {acked_aggregated_ticket}");
         Ok(acked_aggregated_ticket)
     }
 
