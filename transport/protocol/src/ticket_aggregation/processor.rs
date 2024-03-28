@@ -51,7 +51,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
-    ToSend(Hash, Option<AggregationPrerequisites>, TicketAggregationFinalizer),
+    ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
@@ -115,7 +115,7 @@ where
     pub async fn aggregate_tickets_in_the_channel(
         &self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<()> {
         let mut awaiter = self.writer.clone().aggregate_tickets(channel, prerequisites)?;
 
@@ -221,7 +221,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn aggregate_tickets(
         &mut self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<TicketAggregationAwaiter> {
         let (tx, rx) = oneshot::channel::<()>();
 
@@ -558,7 +558,7 @@ mod tests {
 
         let mut awaiter = bob
             .writer()
-            .aggregate_tickets(&channel_alice_bob.get_id(), None)
+            .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())
             .unwrap();
 
         let mut finalizer = None;
