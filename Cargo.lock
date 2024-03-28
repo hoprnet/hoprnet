@@ -3419,16 +3419,27 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
+ "async-std",
+ "bindings",
+ "chain-api",
+ "chain-rpc",
+ "chain-types",
  "clap",
+ "env_logger 0.11.3",
  "ethers",
+ "hex",
+ "hex-literal",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-lib",
  "hopr-primitive-types",
  "hoprd-keypair",
  "serde",
  "serde_json",
+ "serde_with",
  "tempfile",
  "thiserror",
  "tracing",

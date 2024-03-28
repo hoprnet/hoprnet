@@ -1,109 +1,356 @@
-use clap::Parser;
-use std::env;
-use tracing::info;
-
-use hopr_crypto_types::keypairs::Keypair;
-
+//! This module contains arguments and functions to interact with the Network Registry contract for a previledged account.
+//! To participate in the HOPR network, a node must be included in the network registry contract.
+//! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
+//! Nodes and safes can be registered by either a manager or by the staking account itself.
+//!
+//! Note the currently only manager wallet can register node-safe pairs. Node runners cannot self-register their nodes.
+//!
+//! A manager (i.e. an account with `MANAGER_ROLE` role), can perform the following actions with `hopli network-registry`,
+//! by specifying the subcommand:
+//! A manager account can register nodes and safes with `manager-regsiter`
+//! A manager account can deregister nodes with `manager-deregsiter`
+//! A manager account can set eligibility of staking accounts with `manager-force-sync`
+//!
+//! Some sample commands:
+//! - Manager registers nodes:
+//! ```text
+//! hopli -- network-registry manager-register \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --identity-directory "./test" --password-path "./test/pwd" \
+//!     --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+//!     --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
+//! ```
+//!
+//! - Manager deregisters nodes:
+//! ```text
+//! hopli -- network-registry manager-deregister \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
+//! ````
+//!
+//! - Manager syncs the eligibility of safes
+//! ```text
+//! hopli -- network-registry manager-force-sync \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --safe-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+//!     --eligibility true \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
+//! ```
+use crate::key_pair::ArgEnvReader;
 use crate::{
-    identity_input::LocalIdentityArgs,
-    key_pair::read_identities,
-    password::PasswordArgs,
-    process::{child_process_call_foundry_self_register, set_process_path_env},
+    environment_config::NetworkProviderArgs,
+    key_pair::{IdentityFileArgs, PrivateKeyArgs},
+    methods::{
+        deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
+        register_safes_and_nodes_on_network_registry,
+    },
     utils::{Cmd, HelperErrors},
 };
+use bindings::hopr_network_registry::HoprNetworkRegistry;
+use clap::Parser;
+use ethers::types::H160;
+use std::str::FromStr;
+use tracing::info;
 
-/// CLI arguments for `hopli register-in-network-registry`
-#[derive(Parser, Default, Debug)]
-pub struct RegisterInNetworkRegistryArgs {
-    #[clap(help = "Network name. E.g. monte_rosa", long)]
-    network: String,
+/// CLI arguments for `hopli network-registry`
+#[derive(Clone, Debug, Parser)]
+pub enum NetworkRegistrySubcommands {
+    // Register nodes and safes with a manager account
+    #[command(visible_alias = "mr")]
+    ManagerRegister {
+        /// Network name, contracts config file root, and customized provider, if available
+        #[command(flatten)]
+        network_provider: NetworkProviderArgs,
 
-    #[clap(
-        help = "Comma separated node peer ids",
-        long,
-        short,
-        default_value = None
-    )]
-    peer_ids: Option<String>,
+        /// node addresses
+        #[clap(
+            help = "Comma separated node Ethereum addresses",
+            long,
+            short = 'o',
+            default_value = None
+        )]
+        node_address: Option<String>,
 
-    #[clap(flatten)]
-    local_identity: LocalIdentityArgs,
+        /// Addresses of the safe proxy instances
+        #[clap(
+            help = "Comma separated Safe Ethereum addresses",
+            long,
+            short,
+            default_value = None
+        )]
+        safe_address: Option<String>,
 
-    #[clap(flatten)]
-    password: PasswordArgs,
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
 
-    #[clap(
-        help = "Specify path pointing to the contracts root",
-        long,
-        short,
-        default_value = None
-    )]
-    contracts_root: Option<String>,
+        /// Access to the private key of a manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
+    },
+
+    /// Remove nodes and safes with a manager account
+    #[command(visible_alias = "md")]
+    ManagerDeregister {
+        /// Network name, contracts config file root, and customized provider, if available
+        #[command(flatten)]
+        network_provider: NetworkProviderArgs,
+
+        /// node addresses
+        #[clap(
+            help = "Comma separated node Ethereum addresses",
+            long,
+            short = 'o',
+            default_value = None
+        )]
+        node_address: Option<String>,
+
+        /// Arguments to locate identity file(s) of HOPR node(s)
+        #[command(flatten)]
+        local_identity: IdentityFileArgs,
+
+        /// Access to the private key of a manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
+    },
+
+    /// Force sync the eligibility of safe accounts
+    #[command(visible_alias = "ms")]
+    ManagerForceSync {
+        /// Network name, contracts config file root, and customized provider, if available
+        #[command(flatten)]
+        network_provider: NetworkProviderArgs,
+
+        /// Addresses of the safe proxy instances
+        #[clap(
+            help = "Comma separated Safe Ethereum addresses",
+            long,
+            short,
+            default_value = None
+        )]
+        safe_address: Option<String>,
+
+        /// Access to the private key of a manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
+
+        /// Eligibility of safes when calling `hopli network-registry -a manager-force-sync`
+        #[clap(
+            help = "Desired eligibility of safes",
+            long,
+            short,
+            default_value = None
+        )]
+        eligibility: Option<bool>,
+    },
 }
 
-impl RegisterInNetworkRegistryArgs {
-    /// Node self register with given parameters
-    /// `PRIVATE_KEY` env variable is required to send on-chain transactions
-    fn execute_self_register(self) -> Result<(), HelperErrors> {
-        let RegisterInNetworkRegistryArgs {
-            network,
-            local_identity,
-            peer_ids: chain_addresses,
-            password,
-            contracts_root,
-        } = self;
+impl NetworkRegistrySubcommands {
+    /// Execute command to register a node and its staking account (safe) with manager privilege and make the safe eligible.
+    ///
+    /// Manager wallet registers nodes with associated staking accounts
+    pub async fn execute_manager_register(
+        network_provider: NetworkProviderArgs,
+        local_identity: IdentityFileArgs,
+        node_address: Option<String>,
+        safe_address: Option<String>,
+        private_key: PrivateKeyArgs,
+    ) -> Result<(), HelperErrors> {
+        // read all the node addresses
+        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = node_address {
+            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
 
-        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
-        if env::var("PRIVATE_KEY").is_err() {
-            return Err(HelperErrors::UnableToReadPrivateKey);
+        // read all the safe addresses
+        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = safe_address {
+            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
 
-        // collect all the peer ids
-        let mut all_chain_addrs = Vec::new();
-        // add peer_ids from CLI, if there's one
-        if let Some(provided_chain_addrs) = chain_addresses {
-            all_chain_addrs.push(provided_chain_addrs);
+        // read private key. The provided env
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+
+        // get registered safe of all the nodes
+        // check if any of the node has been registered to a different address than the given safe address.
+        // if the node has been registered to the given safe address, skip any action on it
+        // if the node has not been registered to any safe address, register it.
+        // if the node has been registered to a different safe address, remove the old safe and register the new one
+        let (removed_pairs_num, added_pairs_num) =
+            register_safes_and_nodes_on_network_registry(hopr_network_registry, safe_eth_addresses, node_eth_addresses)
+                .await?;
+        info!(
+            "{:?} pairs have been removed and {:?} pairs have been added to the network registry.",
+            removed_pairs_num, added_pairs_num
+        );
+        Ok(())
+    }
+
+    /// Execute command to deregister a node and its staking account with manager privilege
+    ///
+    /// This action does not need to provide safe_address
+    /// Manager wallet deregisters nodes from associated staking accounts
+    pub async fn execute_manager_deregister(
+        network_provider: NetworkProviderArgs,
+        local_identity: IdentityFileArgs,
+        node_address: Option<String>,
+        private_key: PrivateKeyArgs,
+    ) -> Result<(), HelperErrors> {
+        // read all the node addresses
+        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = node_address {
+            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+        }
+        // if local identity dirs/path is provided, read addresses from identity files
+        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        info!(
+            "Will deregister {:?} nodes from the network registry",
+            node_eth_addresses.len()
+        );
+
+        // read private key
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+
+        // deregister all the given nodes from the network registry
+        let removed_pairs_num =
+            deregister_nodes_from_network_registry(hopr_network_registry, node_eth_addresses).await?;
+        info!(
+            "{:?} pairs have been removed from the network registry.",
+            removed_pairs_num
+        );
+        Ok(())
+    }
+
+    /// Execute command to force sync eligibility of staking accounts with manager privilege
+    ///
+    /// This action does not need to provide node_address
+    /// Manager wallet sync eligibility of staking accounts to a given value
+    pub async fn execute_manager_force_sync(
+        network_provider: NetworkProviderArgs,
+        safe_address: Option<String>,
+        private_key: PrivateKeyArgs,
+        eligibility: Option<bool>,
+    ) -> Result<(), HelperErrors> {
+        // read all the safe addresses
+        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        if let Some(addresses) = safe_address {
+            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
 
-        // read all the identities from the directory
-        let local_files = local_identity.get_files();
-        // get peer ids and stringinfy them
-        if !local_files.is_empty() {
-            // check if password is provided
-            let pwd = match password.read_password() {
-                Ok(read_pwd) => read_pwd,
-                Err(e) => return Err(e),
-            };
+        info!(
+            "Will force sync {:?} safes in the network registry",
+            safe_eth_addresses.len()
+        );
 
-            // read all the identities from the directory
-            match read_identities(local_files, &pwd) {
-                Ok(node_identities) => {
-                    all_chain_addrs.extend(
-                        node_identities
-                            .values()
-                            .map(|ni| ni.chain_key.public().0.to_address().to_string()),
-                    );
-                }
-                Err(e) => {
-                    println!("error {:?}", e);
-                    return Err(e);
-                }
+        // read private key
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+
+        // deregister all the given nodes from the network registry
+        match eligibility {
+            Some(safe_eligibility) => {
+                force_sync_safes_on_network_registry(
+                    hopr_network_registry,
+                    safe_eth_addresses.clone(),
+                    vec![safe_eligibility; safe_eth_addresses.len()],
+                )
+                .await?;
+                info!(
+                    "synced the eligibility of {:?} safes in the network registry to {:?}",
+                    safe_eth_addresses.len(),
+                    safe_eligibility
+                );
+                Ok(())
             }
+            None => Err(HelperErrors::MissingParameter("eligibility".to_string())),
         }
-
-        info!(target: "network_registry", "merged peer_ids {:?}", all_chain_addrs.join(","));
-
-        // set directory and environment variables
-        set_process_path_env(&contracts_root, &network)?;
-
-        // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_self_register(&network, &all_chain_addrs.join(","))
     }
 }
 
-impl Cmd for RegisterInNetworkRegistryArgs {
-    /// Run the execute_self_register function
+impl Cmd for NetworkRegistrySubcommands {
+    /// Run the execute_register function.
+    /// By default, registration is done by manager wallet
     fn run(self) -> Result<(), HelperErrors> {
-        self.execute_self_register()
+        Ok(())
+    }
+
+    async fn async_run(self) -> Result<(), HelperErrors> {
+        match self {
+            NetworkRegistrySubcommands::ManagerRegister {
+                network_provider,
+                local_identity,
+                node_address,
+                safe_address,
+                private_key,
+            } => {
+                NetworkRegistrySubcommands::execute_manager_register(
+                    network_provider,
+                    local_identity,
+                    node_address,
+                    safe_address,
+                    private_key,
+                )
+                .await?;
+            }
+            NetworkRegistrySubcommands::ManagerDeregister {
+                network_provider,
+                local_identity,
+                node_address,
+                private_key,
+            } => {
+                NetworkRegistrySubcommands::execute_manager_deregister(
+                    network_provider,
+                    local_identity,
+                    node_address,
+                    private_key,
+                )
+                .await?;
+            }
+            NetworkRegistrySubcommands::ManagerForceSync {
+                network_provider,
+                safe_address,
+                private_key,
+                eligibility,
+            } => {
+                NetworkRegistrySubcommands::execute_manager_force_sync(
+                    network_provider,
+                    safe_address,
+                    private_key,
+                    eligibility,
+                )
+                .await?;
+            }
+        }
+        Ok(())
     }
 }

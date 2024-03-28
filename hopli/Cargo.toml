@@ -1,6 +1,6 @@
 [package]
 name = "hopli"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -10,8 +10,10 @@ license = "GPL-3.0-only"
 # using own fork until the PR was merged
 clap = { workspace = true }
 ethers = { workspace = true }
-serde = "1.0"
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+hex = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-internal-types = { workspace = true }
@@ -19,6 +21,15 @@ hopr-primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+chain-rpc = {workspace = true}
+chain-api = {workspace = true}
+hopr-lib = { workspace = true }
+chain-types = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
+hex-literal = { workspace = true }
+bindings = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+hopr-crypto-random = { workspace = true }
+env_logger = { workspace = true }
