@@ -311,7 +311,10 @@ where
     let rpc_http_config = chain_rpc::client::native::HttpPostRequestorConfig::default();
 
     // TODO: extract this from the global config type
-    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy::default();
+    let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
+        min_retries: Some(2),
+        ..SimpleJsonRpcRetryPolicy::default()
+    };
 
     // TODO: extract this from the global config type
     let rpc_cfg = RpcOperationsConfig {

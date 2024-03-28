@@ -44,7 +44,7 @@ use std::{
     fmt::{Display, Formatter},
     sync::Arc,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
@@ -94,6 +94,15 @@ pub struct AggregatingStrategyConfig {
     /// Default is true.
     #[default = true]
     pub aggregate_on_channel_close: bool,
+}
+
+impl From<AggregatingStrategyConfig> for AggregationPrerequisites {
+    fn from(value: AggregatingStrategyConfig) -> Self {
+        AggregationPrerequisites {
+            min_ticket_count: value.aggregation_threshold.map(|x| x as usize),
+            min_unaggregated_ratio: value.unrealized_balance_ratio.map(|x| x as f64),
+        }
+    }
 }
 
 /// Represents a strategy that starts aggregating tickets in a certain
@@ -163,7 +172,7 @@ where
         channel_id: Hash,
         criteria: AggregationPrerequisites,
     ) -> crate::errors::Result<()> {
-        trace!("starting aggregation in {channel_id}");
+        debug!("starting aggregation in {channel_id} with criteria {criteria:?}");
 
         if !self.is_strategy_aggregating_in_channel(channel_id).await {
             let agg_tasks_clone = self.agg_tasks.clone();
@@ -171,7 +180,7 @@ where
             let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
             let task = async_std::task::spawn(async move {
                 match aggregator_clone
-                    .aggregate_tickets_in_the_channel(&channel_id, Some(criteria))
+                    .aggregate_tickets_in_the_channel(&channel_id, criteria)
                     .await
                 {
                     Ok(_) => {
@@ -238,13 +247,8 @@ where
             .filter(|c| !c.closure_time_passed(current_time()))
             .map(|c| c.get_id());
 
-        let criteria = AggregationPrerequisites {
-            min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(1) as usize,
-            min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
-        };
-
         for channel_id in incoming {
-            if let Err(e) = self.try_start_aggregation(channel_id, criteria).await {
+            if let Err(e) = self.try_start_aggregation(channel_id, self.cfg.into()).await {
                 debug!("skipped aggregation in channel {channel_id}: {e}");
             }
         }
@@ -270,12 +274,7 @@ where
 
             info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
-            let criteria = AggregationPrerequisites {
-                min_ticket_count: self.cfg.aggregation_threshold.unwrap_or(1) as usize,
-                min_unaggregated_ratio: self.cfg.unrealized_balance_ratio.unwrap_or(0.0f32) as f64,
-            };
-
-            Ok(self.try_start_aggregation(channel.get_id(), criteria).await?)
+            Ok(self.try_start_aggregation(channel.get_id(), self.cfg.into()).await?)
         } else {
             Ok(())
         }
