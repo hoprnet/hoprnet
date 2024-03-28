@@ -1,7 +1,7 @@
 use async_stream::stream;
 use hopr_db_entity::ticket_statistics;
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Sub};
+use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -168,14 +168,90 @@ impl IntoCondition for TicketSelector {
 
 /// Prerequisites for the ticket aggregator.
 /// The prerequisites are **independent** of each other.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// If none of the prerequisites are given, they are considered satisfied.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AggregationPrerequisites {
     /// Minimum number of tickets in the channel.
-    pub min_ticket_count: usize,
+    pub min_ticket_count: Option<usize>,
     /// Minimum ratio of balance of unaggregated messages and channel stake.
     /// I.e. the condition is met if sum of unaggregated ticket amounts divided by
     /// the total channel stake is greater than `min_unaggregated_ratio`.
-    pub min_unaggregated_ratio: f64,
+    pub min_unaggregated_ratio: Option<f64>,
+}
+
+impl AggregationPrerequisites {
+    /// Filters the list of ticket models according to the prerequisites.
+    /// **NOTE:** the input list is assumed to be sorted by ticket index in ascending order.
+    ///
+    /// The following is applied:
+    /// - the list of tickets is reduced so that the total amount on the tickets does not exceed the channel balance
+    /// - it is checked whether the list size is greater than `min_unaggregated_ratio`
+    /// - it is checked whether the ratio of total amount on the unaggregated tickets on the list and the channel balance ratio is greater than `min_unaggregated_ratio`
+    fn filter_satisfying_ticket_models(
+        self,
+        models: Vec<ticket::Model>,
+        channel_entry: &ChannelEntry,
+    ) -> Result<Vec<ticket::Model>> {
+        let channel_id = channel_entry.get_id();
+
+        let mut to_be_aggregated = Vec::with_capacity(models.len());
+        let mut total_balance = BalanceType::HOPR.zero();
+        let mut unaggregated_balance = BalanceType::HOPR.zero();
+
+        for m in models {
+            let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
+            // Count only balances of unaggregated tickets
+            if m.index_offset == 1 {
+                unaggregated_balance = unaggregated_balance.add(to_add);
+            }
+
+            // Do a balance check to be sure not to aggregate more than current channel stake
+            total_balance = total_balance + to_add;
+            if total_balance.gt(&channel_entry.balance) {
+                break;
+            }
+
+            to_be_aggregated.push(m);
+        }
+
+        // If there are no criteria, just send everything for aggregation
+        if self.min_ticket_count.is_none() && self.min_unaggregated_ratio.is_none() {
+            info!("Aggregation check OK {channel_id}: no aggregation prerequisites were given");
+            return Ok(to_be_aggregated);
+        }
+
+        let to_be_agg_count = to_be_aggregated.len();
+
+        // Check the aggregation threshold
+        if let Some(agg_threshold) = self.min_ticket_count {
+            if to_be_agg_count >= agg_threshold {
+                info!("Aggregation check OK {channel_id}: {to_be_agg_count} >= {agg_threshold} ack tickets");
+                return Ok(to_be_aggregated);
+            } else {
+                debug!("Aggregation check FAIL {channel_id}: {to_be_agg_count} < {agg_threshold} ack tickets");
+            }
+        }
+
+        if let Some(unrealized_threshold) = self.min_unaggregated_ratio {
+            let diminished_balance = channel_entry.balance.mul_f64(unrealized_threshold)?;
+
+            // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
+            // and there are at least two tickets
+            if unaggregated_balance.ge(&diminished_balance) {
+                if to_be_agg_count > 1 {
+                    info!("Aggregation check OK {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} in {to_be_agg_count} tickets");
+                    return Ok(to_be_aggregated);
+                } else {
+                    debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} >= {diminished_balance} but in only {to_be_agg_count} tickets");
+                }
+            } else {
+                debug!("Aggregation check FAIL {channel_id}: unrealized balance {unaggregated_balance} < {diminished_balance} in {to_be_agg_count} tickets");
+            }
+        }
+
+        debug!("Aggregation check FAIL {channel_id}: no prerequisites were met");
+        Ok(vec![])
+    }
 }
 
 #[async_trait]
@@ -265,7 +341,7 @@ pub trait HoprDbTicketOperations {
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>>;
 
     /// Perform a ticket aggregation rollback in the channel.
@@ -351,7 +427,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
+                        .map(|m| model_to_acknowledged_ticket(&m, &channel_dst, &ckp).map_err(DbError::from))
                         .collect::<Result<Vec<_>>>()
                 })
             })
@@ -377,7 +453,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|m| model_to_acknowledged_ticket(&m, channel_dst, &ckp).map_err(DbError::from))
+                        .map(|m| model_to_acknowledged_ticket(&m, &channel_dst, &ckp).map_err(DbError::from))
                         .collect::<Result<Vec<_>>>()
                 })
             })
@@ -544,7 +620,7 @@ impl HoprDbTicketOperations for HoprDb {
                             }
                         }
 
-                        match model_to_acknowledged_ticket(&ticket, channel_dst, &self.chain_key) {
+                        match model_to_acknowledged_ticket(&ticket, &channel_dst, &self.chain_key) {
                             Ok(mut ticket) => {
                                 // Update the state manually, since we do not want to re-fetch the model after the update
                                 ticket.status = new_state;
@@ -788,7 +864,7 @@ impl HoprDbTicketOperations for HoprDb {
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
-        prerequisites: Option<AggregationPrerequisites>,
+        prerequisites: AggregationPrerequisites,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>> {
         let myself = self.clone();
         let chain_keypair = self.chain_key.clone();
@@ -867,45 +943,16 @@ impl HoprDbTicketOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?;
 
-                    // do a balance check to be sure not to aggregate more than current channel stake
-                    let mut total_balance = Balance::zero(BalanceType::HOPR);
-                    let mut aggregated_balance = Balance::zero(BalanceType::HOPR);
-                    let mut last_idx_to_take = 0_u64;
-
-                    for m in &to_be_aggregated {
-                        let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
-                        if m.index_offset > 1 {
-                            aggregated_balance = aggregated_balance.add(to_add);
-                        }
-
-                        total_balance = total_balance.add(to_add);
-                        if total_balance.gt(&channel_entry.balance) {
-                            break;
-                        } else {
-                            last_idx_to_take = U256::from_be_bytes(&m.index).as_u64();
-                        }
-                    }
-
-                    let to_be_aggregated = to_be_aggregated
+                    // Filter the list of tickets according to the prerequisites
+                    let to_be_aggregated = prerequisites
+                        .filter_satisfying_ticket_models(to_be_aggregated, &channel_entry)?
                         .into_iter()
-                        .take_while(|m| U256::from_be_bytes(&m.index).as_u64() <= last_idx_to_take)
-                        .map(|m| model_to_acknowledged_ticket(&m, ds, &chain_keypair).map_err(DbError::from))
-                        .collect::<Result<Vec<AcknowledgedTicket>>>()?;
-
-                    if let Some(prerequisites) = prerequisites {
-                        if to_be_aggregated.len() < prerequisites.min_ticket_count
-                            && total_balance
-                                .sub(aggregated_balance)
-                                .gt(&channel_entry.balance.mul_f64(prerequisites.min_unaggregated_ratio)?)
-                        {
-                            // aborting, because the constraints have not been met
-                            return Ok(vec![]);
-                        }
-                    };
+                        .map(|m| model_to_acknowledged_ticket(&m, &ds, &chain_keypair).map_err(DbError::from))
+                        .collect::<Result<Vec<_>>>()?;
 
                     // mark all tickets with appropriate characteristics as being aggregated
-                    let to_be_aggregated_count = to_be_aggregated.len();
-                    if to_be_aggregated_count > 0 {
+                    if !to_be_aggregated.is_empty() {
+                        let last_idx_to_take = to_be_aggregated.last().unwrap().ticket.index;
                         let marked: sea_orm::UpdateResult = ticket::Entity::update_many()
                             .filter(TicketSelector::from(&channel_entry))
                             .filter(ticket::Column::Index.gte(first_idx_to_take.to_be_bytes().to_vec()))
@@ -918,10 +965,11 @@ impl HoprDbTicketOperations for HoprDb {
                             .exec(tx.as_ref())
                             .await?;
 
-                        if marked.rows_affected as usize != to_be_aggregated_count {
+                        if marked.rows_affected as usize != to_be_aggregated.len() {
                             return Err(DbError::LogicalError(format!(
-                                "expected to mark {to_be_aggregated_count}, but was able to mark {}",
-                                marked.rows_affected
+                                "expected to mark {}, but was able to mark {}",
+                                to_be_aggregated.len(),
+                                marked.rows_affected,
                             )));
                         }
                     }
@@ -1044,7 +1092,7 @@ impl HoprDbTicketOperations for HoprDb {
 
         let acknowledged_tickets = acknowledged_tickets
             .into_iter()
-            .map(|m| model_to_acknowledged_ticket(&m, domain_separator, &self.chain_key).map_err(DbError::from))
+            .map(|m| model_to_acknowledged_ticket(&m, &domain_separator, &self.chain_key).map_err(DbError::from))
             .collect::<Result<Vec<AcknowledgedTicket>>>()?;
 
         // can be done, because the tickets collection is tested for emptiness before
@@ -1272,6 +1320,7 @@ mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_entity::ticket;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
@@ -1920,6 +1969,337 @@ mod tests {
         assert_eq!(cache.get(&1).await, clone.get(&1).await);
     }
 
+    fn dummy_ticket_model(channel_id: Hash, idx: u64, idx_offset: u32, amount: u32) -> ticket::Model {
+        ticket::Model {
+            id: 0,
+            channel_id: channel_id.to_string(),
+            amount: U256::from(amount).to_be_bytes().to_vec(),
+            index: idx.to_be_bytes().to_vec(),
+            index_offset: idx_offset as i32,
+            winning_probability: vec![],
+            channel_epoch: vec![],
+            signature: vec![],
+            response: vec![],
+            state: 0,
+        }
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_default_filter_no_tickets() {
+        let prerequisites = AggregationPrerequisites::default();
+        assert_eq!(None, prerequisites.min_unaggregated_ratio);
+        assert_eq!(None, prerequisites.min_ticket_count);
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(u32::MAX),
+            2.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert_eq!(
+            dummy_tickets, filtered_tickets,
+            "empty prerequisites must not filter anything"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_trim_tickets_exceeding_channel_balance() {
+        const TICKET_COUNT: usize = 110;
+
+        let prerequisites = AggregationPrerequisites::default();
+        assert_eq!(None, prerequisites.min_unaggregated_ratio);
+        assert_eq!(None, prerequisites.min_ticket_count);
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert_eq!(
+            100,
+            filtered_tickets.len(),
+            "must take only tickets up to channel balance"
+        );
+        assert!(
+            filtered_tickets
+                .into_iter()
+                .map(|t| U256::from_be_bytes(t.amount).as_u64())
+                .sum::<u64>()
+                <= channel.balance.amount().as_u64(),
+            "filtered tickets must not exceed channel balance"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_ticket_count_not_met() {
+        const TICKET_COUNT: usize = 10;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: Some(TICKET_COUNT + 1),
+            min_unaggregated_ratio: None,
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(
+            filtered_tickets.is_empty(),
+            "must return empty when min_ticket_count is not met"
+        )
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_unaggregated_ratio_is_not_met() {
+        const TICKET_COUNT: usize = 10;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: None,
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(
+            filtered_tickets.is_empty(),
+            "must return empty when min_unaggregated_ratio is not met"
+        )
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met() {
+        const TICKET_COUNT: usize = 10;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: Some(TICKET_COUNT),
+            min_unaggregated_ratio: None,
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(!filtered_tickets.is_empty(), "must not return empty");
+        assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met_regardless_ratio() {
+        const TICKET_COUNT: usize = 10;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: Some(TICKET_COUNT),
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(!filtered_tickets.is_empty(), "must not return empty");
+        assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met() {
+        const TICKET_COUNT: usize = 90;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: None,
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(!filtered_tickets.is_empty(), "must not return empty");
+        assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met_regardless_count() {
+        const TICKET_COUNT: usize = 90;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: Some(TICKET_COUNT + 1),
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(!filtered_tickets.is_empty(), "must not return empty");
+        assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_aggregated_ratio_is_met() {
+        const TICKET_COUNT: usize = 90;
+
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: None,
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            (TICKET_COUNT + 1).into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        let mut dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
+            .into_iter()
+            .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
+            .collect();
+        dummy_tickets[0].index_offset = 2; // Make this ticket aggregated
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(filtered_tickets.is_empty(), "must return empty");
+    }
+
+    #[async_std::test]
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_unaggregated_ratio_is_met_in_single_ticket_only(
+    ) {
+        let prerequisites = AggregationPrerequisites {
+            min_ticket_count: None,
+            min_unaggregated_ratio: Some(0.9),
+        };
+
+        let channel = ChannelEntry::new(
+            BOB.public().to_address(),
+            ALICE.public().to_address(),
+            BalanceType::HOPR.balance(100),
+            2.into(),
+            ChannelStatus::Open,
+            4_u32.into(),
+        );
+
+        // Single aggregated ticket exceeding the min_unaggregated_ratio
+        let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 2, 110)];
+
+        let filtered_tickets = prerequisites
+            .filter_satisfying_ticket_models(dummy_tickets.clone(), &channel)
+            .expect("must filter tickets");
+
+        assert!(filtered_tickets.is_empty(), "must return empty");
+    }
+
     async fn create_alice_db_with_tickets_from_bob(
         ticket_count: usize,
     ) -> crate::errors::Result<(HoprDb, ChannelEntry, Vec<AcknowledgedTicket>)> {
@@ -1951,7 +2331,7 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
@@ -1965,7 +2345,7 @@ mod tests {
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await
             .is_err());
 
@@ -1979,12 +2359,12 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_0_tickets = channel.get_id();
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_0_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_0_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, None);
@@ -2001,12 +2381,12 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
@@ -2030,7 +2410,7 @@ mod tests {
 
         let (db, channel, mut tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
@@ -2044,7 +2424,7 @@ mod tests {
         ticket.save(&db.tickets_db).await?;
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         tickets.remove(0);
@@ -2061,21 +2441,20 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_within_limits(
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_return_when_ticket_threshold_is_met(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         const COUNT_TICKETS: usize = 5;
-        const COUNT_JUST_WANTED_TICKETS: usize = 4;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
-        let constraints = Some(AggregationPrerequisites {
-            min_ticket_count: COUNT_JUST_WANTED_TICKETS,
-            min_unaggregated_ratio: 0.0,
-        });
+        let constraints = AggregationPrerequisites {
+            min_ticket_count: Some(COUNT_TICKETS - 1),
+            min_unaggregated_ratio: None,
+        };
         let actual = db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, constraints)
             .await?;
@@ -2093,20 +2472,20 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_pass_with_requirements_outside_limits_not_marking_anything(
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_not_return_when_ticket_threshold_is_not_met(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
-        let constraints = Some(AggregationPrerequisites {
-            min_ticket_count: COUNT_TICKETS + 1,
-            min_unaggregated_ratio: 0.0,
-        });
+        let constraints = AggregationPrerequisites {
+            min_ticket_count: Some(COUNT_TICKETS + 1),
+            min_unaggregated_ratio: None,
+        };
         let actual = db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, constraints)
             .await?;
@@ -2146,7 +2525,7 @@ mod tests {
         }
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, None);
@@ -2170,7 +2549,7 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
@@ -2184,7 +2563,7 @@ mod tests {
         ticket.save(&db.tickets_db).await?;
 
         assert!(db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await
             .is_ok());
 
@@ -2211,7 +2590,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_aggregation_should_replace_the_tickes_with_a_correctly_aggregated_ticket(
+    async fn test_ticket_aggregation_should_replace_the_tickets_with_a_correctly_aggregated_ticket(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         const COUNT_TICKETS: usize = 5;
 
@@ -2239,12 +2618,12 @@ mod tests {
             &Hash::default(),
         )?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
@@ -2288,12 +2667,12 @@ mod tests {
             &Hash::default(),
         )?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
@@ -2335,12 +2714,12 @@ mod tests {
             &Hash::default(),
         )?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), COUNT_TICKETS);
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
         let actual = db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, None)
+            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
         assert_eq!(actual, Some((BOB_OFFCHAIN.public().clone(), tickets)));
