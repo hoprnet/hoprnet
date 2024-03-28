@@ -1,5 +1,5 @@
 ---
-version: '3.8'
+version: "3.8"
 
 networks:
   hopr-net:
@@ -45,7 +45,7 @@ services:
       - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
       - ./hoprd.id:/app/hoprd.id
       - hoprd_data:/app/hoprd-db
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - "/var/run/docker.sock:/var/run/docker.sock"
     logging:
       driver: json-file
       options:
@@ -65,7 +65,7 @@ services:
     expose:
       - 9093
     ports:
-      - '9093:8080'
+      - "9093:8080"
     networks:
       - hopr-net
     devices:
@@ -79,15 +79,15 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)"
     restart: unless-stopped
     expose:
       - 9100
     ports:
-      - '9100:9100'
+      - "9100:9100"
     networks:
       - hopr-net
   prometheus:
@@ -104,7 +104,7 @@ services:
       --web.console.libraries=/usr/share/prometheus/console_libraries
       --web.console.templates=/usr/share/prometheus/consoles
     ports:
-      - '9090:9090'
+      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -114,17 +114,17 @@ services:
       - hopr-net
   grafana:
     image: grafana/grafana:10.3.1@sha256:1adbcc2df3866ff5ec1d836e9d2220c904c7f98901b918d3cc5e1118ab1af991
-    user: '472'
+    user: "472"
     restart: always
     environment:
-      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
     env_file:
       - ./grafana/config.monitoring
     ports:
-      - '3030:3000'
+      - "3030:3000"
     depends_on:
       - prometheus
     networks:

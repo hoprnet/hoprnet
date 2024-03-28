@@ -2,7 +2,7 @@
 name: Custom Template
 about: Create a custom issue
 title: ''
-labels: 'new issue'
+labels: 'status:new'
 assignees: ''
 ---
 

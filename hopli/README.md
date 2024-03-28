@@ -179,7 +179,6 @@ hopli update_identity_password \
 
 The identities will be modified inplace.
 
-
 ## Development
 
 ### Run local development

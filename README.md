@@ -42,21 +42,20 @@
 - [Contact](#contact)
 - [License](#license)
 
-
 ## About
 
 The HOPR project produces multiple artifacts that allow running, maintaining and modiyfing the HOPR node. The most relevant components for production use cases are:
 
 1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
-    - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incroporated into another projects as a transport layer.
+   - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incroporated into another projects as a transport layer.
 2. [hoprd](https://hoprnet.github.io/hoprnet/hoprd/index.html)
-    - Daemon application providing a higher level interface for creating a HOPR protocol compliant node that can use a dedicated REST API.
+   - Daemon application providing a higher level interface for creating a HOPR protocol compliant node that can use a dedicated REST API.
 3. [hoprd-api-schema](https://hoprnet.github.io/hoprnet/hoprd_api_schema/index.html)
-    - Utility to generate the OpenAPI spec for the `hoprd` served REST API.
+   - Utility to generate the OpenAPI spec for the `hoprd` served REST API.
 4. [hoprd-cfg](https://hoprnet.github.io/hoprnet/hoprd_cfg/index.html)
-    - Utility for configuration management of the `hoprd`
+   - Utility for configuration management of the `hoprd`
 5. [hopli](https://hoprnet.github.io/hoprnet/hopli/index.html)
-    - Utility designed to simplify and unify the management of on-chain and identity related tasks.
+   - Utility designed to simplify and unify the management of on-chain and identity related tasks.
 
 Unless stated otherwise, the following sections only apply to `hoprd`.
 
@@ -71,13 +70,15 @@ All releases and associated changelogs are located in the [official releases](ht
 ### Install via Docker
 
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
+
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
 - `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
-Container image has the format 
+Container image has the format
 `europe-west3-docker.pkg.dev/hoprassociation/docker-images/$PROJECT:$RELEASE`.
 where:
+
 - `$PROJECT` can be either `hopli` or `hoprd`
 
 Pull the container image with `docker`:
@@ -186,6 +187,7 @@ Options:
 ```
 
 ### Example execution
+
 Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
 A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
@@ -200,18 +202,18 @@ Here is a short breakdown of each argument.
 hoprd
   # store your node identity information in the persisted database folder
   --identity /app/hoprd-db/.hopr-identity
-  # set the encryption password for your identity     
+  # set the encryption password for your identity
   --password switzerland
-  # initialize the database and identity if not present 	                  
+  # initialize the database and identity if not present
   --init
-  # announce the node to other nodes in the network and act as relay if publicly reachable	                              
+  # announce the node to other nodes in the network and act as relay if publicly reachable
   --announce
-  # set IP and port of the P2P API to the container's external IP so it can be reached on your host		                          
-  --host "0.0.0.0:9091" 
-  # specify password for accessing REST API	                  
+  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --host "0.0.0.0:9091"
+  # specify password for accessing REST API
   --apiToken <MY_TOKEN>
-  # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain                       
-  --network doufur                        
+  # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+  --network doufur
 ```
 
 Special care needs to given to the `network` argument, which defines the specific network `hoprd` node should join. Only nodes within the same network can communicate using the HOPR protocol.
@@ -224,9 +226,10 @@ An optional `docker compose` setup can be used to run the above containerized `h
 docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
-Copy the  `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
+Copy the `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
 
 The composite setup will publish multiple additional services alongside the `hoprd`:
+
 - Admin UI at `localhost:3000`
 - Grafana with `hoprd` dashboards at `localhost:3030` (default user: `admin` and pass `hopr`)
 
@@ -293,6 +296,26 @@ development easier, to get the full list execute:. You may get the full list lik
 $ nix flake show
 ```
 
+#### Code Formatting
+
+All nix, rust, solidity and python code can be automatically formatted:
+
+```shell
+nix fmt
+```
+
+These formatters are also automatically run as a Git pre-commit check.
+
+#### Code Linting
+
+All linters can be executed via a Nix flake helper app:
+
+```shell
+nix run .#lint
+```
+
+This will in particular run `clippy` for the entire Rust codebase.
+
 ### Local node with safe staking service (local network)
 
 Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
@@ -336,7 +359,7 @@ make run-hopr-admin &
 
 Running one node in test mode, with safe and module attached (in dufour network)
 
-```shell
+````shell
 # build deps and HOPRd code
 make -j deps && make -j build
 
@@ -361,7 +384,7 @@ bash scripts/generate-identity.sh
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
-```
+````
 
 ## Local cluster
 
@@ -370,6 +393,7 @@ The best way to test with multiple HOPR nodes is by using a [local cluster of in
 ## Test
 
 ### Unit testing
+
 Tests both the Rust and Solidity code.
 
 ```shell
@@ -394,11 +418,12 @@ For more information please refer to [act][2]'s documentation.
 
 When using the `nix` environment, the test environment preparation and activation is automatic.
 
-Tests are using the `pytest` infrastructure. 
+Tests are using the `pytest` infrastructure.
 
 #### Running Tests Locally
 
 ##### Testing environment
+
 If not using `nix`, setup the `pytest` environment:
 
 ```shell
@@ -437,6 +462,3 @@ make smoke-test-full
 
 [1]: https://nixos.org/learn.html
 [2]: https://github.com/nektos/act
-
-
-

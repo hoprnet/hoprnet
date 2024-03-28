@@ -2,7 +2,7 @@
 name: Feature Template
 about: Create a feature request
 title: ''
-labels: 'feature, new issue'
+labels: 'feature, status:new'
 assignees: ''
 ---
 

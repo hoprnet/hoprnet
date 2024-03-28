@@ -88,7 +88,7 @@ Below there is a list with the contents of this release
 - #5875 - Cleanup WASM remnants and fix repo structure
 - #5873 - Add websocket support for message sending
 - #5869 - Proofreading the docs
-- #5868 - Pipeline to auto generate python SDK on cutting release event 
+- #5868 - Pipeline to auto generate python SDK on cutting release event
 - #5863 - Add nix derivation for hoprd
 - #5852 - fix Docker build
 - #5832 - Timestamp filtering in `peek-all`

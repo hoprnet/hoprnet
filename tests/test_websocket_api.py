@@ -132,9 +132,7 @@ async def ws_connections(swarm7: dict[str, Node]):
         url(swarm7["2"].host_addr, swarm7["2"].api_port), extra_headers=EXTRA_HEADERS
     ) as ws2, websockets.connect(
         url(swarm7["3"].host_addr, swarm7["3"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws3, websockets.connect(
-        url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS
-    ) as ws4:
+    ) as ws3, websockets.connect(url(swarm7["4"].host_addr, swarm7["4"].api_port), extra_headers=EXTRA_HEADERS) as ws4:
         yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4}
 
 
