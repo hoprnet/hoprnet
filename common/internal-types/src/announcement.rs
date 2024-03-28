@@ -21,8 +21,8 @@ impl KeyBinding {
     fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> Box<[u8]> {
         let mut to_sign = Vec::with_capacity(70);
         to_sign.extend_from_slice(b"HOPR_KEY_BINDING");
-        to_sign.extend_from_slice(&chain_key.to_bytes());
-        to_sign.extend_from_slice(&packet_key.to_bytes());
+        to_sign.extend_from_slice(chain_key.as_ref());
+        to_sign.extend_from_slice(packet_key.as_ref());
         to_sign.into_boxed_slice()
     }
 

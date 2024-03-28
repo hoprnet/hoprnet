@@ -86,7 +86,7 @@ impl BinarySerializable for ProofOfRelayString {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.next_ticket_challenge.to_bytes());
-        ret.extend_from_slice(&self.hint.to_bytes());
+        ret.extend_from_slice(self.hint.as_ref());
         ret.into_boxed_slice()
     }
 }

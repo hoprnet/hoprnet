@@ -271,19 +271,19 @@ impl HoprDbInfoOperations for HoprDb {
                                     .ok_or(DbError::MissingFixedTableEntry("chain_info".into()))?;
 
                                 let ledger_dst = if let Some(b) = model.ledger_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
 
                                 let safe_registry_dst = if let Some(b) = model.safe_registry_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
 
                                 let channels_dst = if let Some(b) = model.channels_dst {
-                                    Some(Hash::from_bytes(&b)?)
+                                    Some(Hash::try_from(b.as_ref())?)
                                 } else {
                                     None
                                 };
@@ -316,13 +316,13 @@ impl HoprDbInfoOperations for HoprDb {
 
                     match dst_type {
                         DomainSeparator::Ledger => {
-                            active_model.ledger_dst = Set(Some(value.to_bytes().into()));
+                            active_model.ledger_dst = Set(Some(value.as_ref().into()));
                         }
                         DomainSeparator::SafeRegistry => {
-                            active_model.safe_registry_dst = Set(Some(value.to_bytes().into()));
+                            active_model.safe_registry_dst = Set(Some(value.as_ref().into()));
                         }
                         DomainSeparator::Channel => {
-                            active_model.channels_dst = Set(Some(value.to_bytes().into()));
+                            active_model.channels_dst = Set(Some(value.as_ref().into()));
                         }
                     }
 

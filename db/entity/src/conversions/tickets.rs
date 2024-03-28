@@ -11,7 +11,7 @@ pub fn model_to_acknowledged_ticket(
     domain_separator: &Hash,
     chain_keypair: &ChainKeypair,
 ) -> crate::errors::Result<AcknowledgedTicket> {
-    let response = Response::from_bytes(&db_ticket.response)?;
+    let response = Response::try_from(db_ticket.response.as_ref())?;
 
     // To be refactored with https://github.com/hoprnet/hoprnet/pull/6018
     let mut ticket = Ticket::default();
@@ -26,7 +26,7 @@ pub fn model_to_acknowledged_ticket(
         .try_into()
         .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
-    ticket.signature = Some(Signature::from_bytes(&db_ticket.signature)?);
+    ticket.signature = Some(Signature::try_from(db_ticket.signature.as_ref())?);
 
     let signer = ticket.recover_signer(domain_separator)?.to_address();
 
@@ -46,8 +46,8 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             index_offset: Set(value.ticket.index_offset as i32),
             winning_probability: Set(value.ticket.encoded_win_prob.to_vec()),
             channel_epoch: Set(U256::from(value.ticket.channel_epoch).to_be_bytes().to_vec()),
-            signature: Set(value.ticket.signature.unwrap().to_bytes().to_vec()),
-            response: Set(value.response.to_bytes().to_vec()),
+            signature: Set(value.ticket.signature.unwrap().as_ref().to_vec()),
+            response: Set(value.response.as_ref().to_vec()),
             state: Set(value.status as u8 as i32),
             ..Default::default()
         }

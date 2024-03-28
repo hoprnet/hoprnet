@@ -20,8 +20,19 @@ use std::{
 /// network transfer and in the smart contract.
 const ENCODED_TICKET_LENGTH: usize = 64;
 
+/// Custom float to integer encoding used in the integer-only
+/// Ethereum Virtual Machine (EVM). Chosen to be easily
+/// convertible to IEEE754 double-precision and vice versa
+const ENCODED_WIN_PROB_LENGTH: usize = 7;
+
 /// Winning probability encoded in 7-byte representation
-pub type EncodedWinProb = [u8; 7];
+pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
+
+/// Encodes 100% winning probability
+const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
+
+/// Encodes 0% winning probability
+const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
 
 /// Describes status of a channel
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
@@ -185,8 +196,8 @@ impl BinarySerializable for ChannelEntry {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
-            let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
-            let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
+            let source = Address::try_from(b.drain(0..Address::SIZE).as_ref())?;
+            let destination = Address::try_from(b.drain(0..Address::SIZE).as_ref())?;
             let balance = Balance::new(U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?, BalanceType::HOPR);
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let status_byte = b.drain(0..1).as_ref()[0];
@@ -217,8 +228,8 @@ impl BinarySerializable for ChannelEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.to_bytes().as_ref());
-        ret.extend_from_slice(self.destination.to_bytes().as_ref());
+        ret.extend_from_slice(self.source.as_ref());
+        ret.extend_from_slice(self.destination.as_ref());
         ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(match self.status {
@@ -242,8 +253,9 @@ impl BinarySerializable for ChannelEntry {
     }
 }
 
+/// Generates channel ID hash from `source` and `destination` addresses.
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
-    Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
+    Hash::create(&[source.as_ref(), destination.as_ref()])
 }
 
 /// Enumerates possible changes on a channel entry update
@@ -663,7 +675,7 @@ impl Ticket {
             Self::SIZE - Signature::SIZE
         });
 
-        ret.extend_from_slice(&self.channel_id.to_bytes());
+        ret.extend_from_slice(self.channel_id.as_ref());
         ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
@@ -673,7 +685,7 @@ impl Ticket {
 
         if with_signature {
             if let Some(ref signature) = self.signature {
-                ret.extend_from_slice(&signature.to_bytes());
+                ret.extend_from_slice(signature.as_ref());
             } else {
                 return Err(CoreTypesError::ParseError(
                     "Tried to serialize with a non-existing signature".into(),
@@ -688,14 +700,14 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[&self.to_bytes_internal(false).unwrap()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], &ticket_hash.to_bytes()]);
-        Hash::create(&[&hex!("1901"), &domain_separator.to_bytes(), &hash_struct.to_bytes()])
+        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+        Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
         self.signature = Some(Signature::sign_hash(
-            &self.get_hash(domain_separator).to_bytes(),
+            self.get_hash(domain_separator).as_ref(),
             signing_key,
         ));
     }
@@ -750,7 +762,7 @@ impl Ticket {
             Ok(signer.clone())
         } else {
             let signer = PublicKey::from_signature_hash(
-                &self.get_hash(domain_separator).to_bytes(),
+                self.get_hash(domain_separator).as_ref(),
                 self.signature.as_ref().expect("ticket not signed"),
             )?;
             Ok(self.signer.get_or_init(|| signer).clone())
@@ -783,7 +795,7 @@ impl BinarySerializable for Ticket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // TODO: not necessary to transmit over the wire
-            let channel_id = Hash::from_bytes(&data[0..32])?;
+            let channel_id = Hash::try_from(&data[0..32])?;
             let mut amount = [0u8; 32];
             amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
 
@@ -803,7 +815,7 @@ impl BinarySerializable for Ticket {
                 &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
             )?;
 
-            let signature = Signature::from_bytes(
+            let signature = Signature::try_from(
                 &data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
                     ..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE],
             )?;

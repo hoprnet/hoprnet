@@ -24,7 +24,7 @@ pub struct Acknowledgement {
 impl Acknowledgement {
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
-            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_keypair),
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
             ack_key_share,
             validated: true,
         }
@@ -35,7 +35,7 @@ impl Acknowledgement {
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
             .ack_signature
-            .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
+            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
 
         self.validated
     }
@@ -53,8 +53,8 @@ impl BinarySerializable for Acknowledgement {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
-            let ack_signature = OffchainSignature::from_bytes(buf.drain(..OffchainSignature::SIZE).as_ref())?;
-            let ack_key_share = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
+            let ack_signature = OffchainSignature::try_from(buf.drain(..OffchainSignature::SIZE).as_ref())?;
+            let ack_key_share = HalfKey::try_from(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
                 ack_key_share,
@@ -68,8 +68,8 @@ impl BinarySerializable for Acknowledgement {
     fn to_bytes(&self) -> Box<[u8]> {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ack_signature.to_bytes());
-        ret.extend_from_slice(&self.ack_key_share.to_bytes());
+        ret.extend_from_slice(self.ack_signature.as_ref());
+        ret.extend_from_slice(self.ack_key_share.as_ref());
         ret.into_boxed_slice()
     }
 }
@@ -154,7 +154,7 @@ impl AcknowledgedTicket {
         let vrf_params = derive_vrf_parameters(
             &ticket.get_hash(domain_separator).into(),
             chain_keypair,
-            &domain_separator.to_bytes(),
+            domain_separator.as_ref(),
         )?;
 
         Ok(Self {
@@ -190,7 +190,7 @@ impl AcknowledgedTicket {
             .verify(
                 recipient,
                 &self.ticket.get_hash(domain_separator).into(),
-                &domain_separator.to_bytes(),
+                domain_separator.as_ref(),
             )
             .is_err()
         {
@@ -206,12 +206,12 @@ impl AcknowledgedTicket {
         if let Some(ref signature) = self.ticket.signature {
             luck.copy_from_slice(
                 &Hash::create(&[
-                    &self.ticket.get_hash(domain_separator).to_bytes(),
+                    self.ticket.get_hash(domain_separator).as_ref(),
                     &self.vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
-                    &self.response.to_bytes(),
-                    &signature.to_bytes(),
+                    self.response.as_ref(),
+                    &signature.as_ref(),
                 ])
-                .to_bytes()[0..7],
+                .as_ref()[0..7],
             );
         } else {
             return Err(InvalidInputData(
@@ -246,11 +246,11 @@ impl BinarySerializable for AcknowledgedTicket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
-            let response = Response::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
+            let response = Response::try_from(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
             let vrf_params = VrfParameters::from_bytes(
                 &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
             )?;
-            let signer = Address::from_bytes(
+            let signer = Address::try_from(
                 &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
                     ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
             )?;
@@ -272,9 +272,9 @@ impl BinarySerializable for AcknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.response.to_bytes());
+        ret.extend_from_slice(self.response.as_ref());
         ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.extend_from_slice(self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }
@@ -344,9 +344,9 @@ impl BinarySerializable for UnacknowledgedTicket {
     fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
-            let own_key = HalfKey::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
+            let own_key = HalfKey::try_from(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
             let signer =
-                Address::from_bytes(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
+                Address::try_from(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
             Ok(Self {
                 ticket,
                 own_key,
@@ -360,8 +360,8 @@ impl BinarySerializable for UnacknowledgedTicket {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.own_key.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.extend_from_slice(self.own_key.as_ref());
+        ret.extend_from_slice(self.signer.as_ref());
         ret.into_boxed_slice()
     }
 }

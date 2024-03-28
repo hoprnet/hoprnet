@@ -6,6 +6,7 @@ use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
+use crate::prelude::VariableBytesEncodable;
 use crate::traits::{BinarySerializable, IntoEndian, ToHex, UnitaryFloatOps};
 
 pub type U256 = primitive_types::U256;
@@ -61,22 +62,17 @@ impl AsRef<[u8]> for Address {
     }
 }
 
-impl BinarySerializable for Address {
+impl TryFrom<&[u8]> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError)?))
+    }
+}
+
+impl VariableBytesEncodable for Address {
+    /// Fixed size of the address when encoded as bytes (e.g. via `as_ref()`).
     const SIZE: usize = 20;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut ret = Self([0u8; Self::SIZE]);
-            ret.0.copy_from_slice(data);
-            Ok(ret)
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.0.into()
-    }
 }
 
 impl From<[u8; Address::SIZE]> for Address {
@@ -364,59 +360,6 @@ impl BinarySerializable for EthereumChallenge {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.challenge.into()
-    }
-}
-
-/// Represents a snapshot in the blockchain
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct Snapshot {
-    pub block_number: U256,
-    pub transaction_index: U256,
-    pub log_index: U256,
-}
-
-impl Default for Snapshot {
-    fn default() -> Self {
-        Self {
-            block_number: U256::zero(),
-            transaction_index: U256::zero(),
-            log_index: U256::zero(),
-        }
-    }
-}
-
-impl Snapshot {
-    pub fn new(block_number: U256, transaction_index: U256, log_index: U256) -> Self {
-        Self {
-            block_number,
-            transaction_index,
-            log_index,
-        }
-    }
-}
-
-impl BinarySerializable for Snapshot {
-    const SIZE: usize = 3 * U256::SIZE;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(Self {
-                block_number: U256::from_bytes(&data[0..U256::SIZE])?,
-                transaction_index: U256::from_bytes(&data[U256::SIZE..2 * U256::SIZE])?,
-                log_index: U256::from_bytes(&data[2 * U256::SIZE..3 * U256::SIZE])?,
-            })
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-
-        ret.extend_from_slice(&self.block_number.to_bytes());
-        ret.extend_from_slice(&self.transaction_index.to_bytes());
-        ret.extend_from_slice(&self.log_index.to_bytes());
-        ret.into_boxed_slice()
     }
 }
 

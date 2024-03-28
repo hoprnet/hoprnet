@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::errors::GeneralError::ParseError;
-use crate::errors::Result;
+use crate::errors::{GeneralError, Result};
 
 /// A generic type that can be converted to a hexadecimal string.
 pub trait ToHex: Sized {
@@ -51,12 +51,39 @@ where
     }
 }
 
-impl<T> ToHex for T
-where
-    T: BinarySerializable,
-{
+/*pub trait FixedBytesEncodable<const N: usize>: AsRef<[u8; N]> + TryFrom<[u8; N], Error = GeneralError> {}
+
+impl<const N: usize, T: FixedBytesEncodable<N>> ToHex for T {
     fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(&self.to_bytes()))
+        format!("0x{}", hex::encode(self.as_ref()))
+    }
+
+    fn from_hex(str: &str) -> Result<Self> {
+        if !str.is_empty() && str.len() % 2 == 0 {
+            let data = if &str[..2] == "0x" || &str[..2] == "0X" {
+                &str[2..]
+            } else {
+                str
+            };
+
+            let decoded: [u8; N] = hex::decode(data)
+                .map_err(|_| ParseError)
+                .and_then(|bytes| bytes.try_into().map_err(|_| ParseError))?;
+
+            decoded.try_into()
+        } else {
+            Err(ParseError)
+        }
+    }
+}*/
+
+pub trait VariableBytesEncodable: AsRef<[u8]> + for <'a> TryFrom<&'a [u8], Error = GeneralError> {
+    const SIZE: usize;
+}
+
+impl<T: VariableBytesEncodable> ToHex for T {
+    fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(self.as_ref()))
     }
 
     fn from_hex(str: &str) -> Result<Self> {
@@ -69,7 +96,7 @@ where
 
             hex::decode(data)
                 .map_err(|_| ParseError)
-                .and_then(|bytes| T::from_bytes(&bytes))
+                .and_then(|bytes| T::try_from(&bytes))
         } else {
             Err(ParseError)
         }

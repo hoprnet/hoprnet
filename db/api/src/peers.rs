@@ -183,7 +183,7 @@ impl HoprDbPeersOperations for HoprDb {
             packet_key: sea_orm::ActiveValue::Set(Vec::from(
                 OffchainPublicKey::try_from(peer)
                     .map_err(|_| crate::errors::DbError::DecodingError)?
-                    .to_bytes(),
+                    .as_ref(),
             )),
             multi_addresses: sea_orm::ActiveValue::Set(
                 mas.into_iter()
@@ -211,7 +211,7 @@ impl HoprDbPeersOperations for HoprDb {
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
                     OffchainPublicKey::try_from(peer)
                         .map_err(|_| crate::errors::DbError::DecodingError)?
-                        .to_bytes(),
+                        .as_ref(),
                 )),
             )
             .exec(&self.peers_db)
@@ -232,7 +232,7 @@ impl HoprDbPeersOperations for HoprDb {
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
                     OffchainPublicKey::try_from(new_status.id)
                         .map_err(|_| crate::errors::DbError::DecodingError)?
-                        .to_bytes(),
+                        .as_ref(),
                 )),
             )
             .one(&self.peers_db)
@@ -243,7 +243,7 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.packet_key = sea_orm::ActiveValue::Set(Vec::from(
                 OffchainPublicKey::try_from(new_status.id)
                     .map_err(|_| crate::errors::DbError::DecodingError)?
-                    .to_bytes(),
+                    .as_ref(),
             ));
             peer_data.multi_addresses = sea_orm::ActiveValue::Set(
                 new_status
@@ -286,7 +286,7 @@ impl HoprDbPeersOperations for HoprDb {
                 hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
                     OffchainPublicKey::try_from(peer)
                         .map_err(|_| crate::errors::DbError::DecodingError)?
-                        .to_bytes(),
+                        .as_ref(),
                 )),
             )
             .one(&self.peers_db)
@@ -459,7 +459,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for PeerStatus {
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
         Ok(PeerStatus {
-            id: OffchainPublicKey::from_bytes(value.packet_key.as_slice())
+            id: OffchainPublicKey::try_from(value.packet_key.as_slice())
                 .map_err(|_| Self::Error::DecodingError)?
                 .into(),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,

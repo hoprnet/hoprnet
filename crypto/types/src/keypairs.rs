@@ -21,7 +21,7 @@ pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     type SecretLen: ArrayLength<u8>;
 
     /// Represents the type of the public key
-    type Public: BinarySerializable + Clone + PartialEq;
+    type Public: VariableBytesEncodable + Clone + PartialEq;
 
     /// Generates a new random keypair.
     fn random() -> Self;
@@ -52,7 +52,7 @@ impl Keypair for OffchainKeypair {
     fn random() -> Self {
         let mut kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
         // TODO: remove this loop once https://github.com/hoprnet/hoprnet/pull/5665 is merged
-        while kp.1.to_bytes().as_ref()[0] == 0xff {
+        while kp.1.as_ref()[0] == 0xff {
             kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
         }
         kp

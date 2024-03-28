@@ -258,7 +258,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 ),
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
-                next_node: <S::P as Keypair>::Public::from_bytes(&next_node)
+                next_node: <S::P as Keypair>::Public::try_from(&next_node)
                     .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
                 path_pos,
                 additional_info,

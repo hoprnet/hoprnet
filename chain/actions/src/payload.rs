@@ -178,12 +178,12 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         tx.set_data(
             match &announcement.key_binding {
                 Some(binding) => {
-                    let serialized_signature = binding.signature.to_bytes();
+                    let serialized_signature = binding.signature.as_ref();
 
                     BindKeysAnnounceCall {
                         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.as_ref()).into(),
                         base_multiaddr: announcement.multiaddress().to_string(),
                     }
                     .encode()
@@ -351,13 +351,13 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
     fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
         let call_data = match &announcement.key_binding {
             Some(binding) => {
-                let serialized_signature = binding.signature.to_bytes();
+                let serialized_signature = binding.signature.as_ref();
 
                 BindKeysAnnounceSafeCall {
-                    self_: H160::from_slice(&self.me.to_bytes()),
+                    self_: self.me.into(),
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                    ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                    ed_25519_pub_key: H256::from_slice(&binding.packet_key.as_ref()).into(),
                     base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode()
@@ -532,7 +532,7 @@ pub fn convert_vrf_parameters(
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.v.serialize_uncompressed();
     let s_b = off_chain
-        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_slice())
+        .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_ref())
         // Safe: hash value is always in the allowed length boundaries,
         //       only fails for longer values
         // Safe: always encoding to secp256k1 whose field elements are in
@@ -559,7 +559,7 @@ pub fn convert_vrf_parameters(
 /// Not implemented using From trait because logic fits better here
 pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<RedeemableTicket> {
     if let Some(ref signature) = off_chain.ticket.signature {
-        let serialized_signature = signature.to_bytes();
+        let serialized_signature = signature.as_ref();
 
         let mut encoded_win_prob = [0u8; 8];
         encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
@@ -577,7 +577,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
                 vs: H256::from_slice(&serialized_signature[32..64]).into(),
             },
-            por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
+            por_secret: U256::from_big_endian(&off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))
