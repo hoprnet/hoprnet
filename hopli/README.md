@@ -4,20 +4,7 @@ CLI tool to manage HOPR identity generation, decryption, funding and registering
 
 ## Installation
 
-It uses Foundry's `forge` component to prepare, sign and broadcast transaction.
-Please ensure that `forge` binary exists in your PATH.
-It should return the version when running
-
-```
-forge --version
-```
-
-If an error returns, please follow the [Foundry installation guide](https://book.getfoundry.sh/getting-started/installation) to install it on your machine.
-
-```
-cargo build --release
-cargo install --path .
-```
+hopli requires contract bindings (`../ethereum/contracts/bindings`) which is build by foundry (`forge bind`)
 
 ## Commands
 
@@ -37,7 +24,7 @@ An additional parameter which specifies its prefix can also be passed.
 
 When reading from a path, use `--identity-from-path "./test/hopr.id"`
 
-Path and directory can be passed at the same time.
+Path and directory can be passed at the same time. When both are provided, files from the directory are read first and file from path is read later.
 
 Note: when CREATing identities, you must pass `--identity-directory`. `--identity-from-path` is not accepted
 
@@ -45,281 +32,213 @@ Note: when CREATing identities, you must pass `--identity-directory`. `--identit
 
 Password can be passed either as an env variable `IDENTITY_PASSWORD`, or via a path to the password file `--password-path`, e.g. `--password-path ./.pwd`
 
-### Create/Read identities
+#### Private key
 
-To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
+Private key to signer wallet can be passed either as an env variable or as a command line argument `--private-key`, e.g. `--private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`.
 
-```
-IDENTITY_PASSWORD=local \
-    hopli identity \
-    --action create \
-    --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 3
-```
+Unless specified, the name of the env variable is `PRIVATE_KEY` by default. In commands that accept two or more private keys, each private key has its own specific name. E.g. `MANAGER_PRIVATE_KEY` for network registry commands that are reserved for wallets with manager privilege.
 
-Read ethereum addresses from identities
+### Create identities
+
+To create identities, a [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
 
 ```
-IDENTITY_PASSWORD=switzerland \
-    hopli identity \
-    --action read \
-    --identity-directory "./test" \
-    --identity-prefix node_
-
+hopli identity create \
+  --identity-directory "./test" \
+  --identity-prefix nodes_ \
+  --number 2 \
+  --password-path "./test/pwd"
 ```
 
-To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
+#### Read identities
+
+Read ethereum addresses from identities. A [path to it](####Identity-directory-or-path) and a [password](####Password) must be provided.
+
+```
+hopli identity read \
+  --identity-directory "./test" \
+  --identity-prefix node_ \
+  --password-path "./test/pwd"
+```
+
+#### Update identities password
+
+To update some identites' password. Two [passwords](####Password) must be provided:
+
+- an old (and valid) password to the identity files. Either provided as cli argument `--password-path` or as an env variable `IDENTITY_PASSWORD`
+- a new password to the identity files. Either provided as cli argument `--new-password-path` or as an env variable `NEW_IDENTITY_PASSWORD`
+
+```
+hopli identity update \
+  --identity-directory "./test" \
+  --identity-prefix node_ \
+  --password-path "./test/pwd" \
+  --new-password-path "./test/newpwd"
+```
+
+The identities will be modified inplace.
+
+### Faucet
+
+To fund nodes with password, a [path to it](####Identity-directory-or-path), a [password](####Password), and a [private key](####Private-key) to the faucet wallet (EOA) must be provided.
 
 `--hopr-amount` and `native-amount` can be floating number
 
 ```
-IDENTITY_PASSWORD=local \
-PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --network anvil-localhost \
-    --use-local-identities --identity-directory "/app/.hoprd-db" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
     --contracts-root "../ethereum/contracts" \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+    --identity-directory "./test" --identity-prefix node_ \
+    --password-path "./test/pwd" \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --hopr-amount 10 --native-amount 0.1
 ```
 
-Note that only identity files ending with `.id` are recognized by the CLI
+### Network registery
 
-To register nodes
+#### Register nodes
+
+A manager (EOA) of the network registry can register node and safe pairs to the network. Nodes' Ethereum addresses can either be provided as string or read from identity files.
+
+The private key to the manager wallet (EOA) should be provided as a cli argument as in [private key](####Private-key) or as an env variable `MANAGER_PRIVATE_KEY`,
+
+Note that when registering a node, if the said node:
+
+- has been registered with the given safe, skip it. (It's idempotent)
+- has been registered to a different safe, remove the registration with the old safe and register with the new safe
+- has not been registered to the network registry, register it.
+
+After the registration, manager will also call "force-sync" to set all the added safes to be "eligible" to the network.
 
 ```
-export PRIVATE_KEY=<bank_private_key> \
-hopli register-in-network-registry \
+export MANAGER_PRIVATE_KEY=<bank_private_key> \
+hopli network-registry manager-register \
     --network anvil-localhost \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --contracts-root "../ethereum/contracts"
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08
 ```
 
 with node identities in the network registry contract
 
 ```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=switzerland \
-hopli register-in-network-registry \
+hopli -- network-registry manager-register \
     --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Express stake + register + fund
-
-```
-PRIVATE_KEY=<bank_private_key> \
-hopli initialize-node --network anvil-localhost \
-    --identity-directory "/tmp" \
-    --password-path "/tmp/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Express create a safe and a module instances, then set default permissions
-
-```
-PRIVATE_KEY=<bank_private_key> \
-hopli create-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "/test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Migrate an exising set of node(d) with safe and module to a new network
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli migrate-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Move a registered node to a new pair of safe and module
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli move-node-to-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
-If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
-
-```
-PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-hopli sync-network-registry --network anvil-localhost \
     --contracts-root "../ethereum/contracts" \
-    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
-    --sync-type forced-sync \
-    --eligibility true
+    --identity-directory "./test" --password-path "./test/pwd" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --safe-address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
-### Update identities password
+#### Deregister nodes
 
-To update some identites' password with old and new password as env variables. Alternatively, paths to the passwords files can be provided with `--old-password-path` and `--new-password-path`.
+A manager (EOA) of the network registry can remove node and safe pairs from the network. Nodes' Ethereum addresses can either be provided as string or read from identity files.
 
-```
-IDENTITY_PASSWORD=old_pwd
-NEW_IDENTITY_PASSWORD=new_pwd
-hopli update_identity_password \
-    --identity-directory "./test"
-```
+The private key to the manager wallet (EOA) should be provided as a cli argument as in [private key](####Private-key) or as an env variable `MANAGER_PRIVATE_KEY`,
 
-The identities will be modified inplace.
-
-## Development
-
-### Run local development
+If the node address has not been registered in the network registry contract, it's will be skipped.
 
 ```
-cargo run -- -h
+hopli -- network-registry manager-deregister \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
-### Commands
+#### Sync eligibility
 
-Create 3 identity files in `./test` folder where password is saved in `.pwd` file
+A manager (EOA) of the network registry can forcely set eligibility of safes.
+
+The private key to the manager wallet (EOA) should be provided as a cli argument as in [private key](####Private-key) or as an env variable `MANAGER_PRIVATE_KEY`,
 
 ```
-cargo run -- identity \
-    --action create \
-    --password-path ./.pwd \
+hopli -- network-registry manager-force-sync \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
+    --eligibility true \
+    --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+```
+
+### Safe module
+
+To launch a HOPR node, it requires a Safe with HOPR node management module to be pre-established.
+Such a safe is designed to hold assets (wxHOPR tokens in particular) so that funds are held outside of node for better security.
+HOPR node management module is a plugin to the safe so that permitted nodes can interact with the Safe to transfer funds between the said Safe and the HoprChannels smart contract.
+
+The private key to the deployer wallet (EOA) should be provided as a cli argument `--private-key` as in [private key](####Private-key) or as an env variable `PRIVATE_KEY`.
+
+The private key to the manager wallet (EOA) should be provided as a cli argument `--manager-private-key` as in [private key](####Private-key) or as an env variable `MANAGER_PRIVATE_KEY`.
+
+#### Create: express create and setup a safe and a module
+
+Express create a safe and a module instances, and
+
+- set default permissions to scope channels and token contracts as targets.
+- add announcement as a permitted target in the deployed module proxy
+- approve token transfer to be done for the safe by channels contracts
+- if node addresses are known, include nodes to the module by the safe
+- set desired threshold
+- if no `admin-address` is provided, the only admin will be the caller (wallet of the `private-key`)
+- fund safe with wxHOPR tokens
+- if node addresses are known, fund nodes with native tokens
+- if node addresses are known and a manager private key is proivded, add created safe and node to the network registry.
+
+```
+hopli safe-module create \
+    --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
     --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 3
+    --password-path "./test/pwd" \
+    --admin-address 0x47f2710069F01672D01095cA252018eBf08bF85e,0x0D07Eb66Deb54D48D004765E13DcC028cf56592b \
+    --allowance 10.5 \
+    --hopr-amount 10 \
+    --native-amount 0.1 \
+    --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
 
-Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
+#### Migrate: make safe and module compatible with a new network
+
+Migrate an exising set of node(d) with safe and module to a new network:
+
+- add the Channel contract of the new network to the module as target and set default permissions.
+- add the Announcement contract as target to the module
+- approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+- Use the manager wallet to add nodes and Safes to the Network Registry contract of the new network.
 
 ```
-IDENTITY_PASSWORD=switzerland \
-cargo run -- identity \
-    --action create \
+hopli safe-module migrate \
+    --network anvil-localhost2 \
+    --contracts-root "../ethereum/contracts" \
     --identity-directory "./test" \
-    --identity-prefix node_ \
-    --number 2
+    --password-path "./test/pwd" \
+    --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
+    --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+    --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
 
-Read ethereum addresses from identities
+#### Move: move registered nodes to a new pair of safe and module
+
+For each node, if the node has been registered to the NodeSafeRegistry, deregister itself and register it to the new pair of safe and module.
+
+- use old safes to deregister nodes from Node-safe registry
+- use the new safe to include nodes to the module
+- use manager wallet to deregister nodes from the network registry
+- use manager wallet to register nodes with new safes to the network regsitry
 
 ```
-IDENTITY_PASSWORD=switzerland \
-cargo run -- identity \
-    --action read \
-    --identity-directory "./test" \
-    --identity-prefix node_
-
-```
-
-Fund nodes with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
-
-```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=local \
-    cargo run -- faucet --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1,0xd057604a14982fe8d88c5fc25aac3267ea142a08 \
+hopli safe-module safe-module move \
+    --network anvil-localhost \
     --contracts-root "../ethereum/contracts"  \
-    --hopr-amount 10 --native-amount 0.1
+    --old-module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+    --new-safe-address 0xce66d19a86600f3c6eb61edd6c431ded5cc92b21 \
+    --new-module-address 0x3086c20265cf742b169b05cd0eae1941455e4e9f \
+    --node-address 0x93a50B0fFF7b4ED36A3C6445e280E72AC2AEFc51,0x58033D3074D001a32bF379801eaf8969817fFfCf,0xeEDaab91158928647a9270Fe290897eBB1230250 \
+    --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
-
-Register some peer ids in the network registry contract
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- register-in-network-registry --network anvil-localhost \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Register some peer ids as well as some node identities in the network registry contract
-
-```
-PRIVATE_KEY=<bank_private_key> \
-IDENTITY_PASSWORD=local \
-    cargo run -- register-in-network-registry --network anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
-    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --contracts-root "../ethereum/contracts"
-```
-
-> If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.networks."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
-
-Express stake + registry + fund for node identity
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- initialize-node --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "/test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Express create a safe and a module instances, then set default permissions
-
-```
-PRIVATE_KEY=<bank_private_key> \
-    cargo run -- create-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --hopr-amount 10 --native-amount 0.1 \
-    --contracts-root "../ethereum/contracts"
-```
-
-Migrate an exising set of node(d) with safe and module to a new network
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- migrate-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Move a registered node to a new pair of safe and module
-
-```
-PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- move-node-to-safe-module --network anvil-localhost \
-    --identity-directory "./test" \
-    --password-path "./test/.pwd" \
-    --safe-address <safe_address> \
-    --module-address <module_address> \
-    --contracts-root "../ethereum/contracts"
-```
-
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
-If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
-
-```
-PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
-    cargo run -- sync-network-registry --network anvil-localhost \
-    --contracts-root "../ethereum/contracts" \
-    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
-    --sync-type forced-sync \
-    --eligibility true
-```
-
-### Test
-
-```
-cargo test -- --nocapture
-```
-
-## Note:
-
-1. When ` --use-local-identities`, the identity file should contain "id" in its name, either as part of the extention, or in the file stem.

@@ -19,12 +19,8 @@
 //! ### 2) Channel transition from `Open` to `PendingToClose` event
 //!
 //! If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
-//! This behavior does not have any additional criteria, unlike in the previous event.
+//! This behavior does not have any additional criteria, unlike in the previous event, but there must be at least 2 tickets in the channel.
 //!
-//! The aggregation on channel closure slightly differs from the one that happens on a new winning ticket.
-//! The difference lies in the on-failure behaviour.
-//! If the aggregation on channel closure fails, the unaggregated tickets in that channel are automatically send for redeeming.
-//! When this strategy is triggered from the
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
 use async_trait::async_trait;
@@ -172,9 +168,9 @@ where
         channel_id: Hash,
         criteria: AggregationPrerequisites,
     ) -> crate::errors::Result<()> {
-        debug!("starting aggregation in {channel_id} with criteria {criteria:?}");
-
         if !self.is_strategy_aggregating_in_channel(channel_id).await {
+            debug!("checking aggregation in {channel_id} with criteria {criteria:?}...");
+
             let agg_tasks_clone = self.agg_tasks.clone();
             let aggregator_clone = self.ticket_aggregator.clone();
             let (can_remove_tx, can_remove_rx) = futures::channel::oneshot::channel();
@@ -184,7 +180,7 @@ where
                     .await
                 {
                     Ok(_) => {
-                        info!("completed ticket aggregation in channel {channel_id}");
+                        debug!("completed ticket aggregation in channel {channel_id}");
                     }
                     Err(e) => {
                         error!("cannot complete aggregation in channel {channel_id}: {e}");
@@ -274,7 +270,15 @@ where
 
             info!("going to aggregate tickets in {channel} because it transitioned to PendingToClose");
 
-            Ok(self.try_start_aggregation(channel.get_id(), self.cfg.into()).await?)
+            // On closing there must be at least 2 tickets to justify aggregation
+            let on_close_agg_prerequisites = AggregationPrerequisites {
+                min_ticket_count: Some(2),
+                min_unaggregated_ratio: None,
+            };
+
+            Ok(self
+                .try_start_aggregation(channel.get_id(), on_close_agg_prerequisites)
+                .await?)
         } else {
             Ok(())
         }
@@ -284,6 +288,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::strategy::SingularStrategy;
+    use async_std::prelude::FutureExt as AsyncStdFutureExt;
     use core_protocol::ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
     };
@@ -647,7 +652,7 @@ mod tests {
         let (_, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), 5).await;
 
         let cfg = super::AggregatingStrategyConfig {
-            aggregation_threshold: None,
+            aggregation_threshold: Some(100),
             unrealized_balance_ratio: None,
             aggregate_on_channel_close: true,
         };
@@ -675,11 +680,66 @@ mod tests {
             .expect("strategy call should not fail");
 
         // Wait until aggregation has finished
-        let f1 = pin!(awaiter);
-        let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
-        let _ = futures::future::select(f1, f2).await;
+        awaiter
+            .timeout(Duration::from_secs(5))
+            .await
+            .expect("should not timeout")
+            .unwrap();
 
         let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
         assert_eq!(tickets.len(), 1, "there should be a single aggregated ticket");
+    }
+
+    #[async_std::test]
+    async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // db_0: Alice (channel source)
+        // db_1: Bob (channel destination)
+        let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await;
+        let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await;
+
+        init_db(db_alice.clone()).await;
+        init_db(db_bob.clone()).await;
+
+        const NUM_TICKETS: usize = 1;
+        let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await;
+
+        let (bob_aggregator, awaiter) =
+            spawn_aggregation_interaction(db_alice.clone(), db_bob.clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), NUM_TICKETS, "should have a single ticket");
+
+        db_alice.upsert_channel(None, channel).await.unwrap();
+        db_bob.upsert_channel(None, channel).await.unwrap();
+
+        let cfg = super::AggregatingStrategyConfig {
+            aggregation_threshold: Some(100),
+            unrealized_balance_ratio: Some(0.75),
+            aggregate_on_channel_close: true,
+        };
+
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), bob_aggregator);
+
+        aggregation_strategy
+            .on_own_channel_changed(
+                &channel,
+                ChannelDirection::Incoming,
+                ChannelChange::Status {
+                    left: ChannelStatus::Open,
+                    right: ChannelStatus::PendingToClose(std::time::SystemTime::now()),
+                },
+            )
+            .await
+            .expect("strategy call should not fail");
+
+        awaiter
+            .timeout(Duration::from_millis(500))
+            .await
+            .expect_err("should timeout");
+
+        let tickets = db_bob.get_tickets(None, (&channel).into()).await.unwrap();
+        assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
     }
 }
