@@ -437,7 +437,7 @@
 
             programs.prettier.enable = true;
             settings.formatter.prettier.includes = [ "*.md" "*.json" ];
-            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" ];
+            settings.formatter.prettier.excludes = [ "./vendor/*" "./ethereum/contracts/broadcast/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
             settings.formatter.rustfmt.excludes = [ "./vendor/*" ];

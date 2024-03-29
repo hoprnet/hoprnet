@@ -10,7 +10,7 @@ on:
       pr_number:
         type: number
         required: true
-        description: 'Pull request number'
+        description: "Pull request number"
 
 jobs:
   cleanup-pr:
@@ -24,7 +24,7 @@ jobs:
           ref: master
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}

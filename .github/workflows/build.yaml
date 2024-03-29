@@ -25,13 +25,12 @@ jobs:
           - hoprd-debug
           - hopli
     steps:
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -51,7 +50,7 @@ jobs:
       - uses: cachix/cachix-action@v14
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 

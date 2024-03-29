@@ -16,7 +16,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-
   build:
     name: package
     runs-on: self-hosted-hoprnet-small
@@ -29,7 +28,7 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -78,13 +77,13 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            push-to-fork: hoprnet/DAppNodePackage-Hopr
-            commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
-            title: "Update to release ${{ steps.setup.outputs.current_version }}"
-            body: "This pull request contains the changes needed to bump Hoprd to version ${{ steps.setup.outputs.current_version }}"
-            branch: bot/update-${{ steps.setup.outputs.current_version }}
-            path: "./DAppNodePackage-Hopr"
-            delete-branch: true
-            assignees: ${{ github.actor }}
-            reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka,QYuQianchen"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          push-to-fork: hoprnet/DAppNodePackage-Hopr
+          commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
+          title: "Update to release ${{ steps.setup.outputs.current_version }}"
+          body: "This pull request contains the changes needed to bump Hoprd to version ${{ steps.setup.outputs.current_version }}"
+          branch: bot/update-${{ steps.setup.outputs.current_version }}
+          path: "./DAppNodePackage-Hopr"
+          delete-branch: true
+          assignees: ${{ github.actor }}
+          reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka,QYuQianchen"
