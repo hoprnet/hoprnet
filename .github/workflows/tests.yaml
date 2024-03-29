@@ -26,7 +26,7 @@ jobs:
         target:
           - unit
           - smoke
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     steps:
@@ -49,7 +49,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
@@ -77,10 +77,10 @@ jobs:
         working-directory: "/tmp"
 
       - name: Upload test logs
-        uses: 'google-github-actions/upload-cloud-storage@v1'
+        uses: "google-github-actions/upload-cloud-storage@v1"
         if: matrix.target == 'smoke' && always()
         with:
           path: /tmp/
-          glob: 'test-smoke-*'
+          glob: "test-smoke-*"
           parent: false
           destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}

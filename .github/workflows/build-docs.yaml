@@ -20,7 +20,7 @@ jobs:
   rust:
     name: Rust docs
     # big runner is needed because building docs involves building Rust code
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
       - name: Checkout repo
@@ -36,7 +36,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
