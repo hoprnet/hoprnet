@@ -26,6 +26,7 @@ jobs:
         target:
           - unit
           - smoke
+    # no nix and cachix setup needed because they are available natively
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
@@ -39,19 +40,6 @@ jobs:
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@v14
-        if: ${{ !env.ACT }}
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
 
       - name: Run unit tests
         if: matrix.target == 'unit'
