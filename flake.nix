@@ -369,6 +369,7 @@
               yq-go
               curl
               bash
+              gnumake
 
               # test Github automation
               act
