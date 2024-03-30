@@ -368,6 +368,7 @@
               jq
               yq-go
               curl
+              bash
 
               # test Github automation
               act
