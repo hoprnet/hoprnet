@@ -104,6 +104,16 @@
             # prevent nix from changing config.sub files under vendor/cargo
             dontUpdateAutotoolsGnuConfigScripts = true;
           };
+          commonPhases = {
+            preConfigure = ''
+              # respect the amount of available cores for building
+              export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
+              echo "# placeholder" > vendor/cargo/config.toml
+              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                ethereum/contracts/foundry.toml.in > \
+                ethereum/contracts/foundry.toml
+            '';
+          };
           hopliCrateInfo = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopli/Cargo.toml;
           };
@@ -117,38 +127,20 @@
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release" }: craneLib.buildPackage (commonArgs // {
+          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release" }: craneLib.buildPackage (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
           });
-          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // {
+          rustPackageTest = { pname, version, cargoArtifacts }: craneLib.cargoTest (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
             # this ensures the tests are run as part of the build process
             doCheck = true;
           });
-          rustPackageClippy = { pname, version, cargoArtifacts }: craneLib.cargoClippy (commonArgs // {
+          rustPackageClippy = { pname, version, cargoArtifacts }: craneLib.cargoClippy (commonArgs // commonPhases // {
             inherit pname version cargoArtifacts src;
             cargoExtraArgs = "--offline -p ${pname}";
             cargoClippyExtraArgs = "-- -Dwarnings";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
           });
           hoprd = rustPackage (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hoprd-debug = rustPackage (hoprdCrateInfo // {
@@ -301,19 +293,13 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-          docs = craneLibNightly.cargoDoc (commonArgs // {
+          docs = craneLibNightly.cargoDoc (commonArgs // commonPhases // {
             inherit src;
             pname = "hopr";
             version = hoprdCrateInfo.version;
             cargoArtifacts = null;
             buildPhaseCargoCommand = "cargo doc --offline --no-deps";
             RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
-            preConfigure = ''
-              echo "# placeholder" > vendor/cargo/config.toml
-              sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                ethereum/contracts/foundry.toml.in > \
-                ethereum/contracts/foundry.toml
-            '';
             postBuild = ''
               ${pkgs.pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
               ${pkgs.html-tidy}/bin/tidy -q -i target/doc/index.html > index.html || :
@@ -370,6 +356,7 @@
               curl
               bash
               gnumake
+              which
 
               # test Github automation
               act

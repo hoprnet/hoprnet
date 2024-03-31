@@ -21,6 +21,8 @@ SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
 
+current_system := $(shell nix eval --impure --expr "builtins.currentSystem")
+
 all: help
 
 .PHONY: init
@@ -68,6 +70,16 @@ install:
 clean: # Cleanup build directories
 	cargo clean
 	find ethereum/bindings/src -delete
+
+.PHONY: nix-check
+nix-check: # Run a single nix flake check as specified by check=, or all if no name is given
+ifeq ($(check),)
+	nix flake show --json 2>/dev/null | \
+		jq -r '.checks.$(current_system) | to_entries | .[].key' | \
+		xargs -I '{}' $(MAKE) nix-check check='{}'
+else
+	nix build ".#checks.$(current_system).$(check)"
+endif
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set

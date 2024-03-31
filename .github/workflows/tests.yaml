@@ -44,7 +44,9 @@ jobs:
       - name: Run unit tests
         if: matrix.target == 'unit'
         run: |
-          nix develop -c make -j test
+          nix develop -c make -j smart-contract-test
+          nix build .#hoprd-test
+          nix build .#hopli-test
         env:
           HOPR_NETWORK: anvil-localhost
 
