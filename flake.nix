@@ -400,6 +400,19 @@
           };
           defaultDevShell = buildDevShell [ ];
           smoketestsDevShell = buildDevShell [ hoprd hopli ];
+          run-check = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellScriptBin "run-check" ''
+              set -e
+              check=$1
+              if [ -z "$check" ]; then
+                nix flake show --json 2>/dev/null | \
+                  jq -r '.checks."${system}" | to_entries | .[].key' | \
+                  xargs -I '{}' nix build ".#checks."${system}".{}"
+              else
+              	nix build ".#checks."${system}".$check"
+              fi
+            '';
+          };
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
@@ -470,6 +483,7 @@
             inherit hoprd-debug-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
             inherit update-github-labels;
+            check = run-check;
           };
 
           packages = {
