@@ -76,6 +76,7 @@
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.toml.in
               ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
