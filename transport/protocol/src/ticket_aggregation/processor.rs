@@ -444,14 +444,10 @@ mod tests {
         let channel_epoch = 1u64;
         let domain_separator = Hash::default();
 
-        let response = Response::new(
-            &Hash::create(&[
-                &channel_id.to_bytes(),
-                &channel_epoch.to_be_bytes(),
-                &index.to_be_bytes(),
-            ])
-            .to_bytes(),
-        );
+        let response = Response::try_from(
+            Hash::create(&[channel_id.as_ref(), &channel_epoch.to_be_bytes(), &index.to_be_bytes()]).as_ref(),
+        )
+        .unwrap();
 
         let ticket = Ticket::new(
             &destination.into(),

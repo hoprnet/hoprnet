@@ -112,7 +112,7 @@ pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> hopr_crypto_t
             &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
         )
         .map_err(|_| CalculationError)?;
-        Ok(HalfKey::new(scalar.to_bytes().as_ref()))
+        Ok(HalfKey::try_from(scalar.to_bytes().as_ref())?)
     } else {
         Err(InvalidParameterSize {
             name: "secret".into(),
@@ -141,7 +141,6 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::PublicKey;
     use hopr_crypto_types::vrf::derive_vrf_parameters;
-    use hopr_primitive_types::traits::BinarySerializable;
     use k256::Scalar;
 
     #[test]
@@ -190,7 +189,7 @@ mod tests {
         let params = derive_vrf_parameters(&message, &keypair, dst).unwrap();
 
         let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
-            &[&pub_key.to_address().to_bytes(), &message],
+            &[&pub_key.to_address().as_ref(), &message],
             &[dst],
         )
         .unwrap();
@@ -205,7 +204,7 @@ mod tests {
         let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&priv_key).unwrap().into();
         assert_eq!(params.get_h_v_witness(), (cap_b * a * params.h).to_encoded_point(false));
 
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.v.into_projective_point() * params.h;
+        let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.v.clone().into_projective_point() * params.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[

@@ -21,7 +21,7 @@ pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     type SecretLen: ArrayLength<u8>;
 
     /// Represents the type of the public key
-    type Public: VariableBytesEncodable + Clone + PartialEq;
+    type Public: BytesRepresentable + Clone + PartialEq;
 
     /// Generates a new random keypair.
     fn random() -> Self;

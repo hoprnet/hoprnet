@@ -278,7 +278,7 @@ pub mod tests {
                 address,
                 topics: vec![AddressAnnouncementFilter::signature().into()],
                 data: encode(&[
-                    Token::Address(ethers::abi::Address::from_slice(&address.to_bytes())),
+                    Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
                     Token::String(test_multiaddr.to_string()),
                 ])
                 .into(),

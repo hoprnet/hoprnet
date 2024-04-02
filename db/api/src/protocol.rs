@@ -263,7 +263,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
                 payload.extend_from_slice(packet.as_ref());
-                payload.extend_from_slice(&ticket.to_bytes());
+
+                let ticket_bytes: [u8; Ticket::SIZE] = ticket.into();
+                payload.extend_from_slice(ticket_bytes.as_ref());
 
                 Ok(TransportPacketWithChainData::Outgoing {
                     next_hop,
@@ -451,7 +453,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
                 payload.extend_from_slice(packet.as_ref());
-                payload.extend_from_slice(&t.to_bytes());
+
+                let ticket_bytes: [u8; Ticket::SIZE] = t.into();
+                payload.extend_from_slice(ticket_bytes.as_ref());
 
                 Ok(TransportPacketWithChainData::Forwarded {
                     packet_tag,

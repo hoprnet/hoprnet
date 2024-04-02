@@ -119,7 +119,7 @@ mod tests {
     async fn test_announce() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009").unwrap();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -226,7 +226,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())

@@ -224,8 +224,8 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
@@ -305,7 +305,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_redeem_flow() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
@@ -412,7 +412,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_redeem_in_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
@@ -494,7 +494,7 @@ mod tests {
     #[async_std::test]
     async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
@@ -582,7 +582,7 @@ mod tests {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 1;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
         let (channel_from_bob, mut tickets) =
@@ -651,7 +651,7 @@ mod tests {
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await;
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 4 tickets in Epoch
         let (channel_from_bob, mut tickets) =

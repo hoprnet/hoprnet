@@ -141,12 +141,12 @@ mod tests {
     use crate::prelude::decapsulate_multiaddress;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_primitive_types::{primitives::Address, traits::BinarySerializable};
+    use hopr_primitive_types::primitives::Address;
     use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();
-        static ref CHAIN_ADDR: Address = Address::from_bytes(&hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185")).unwrap();
+        static ref CHAIN_ADDR: Address = Address::try_from(hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185").as_ref()).unwrap();
         static ref SECOND_KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299")).unwrap();
     }
 

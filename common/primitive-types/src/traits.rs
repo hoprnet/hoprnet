@@ -2,60 +2,60 @@ use crate::errors::GeneralError::ParseError;
 use crate::errors::{GeneralError, Result};
 
 /// A generic type that can be converted to a hexadecimal string.
-pub trait ToHex: Sized {
+pub trait ToHex {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
 
     /// Tries to parse the type from the hexadecimal representation.
-    fn from_hex(str: &str) -> Result<Self>;
+    fn from_hex(str: &str) -> Result<Self>
+    where
+        Self: Sized;
 }
 
-/// A type that can be serialized and deserialized to a binary form.
+/// Represents a type that can be encoded to/decoded from a fixed sized byte array.
+/// This requires processing and memory allocation in order to represent the type in binary encoding.
 ///
-/// Implementing this trait automatically implements ToHex trait
-/// which then uses the serialize method.
-pub trait BinarySerializable: Sized {
-    /// Minimum size of this type in bytes.
-    const SIZE: usize;
+/// Differences between [BytesEncodable] and [BytesRepresentable] :
+/// - [BytesRepresentable] is already internally carrying the encoded representation of the type,
+/// so no additional encoding or allocation is required to represent the type as a byte array.
+/// - [BytesEncodable] requires additional transformation and allocation in order to represent the type as a fixed size
+/// byte array.
+/// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
+/// for a type that already implements the latter, but it is not possible vice-versa.
+pub trait BytesEncodable<const N: usize>: Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+    /// Size of the encoded byte array.
+    const SIZE: usize = N;
 
-    /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &[u8]) -> Result<Self>;
-
-    /// Serializes the type into a fixed size binary blob.
-    fn to_bytes(&self) -> Box<[u8]>;
-}
-
-/*pub trait FixedBytesEncodable<const N: usize>: AsRef<[u8; N]> + TryFrom<[u8; N], Error = GeneralError> {}
-
-impl<const N: usize, T: FixedBytesEncodable<N>> ToHex for T {
-    fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(self.as_ref()))
+    /// Convenience function to avoid defining temporary variable.
+    /// A shorthand for `let v: [u8; N] = self.into()`.
+    #[inline]
+    fn into_encoded(self) -> [u8; N] {
+        self.into()
     }
 
-    fn from_hex(str: &str) -> Result<Self> {
-        if !str.is_empty() && str.len() % 2 == 0 {
-            let data = if &str[..2] == "0x" || &str[..2] == "0X" {
-                &str[2..]
-            } else {
-                str
-            };
-
-            let decoded: [u8; N] = hex::decode(data)
-                .map_err(|_| ParseError)
-                .and_then(|bytes| bytes.try_into().map_err(|_| ParseError))?;
-
-            decoded.try_into()
-        } else {
-            Err(ParseError)
-        }
+    /// Convenience function to encode the type into a Box.
+    #[inline]
+    fn into_boxed(self) -> Box<[u8]> {
+        Box::new(self.into_encoded())
     }
-}*/
-
-pub trait VariableBytesEncodable: AsRef<[u8]> + for <'a> TryFrom<&'a [u8], Error = GeneralError> {
-    const SIZE: usize;
 }
 
-impl<T: VariableBytesEncodable> ToHex for T {
+/// Represents a type that is already internally represented by a fixed size byte array,
+/// and therefore requires no memory allocation to represent the type in binary encoding.
+///
+/// This is a strict subset of [BytesEncodable], see its documentation for details.
+pub trait BytesRepresentable: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
+    /// Size of the encoded byte array.
+    const SIZE: usize;
+
+    /// Convenience function to copy this type's binary representation into a Box.
+    #[inline]
+    fn into_boxed(self) -> Box<[u8]> {
+        self.as_ref().to_vec().into_boxed_slice()
+    }
+}
+
+impl<T: BytesRepresentable> ToHex for T {
     fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(self.as_ref()))
     }

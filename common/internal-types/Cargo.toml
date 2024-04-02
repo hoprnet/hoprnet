@@ -13,6 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
+bincode = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }

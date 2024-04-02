@@ -329,7 +329,8 @@ impl Serialize for Ticket {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.to_bytes().as_ref())
+        let v: [u8; Self::SIZE] = self.clone().into();
+        serializer.serialize_bytes(v.as_ref())
     }
 }
 
@@ -346,7 +347,7 @@ impl<'de> Visitor<'de> for TicketVisitor {
     where
         E: de::Error,
     {
-        Ticket::from_bytes(v).map_err(|e| de::Error::custom(e.to_string()))
+        Ticket::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
     }
 }
 
@@ -604,38 +605,40 @@ impl Ticket {
     ///
     /// Signing requires hashing which requires serialization without signature.
     /// Transferring ticket requires serialization with signature attached.
-    fn to_bytes_internal(&self, with_signature: bool) -> Result<Vec<u8>> {
-        let mut ret = Vec::<u8>::with_capacity(if with_signature {
-            Self::SIZE
-        } else {
-            Self::SIZE - Signature::SIZE
-        });
+    fn encode_without_signature(&self) -> [u8; Self::SIZE - Signature::SIZE] {
+        let mut ret = [0u8; Self::SIZE - Signature::SIZE];
+        let mut offset = 0;
 
-        ret.extend_from_slice(self.channel_id.as_ref());
-        ret.extend_from_slice(&self.amount.amount().to_be_bytes()[20..32]);
-        ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
-        ret.extend_from_slice(&self.index_offset.to_be_bytes());
-        ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
-        ret.extend_from_slice(&self.encoded_win_prob);
-        ret.extend_from_slice(&self.challenge.as_ref());
+        ret[offset..offset + Hash::SIZE].copy_from_slice(self.channel_id.as_ref());
+        offset += Hash::SIZE;
 
-        if with_signature {
-            if let Some(ref signature) = self.signature {
-                ret.extend_from_slice(signature.as_ref());
-            } else {
-                return Err(CoreTypesError::ParseError(
-                    "Tried to serialize with a non-existing signature".into(),
-                ));
-            }
-        }
+        // There are only 2^96 HOPR tokens
+        ret[offset..offset + 12].copy_from_slice(&self.amount.amount().to_be_bytes()[20..32]);
+        offset += 12;
 
-        Ok(ret)
+        // Ticket index can go only up to 2^48
+        ret[offset..offset + 6].copy_from_slice(&self.index.to_be_bytes()[2..8]);
+        offset += 6;
+
+        ret[offset..offset + 4].copy_from_slice(&self.index_offset.to_be_bytes());
+        offset += 4;
+
+        // Channel epoch can go only up to 2^24
+        ret[offset..offset + 3].copy_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
+        offset += 3;
+
+        ret[offset..offset + ENCODED_WIN_PROB_LENGTH].copy_from_slice(&self.encoded_win_prob);
+        offset += ENCODED_WIN_PROB_LENGTH;
+
+        ret[offset..offset + EthereumChallenge::SIZE].copy_from_slice(self.challenge.as_ref());
+
+        ret
     }
 
     /// Computes Ethereum signature hash of the ticket,
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
-        let ticket_hash = Hash::create(&[&self.to_bytes_internal(false).unwrap()]); // cannot fail
+        let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
         let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
@@ -722,37 +725,48 @@ impl Ticket {
     }
 }
 
-impl BinarySerializable for Ticket {
-    const SIZE: usize = ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE;
+impl From<Ticket> for [u8; TICKET_SIZE] {
+    fn from(value: Ticket) -> Self {
+        let mut ret = [0u8; TICKET_SIZE];
+        ret[0..Ticket::SIZE - Signature::SIZE].copy_from_slice(value.encode_without_signature().as_ref());
+        ret[Ticket::SIZE - Signature::SIZE..].copy_from_slice(
+            value
+                .signature
+                .expect("cannot serialize ticket without signature")
+                .as_ref(),
+        );
+        ret
+    }
+}
 
-    /// Tickets get sent next to packets, hence they need to be as small as possible.
-    /// Transmitting tickets to the next downstream share the same binary representation
-    /// as used in the smart contract.
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            // TODO: not necessary to transmit over the wire
-            let channel_id = Hash::try_from(&data[0..32])?;
+impl TryFrom<&[u8]> for Ticket {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
+            // TODO: not necessary to transmit over the wire, only the counterparty is sufficient
+            let channel_id = Hash::try_from(&value[0..32])?;
             let mut amount = [0u8; 32];
-            amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
+            amount[20..32].copy_from_slice(&value[Hash::SIZE..Hash::SIZE + 12]);
 
             let mut index = [0u8; 8];
-            index[2..8].copy_from_slice(&data[Hash::SIZE + 12..Hash::SIZE + 12 + 6]);
+            index[2..8].copy_from_slice(&value[Hash::SIZE + 12..Hash::SIZE + 12 + 6]);
 
             let mut index_offset = [0u8; 4];
-            index_offset.copy_from_slice(&data[Hash::SIZE + 12 + 6..Hash::SIZE + 12 + 6 + 4]);
+            index_offset.copy_from_slice(&value[Hash::SIZE + 12 + 6..Hash::SIZE + 12 + 6 + 4]);
 
             let mut channel_epoch = [0u8; 4];
-            channel_epoch[1..4].copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 3]);
+            channel_epoch[1..4].copy_from_slice(&value[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 3]);
 
             let mut encoded_win_prob = [0u8; 7];
-            encoded_win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
+            encoded_win_prob.copy_from_slice(&value[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
 
             let challenge = EthereumChallenge::try_from(
-                &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
+                &value[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
             )?;
 
             let signature = Signature::try_from(
-                &data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
+                &value[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
                     ..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE],
             )?;
 
@@ -768,27 +782,22 @@ impl BinarySerializable for Ticket {
                 signer: OnceLock::new(),
             })
         } else {
-            // TODO: make Error a generic
             Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
     }
-
-    /// Serializes the ticket to be transmitted to the next downstream node or handled by the
-    /// smart contract
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.to_bytes_internal(true)
-            .expect("ticket not signed")
-            .into_boxed_slice()
-    }
 }
 
+const TICKET_SIZE: usize = ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE;
+impl BytesEncodable<TICKET_SIZE> for Ticket {}
+
 /// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
+/// See [ALWAYS_WINNING] and [NEVER_WINNING].
 pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
-    if encoded_win_prob.eq(&hex!("00000000000000")) {
+    if encoded_win_prob.eq(&NEVER_WINNING) {
         return 0.0;
     }
 
-    if encoded_win_prob.eq(&hex!("ffffffffffffff")) {
+    if encoded_win_prob.eq(&ALWAYS_WINNING) {
         return 1.0;
     }
 
@@ -804,6 +813,7 @@ pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
 }
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
+/// See [ALWAYS_WINNING] and [NEVER_WINNING].
 pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
     if !(0.0..=1.0).contains(&win_prob) {
         return Err(CoreTypesError::InvalidInputData(
@@ -812,11 +822,11 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
     }
 
     if win_prob == 0.0 {
-        return Ok(hex!("00000000000000"));
+        return Ok(NEVER_WINNING);
     }
 
     if win_prob == 1.0 {
-        return Ok(hex!("ffffffffffffff"));
+        return Ok(ALWAYS_WINNING);
     }
 
     let tmp: u64 = (win_prob + 1.0).to_bits();
@@ -847,8 +857,8 @@ pub mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
 
-        static ref ADDRESS_1: Address = Address::from_bytes(&hex!("3829b806aea42200c623c4d6b9311670577480ed")).unwrap();
-        static ref ADDRESS_2: Address = Address::from_bytes(&hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1")).unwrap();
+        static ref ADDRESS_1: Address = "3829b806aea42200c623c4d6b9311670577480ed".parse().unwrap();
+        static ref ADDRESS_2: Address = "1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1".parse().unwrap();
     }
 
     #[test]
@@ -970,9 +980,10 @@ pub mod tests {
         )
         .unwrap();
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).to_bytes(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
-        assert_eq!(initial_ticket, Ticket::from_bytes(&initial_ticket.to_bytes()).unwrap());
+        let ticket_bytes: [u8; Ticket::SIZE] = initial_ticket.clone().into();
+        assert_eq!(initial_ticket, Ticket::try_from(ticket_bytes.as_ref()).unwrap());
     }
 
     #[test]
@@ -1011,7 +1022,7 @@ pub mod tests {
         )
         .unwrap();
 
-        assert_ne!(*initial_ticket.get_hash(&Hash::default()).to_bytes(), [0u8; Hash::SIZE]);
+        assert_ne!(*initial_ticket.get_hash(&Hash::default()).as_ref(), [0u8; Hash::SIZE]);
 
         assert!(initial_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())

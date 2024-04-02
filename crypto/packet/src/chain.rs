@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::traits::BinarySerializable;
+use hopr_primitive_types::prelude::*;
 
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
@@ -25,7 +25,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet must be forwarded
     Forwarded {
-        packet: Box<[u8]>,
+        packet: MetaPacket<CurrentSphinxSuite>,
         ticket: Ticket,
         ack_challenge: HalfKeyChallenge,
         packet_tag: PacketTag,
@@ -38,7 +38,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet that is being sent out by us
     Outgoing {
-        packet: Box<[u8]>,
+        packet: MetaPacket<CurrentSphinxSuite>,
         ticket: Ticket,
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
@@ -88,10 +88,9 @@ impl ChainPacketComponents {
                 public_keys_path,
                 INTERMEDIATE_HOPS + 1,
                 POR_SECRET_LENGTH,
-                &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
+                &por_strings.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
                 None,
-            )
-            .to_bytes(),
+            ),
             ticket,
             next_hop: public_keys_path[0],
             ack_challenge: por_values.ack_challenge,
@@ -105,7 +104,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
 
             let mp: MetaPacket<hopr_crypto_sphinx::ec_groups::X25519Suite> =
-                MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
+                MetaPacket::<CurrentSphinxSuite>::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::Relayed {
@@ -119,10 +118,10 @@ impl ChainPacketComponents {
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
-                    let ticket = Ticket::from_bytes(pre_ticket)?;
+                    let ticket = Ticket::try_from(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self::Forwarded {
-                        packet: packet.to_bytes(),
+                        packet,
                         ticket,
                         packet_tag,
                         ack_key,
@@ -142,7 +141,7 @@ impl ChainPacketComponents {
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
-                    let ticket = Ticket::from_bytes(pre_ticket)?;
+                    let ticket = Ticket::try_from(pre_ticket)?;
                     Ok(Self::Final {
                         ticket,
                         packet_tag,
@@ -229,14 +228,14 @@ mod tests {
     impl ChainPacketComponents {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let (packet, ticket) = match self {
-                Self::Final { plain_text, ticket, .. } => (plain_text, ticket),
-                Self::Forwarded { packet, ticket, .. } => (packet, ticket),
-                Self::Outgoing { packet, ticket, .. } => (packet, ticket),
+                Self::Final { plain_text, ticket, .. } => (plain_text.clone(), ticket),
+                Self::Forwarded { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
+                Self::Outgoing { packet, ticket, .. } => (Vec::from(packet.as_ref()).into_boxed_slice(), ticket),
             };
 
             let mut ret = Vec::with_capacity(Self::SIZE);
             ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.to_bytes());
+            ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
         }
     }

@@ -11,6 +11,7 @@ use hopr_crypto_types::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use typenum::Unsigned;
 
@@ -72,6 +73,12 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 pub struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
     _s: PhantomData<S>,
+}
+
+impl<S: SphinxSuite> Debug for MetaPacket<S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", hex::encode(&self.packet))
+    }
 }
 
 // Needs manual Clone implementation to not impose Clone restriction on `S`
@@ -278,24 +285,30 @@ impl<S: SphinxSuite> MetaPacket<S> {
     }
 }
 
-impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
-    const SIZE: usize =
-        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
+impl<S: SphinxSuite> AsRef<[u8]> for MetaPacket<S> {
+    fn as_ref(&self) -> &[u8] {
+        self.packet.as_ref()
+    }
+}
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
+impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
             Ok(Self {
-                packet: data.into(),
+                packet: value.into(),
                 _s: PhantomData,
             })
         } else {
             Err(GeneralError::ParseError)
         }
     }
+}
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.packet.clone()
-    }
+impl<S: SphinxSuite> BytesRepresentable for MetaPacket<S> {
+    const SIZE: usize =
+        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
 }
 
 #[cfg(test)]
@@ -341,7 +354,7 @@ mod tests {
             &pubkeys,
             INTERMEDIATE_HOPS + 1,
             POR_SECRET_LENGTH,
-            &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
+            &por_strings.iter().map(|v| v.as_ref()).collect::<Vec<_>>(),
             None,
         );
 

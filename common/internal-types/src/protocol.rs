@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -75,6 +75,16 @@ impl TagBloomFilter {
             false
         }
     }
+
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
+    }
+
+    pub fn to_bytes(&self) -> Box<[u8]> {
+        bincode::serialize(&self)
+            .expect("serialization must not fail")
+            .into_boxed_slice()
+    }
 }
 
 impl Default for TagBloomFilter {
@@ -122,10 +132,10 @@ impl Display for ApplicationData {
     }
 }
 
-impl BinarySerializable for ApplicationData {
+impl ApplicationData {
     const SIZE: usize = 2; // minimum size
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
+    pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
             let mut tag = [0u8; 2];
             tag.copy_from_slice(&data[0..2]);
@@ -143,7 +153,7 @@ impl BinarySerializable for ApplicationData {
         }
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
+    pub fn to_bytes(&self) -> Box<[u8]> {
         let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
         let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
         buf.extend_from_slice(&tag.to_be_bytes());
@@ -156,7 +166,6 @@ impl BinarySerializable for ApplicationData {
 mod tests {
     use crate::protocol::{ApplicationData, TagBloomFilter};
     use hopr_crypto_random::random_bytes;
-    use hopr_primitive_types::traits::BinarySerializable;
 
     #[test]
     fn test_application_data() {

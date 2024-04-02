@@ -31,7 +31,8 @@ impl Serialize for VrfParameters {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.to_bytes().as_ref())
+        let v: [u8; Self::SIZE] = self.clone().into();
+        serializer.serialize_bytes(v.as_ref())
     }
 }
 
@@ -48,7 +49,7 @@ impl<'de> Visitor<'de> for VrfParametersVisitor {
     where
         E: de::Error,
     {
-        VrfParameters::from_bytes(v).map_err(|e| de::Error::custom(e.to_string()))
+        VrfParameters::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
     }
 }
 
@@ -79,19 +80,30 @@ impl std::fmt::Debug for VrfParameters {
     }
 }
 
-impl BinarySerializable for VrfParameters {
-    const SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
+impl From<VrfParameters> for [u8; VRF_PARAMETERS_SIZE] {
+    fn from(value: VrfParameters) -> Self {
+        let mut ret = [0u8; VRF_PARAMETERS_SIZE];
+        ret[0..CurvePoint::SIZE_COMPRESSED].copy_from_slice(value.v.as_compressed().as_ref());
+        ret[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32].copy_from_slice(value.h.to_bytes().as_ref());
+        ret[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 64]
+            .copy_from_slice(value.s.to_bytes().as_ref());
+        ret
+    }
+}
 
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
+impl TryFrom<&[u8]> for VrfParameters {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
             let mut v = [0u8; CurvePoint::SIZE_COMPRESSED];
-            v.copy_from_slice(&data[..CurvePoint::SIZE_COMPRESSED]);
+            v.copy_from_slice(&value[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
-                v: CurvePoint::try_from(&data[..CurvePoint::SIZE_COMPRESSED])?,
-                h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
+                v: CurvePoint::try_from(&value[..CurvePoint::SIZE_COMPRESSED])?,
+                h: k256_scalar_from_bytes(&value[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
                     .map_err(|_| GeneralError::ParseError)?,
                 s: k256_scalar_from_bytes(
-                    &data[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
+                    &value[CurvePoint::SIZE_COMPRESSED + 32..CurvePoint::SIZE_COMPRESSED + 32 + 32],
                 )
                 .map_err(|_| GeneralError::ParseError)?,
             })
@@ -99,15 +111,10 @@ impl BinarySerializable for VrfParameters {
             Err(GeneralError::ParseError)
         }
     }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.v.as_compressed().as_bytes());
-        ret.extend_from_slice(&self.h.to_bytes());
-        ret.extend_from_slice(&self.s.to_bytes());
-        ret.into_boxed_slice()
-    }
 }
+
+const VRF_PARAMETERS_SIZE: usize = CurvePoint::SIZE_COMPRESSED + 32 + 32;
+impl BytesEncodable<VRF_PARAMETERS_SIZE> for VrfParameters {}
 
 impl VrfParameters {
     /// Verifies that VRF values are valid
@@ -243,34 +250,35 @@ mod test {
 
     #[test]
     fn vrf_values_serialize_deserialize() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
-        let deserialized = VrfParameters::from_bytes(&*ALICE_VRF_OUTPUT).unwrap();
+        let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref()).unwrap();
 
         // check for regressions
         assert_eq!(vrf_values.v, deserialized.v);
         assert!(deserialized
-            .verify(&*ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
 
-        assert_eq!(vrf_values, VrfParameters::from_bytes(&vrf_values.to_bytes()).unwrap());
+        let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
+        assert_eq!(vrf_values, VrfParameters::try_from(vrf.as_ref()).unwrap());
     }
 
     #[test]
     fn vrf_values_serialize_deserialize_bad_examples() {
-        assert!(VrfParameters::from_bytes(&*WRONG_V_POINT_PREFIX).is_err());
+        assert!(VrfParameters::try_from(WRONG_V_POINT_PREFIX.as_ref()).is_err());
 
-        assert!(VrfParameters::from_bytes(&*H_NOT_IN_FIELD).is_err());
+        assert!(VrfParameters::try_from(H_NOT_IN_FIELD.as_ref()).is_err());
 
-        assert!(VrfParameters::from_bytes(&*S_NOT_IN_FIELD).is_err());
+        assert!(VrfParameters::try_from(S_NOT_IN_FIELD.as_ref()).is_err());
     }
 
     #[test]
     fn vrf_values_crypto() {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, &Hash::default().to_bytes()).unwrap();
+        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref()).unwrap();
 
         assert!(vrf_values
-            .verify(&ALICE_ADDR, &*TEST_MSG, &Hash::default().to_bytes())
+            .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
             .is_ok());
     }
 }

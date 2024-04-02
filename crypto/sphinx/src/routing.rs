@@ -269,8 +269,7 @@ pub fn forward_header<S: SphinxSuite>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::ec_groups::Secp256k1Suite;
-    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
 
     #[parameterized(hops = { 3, 4 })]
@@ -360,7 +359,7 @@ pub mod tests {
                         "invalid path position {path_pos}"
                     );
                     assert_eq!(
-                        pub_keys[i + 1].to_bytes().as_ref(),
+                        pub_keys[i + 1].as_ref(),
                         next_node.as_ref(),
                         "invalid public key of the next node"
                     );
@@ -392,7 +391,7 @@ pub mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
         )
     }

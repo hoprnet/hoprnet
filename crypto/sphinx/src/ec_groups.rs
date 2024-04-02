@@ -104,8 +104,8 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        use hopr_primitive_types::traits::BinarySerializable;
-        hopr_crypto_types::types::CurvePoint::from_bytes(&alpha)
+        let v: &[u8] = alpha.as_ref();
+        hopr_crypto_types::types::CurvePoint::try_from(v)
             .map(|c| c.into_projective_point())
             .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
     }

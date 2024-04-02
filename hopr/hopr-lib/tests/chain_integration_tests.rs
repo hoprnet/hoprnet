@@ -37,8 +37,8 @@ async fn generate_the_first_ack_ticket<M: Middleware>(
     let hk1 = HalfKey::random();
     let hk2 = HalfKey::random();
 
-    let cp1: CurvePoint = hk1.to_challenge().into();
-    let cp2: CurvePoint = hk2.to_challenge().into();
+    let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+    let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
     let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
     let domain_separator: Hash = instances.channels.domain_separator().call().await.unwrap().into();

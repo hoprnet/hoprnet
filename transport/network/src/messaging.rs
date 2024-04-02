@@ -1,5 +1,7 @@
 use crate::errors::NetworkingError::MessagingError;
 use hopr_crypto_sphinx::derivation::derive_ping_pong;
+use hopr_primitive_types::errors::GeneralError;
+use hopr_primitive_types::prelude::BytesEncodable;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
@@ -72,34 +74,36 @@ impl PingMessage {
     }
 }
 
-#[cfg(feature = "compat-ping")]
-impl hopr_primitive_types::traits::BinarySerializable for PingMessage {
-    const SIZE: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
+impl From<PingMessage> for [u8; PING_MESSAGE_LEN] {
+    fn from(value: PingMessage) -> Self {
+        let mut ret = [0u8; PING_MESSAGE_LEN];
+        ret[0..PING_MESSAGE_LEN].copy_from_slice(&value.nonce);
+        ret
+    }
+}
 
-    // This implementation is backwards compatible with older HOPR versions
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() >= Self::SIZE {
+impl TryFrom<&[u8]> for PingMessage {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() >= Self::SIZE {
             let mut ret = PingMessage::default();
-            let mut buf = data.to_vec();
-            ret.nonce.copy_from_slice(buf.drain(0..Self::SIZE).as_ref());
+            ret.nonce.copy_from_slice(&value[0..Self::SIZE]);
             Ok(ret)
         } else {
             Err(hopr_primitive_types::errors::GeneralError::ParseError)
         }
     }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.nonce);
-        ret.into_boxed_slice()
-    }
 }
+
+const PING_MESSAGE_LEN: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
+impl BytesEncodable<PING_MESSAGE_LEN> for PingMessage {}
 
 #[cfg(test)]
 mod tests {
     use crate::messaging::ControlMessage::{Ping, Pong};
     use crate::messaging::{ControlMessage, PingMessage};
-    use hopr_primitive_types::traits::BinarySerializable;
+    use hopr_primitive_types::prelude::BytesEncodable;
 
     #[test]
     fn test_ping_pong_roundtrip() {
@@ -108,20 +112,20 @@ mod tests {
         let sent_req: ControlMessage;
         {
             sent_req = ControlMessage::generate_ping_request();
-            sent_req_s = sent_req.get_ping_message().unwrap().to_bytes();
+            sent_req_s = sent_req.get_ping_message().unwrap().clone().into_boxed();
         }
 
         // pong responder
         let sent_resp_s: Box<[u8]>;
         {
-            let recv_req = PingMessage::from_bytes(sent_req_s.as_ref()).unwrap();
+            let recv_req = PingMessage::try_from(sent_req_s.as_ref()).unwrap();
             let send_resp = ControlMessage::generate_pong_response(&Ping(recv_req)).unwrap();
-            sent_resp_s = send_resp.get_ping_message().unwrap().to_bytes();
+            sent_resp_s = send_resp.get_ping_message().unwrap().clone().into_boxed();
         }
 
         // verify pong
         {
-            let recv_resp = PingMessage::from_bytes(sent_resp_s.as_ref()).unwrap();
+            let recv_resp = PingMessage::try_from(sent_resp_s.as_ref()).unwrap();
             assert!(ControlMessage::validate_pong_response(&sent_req, &Pong(recv_resp)).is_ok());
         }
     }

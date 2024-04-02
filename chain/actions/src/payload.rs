@@ -691,7 +691,7 @@ pub mod tests {
         )
         .await;
 
-        let response = Response::from_bytes(&RESPONSE_TO_CHALLENGE).unwrap();
+        let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref()).unwrap();
 
         // Alice issues a ticket to Bob
         let ticket = Ticket::new(

@@ -6,7 +6,7 @@ use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::prelude::VariableBytesEncodable;
+use crate::prelude::BytesRepresentable;
 use crate::traits::{IntoEndian, ToHex, UnitaryFloatOps};
 
 pub type U256 = primitive_types::U256;
@@ -63,7 +63,7 @@ impl TryFrom<&[u8]> for Address {
     }
 }
 
-impl VariableBytesEncodable for Address {
+impl BytesRepresentable for Address {
     /// Fixed size of the address when encoded as bytes (e.g. via `as_ref()`).
     const SIZE: usize = 20;
 }
@@ -344,7 +344,7 @@ impl TryFrom<&[u8]> for EthereumChallenge {
     }
 }
 
-impl VariableBytesEncodable for EthereumChallenge {
+impl BytesRepresentable for EthereumChallenge {
     const SIZE: usize = 20;
 }
 
@@ -417,8 +417,8 @@ mod tests {
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::from_bytes(&hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
-        let addr_2 = Address::from_bytes(&addr_1.to_bytes()).unwrap();
+        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
+        let addr_2 = Address::try_from(addr_1.as_ref()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
         assert_eq!(
@@ -514,17 +514,9 @@ mod tests {
     #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
-        let e_2 = EthereumChallenge::from_bytes(&e_1.to_bytes()).unwrap();
+        let e_2 = EthereumChallenge::try_from(e_1.as_ref()).unwrap();
 
         assert_eq!(e_1, e_2);
-    }
-
-    #[test]
-    fn snapshot_tests() {
-        let s1 = Snapshot::new(1234_u32.into(), 4567_u32.into(), 102030_u32.into());
-        let s2 = Snapshot::from_bytes(&s1.to_bytes()).unwrap();
-
-        assert_eq!(s1, s2);
     }
 
     #[test]
@@ -559,11 +551,6 @@ mod tests {
         assert_ne!(
             be_bytes, le_bytes,
             "sanity check: input number must have different endianness"
-        );
-        assert_eq!(
-            num.to_bytes().as_ref(),
-            be_bytes.as_ref(),
-            "to_bytes must yield big endian"
         );
 
         let expected_be = hex!("0000000000000000000000000000000000000000000000000000001CBE991A08");

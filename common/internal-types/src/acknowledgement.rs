@@ -286,19 +286,16 @@ pub enum PendingAcknowledgement {
 #[cfg(test)]
 pub mod test {
     use crate::{
-        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket},
+        acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket},
         channels::Ticket,
     };
     use hex_literal::hex;
     use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
+        keypairs::{ChainKeypair, Keypair},
+        types::{Challenge, CurvePoint, HalfKey, Hash, Response},
     };
     use hopr_primitive_types::prelude::UnitaryFloatOps;
-    use hopr_primitive_types::{
-        primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
-        traits::BinarySerializable,
-    };
+    use hopr_primitive_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -345,14 +342,14 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_challenge_response() {
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
+            .unwrap();
+
+        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
+            .unwrap();
+
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = mock_ticket(
@@ -370,14 +367,14 @@ pub mod test {
 
     #[test]
     fn test_unack_transformation() {
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let hk1 = HalfKey::try_from(hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa").as_ref())
+            .unwrap();
+
+        let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())
+            .unwrap();
+
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = mock_ticket(
@@ -402,10 +399,9 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket() {
-        let response = Response::from_bytes(&hex!(
-            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
-        ))
-        .unwrap();
+        let response =
+            Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())
+                .unwrap();
 
         let ticket = mock_ticket(
             &ALICE,

@@ -257,7 +257,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
         let db_clone = db.clone();
@@ -574,7 +574,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
@@ -843,7 +843,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
@@ -963,7 +963,7 @@ mod tests {
     #[async_std::test]
     async fn test_close_channel_incoming() {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 

@@ -180,8 +180,8 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp1: CurvePoint = hk1.to_challenge().try_into().unwrap();
+        let cp2: CurvePoint = hk2.to_challenge().try_into().unwrap();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = Ticket::new(
@@ -224,7 +224,7 @@ mod tests {
     }
 
     fn mock_action_confirmation(ack: AcknowledgedTicket) -> ActionConfirmation {
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::TicketRedeemed(
