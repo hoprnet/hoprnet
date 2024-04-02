@@ -560,14 +560,13 @@ pub async fn p2p_loop<T>(
 
                     if allowed_peers.contains(&peer_id) {
                         let network = network.clone();
-                        let peer_id = peer_id.clone();
                         async_std::task::spawn(async move {
                             if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
                                 error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
                             }
                         });
                     } else {
-                        info!("transport - p2p - DISCONNECTING '{peer_id}' (reason: network registry)");
+                        info!("transport - p2p - DISCONNECTING '{peer_id}': not allowed in the network registry)");
                         let _ = swarm.disconnect_peer_id(peer_id);
                     }
                 },
