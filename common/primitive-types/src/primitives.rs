@@ -7,12 +7,12 @@ use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::prelude::VariableBytesEncodable;
-use crate::traits::{BinarySerializable, IntoEndian, ToHex, UnitaryFloatOps};
+use crate::traits::{IntoEndian, ToHex, UnitaryFloatOps};
 
 pub type U256 = primitive_types::U256;
 
 /// Represents an Ethereum address
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub struct Address([u8; Self::SIZE]);
 
 impl Debug for Address {
@@ -25,13 +25,6 @@ impl Debug for Address {
 impl Display for Address {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
-    }
-}
-
-impl Default for Address {
-    /// Defaults to all zeroes.
-    fn default() -> Self {
-        Self([0u8; Self::SIZE])
     }
 }
 
@@ -324,61 +317,35 @@ impl FromStr for Balance {
 
 /// Represents and Ethereum challenge.
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct EthereumChallenge {
-    challenge: [u8; Self::SIZE],
-}
-
-impl Default for EthereumChallenge {
-    fn default() -> Self {
-        Self {
-            challenge: [0u8; Self::SIZE],
-        }
-    }
-}
+#[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub struct EthereumChallenge([u8; Self::SIZE]);
 
 impl EthereumChallenge {
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
 
         let mut ret = Self::default();
-        ret.challenge.copy_from_slice(data);
+        ret.0.copy_from_slice(data);
         ret
     }
 }
 
-impl BinarySerializable for EthereumChallenge {
-    const SIZE: usize = 20;
-
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(EthereumChallenge::new(data))
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.challenge.into()
+impl AsRef<[u8]> for EthereumChallenge {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
-impl BinarySerializable for U256 {
-    const SIZE: usize = 32;
+impl TryFrom<&[u8]> for EthereumChallenge {
+    type Error = GeneralError;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() <= Self::SIZE {
-            Ok(Self::from_big_endian(data))
-        } else {
-            Err(GeneralError::ParseError)
-        }
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError)?))
     }
+}
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = [0u8; Self::SIZE];
-        self.to_big_endian(&mut ret);
-        ret.into()
-    }
+impl VariableBytesEncodable for EthereumChallenge {
+    const SIZE: usize = 20;
 }
 
 impl IntoEndian<32> for U256 {

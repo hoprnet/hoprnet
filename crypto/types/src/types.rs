@@ -27,6 +27,7 @@ use std::{
     ops::Add,
     str::FromStr,
 };
+use std::sync::OnceLock;
 use tracing::warn;
 use hopr_primitive_types::errors::GeneralError::ParseError;
 
@@ -100,7 +101,7 @@ mod arrays {
     }
 }
 
-/// Represent an uncompressed elliptic curve point on the secp256k1 curve
+/// Represents an uncompressed elliptic curve point on the secp256k1 curve
 ///
 /// ```rust
 /// # use hopr_crypto_types::prelude::*;
@@ -126,18 +127,22 @@ mod arrays {
 /// // (a + b) * G = a * G + b * G
 /// assert_eq!(A_plus_B, a_plus_b);
 /// ```
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct CurvePoint {
     pub(crate) affine: AffinePoint,
+    compressed: EncodedPoint<Secp256k1>,
+    uncompressed: OnceLock<EncodedPoint<Secp256k1>>,
 }
 
 impl CurvePoint {
-    /// Size of the point if serialized via `serialize_compressed`.
+    /// Size of the point if serialized via [`CurvePoint::as_compressed`].
     pub const SIZE_COMPRESSED: usize = 33;
+    /// Size of the point if serialized via [`CurvePoint::as_uncompressed`].
+    pub const SIZE_UNCOMPRESSED: usize = 65;
 
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
-        let serialized = self.serialize_uncompressed();
+        let serialized = self.as_uncompressed();
         let hash = Hash::create(&[&serialized.as_bytes()[1..]]);
         Address::new(&hash.as_ref()[12..])
     }
@@ -150,18 +155,18 @@ impl CurvePoint {
     }
 
     /// Converts the curve point to a representation suitable for calculations.
-    pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
+    pub fn into_projective_point(self) -> ProjectivePoint<Secp256k1> {
         self.affine.into()
     }
 
-    /// Serializes the curve point into a compressed form. This is a cheap operation.
-    pub fn serialize_compressed(&self) -> EncodedPoint<Secp256k1> {
-        self.affine.to_encoded_point(true)
+    /// Converts the curve point into a compressed form. This is a cheap operation.
+    pub fn as_compressed(&self) -> &EncodedPoint<Secp256k1> {
+        &self.compressed
     }
 
-    /// Serializes the curve point into a compressed form. This is many cases an expensive operation.
-    pub fn serialize_uncompressed(&self) -> EncodedPoint<Secp256k1> {
-        self.affine.to_encoded_point(false)
+    /// Converts the curve point into an uncompressed form. This is many cases an expensive operation.
+    pub fn as_uncompressed(&self) -> &EncodedPoint<Secp256k1> {
+        self.uncompressed.get_or_init(|| self.affine.to_encoded_point(false))
     }
 
     /// Sums all given curve points together, creating a new curve point.
@@ -182,7 +187,7 @@ impl CurvePoint {
 
 impl Default for CurvePoint {
     fn default() -> Self {
-        CurvePoint::from_exponent(&U256::one().to_bytes()).unwrap()
+        Self::from(AffinePoint::default())
     }
 }
 
@@ -200,13 +205,19 @@ impl From<&PublicKey> for CurvePoint {
 
 impl From<AffinePoint> for CurvePoint {
     fn from(affine: AffinePoint) -> Self {
-        Self { affine }
+        Self {
+            affine,
+            compressed: affine.to_encoded_point(true),
+            uncompressed: OnceLock::new(),
+        }
     }
 }
 
-impl From<HalfKeyChallenge> for CurvePoint {
-    fn from(value: HalfKeyChallenge) -> Self {
-        CurvePoint::from_bytes(&value.0).unwrap()
+impl TryFrom<HalfKeyChallenge> for CurvePoint {
+    type Error = GeneralError;
+
+    fn try_from(value: HalfKeyChallenge) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(value.0.as_ref())
     }
 }
 
@@ -214,8 +225,8 @@ impl FromStr for CurvePoint {
     type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(CurvePoint::from_bytes(
-            &hex::decode(s).map_err(|_| GeneralError::ParseError)?,
+        Ok(CurvePoint::try_from(
+            hex::decode(s).map_err(|_| GeneralError::ParseError)?.as_slice(),
         )?)
     }
 }
@@ -226,35 +237,42 @@ impl From<CurvePoint> for AffinePoint {
     }
 }
 
-impl BinarySerializable for CurvePoint {
-    const SIZE: usize = 65; // Stores uncompressed data
-
-    fn from_bytes(bytes: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        // Deserializes both compressed and uncompressed
-        elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
-            .map_err(|_| GeneralError::ParseError)
-            .and_then(|encoded| Option::from(AffinePoint::from_encoded_point(&encoded)).ok_or(GeneralError::ParseError))
-            .map(|affine| Self { affine })
+impl AsRef<[u8]> for CurvePoint {
+    fn as_ref(&self) -> &[u8] {
+        self.compressed.as_ref()
     }
+}
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.serialize_uncompressed().to_bytes()
+impl TryFrom<&[u8]> for CurvePoint {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        let ep = elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(value).map_err(|_| GeneralError::ParseError)?;
+        Ok(Self {
+            affine: Option::from(AffinePoint::from_encoded_point(&ep)).ok_or(GeneralError::ParseError)?,
+            // Compressing an uncompressed EC point is cheap
+            compressed: if ep.is_compressed() { ep } else { ep.compress() },
+            // If not directly uncompressed, defer the expensive operation for later
+            uncompressed: if !ep.is_compressed() { ep.into() } else { OnceLock::new() }
+        })
     }
+}
+
+impl VariableBytesEncodable for CurvePoint {
+    const SIZE: usize = Self::SIZE_COMPRESSED;
 }
 
 /// Natural extension of the Curve Point to the Proof-of-Relay challenge.
 /// Proof-of-Relay challenge is a secp256k1 curve point.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Challenge {
-    curve_point: CurvePoint,
-}
+pub struct Challenge(CurvePoint);
 
 impl Challenge {
     /// Converts the PoR challenge to an Ethereum challenge.
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
     /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(self.curve_point.to_address().as_ref())
+        EthereumChallenge::new(self.0.to_address().as_ref())
     }
 }
 
@@ -284,7 +302,7 @@ impl Challenge {
 
 impl From<CurvePoint> for Challenge {
     fn from(curve_point: CurvePoint) -> Self {
-        Self { curve_point }
+        Self(curve_point)
     }
 }
 
@@ -294,17 +312,19 @@ impl From<Response> for Challenge {
     }
 }
 
-impl BinarySerializable for Challenge {
-    const SIZE: usize = PublicKey::SIZE_COMPRESSED;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        // Accepts both compressed and uncompressed points
-        CurvePoint::from_bytes(data).map(|curve_point| Challenge { curve_point })
+impl AsRef<[u8]> for Challenge {
+    fn as_ref(&self) -> &[u8] {
+        // Serializes as compressed point
+        self.0.as_ref()
     }
+}
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        // Serializes only compressed points
-        self.curve_point.serialize_compressed().to_bytes()
+impl TryFrom<&[u8]> for Challenge {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        // Accepts both compressed and uncompressed points
+        Ok(Self(value.try_into()?))
     }
 }
 
@@ -344,7 +364,7 @@ impl HalfKey {
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
         CurvePoint::from_exponent(&self.0)
-            .map(|cp| HalfKeyChallenge::new(cp.serialize_compressed().as_bytes()))
+            .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
     }
 }
@@ -445,14 +465,8 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
 pub struct Hash([u8; Self::SIZE]);
-
-impl Default for Hash {
-    fn default() -> Self {
-        Self([0u8; Self::SIZE])
-    }
-}
 
 impl Debug for Hash {
     // Intentionally same as Display
@@ -959,10 +973,7 @@ impl Response {
     /// Converts this response to the PoR challenge by turning the non-zero scalar
     /// represented by this response into a secp256k1 curve point (public key)
     pub fn to_challenge(&self) -> Challenge {
-        Challenge {
-            curve_point: CurvePoint::from_exponent(&self.0)
-                .expect("response represents an invalid non-zero scalar"),
-        }
+        Challenge(CurvePoint::from_exponent(&self.0).expect("response represents an invalid non-zero scalar"))
     }
 
     /// Derives the response from two half-keys.
@@ -1193,6 +1204,7 @@ pub trait ToChecksum {
 }
 
 impl ToChecksum for Address {
+    /// Checksum of self according to `<https://eips.ethereum.org/EIPS/eip-55>`
     fn to_checksum(&self) -> String {
         let address_hex = &self.to_hex()[2..];
 
@@ -1242,7 +1254,7 @@ pub mod tests {
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
-    fn signature_signing_test() {
+    fn test_signature_signing() {
         let msg = b"test12345";
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
         let sgn = Signature::sign_message(msg, &kp);
@@ -1255,7 +1267,7 @@ pub mod tests {
     }
 
     #[test]
-    fn offchain_signature_signing_test() {
+    fn test_offchain_signature_signing() {
         let msg = b"test12345";
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
 
@@ -1281,7 +1293,7 @@ pub mod tests {
     }
 
     #[test]
-    fn signature_serialize_test() {
+    fn test_signature_serialize() {
         let msg = b"test000000";
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
         let sgn = Signature::sign_message(msg, &kp);
@@ -1291,7 +1303,7 @@ pub mod tests {
     }
 
     #[test]
-    fn offchain_signature() {
+    fn test_offchain_signature() {
         let msg = b"test12345";
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
 
@@ -1322,7 +1334,7 @@ pub mod tests {
     }
 
     #[test]
-    fn public_key_to_hex() {
+    fn test_public_key_to_hex() {
         let pk = PublicKey::from_privkey(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
@@ -1337,7 +1349,7 @@ pub mod tests {
     }
 
     #[test]
-    fn public_key_recover_test() {
+    fn test_public_key_recover() {
         let address = Address::from_str("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266").unwrap();
 
         let r = hex!("bcae4d37e3a1cd869984d1d68f9242291773cd33d26f1e754ecc1a9bfaee7d17");
@@ -1355,7 +1367,7 @@ pub mod tests {
     }
 
     #[test]
-    fn public_key_combine_tweak() {
+    fn test_public_key_combine_tweak() {
         let (scalar1, point1) = random_group_element();
         let (scalar2, point2) = random_group_element();
 
@@ -1371,7 +1383,7 @@ pub mod tests {
     }
 
     #[test]
-    fn sign_and_recover_test() {
+    fn test_sign_and_recover() {
         let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
 
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
@@ -1415,7 +1427,7 @@ pub mod tests {
     }
 
     #[test]
-    fn public_key_serialize_test() {
+    fn test_public_key_serialize() {
         let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize 1");
         let pk2 = PublicKey::from_bytes(&pk1.to_bytes(true)).expect("failed to deserialize 2");
         let pk3 = PublicKey::from_bytes(&pk1.to_bytes(false)).expect("failed to deserialize 3");
@@ -1440,14 +1452,14 @@ pub mod tests {
     }
 
     #[test]
-    fn public_key_curve_point() {
+    fn test_public_key_curve_point() {
         let cp1: CurvePoint = PublicKey::from_bytes(&PUBLIC_KEY).unwrap().into();
         let cp2 = CurvePoint::from_bytes(&cp1.to_bytes()).unwrap();
         assert_eq!(cp1, cp2);
     }
 
     #[test]
-    fn public_key_from_privkey() {
+    fn test_public_key_from_privkey() {
         let pk1 = PublicKey::from_privkey(&PRIVATE_KEY).expect("failed to convert from private key");
         let pk2 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
 
@@ -1455,7 +1467,7 @@ pub mod tests {
     }
 
     #[test]
-    fn offchain_public_key_test() {
+    fn test_offchain_public_key() {
         let (s, pk1) = OffchainKeypair::random().unzip();
 
         let pk2 = OffchainPublicKey::from_privkey(s.as_ref()).unwrap();
@@ -1466,7 +1478,7 @@ pub mod tests {
     }
 
     #[test]
-    fn offchain_public_key_peerid_test() {
+    fn test_offchain_public_key_peerid() {
         let valid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
         let valid = OffchainPublicKey::try_from(valid_peerid).unwrap();
         assert_eq!(valid_peerid, valid.into(), "must work with ed25519 peer ids");
@@ -1481,14 +1493,14 @@ pub mod tests {
     }
 
     #[test]
-    pub fn response_test() {
+    pub fn test_response() {
         let r1 = Response::new(&[0u8; Response::SIZE]);
         let r2 = Response::from_bytes(&r1.to_bytes()).unwrap();
         assert_eq!(r1, r2, "deserialized response does not match");
     }
 
     #[test]
-    fn curve_point_test() {
+    fn test_curve_point() {
         let scalar = NonZeroScalar::from_uint(U256::from_u8(100)).unwrap();
         let test_point = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref()).to_affine();
 
@@ -1531,7 +1543,7 @@ pub mod tests {
     }
 
     #[test]
-    fn half_key_test() {
+    fn test_half_key() {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
         let hk2 = HalfKey::from_bytes(&hk1.to_bytes()).unwrap();
 
@@ -1539,14 +1551,14 @@ pub mod tests {
     }
 
     #[test]
-    fn half_key_challenge_test() {
+    fn test_half_key_challenge() {
         let hkc1 = HalfKeyChallenge::from_bytes(&PUBLIC_KEY).unwrap();
         let hkc2 = HalfKeyChallenge::from_bytes(&hkc1.to_bytes()).unwrap();
         assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
     }
 
     #[test]
-    fn hash_test() {
+    fn test_hash() {
         let hash1 = Hash::create(&[b"msg"]);
         assert_eq!(
             "0x92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
@@ -1566,7 +1578,7 @@ pub mod tests {
     }
 
     #[test]
-    fn address_to_checksum_test_all_caps() {
+    fn test_address_to_checksum_all_caps() {
         let addr_1 = Address::from_str("52908400098527886e0f7030069857d2e4169ee7").unwrap();
         let value_1 = addr_1.to_checksum();
         let addr_2 = Address::from_str("8617e340b3d01fa5f11f306f4090fd50e238070d").unwrap();
@@ -1583,7 +1595,7 @@ pub mod tests {
     }
 
     #[test]
-    fn address_to_checksum_test_all_lower() {
+    fn test_address_to_checksum_all_lower() {
         let addr_1 = Address::from_str("de709f2102306220921060314715629080e2fb77").unwrap();
         let value_1 = addr_1.to_checksum();
         let addr_2 = Address::from_str("27b1fdb04752bbc536007a920d24acb045561c26").unwrap();
@@ -1600,7 +1612,7 @@ pub mod tests {
     }
 
     #[test]
-    fn address_to_checksum_test_all_normal() {
+    fn test_address_to_checksum_all_normal() {
         let addr_1 = Address::from_str("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed").unwrap();
         let addr_2 = Address::from_str("fb6916095ca1df60bb79ce92ce3ea74c37c5d359").unwrap();
         let addr_3 = Address::from_str("dbf03b407c01e7cd3cbea99509d93f8dddc8c6fb").unwrap();

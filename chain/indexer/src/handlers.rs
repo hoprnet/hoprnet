@@ -169,7 +169,7 @@ where
                     let diff = channel_entry.balance.sub(&new_balance);
 
                     let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
                     let channel = updated.update(tx.as_ref()).await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(channel.try_into()?, diff)))
@@ -186,7 +186,7 @@ where
                     let diff = new_balance.sub(&channel_entry.balance);
 
                     let mut updated = channel.into_active_model();
-                    updated.balance = Set(new_balance.amount().to_bytes().to_vec());
+                    updated.balance = Set(new_balance.amount().to_be_bytes().to_vec());
                     let channel = updated.update(tx.as_ref()).await?;
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(channel.try_into()?, diff)))
@@ -213,8 +213,8 @@ where
 
                     // set all channel fields like we do on-chain on close
                     let mut active_channel = channel.into_active_model();
-                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_bytes().to_vec());
-                    active_channel.ticket_index = Set(U256::zero().to_bytes().to_vec());
+                    active_channel.balance = Set(BalanceType::HOPR.zero().amount().to_be_bytes().to_vec());
+                    active_channel.ticket_index = Set(U256::zero().to_be_bytes().to_vec());
                     active_channel.set_status(ChannelStatus::Closed);
                     let channel = active_channel.update(tx.as_ref()).await?;
 

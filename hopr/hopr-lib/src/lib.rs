@@ -514,7 +514,7 @@ where
 
             async move {
                 let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
-                (save_tbf)(bloom.to_bytes());
+                (save_tbf)(bincode::serialize(&bloom).expect("bincode should not fail").into());
             }
         })),
     );
@@ -644,7 +644,7 @@ impl Hopr {
 
         let tbf = read_file(&tbf_path)
             .and_then(|data| {
-                TagBloomFilter::from_bytes(&data)
+                bincode::deserialize(data.as_ref())
                     .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_entity::{chain_info, global_settings, node_info};
-use hopr_primitive_types::prelude::{Address, Balance, BalanceType, BinarySerializable, IntoEndian, ToHex};
+use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 
 use crate::db::HoprDb;

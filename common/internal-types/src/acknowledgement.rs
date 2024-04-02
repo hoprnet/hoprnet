@@ -5,7 +5,6 @@ use std::fmt::{Display, Formatter};
 use tracing::debug;
 
 use crate::{
-    acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
     channels::{generate_channel_id, Ticket},
     errors::{
         CoreTypesError::{InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
@@ -44,33 +43,6 @@ impl Acknowledgement {
     pub fn ack_challenge(&self) -> HalfKeyChallenge {
         assert!(self.validated, "acknowledgement not validated");
         self.ack_key_share.to_challenge()
-    }
-}
-
-impl BinarySerializable for Acknowledgement {
-    const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        let mut buf = data.to_vec();
-        if data.len() == Self::SIZE {
-            let ack_signature = OffchainSignature::try_from(buf.drain(..OffchainSignature::SIZE).as_ref())?;
-            let ack_key_share = HalfKey::try_from(buf.drain(..HalfKey::SIZE).as_ref())?;
-            Ok(Self {
-                ack_signature,
-                ack_key_share,
-                validated: false,
-            })
-        } else {
-            Err(GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        assert!(self.validated, "acknowledgement not validated");
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.ack_signature.as_ref());
-        ret.extend_from_slice(self.ack_key_share.as_ref());
-        ret.into_boxed_slice()
     }
 }
 
@@ -207,7 +179,7 @@ impl AcknowledgedTicket {
             luck.copy_from_slice(
                 &Hash::create(&[
                     self.ticket.get_hash(domain_separator).as_ref(),
-                    &self.vrf_params.v.serialize_uncompressed().as_bytes()[1..], // skip prefix
+                    &self.vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
                     self.response.as_ref(),
                     &signature.as_ref(),
                 ])
@@ -237,45 +209,6 @@ impl AcknowledgedTicket {
 impl Display for AcknowledgedTicket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "acknowledged {} in state '{}'", self.ticket, self.status)
-    }
-}
-
-impl BinarySerializable for AcknowledgedTicket {
-    const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
-            let response = Response::try_from(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
-            let vrf_params = VrfParameters::from_bytes(
-                &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
-            )?;
-            let signer = Address::try_from(
-                &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
-                    ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
-            )?;
-
-            Ok(Self {
-                // BinarySerializable is only used for over-the-wire encoding,
-                // so acked tickets are always untouched
-                status: AcknowledgedTicketStatus::Untouched,
-                ticket,
-                response,
-                vrf_params,
-                signer,
-            })
-        } else {
-            Err(GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(self.response.as_ref());
-        ret.extend_from_slice(&self.vrf_params.to_bytes());
-        ret.extend_from_slice(self.signer.as_ref());
-        ret.into_boxed_slice()
     }
 }
 
@@ -338,34 +271,6 @@ impl UnacknowledgedTicket {
     }
 }
 
-impl BinarySerializable for UnacknowledgedTicket {
-    const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + Address::SIZE;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
-            let own_key = HalfKey::try_from(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
-            let signer =
-                Address::try_from(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
-            Ok(Self {
-                ticket,
-                own_key,
-                signer,
-            })
-        } else {
-            Err(GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(self.own_key.as_ref());
-        ret.extend_from_slice(self.signer.as_ref());
-        ret.into_boxed_slice()
-    }
-}
-
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
 #[allow(clippy::large_enum_variant)]
@@ -376,39 +281,6 @@ pub enum PendingAcknowledgement {
     WaitingAsSender,
     /// We're waiting for the acknowledgement as a relayer with a ticket
     WaitingAsRelayer(UnacknowledgedTicket),
-}
-
-impl PendingAcknowledgement {
-    const SENDER_PREFIX: u8 = 0;
-    const RELAYER_PREFIX: u8 = 1;
-}
-
-impl BinarySerializable for PendingAcknowledgement {
-    const SIZE: usize = 1;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() >= Self::SIZE {
-            match data[0] {
-                Self::SENDER_PREFIX => Ok(WaitingAsSender),
-                Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::from_bytes(&data[1..])?)),
-                _ => Err(GeneralError::ParseError),
-            }
-        } else {
-            Err(GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        match &self {
-            WaitingAsSender => ret.push(Self::SENDER_PREFIX),
-            WaitingAsRelayer(unacknowledged) => {
-                ret.push(Self::RELAYER_PREFIX);
-                ret.extend_from_slice(&unacknowledged.to_bytes());
-            }
-        }
-        ret.into_boxed_slice()
-    }
 }
 
 #[cfg(test)]
@@ -458,49 +330,6 @@ pub mod test {
             &domain_separator.unwrap_or_default(),
         )
         .unwrap()
-    }
-
-    #[test]
-    fn test_pending_ack_sender() {
-        assert_eq!(
-            PendingAcknowledgement::WaitingAsSender,
-            PendingAcknowledgement::from_bytes(&PendingAcknowledgement::WaitingAsSender.to_bytes()).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_acknowledgement() {
-        let pk_2 = OffchainKeypair::from_secret(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ))
-        .unwrap();
-        let pub_key_2 = OffchainPublicKey::from_privkey(pk_2.secret().as_ref()).unwrap();
-
-        let ack_key = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-
-        let mut ack1 = Acknowledgement::new(ack_key, &pk_2);
-        assert!(ack1.validate(&pub_key_2));
-
-        let mut ack2 = Acknowledgement::from_bytes(&ack1.to_bytes()).unwrap();
-        assert!(ack2.validate(&pub_key_2));
-
-        assert_eq!(ack1, ack2);
-    }
-
-    #[test]
-    fn test_unacknowledged_ticket_serialize_deserialize() {
-        let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
-            HalfKey::default(),
-            ALICE.public().to_address(),
-        );
-
-        assert_eq!(
-            unacked_ticket,
-            UnacknowledgedTicket::from_bytes(&unacked_ticket.to_bytes()).unwrap()
-        );
     }
 
     #[test]
@@ -605,29 +434,6 @@ pub mod test {
         assert_eq!(
             deserialized_ticket,
             bincode::deserialize(&bincode::serialize(&deserialized_ticket).unwrap()).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_acknowledged_ticket_serialize_deserialize() {
-        let response = Response::from_bytes(&hex!(
-            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
-        ))
-        .unwrap();
-
-        let ticket = mock_ticket(
-            &ALICE,
-            &BOB.public().to_address(),
-            None,
-            Some(response.to_challenge().into()),
-        );
-
-        let acked_ticket =
-            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
-
-        assert_eq!(
-            acked_ticket,
-            AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
         );
     }
 }

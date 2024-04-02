@@ -77,8 +77,6 @@ impl TagBloomFilter {
     }
 }
 
-impl AutoBinarySerializable for TagBloomFilter {}
-
 impl Default for TagBloomFilter {
     fn default() -> Self {
         Self {

@@ -8,7 +8,6 @@ use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-use std::ops::Add;
 use std::time::{Duration, SystemTime};
 use std::{
     cmp::Ordering,
@@ -187,69 +186,6 @@ impl ChannelEntry {
 impl Display for ChannelEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} channel {}", self.status, self.get_id(),)
-    }
-}
-
-impl BinarySerializable for ChannelEntry {
-    const SIZE: usize = Address::SIZE + Address::SIZE + U256::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
-
-    fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut b = data.to_vec();
-            let source = Address::try_from(b.drain(0..Address::SIZE).as_ref())?;
-            let destination = Address::try_from(b.drain(0..Address::SIZE).as_ref())?;
-            let balance = Balance::new(U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?, BalanceType::HOPR);
-            let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let status_byte = b.drain(0..1).as_ref()[0];
-            let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-
-            let status = match status_byte {
-                0 => ChannelStatus::Open,
-                1 => ChannelStatus::Closed,
-                2 => {
-                    ChannelStatus::PendingToClose(std::time::UNIX_EPOCH.add(Duration::from_secs(closure_time.as_u64())))
-                }
-                _ => return Err(hopr_primitive_types::errors::GeneralError::ParseError),
-            };
-
-            Ok(Self::new(
-                source,
-                destination,
-                balance,
-                ticket_index,
-                status,
-                channel_epoch,
-            ))
-        } else {
-            Err(hopr_primitive_types::errors::GeneralError::ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.as_ref());
-        ret.extend_from_slice(self.destination.as_ref());
-        ret.extend_from_slice(self.balance.amount().to_bytes().as_ref());
-        ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
-        ret.push(match self.status {
-            ChannelStatus::Closed => 0_u8,
-            ChannelStatus::Open => 1_u8,
-            ChannelStatus::PendingToClose(_) => 2_u8,
-        });
-        ret.extend_from_slice(self.channel_epoch.to_bytes().as_ref());
-        ret.extend_from_slice(
-            U256::from(match self.status {
-                ChannelStatus::Closed => 0_u64, // We do not store the closure time value anymore once already closed
-                ChannelStatus::Open => 0_u64,
-                ChannelStatus::PendingToClose(closure_time) => {
-                    closure_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
-                }
-            })
-            .to_bytes()
-            .as_ref(),
-        );
-        ret.into_boxed_slice()
     }
 }
 
@@ -676,12 +612,12 @@ impl Ticket {
         });
 
         ret.extend_from_slice(self.channel_id.as_ref());
-        ret.extend_from_slice(&self.amount.amount().to_bytes()[20..32]);
+        ret.extend_from_slice(&self.amount.amount().to_be_bytes()[20..32]);
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
         ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
         ret.extend_from_slice(&self.encoded_win_prob);
-        ret.extend_from_slice(&self.challenge.to_bytes());
+        ret.extend_from_slice(&self.challenge.as_ref());
 
         if with_signature {
             if let Some(ref signature) = self.signature {
@@ -811,7 +747,7 @@ impl BinarySerializable for Ticket {
             let mut encoded_win_prob = [0u8; 7];
             encoded_win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
 
-            let challenge = EthereumChallenge::from_bytes(
+            let challenge = EthereumChallenge::try_from(
                 &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
             )?;
 
@@ -822,7 +758,7 @@ impl BinarySerializable for Ticket {
 
             Ok(Self {
                 channel_id,
-                amount: Balance::new(U256::from_bytes(&amount)?, BalanceType::HOPR),
+                amount: Balance::new(U256::from_be_bytes(amount), BalanceType::HOPR),
                 index: u64::from_be_bytes(index),
                 index_offset: u32::from_be_bytes(index_offset),
                 encoded_win_prob,
@@ -931,21 +867,6 @@ pub mod tests {
             "PendingToClose",
             ChannelStatus::PendingToClose(SystemTime::now()).to_string()
         );
-    }
-
-    #[test]
-    pub fn channel_entry_test() {
-        let ce1 = ChannelEntry::new(
-            *ADDRESS_1,
-            *ADDRESS_2,
-            Balance::new(10_u64, BalanceType::HOPR),
-            23u64.into(),
-            ChannelStatus::PendingToClose(SystemTime::now()),
-            3u64.into(),
-        );
-
-        let ce2 = ChannelEntry::from_bytes(&ce1.to_bytes()).unwrap();
-        assert_eq!(ce1, ce2, "deserialized channel entry does not match");
     }
 
     #[test]

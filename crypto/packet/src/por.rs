@@ -75,7 +75,7 @@ impl BinarySerializable for ProofOfRelayString {
         if data.len() == POR_SECRET_LENGTH {
             let (next_ticket_challenge, hint) = data.split_at(POR_SECRET_LENGTH / 2);
             Ok(Self {
-                next_ticket_challenge: CurvePoint::from_bytes(next_ticket_challenge)?.into(),
+                next_ticket_challenge: CurvePoint::try_from(next_ticket_challenge)?.into(),
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
@@ -85,7 +85,7 @@ impl BinarySerializable for ProofOfRelayString {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.next_ticket_challenge.to_bytes());
+        ret.extend_from_slice(&self.next_ticket_challenge.as_ref());
         ret.extend_from_slice(self.hint.as_ref());
         ret.into_boxed_slice()
     }

@@ -18,7 +18,7 @@ use crate::utils::k256_scalar_from_bytes;
 ///
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
-#[derive(Clone, Copy, Default, Eq)]
+#[derive(Clone, Default, Eq)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,
@@ -72,7 +72,7 @@ impl PartialEq for VrfParameters {
 impl std::fmt::Debug for VrfParameters {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VrfParameters")
-            .field("V", &hex::encode(self.v.serialize_compressed()))
+            .field("V", &hex::encode(self.v.as_compressed()))
             .field("h", &hex::encode(self.h.to_bytes()))
             .field("s", &hex::encode(self.s.to_bytes()))
             .finish()
@@ -87,7 +87,7 @@ impl BinarySerializable for VrfParameters {
             let mut v = [0u8; CurvePoint::SIZE_COMPRESSED];
             v.copy_from_slice(&data[..CurvePoint::SIZE_COMPRESSED]);
             Ok(VrfParameters {
-                v: CurvePoint::from_bytes(&data[..CurvePoint::SIZE_COMPRESSED])?,
+                v: CurvePoint::try_from(&data[..CurvePoint::SIZE_COMPRESSED])?,
                 h: k256_scalar_from_bytes(&data[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + 32])
                     .map_err(|_| GeneralError::ParseError)?,
                 s: k256_scalar_from_bytes(
@@ -102,7 +102,7 @@ impl BinarySerializable for VrfParameters {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.v.serialize_compressed().as_bytes());
+        ret.extend_from_slice(self.v.as_compressed().as_bytes());
         ret.extend_from_slice(&self.h.to_bytes());
         ret.extend_from_slice(&self.s.to_bytes());
         ret.into_boxed_slice()
@@ -114,12 +114,12 @@ impl VrfParameters {
     pub fn verify<const T: usize>(&self, creator: &Address, msg: &[u8; T], dst: &[u8]) -> Result<()> {
         let cap_b = self.get_encoded_payload(creator, msg, dst)?;
 
-        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.to_projective_point() * self.h;
+        let r_v: ProjectivePoint<Secp256k1> = cap_b * self.s - self.v.clone().into_projective_point() * self.h;
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 &creator.as_ref(),
-                &self.v.serialize_uncompressed().as_bytes()[1..],
+                &self.v.as_uncompressed().as_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 msg,
             ],

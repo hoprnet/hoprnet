@@ -530,7 +530,7 @@ pub fn convert_vrf_parameters(
     domain_separator: &Hash,
 ) -> Vrfparameters {
     // skip the secp256k1 curvepoint prefix
-    let v = off_chain.v.serialize_uncompressed();
+    let v = off_chain.v.as_uncompressed();
     let s_b = off_chain
         .get_s_b_witness(signer, &ticket_hash.into(), domain_separator.as_ref())
         // Safe: hash value is always in the allowed length boundaries,

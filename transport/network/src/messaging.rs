@@ -72,9 +72,6 @@ impl PingMessage {
     }
 }
 
-#[cfg(not(feature = "compat-ping"))]
-impl hopr_primitive_types::traits::AutoBinarySerializable for PingMessage {}
-
 #[cfg(feature = "compat-ping")]
 impl hopr_primitive_types::traits::BinarySerializable for PingMessage {
     const SIZE: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;

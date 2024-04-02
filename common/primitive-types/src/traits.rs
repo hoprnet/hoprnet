@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use crate::errors::GeneralError::ParseError;
 use crate::errors::{GeneralError, Result};
 
@@ -25,30 +23,6 @@ pub trait BinarySerializable: Sized {
 
     /// Serializes the type into a fixed size binary blob.
     fn to_bytes(&self) -> Box<[u8]>;
-}
-
-/// Type implementing this trait has automatic binary serialization/deserialization capability
-/// using the default binary format, which is currently `bincode`.
-pub trait AutoBinarySerializable: Serialize + for<'a> Deserialize<'a> {
-    /// Minimum size of an automatically serialized type in bytes is 1.
-    const SIZE: usize = 1;
-}
-
-impl<T> BinarySerializable for T
-where
-    T: AutoBinarySerializable,
-{
-    const SIZE: usize = Self::SIZE;
-
-    /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|_| ParseError)
-    }
-
-    /// Serializes the type into a fixed size binary blob.
-    fn to_bytes(&self) -> Box<[u8]> {
-        bincode::serialize(&self).unwrap().into_boxed_slice()
-    }
 }
 
 /*pub trait FixedBytesEncodable<const N: usize>: AsRef<[u8; N]> + TryFrom<[u8; N], Error = GeneralError> {}
