@@ -180,7 +180,10 @@ impl<T: PingExternalAPI + std::marker::Send> Pinging for Ping<T> {
                                 .saturating_sub(std::time::Duration::from_millis(start))
                                 .div(2u32);
 
-                            debug!(unidirectional_latency, "Successfully pinged '{peer}'");
+                            debug!(
+                                latency = tracing::field::debug(unidirectional_latency),
+                                "Successfully pinged '{peer}'"
+                            );
                             Ok(unidirectional_latency)
                         } else {
                             warn!("Failed to verify the challenge for ping to '{peer}'");

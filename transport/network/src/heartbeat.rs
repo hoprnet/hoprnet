@@ -145,6 +145,54 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
         }
     }
 
+    #[tracing::instrument(level = "info", skip(self), fields(from_timestamp = tracing::field::debug(current_time())))]
+    async fn perform_heartbeat_round(&mut self) {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
+
+        let start = current_time();
+        let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
+
+        let peers = self.external_api.get_peers(from_timestamp).await;
+
+        // random timeout to avoid network sync:
+        let this_round_planned_duration = std::time::Duration::from_millis({
+            let interval_ms = self.config.interval.as_millis() as u64;
+            let variance_ms = self.config.variance.as_millis() as u64;
+
+            hopr_crypto_random::random_integer(
+                interval_ms,
+                Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)),
+            )
+        });
+
+        let timeout = sleep(this_round_planned_duration).fuse();
+        let ping = self.pinger.ping(peers).fuse();
+
+        pin_mut!(timeout, ping);
+
+        match select(timeout, ping).await {
+            Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
+            Either::Right(_) => {
+                info!(
+                    round_duration =
+                        tracing::field::debug(current_time().duration_since(start).unwrap_or_default().as_millis()),
+                    time_til_next_round = tracing::field::debug(
+                        this_round_planned_duration
+                            .saturating_sub(this_round_actual_duration)
+                            .as_millis()
+                    ),
+                    "Heartbeat round finished for all peers"
+                );
+
+                sleep(time_to_wait_for_next_round).await
+            }
+        };
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_TIME_TO_HEARTBEAT.record_measure(heartbeat_round_timer);
+    }
+
     /// Heartbeat loop responsible for periodically requesting peers to ping around from the
     /// external API interface.
     ///
@@ -154,48 +202,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
     /// components have been initialized.
     pub async fn heartbeat_loop(&mut self) {
         loop {
-            #[cfg(all(feature = "prometheus", not(test)))]
-            let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
-
-            let start = current_time();
-            let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
-
-            info!("Starting a heartbeat round for peers since timestamp {from_timestamp:?}");
-            let peers = self.external_api.get_peers(from_timestamp).await;
-
-            // random timeout to avoid network sync:
-            let this_round_planned_duration = std::time::Duration::from_millis({
-                let interval_ms = self.config.interval.as_millis() as u64;
-                let variance_ms = self.config.interval.as_millis() as u64;
-
-                hopr_crypto_random::random_integer(
-                    interval_ms,
-                    Some(interval_ms.checked_add(variance_ms.max(1u64)).unwrap_or(u64::MAX)),
-                )
-            });
-
-            let timeout = sleep(this_round_planned_duration).fuse();
-            let ping = self.pinger.ping(peers).fuse();
-
-            pin_mut!(timeout, ping);
-
-            match select(timeout, ping).await {
-                Either::Left(_) => info!("Heartbeat round interrupted by timeout"),
-                Either::Right(_) => {
-                    info!("Heartbeat round finished for all peers");
-
-                    let this_round_actual_duration = current_time().duration_since(start).unwrap_or_default();
-
-                    let time_to_wait_for_next_round =
-                        this_round_planned_duration.saturating_sub(this_round_actual_duration);
-
-                    debug!("Heartbeat sleeping for: {time_to_wait_for_next_round:?}");
-                    sleep(time_to_wait_for_next_round).await
-                }
-            };
-
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_TIME_TO_HEARTBEAT.record_measure(heartbeat_round_timer);
+            self.perform_heartbeat_round().await
         }
     }
 }
