@@ -44,7 +44,8 @@ class Node:
         res = run(
             [
                 "hopli",
-                "create-safe-module",
+                "safe-module",
+                "create",
                 "--network",
                 self.network,
                 "--identity-from-path",
@@ -53,18 +54,25 @@ class Node:
                 "./ethereum/contracts",
                 "--hopr-amount",
                 "20000.0",
+                "--native-amount",
+                "10.0",
+                "--private-key",
+                "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+                "--manager-private-key",
+                "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+                "--provider-url",
+                "localhost:8545",
             ],
             env=os.environ | custom_env,
             check=True,
             capture_output=True,
             text=True,
         )
-
         for el in res.stdout.split("\n"):
-            if el.startswith("safe: address 0x"):
+            if el.startswith("safe 0x"):
                 self.safe_address = el.split()[-1]
 
-            if el.startswith("module: address 0x"):
+            if el.startswith("node_module 0x"):
                 self.module_address = el.split()[-1]
 
         return self.address is not None and self.module_address is not None

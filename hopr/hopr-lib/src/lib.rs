@@ -24,7 +24,7 @@ pub mod errors;
 mod helpers;
 
 pub use {
-    chain::{Network as ChainNetwork, ProtocolsConfig},
+    chain::{Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig},
     chain_actions::errors::ChainActionsError,
     core_strategy::Strategy,
     core_transport::{
@@ -79,7 +79,6 @@ use hopr_platform::file::native::{join, read_file, remove_dir_all, write};
 use tracing::{debug, error, info};
 
 use crate::chain::ChainNetworkConfig;
-use crate::chain::SmartContractConfig;
 use crate::config::HoprLibConfig;
 use crate::config::SafeModule;
 use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
@@ -627,7 +626,7 @@ impl Hopr {
             &mut cfg.chain.protocols,
         )
         .expect("Failed to resolve blockchain environment");
-        let contract_addresses = SmartContractConfig::from(&resolved_environment);
+        let contract_addresses = ContractAddresses::from(&resolved_environment);
         info!(
             "Resolved contract addresses for myself as '{}': {:?}",
             me_onchain.public().to_hex(),
