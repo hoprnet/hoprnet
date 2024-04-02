@@ -174,14 +174,13 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
         match select(timeout, ping).await {
             Either::Left(_) => debug!("Heartbeat round interrupted by timeout"),
             Either::Right(_) => {
+                let this_round_actual_duration = current_time().duration_since(start).unwrap_or_default();
+                let time_to_wait_for_next_round =
+                    this_round_planned_duration.saturating_sub(this_round_actual_duration);
+
                 info!(
-                    round_duration =
-                        tracing::field::debug(current_time().duration_since(start).unwrap_or_default().as_millis()),
-                    time_til_next_round = tracing::field::debug(
-                        this_round_planned_duration
-                            .saturating_sub(this_round_actual_duration)
-                            .as_millis()
-                    ),
+                    round_duration = tracing::field::debug(this_round_actual_duration.as_millis()),
+                    time_til_next_round = tracing::field::debug(time_to_wait_for_next_round.as_millis()),
                     "Heartbeat round finished for all peers"
                 );
 
