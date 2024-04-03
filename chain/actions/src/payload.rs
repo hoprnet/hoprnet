@@ -183,7 +183,7 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
                     BindKeysAnnounceCall {
                         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.as_ref()).into(),
+                        ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
                         base_multiaddr: announcement.multiaddress().to_string(),
                     }
                     .encode()
@@ -357,7 +357,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
                     self_: self.me.into(),
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                    ed_25519_pub_key: H256::from_slice(&binding.packet_key.as_ref()).into(),
+                    ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
                     base_multiaddr: announcement.multiaddress().to_string(),
                 }
                 .encode()
@@ -577,7 +577,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
                 vs: H256::from_slice(&serialized_signature[32..64]).into(),
             },
-            por_secret: U256::from_big_endian(&off_chain.response.as_ref()),
+            por_secret: U256::from_big_endian(off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))

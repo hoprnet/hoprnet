@@ -589,7 +589,7 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
 
     fn try_from(value: [u8; OffchainPublicKey::SIZE]) -> std::result::Result<Self, Self::Error> {
         let v: &[u8] = &value;
-        Ok(v.try_into()?)
+        v.try_into()
     }
 }
 
@@ -1163,7 +1163,7 @@ impl Signature {
     /// Returns the raw signature, without the encoded public key recovery bit and
     /// the recovery bit as a separate value.
     pub fn raw_signature(&self) -> ([u8; Self::SIZE], u8) {
-        let mut raw_sig = self.0.clone();
+        let mut raw_sig = self.0;
         let recovery: u8 = (raw_sig[Self::SIZE / 2] & 0x80 != 0).into();
         raw_sig[Self::SIZE / 2] &= 0x7f;
         (raw_sig, recovery)

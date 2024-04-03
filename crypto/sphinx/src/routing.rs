@@ -144,7 +144,7 @@ impl RoutingInfo {
                 extended_header.copy_within(0..header_len, routing_info_len);
 
                 let pub_key_size = <S::P as Keypair>::Public::SIZE;
-                extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].as_ref());
+                extended_header[0..pub_key_size].copy_from_slice(path[inverted_idx + 1].as_ref());
                 extended_header[pub_key_size] = idx as u8;
                 extended_header[pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE]
                     .copy_from_slice(&ret.mac);
