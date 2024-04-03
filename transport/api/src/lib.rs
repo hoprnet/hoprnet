@@ -335,8 +335,6 @@ where
     }
 
     pub async fn init_from_db(&self) -> errors::Result<()> {
-        info!("Loading initial peers from the storage");
-
         let index_updater = self.index_updater();
 
         for (peer, _address, multiaddresses) in self.get_public_nodes().await? {
