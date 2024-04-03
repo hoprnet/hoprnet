@@ -44,6 +44,7 @@ hopr-metrics = { workspace = true, optional = true }
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 env_logger = { workspace = true }
+rand = "0.8.5"
 lazy_static = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hex-literal = { workspace = true }
