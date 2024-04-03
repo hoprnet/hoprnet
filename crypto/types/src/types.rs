@@ -5,6 +5,7 @@ use curve25519_dalek::{
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::prelude::*;
+use k256::elliptic_curve::group::prime::PrimeCurveAffine;
 use k256::{
     ecdsa::{
         self,
@@ -101,7 +102,8 @@ mod arrays {
     }
 }
 
-/// Represents an uncompressed elliptic curve point on the secp256k1 curve
+/// Represents an elliptic curve point on the secp256k1 curve
+/// It stores the compressed (and optionally also the uncompressed) form.
 ///
 /// ```rust
 /// # use hopr_crypto_types::prelude::*;
@@ -201,13 +203,13 @@ impl Eq for CurvePoint {}
 
 impl From<PublicKey> for CurvePoint {
     fn from(pubkey: PublicKey) -> Self {
-        (*pubkey.key.as_affine()).into()
+        pubkey.0
     }
 }
 
 impl From<&PublicKey> for CurvePoint {
     fn from(pubkey: &PublicKey) -> Self {
-        (*pubkey.key.as_affine()).into()
+        pubkey.0.clone()
     }
 }
 
@@ -298,8 +300,11 @@ impl From<Challenge> for EthereumChallenge {
 impl Challenge {
     /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
-        let curve_point: CurvePoint =
-            PublicKey::combine(&[&PublicKey::from_bytes(&own_share.0)?, &PublicKey::from_bytes(&hint.0)?]).into();
+        let curve_point: CurvePoint = PublicKey::combine(&[
+            &PublicKey::try_from(own_share.0.as_ref())?,
+            &PublicKey::try_from(hint.0.as_ref())?,
+        ])
+        .into();
         Ok(curve_point.into())
     }
 
@@ -426,7 +431,9 @@ impl HalfKeyChallenge {
     }
 
     pub fn to_address(&self) -> Address {
-        PublicKey::from_bytes(&self.0).expect("invalid half-key").to_address()
+        PublicKey::try_from(self.0.as_ref())
+            .expect("invalid half-key")
+            .to_address()
     }
 }
 
@@ -678,7 +685,6 @@ pub const PACKET_TAG_LENGTH: usize = 16;
 pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 
 /// Represents a secp256k1 public key.
-/// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 ///
 /// ```rust
 /// # use hex_literal::hex;
@@ -697,9 +703,9 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 /// const UNCOMPRESSED: [u8; 65] = hex!("041464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
 ///
 /// let from_privkey = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-/// let from_compressed = PublicKey::from_bytes(&COMPRESSED).unwrap();
-/// let from_uncompressed_plain = PublicKey::from_bytes(&UNCOMPRESSED_PLAIN).unwrap();
-/// let from_uncompressed = PublicKey::from_bytes(&UNCOMPRESSED).unwrap();
+/// let from_compressed = PublicKey::try_from(COMPRESSED.as_ref()).unwrap();
+/// let from_uncompressed_plain = PublicKey::try_from(UNCOMPRESSED_PLAIN.as_ref()).unwrap();
+/// let from_uncompressed = PublicKey::try_from(UNCOMPRESSED.as_ref()).unwrap();
 ///
 /// assert_eq!(from_privkey, from_uncompressed);
 /// assert_eq!(from_compressed, from_uncompressed_plain);
@@ -722,11 +728,8 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 ///
 /// assert_eq!(from_uncompressed, from_transaction_signature);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PublicKey {
-    key: elliptic_curve::PublicKey<Secp256k1>,
-    pub(crate) compressed: EncodedPoint<Secp256k1>,
-}
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PublicKey(CurvePoint);
 
 impl PublicKey {
     /// Size of the compressed public key in bytes
@@ -737,56 +740,12 @@ impl PublicKey {
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
-    /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> ([u8; 32], PublicKey) {
-        let (private, cp) = random_group_element();
-        (private, cp.try_into().unwrap())
-    }
-
-    pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        match data.len() {
-            Self::SIZE_UNCOMPRESSED => {
-                // already has 0x04 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
-                    .map_err(|_| GeneralError::ParseError)?;
-
-                Ok(PublicKey {
-                    key,
-                    compressed: key.to_encoded_point(true),
-                })
-            }
-            Self::SIZE_UNCOMPRESSED_PLAIN => {
-                // add 0x04 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
-                    .map_err(|_| GeneralError::ParseError)?;
-
-                Ok(PublicKey {
-                    key,
-                    compressed: key.to_encoded_point(true),
-                })
-            }
-            Self::SIZE_COMPRESSED => {
-                // has either 0x02 or 0x03 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
-                    .map_err(|_| GeneralError::ParseError)?;
-
-                Ok(PublicKey {
-                    key,
-                    compressed: key.to_encoded_point(true),
-                })
-            }
-            _ => Err(GeneralError::ParseError),
-        }
-    }
-
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
+        // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
         let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key).map_err(|_| GeneralError::ParseError)?;
 
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar);
-        Ok(PublicKey {
-            key,
-            compressed: key.to_encoded_point(true),
-        })
+        Ok(key.into())
     }
 
     fn from_raw_signature<R>(msg: &[u8], r: &[u8], s: &[u8], v: u8, recovery_method: R) -> Result<PublicKey>
@@ -797,9 +756,13 @@ impl PublicKey {
         let signature =
             ECDSASignature::from_scalars(GenericArray::clone_from_slice(r), GenericArray::clone_from_slice(s))
                 .map_err(|_| GeneralError::ParseError)?;
-        let recovered_key = recovery_method(msg, &signature, recid).map_err(|_| CalculationError)?;
 
-        Ok(Self::from_bytes(&recovered_key.to_encoded_point(false).to_bytes())?)
+        let recovered_key = *recovery_method(msg, &signature, recid)
+            .map_err(|_| CalculationError)?
+            .as_affine();
+
+        // Verify that it is a valid public key
+        recovered_key.try_into()
     }
 
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
@@ -829,6 +792,8 @@ impl PublicKey {
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
         let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
         let cps_ref = cps.iter().collect::<Vec<_>>();
+
+        // Verify that it is a valid public key
         CurvePoint::combine(&cps_ref)
             .try_into()
             .expect("combination results in the ec identity (which is an invalid pub key)")
@@ -839,21 +804,20 @@ impl PublicKey {
     pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
         let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak).expect("zero tweak provided");
 
-        let new_pk = (key.key.to_projective()
+        let new_pk = (key.0.clone().into_projective_point()
             + <Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
         .to_affine();
 
-        Self {
-            key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(new_pk)
-                .expect("combination results into ec identity (which is an invalid pub key)"),
-            compressed: new_pk.to_encoded_point(true),
-        }
+        // Verify that it is a valid public key
+        new_pk.try_into().expect("tweak add resulted in an invalid public key")
     }
 
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
     pub fn random() -> Self {
-        Self::random_keypair().1
+        let (_, cp) = random_group_element();
+        cp.try_into()
+            .expect("random_group_element cannot generate identity points")
     }
 
     /// Converts the public key to an Ethereum address
@@ -864,11 +828,10 @@ impl PublicKey {
     }
 
     /// Serializes the public key to a binary form.
-    pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
-        if compressed {
-            self.compressed.as_bytes().to_vec()
-        } else {
-            self.key.as_affine().to_encoded_point(false).as_bytes().to_vec()
+    pub fn to_bytes(&self, compressed: bool) -> Box<[u8]> {
+        match compressed {
+            true => self.0.as_compressed().to_bytes(),
+            false => self.0.as_uncompressed().to_bytes(),
         }
     }
 
@@ -885,30 +848,72 @@ impl Display for PublicKey {
     }
 }
 
+impl TryFrom<&[u8]> for PublicKey {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        match value.len() {
+            Self::SIZE_UNCOMPRESSED => {
+                // already has 0x04 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(value)
+                    .map_err(|_| GeneralError::ParseError)?;
+
+                // Already verified this is a valid public key
+                Ok(key.into())
+            }
+            Self::SIZE_UNCOMPRESSED_PLAIN => {
+                // add 0x04 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], value].concat())
+                    .map_err(|_| GeneralError::ParseError)?;
+
+                // Already verified this is a valid public key
+                Ok(key.into())
+            }
+            Self::SIZE_COMPRESSED => {
+                // has either 0x02 or 0x03 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(value)
+                    .map_err(|_| GeneralError::ParseError)?;
+
+                // Already verified this is a valid public key
+                Ok(key.into())
+            }
+            _ => Err(GeneralError::ParseError),
+        }
+    }
+}
+
+impl TryFrom<AffinePoint> for PublicKey {
+    type Error = CryptoError;
+
+    fn try_from(value: AffinePoint) -> std::result::Result<Self, Self::Error> {
+        if value.is_identity().into() {
+            return Err(CryptoError::InvalidPublicKey);
+        }
+        Ok(Self(value.into()))
+    }
+}
+
 impl TryFrom<CurvePoint> for PublicKey {
     type Error = CryptoError;
 
     fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
-        Ok(Self {
-            key,
-            compressed: key.to_encoded_point(true),
-        })
+        if value.affine.is_identity().into() {
+            return Err(CryptoError::InvalidPublicKey);
+        }
+        Ok(Self(value))
     }
 }
 
 impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
     fn from(key: elliptic_curve::PublicKey<Secp256k1>) -> Self {
-        Self {
-            key,
-            compressed: key.to_encoded_point(true),
-        }
+        Self((*key.as_affine()).into())
     }
 }
 
+// TODO: make this `for &k256::ProjectivePoint`
 impl From<&PublicKey> for k256::ProjectivePoint {
     fn from(value: &PublicKey) -> Self {
-        value.key.to_projective()
+        value.0.clone().into_projective_point()
     }
 }
 
@@ -920,13 +925,14 @@ impl TryFrom<&[u8]> for CompressedPublicKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(PublicKey::from_bytes(value)?.into())
+        Ok(PublicKey::try_from(value)?.into())
     }
 }
 
 impl AsRef<[u8]> for CompressedPublicKey {
     fn as_ref(&self) -> &[u8] {
-        self.0.compressed.as_bytes()
+        // CurvePoint::as_ref() returns a compressed representation of the curve point
+        self.0 .0.as_ref()
     }
 }
 
@@ -1079,13 +1085,7 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
     type Error = GeneralError;
 
     fn try_from(value: ([u8; 32], [u8; 32])) -> std::result::Result<Self, Self::Error> {
-        let mut sig = [0u8; OffchainSignature::SIZE];
-
-        sig[0..32].copy_from_slice(&value.0);
-        sig[32..64].copy_from_slice(&value.1);
-
-        let v: &[u8] = &sig;
-        v.try_into()
+        Ok(ed25519_dalek::Signature::from_components(value.0, value.1).into())
     }
 }
 
@@ -1102,6 +1102,7 @@ impl Signature {
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
         assert_eq!(raw_bytes.len(), Self::SIZE, "invalid length");
         assert!(recovery <= 1, "invalid recovery bit");
+
         let mut ret = Self([0u8; Self::SIZE]);
         ret.0.copy_from_slice(raw_bytes);
         ret.embed_recovery_bit(recovery);
@@ -1248,7 +1249,7 @@ pub mod tests {
     use k256::{
         ecdsa::VerifyingKey,
         elliptic_curve::{sec1::ToEncodedPoint, CurveArithmetic},
-        {NonZeroScalar, Secp256k1, U256},
+        AffinePoint, {NonZeroScalar, Secp256k1, U256},
     };
     use libp2p_identity::PeerId;
     use std::str::FromStr;
@@ -1264,7 +1265,7 @@ pub mod tests {
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
         let sgn = Signature::sign_message(msg, &kp);
 
-        let expected_pk = PublicKey::from_bytes(&PUBLIC_KEY).unwrap();
+        let expected_pk = PublicKey::try_from(PUBLIC_KEY.as_ref()).unwrap();
         assert!(sgn.verify_message(msg, &expected_pk));
 
         let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
@@ -1433,16 +1434,16 @@ pub mod tests {
 
     #[test]
     fn test_public_key_serialize() {
-        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize 1");
-        let pk2 = PublicKey::from_bytes(&pk1.to_bytes(true)).expect("failed to deserialize 2");
-        let pk3 = PublicKey::from_bytes(&pk1.to_bytes(false)).expect("failed to deserialize 3");
+        let pk1 = PublicKey::try_from(PUBLIC_KEY.as_ref()).expect("failed to deserialize 1");
+        let pk2 = PublicKey::try_from(pk1.to_bytes(true).as_ref()).expect("failed to deserialize 2");
+        let pk3 = PublicKey::try_from(pk1.to_bytes(false).as_ref()).expect("failed to deserialize 3");
 
         assert_eq!(pk1, pk2, "pub keys 1 2 don't match");
         assert_eq!(pk2, pk3, "pub keys 2 3 don't match");
 
-        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
-        let pk2 = PublicKey::from_bytes(&PUBLIC_KEY_UNCOMPRESSED).expect("failed to deserialize");
-        let pk3 = PublicKey::from_bytes(&PUBLIC_KEY_UNCOMPRESSED_PLAIN).expect("failed to deserialize");
+        let pk1 = PublicKey::try_from(PUBLIC_KEY.as_ref()).expect("failed to deserialize");
+        let pk2 = PublicKey::try_from(PUBLIC_KEY_UNCOMPRESSED.as_ref()).expect("failed to deserialize");
+        let pk3 = PublicKey::try_from(PUBLIC_KEY_UNCOMPRESSED_PLAIN.as_ref()).expect("failed to deserialize");
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk2, pk3, "pubkeys don't match");
@@ -1451,14 +1452,22 @@ pub mod tests {
         assert_eq!(PublicKey::SIZE_UNCOMPRESSED, pk1.to_bytes(false).len());
 
         let shorter = hex!("f85e38b056284626a7aed0acc5d474605a408e6cccf76d7241ec7b4dedb31929b710e034f4f9a7dba97743b01e1cc35a45a60bebb29642cb0ba6a7fe8433316c");
-        let s1 = PublicKey::from_bytes(&shorter).unwrap();
-        let s2 = PublicKey::from_bytes(&s1.to_bytes(false)).unwrap();
+        let s1 = PublicKey::try_from(shorter.as_ref()).unwrap();
+        let s2 = PublicKey::try_from(s1.to_bytes(false).as_ref()).unwrap();
         assert_eq!(s1, s2);
     }
 
     #[test]
+    fn test_public_key_should_not_accept_identity() {
+        let cp: CurvePoint = AffinePoint::IDENTITY.into();
+
+        PublicKey::try_from(cp).expect_err("must fail for identity point");
+        PublicKey::try_from(AffinePoint::IDENTITY).expect_err("must fail for identity point");
+    }
+
+    #[test]
     fn test_public_key_curve_point() {
-        let cp1: CurvePoint = PublicKey::from_bytes(&PUBLIC_KEY).unwrap().into();
+        let cp1: CurvePoint = PublicKey::try_from(PUBLIC_KEY.as_ref()).unwrap().into();
         let cp2 = CurvePoint::try_from(cp1.as_ref()).unwrap();
         assert_eq!(cp1, cp2);
     }
@@ -1466,7 +1475,7 @@ pub mod tests {
     #[test]
     fn test_public_key_from_privkey() {
         let pk1 = PublicKey::from_privkey(&PRIVATE_KEY).expect("failed to convert from private key");
-        let pk2 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
+        let pk2 = PublicKey::try_from(PUBLIC_KEY.as_ref()).expect("failed to deserialize");
 
         assert_eq!(pk1, pk2, "failed to match deserialized pub key");
     }

@@ -12,7 +12,7 @@ pub trait ToHex {
         Self: Sized;
 }
 
-/// Represents a type that can be encoded to/decoded from a fixed sized byte array.
+/// Represents a type that can be encoded to/decoded from a fixed sized byte array of size `N`.
 /// This requires processing and memory allocation in order to represent the type in binary encoding.
 ///
 /// Differences between [BytesEncodable] and [BytesRepresentable] :
@@ -23,10 +23,10 @@ pub trait ToHex {
 /// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
 /// for a type that already implements the latter, but it is not possible vice-versa.
 pub trait BytesEncodable<const N: usize>: Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> {
-    /// Size of the encoded byte array.
+    /// Size of the encoded byte array. Defaults to `N` and should not be overridden.
     const SIZE: usize = N;
 
-    /// Convenience function to avoid defining temporary variable.
+    /// Convenience function to represent the
     /// A shorthand for `let v: [u8; N] = self.into()`.
     #[inline]
     fn into_encoded(self) -> [u8; N] {
