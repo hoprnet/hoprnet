@@ -2,7 +2,7 @@ use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
 use hopr_primitive_types::traits::ToHex;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
@@ -73,10 +73,10 @@ impl TicketManager {
                                         .one(tx.as_ref())
                                         .await?
                                     {
-                                        hopr_db_entity::ticket_statistics::ActiveModel {
-                                            winning_tickets: sea_orm::Set(model.winning_tickets + 1),
-                                            ..Default::default()
-                                        }
+                                        let winning_tickets = model.winning_tickets + 1;
+                                        let mut active_model = model.into_active_model();
+                                        active_model.winning_tickets = sea_orm::Set(winning_tickets);
+                                        active_model
                                     } else {
                                         hopr_db_entity::ticket_statistics::ActiveModel {
                                             channel_id: sea_orm::Set(channel_id),
@@ -84,7 +84,7 @@ impl TicketManager {
                                             ..Default::default()
                                         }
                                     }
-                                    .insert(tx.as_ref())
+                                    .save(tx.as_ref())
                                     .await
                                     .map_err(DbError::from)
                                 })
