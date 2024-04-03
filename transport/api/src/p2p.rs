@@ -181,7 +181,7 @@ pub async fn p2p_loop<T>(
     on_transport_output: UnboundedSender<TransportOutput>,
     on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) where
-    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: hopr_db_api::peers::HoprDbPeersOperations + Sync + Send + std::fmt::Debug + 'static,
 {
     let me_peer_id = me.public().to_peer_id();
     let mut swarm = core_p2p::build_p2p_network(me, protocol_cfg)
@@ -375,7 +375,7 @@ pub async fn p2p_loop<T>(
                                             swarm.behaviour_mut().ticket_aggregation.add_address(&peer, multiaddress.clone());
                                         },
                                         Err(e) => {
-                                            warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the the address '{multiaddress}'");
+                                            warn!("transport input - indexer - failed to dial an announced peer '{peer}': {e}, ignoring the address '{multiaddress}'");
                                         }
                                     }
                                 }
@@ -558,14 +558,15 @@ pub async fn p2p_loop<T>(
                         METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
                     }
 
-                    // TODO: async await in the event dispatch loop can block it, the await should be removed
                     if allowed_peers.contains(&peer_id) {
-                        // TODO: async spawn local and remove the RWLOCK
-                        if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
-                            error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
-                        }
+                        let network = network.clone();
+                        async_std::task::spawn(async move {
+                            if let Err(e) = network.add(&peer_id, PeerOrigin::IncomingConnection, vec![]).await {
+                                error!("transport - p2p - failed to update the record for '{peer_id}': {e}")
+                            }
+                        });
                     } else {
-                        warn!("transport - p2p - DISCONNECTING '{peer_id}' (reason: network registry)");
+                        info!("transport - p2p - DISCONNECTING '{peer_id}': not allowed in the network registry)");
                         let _ = swarm.disconnect_peer_id(peer_id);
                     }
                 },
