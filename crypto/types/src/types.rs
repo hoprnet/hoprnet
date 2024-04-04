@@ -350,7 +350,7 @@ impl BytesRepresentable for Challenge {
 /// Represents a half-key used for Proof of Relay
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
 /// itself does not validate nor enforce this fact,
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HalfKey([u8; Self::SIZE]);
 
 impl Default for HalfKey {
@@ -990,7 +990,8 @@ impl Response {
     }
 
     /// Derives the response from two half-keys.
-    /// This is done by adding the two non-zero scalars that the given half-keys represent.
+    /// This is done by adding together the two non-zero scalars that the given half-keys represent.
+    /// Returns an error if any of the given scalars is zero.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
         let res = NonZeroScalar::<Secp256k1>::try_from(first.as_ref())
             .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.as_ref()).map(|s2| s1.as_ref() + s2.as_ref()))
@@ -1095,7 +1096,7 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
 /// instantiation over secp256k1.
 /// The instance holds the byte array consisting of `R` and `S` values with the recovery bit
 /// alredy embedded in S.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Signature(#[serde(with = "arrays")] [u8; Self::SIZE]);
 
 impl Signature {

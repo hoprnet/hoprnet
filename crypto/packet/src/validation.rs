@@ -11,26 +11,28 @@ use hopr_primitive_types::prelude::*;
 /// Performs validations of the given unacknowledged ticket and channel.
 #[allow(clippy::too_many_arguments)] // TODO: The number of arguments and the logic needs to be refactored
 pub async fn validate_unacknowledged_ticket(
-    ticket: &Ticket,
+    ticket: Ticket,
     channel: &ChannelEntry,
     sender: &Address,
     min_ticket_amount: Balance,
     required_win_prob: f64,
     unrealized_balance: Option<Balance>,
     domain_separator: &Hash,
-) -> Result<()> {
+) -> Result<VerifiedTicket> {
     debug!("validating unack ticket from {sender}");
 
     // ticket signer MUST be the sender
-    ticket
+    let ticket = ticket
         .verify(sender, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
+    let verified_ticket = ticket.verified_ticket();
+
     // ticket amount MUST be greater or equal to minTicketAmount
-    if !ticket.amount.ge(&min_ticket_amount) {
+    if !verified_ticket.amount.ge(&min_ticket_amount) {
         return Err(TicketValidation(format!(
             "ticket amount {} in not at least {min_ticket_amount}",
-            ticket.amount
+            verified_ticket.amount
         )));
     }
 
@@ -50,10 +52,10 @@ pub async fn validate_unacknowledged_ticket(
     }
 
     // ticket's channelEpoch MUST match the current channel's epoch
-    if !channel.channel_epoch.eq(&ticket.channel_epoch.into()) {
+    if !channel.channel_epoch.eq(&verified_ticket.channel_epoch.into()) {
         return Err(TicketValidation(format!(
             "ticket was created for a different channel iteration {} != {} of channel {}",
-            ticket.channel_epoch,
+            verified_ticket.channel_epoch,
             channel.channel_epoch,
             channel.get_id()
         )));
@@ -61,9 +63,9 @@ pub async fn validate_unacknowledged_ticket(
 
     if let Some(unrealized_balance) = unrealized_balance {
         // ensure sender has enough funds
-        if ticket.amount.gt(&unrealized_balance) {
+        if verified_ticket.amount.gt(&unrealized_balance) {
             debug!(
-                ticket_amount = ticket.amount.to_string(),
+                ticket_amount = verified_ticket.amount.to_string(),
                 available_balance = unrealized_balance.to_string(),
                 "Ticket value is higher than remaining unrealized balance for channel {}",
                 channel.get_id().to_string(),
@@ -73,7 +75,7 @@ pub async fn validate_unacknowledged_ticket(
     }
 
     trace!("ticket validation done");
-    Ok(())
+    Ok(ticket)
 }
 
 #[cfg(test)]
@@ -128,7 +130,7 @@ mod tests {
         let more_than_ticket_balance = ticket.amount.add(&Balance::new(U256::from(500u128), BalanceType::HOPR));
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
@@ -146,7 +148,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &TARGET_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
@@ -169,7 +171,7 @@ mod tests {
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(2_u64, BalanceType::HOPR),
@@ -190,12 +192,12 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() {
         let mut ticket = create_valid_ticket();
         ticket.encoded_win_prob = f64_to_win_prob(0.5f64).unwrap();
-        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
+        let ticket = ticket.sign(&SENDER_PRIV_KEY, &Hash::default()).verified_ticket().clone();
 
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
@@ -219,7 +221,7 @@ mod tests {
         channel.status = ChannelStatus::Closed;
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
@@ -240,12 +242,12 @@ mod tests {
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() {
         let mut ticket = create_valid_ticket();
         ticket.channel_epoch = 2u32;
-        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
+        let ticket = ticket.sign(&SENDER_PRIV_KEY, &Hash::default()).verified_ticket().clone();
 
         let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),
@@ -270,7 +272,7 @@ mod tests {
         channel.channel_epoch = U256::from(ticket.channel_epoch);
 
         let ret = validate_unacknowledged_ticket(
-            &ticket,
+            ticket,
             &channel,
             &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1_u64, BalanceType::HOPR),

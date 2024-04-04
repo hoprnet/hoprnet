@@ -15,6 +15,7 @@ mod m20240301_000012_tickets_create_outgoing_ticket_index;
 mod m20240301_000013_initial_seed_tickets;
 mod m20240301_000014_create_ticket_stats_with_channel_id;
 mod m20240326_000015_recreate_ticket_stats;
+mod m20240404_000016_tickets_recreate_ticket;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
                 BackendType::Postgres,
             )),
             Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::Postgres)),
+            Box::new(m20240404_000016_tickets_recreate_ticket::Migration(BackendType::Postgres)),
         ]
     }
 }
@@ -101,6 +103,7 @@ impl MigratorTrait for MigratorTickets {
                 BackendType::SQLite,
             )),
             Box::new(m20240326_000015_recreate_ticket_stats::Migration(BackendType::SQLite)),
+            Box::new(m20240404_000016_tickets_recreate_ticket::Migration(BackendType::SQLite)),
         ]
     }
 }

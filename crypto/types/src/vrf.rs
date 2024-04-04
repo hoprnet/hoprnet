@@ -185,13 +185,13 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
-pub fn derive_vrf_parameters<const T: usize>(
-    msg: &[u8; T],
+pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
+    msg: T,
     chain_keypair: &ChainKeypair,
     dst: &[u8],
 ) -> crate::errors::Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg], &[dst])?;
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
 
@@ -217,7 +217,7 @@ pub fn derive_vrf_parameters<const T: usize>(
             &chain_addr.as_ref(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
             &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            msg,
+            msg.as_ref(),
         ],
         &[dst],
     )?;

@@ -5,12 +5,12 @@ use std::fmt::{Display, Formatter};
 use tracing::debug;
 
 use crate::{
-    channels::{generate_channel_id, Ticket},
+    channels::{Ticket},
     errors::{
-        CoreTypesError::{InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
         Result as CoreTypesResult,
     },
 };
+use crate::prelude::VerifiedTicket;
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -74,26 +74,13 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
-    pub ticket: Ticket,
+    pub ticket: VerifiedTicket,
     pub response: Response,
-    pub vrf_params: VrfParameters,
-    pub signer: Address,
 }
-
-impl PartialEq for AcknowledgedTicket {
-    fn eq(&self, other: &Self) -> bool {
-        self.status == other.status
-            && self.ticket == other.ticket
-            && self.response == other.response
-            && self.signer == other.signer
-    }
-}
-
-impl Eq for AcknowledgedTicket {}
 
 impl PartialOrd for AcknowledgedTicket {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -110,99 +97,19 @@ impl Ord for AcknowledgedTicket {
 impl AcknowledgedTicket {
     /// Creates an acknowledged ticket out of a plain ticket.
     pub fn new(
-        ticket: Ticket,
+        ticket: VerifiedTicket,
         response: Response,
-        signer: Address,
-        chain_keypair: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> CoreTypesResult<AcknowledgedTicket> {
-        if signer.eq(&chain_keypair.into()) {
-            return Err(LoopbackTicket);
-        }
-        if generate_channel_id(&signer, &chain_keypair.into()).ne(&ticket.channel_id) {
-            return Err(InvalidTicketRecipient);
-        }
-
-        let vrf_params = derive_vrf_parameters(
-            &ticket.get_hash(domain_separator).into(),
-            chain_keypair,
-            domain_separator.as_ref(),
-        )?;
-
-        Ok(Self {
+    ) -> AcknowledgedTicket {
+        Self {
             // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
-            vrf_params,
-            signer,
-        })
+        }
     }
 
-    /// Does a verification of the acknowledged ticket, including:
-    /// - ticket signature
-    /// - ticket challenge (proof-of-relay)
-    /// - VRF values (ticket redemption)
-    pub fn verify(
-        &self,
-        issuer: &Address,
-        recipient: &Address,
-        domain_separator: &Hash,
-    ) -> hopr_crypto_types::errors::Result<()> {
-        if self.ticket.verify(issuer, domain_separator).is_err() {
-            return Err(CryptoError::SignatureVerification);
-        }
-
-        if !self.ticket.challenge.eq(&self.response.to_challenge().into()) {
-            return Err(CryptoError::InvalidChallenge);
-        }
-
-        if self
-            .vrf_params
-            .verify(
-                recipient,
-                &self.ticket.get_hash(domain_separator).into(),
-                domain_separator.as_ref(),
-            )
-            .is_err()
-        {
-            return Err(CryptoError::InvalidVrfValues);
-        }
-
-        Ok(())
-    }
-
-    pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
-        let mut luck = [0u8; 7];
-
-        if let Some(ref signature) = self.ticket.signature {
-            luck.copy_from_slice(
-                &Hash::create(&[
-                    self.ticket.get_hash(domain_separator).as_ref(),
-                    &self.vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
-                    self.response.as_ref(),
-                    &signature.as_ref(),
-                ])
-                .as_ref()[0..7],
-            );
-        } else {
-            return Err(InvalidInputData(
-                "Cannot compute ticket luck from unsigned ticket".into(),
-            ));
-        }
-
-        // clone bytes
-        Ok(luck)
-    }
-
-    pub fn is_winning_ticket(&self, domain_separator: &Hash) -> bool {
-        let mut signed_ticket_luck = [0u8; 8];
-        signed_ticket_luck[1..].copy_from_slice(&self.ticket.encoded_win_prob);
-
-        let mut computed_ticket_luck = [0u8; 8];
-        computed_ticket_luck[1..].copy_from_slice(&self.get_luck(domain_separator).expect("unsigned ticket"));
-
-        u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+    pub fn verified_ticket(&self) -> &Ticket {
+        self.ticket.verified_ticket()
     }
 }
 
@@ -212,70 +119,57 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Wrapper for an unacknowledged ticket
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Wrapper for a **verified** unacknowledged ticket and the half-key for the ticket's challenge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnacknowledgedTicket {
-    pub ticket: Ticket,
-    pub own_key: HalfKey,
-    pub signer: Address,
+    pub ticket: VerifiedTicket,
+    pub(crate) own_key: HalfKey,
 }
 
 impl UnacknowledgedTicket {
-    pub fn new(ticket: Ticket, own_key: HalfKey, signer: Address) -> Self {
-        Self {
-            ticket,
-            own_key,
-            signer,
-        }
+    /// Convenience method to retrieve a reference to the underlying verified [Ticket].
+    pub fn verified_ticket(&self) -> &Ticket {
+        self.ticket.verified_ticket()
     }
 
-    pub fn get_challenge(&self) -> HalfKeyChallenge {
-        self.own_key.to_challenge()
-    }
-
-    /// Verifies if signature on the embedded ticket using the embedded public key.
-    pub fn verify_signature(&self, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
-        self.ticket.verify(&self.signer, domain_separator)
-    }
-
-    /// Verifies if the challenge on the embedded ticket matches the solution
-    /// from the given acknowledgement and the embedded half key.
-    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<()> {
-        if self
-            .ticket
-            .challenge
-            .eq(&self.get_response(acknowledgement)?.to_challenge().into())
-        {
-            Ok(())
-        } else {
-            Err(CryptoError::InvalidChallenge)
-        }
-    }
-
-    pub fn get_response(&self, acknowledgement: &HalfKey) -> hopr_crypto_types::errors::Result<Response> {
-        Response::from_half_keys(&self.own_key, acknowledgement)
-    }
-
-    /// Turn an unacknowledged ticket into an acknowledged ticket by adding
-    /// VRF output (requires private key) and the received acknowledgement of the forwarded packet.
+    /// Verifies that the given acknowledgement solves this ticket's challenge and then
+    /// turns this unacknowledged ticket into an acknowledged ticket by adding
+    /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(
         self,
         acknowledgement: &HalfKey,
-        chain_keypair: &ChainKeypair,
-        domain_separator: &Hash,
     ) -> CoreTypesResult<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
-        AcknowledgedTicket::new(self.ticket, response, self.signer, chain_keypair, domain_separator)
+        if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
+            Ok(AcknowledgedTicket::new(self.ticket, response))
+        } else {
+            Err(CryptoError::InvalidChallenge.into())
+        }
+    }
+}
+
+/// Represents a winning ticket that can be aggregated and redeemed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RedeemableTicket {
+    pub ticket: VerifiedTicket,
+    pub response: Response,
+    pub vrf_params: VrfParameters,
+    pub issuer: Address,
+}
+
+impl RedeemableTicket {
+    pub fn verify_and_check_if_winning(&self, destination: &Address, domain_separator: &Hash) -> CoreTypesResult<bool> {
+        todo!()
+
     }
 }
 
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PendingAcknowledgement {
     /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
@@ -314,14 +208,14 @@ pub mod test {
 
         Ticket::new(
             counterparty,
-            &Balance::new(
+            Balance::new(
                 price_per_packet.div_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
-            U256::zero(),
-            U256::one(),
+            0,
+            1,
             1.0f64,
-            4u64.into(),
+            4,
             challenge.unwrap_or_default(),
             pk,
             &domain_separator.unwrap_or_default(),
@@ -334,7 +228,6 @@ pub mod test {
         let unacked_ticket = UnacknowledgedTicket::new(
             mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
             HalfKey::default(),
-            ALICE.public().to_address(),
         );
 
         assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());

@@ -79,7 +79,7 @@ impl ChainPacketComponents {
 
         // Update the ticket with the challenge
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(chain_keypair, domain_separator);
+        let ticket = ticket.sign(chain_keypair, domain_separator).leak();
 
         Ok(Self::Outgoing {
             packet: MetaPacket::<CurrentSphinxSuite>::new(
@@ -178,10 +178,10 @@ pub fn forward(
             ..
         } => {
             next_ticket.challenge = next_challenge.to_ethereum_challenge();
-            next_ticket.sign(chain_keypair, domain_separator);
+            let ticket = next_ticket.sign(chain_keypair, domain_separator).leak();
             ChainPacketComponents::Forwarded {
                 packet,
-                ticket: next_ticket,
+                ticket,
                 ack_challenge,
                 packet_tag,
                 ack_key,

@@ -13,7 +13,6 @@ use sea_query::{Condition, Expr, IntoCondition};
 use tracing::{debug, error, info, trace};
 
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::conversions::tickets::model_to_acknowledged_ticket;
 use hopr_db_entity::{outgoing_ticket_index, ticket};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -411,14 +410,6 @@ async fn find_stats_for_channel(tx: &OpenTransaction, channel_id: &Hash) -> Resu
 #[async_trait]
 impl HoprDbTicketOperations for HoprDb {
     async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>> {
-        let channel_dst = self
-            .get_indexer_data(None)
-            .await?
-            .channels_dst
-            .ok_or(LogicalError("missing channel dst".into()))?;
-
-        let ckp = self.chain_key.clone();
-
         self.nest_transaction_in_db(None, TargetDb::Tickets)
             .await?
             .perform(|tx| {
@@ -427,23 +418,17 @@ impl HoprDbTicketOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|m| model_to_acknowledged_ticket(&m, &channel_dst, &ckp).map_err(DbError::from))
-                        .collect::<Result<Vec<_>>>()
+                        .map(AcknowledgedTicket::try_from)
+                        .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
+                        .map_err(DbError::from)
                 })
             })
             .await
     }
 
     async fn get_tickets<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
-        let channel_dst = self
-            .get_indexer_data(tx)
-            .await?
-            .channels_dst
-            .ok_or(LogicalError("missing channel dst".into()))?;
-
         debug!("fetching tickets via {selector}");
 
-        let ckp = self.chain_key.clone();
         self.nest_transaction_in_db(tx, TargetDb::Tickets)
             .await?
             .perform(|tx| {
@@ -453,8 +438,9 @@ impl HoprDbTicketOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|m| model_to_acknowledged_ticket(&m, &channel_dst, &ckp).map_err(DbError::from))
-                        .collect::<Result<Vec<_>>>()
+                        .map(AcknowledgedTicket::try_from)
+                        .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
+                        .map_err(DbError::from)
                 })
             })
             .await
@@ -620,7 +606,7 @@ impl HoprDbTicketOperations for HoprDb {
                             }
                         }
 
-                        match model_to_acknowledged_ticket(&ticket, &channel_dst, &self.chain_key) {
+                        match AcknowledgedTicket::try_from(ticket) {
                             Ok(mut ticket) => {
                                 // Update the state manually, since we do not want to re-fetch the model after the update
                                 ticket.status = new_state;
@@ -867,7 +853,6 @@ impl HoprDbTicketOperations for HoprDb {
         prerequisites: AggregationPrerequisites,
     ) -> Result<Option<(OffchainPublicKey, Vec<AcknowledgedTicket>)>> {
         let myself = self.clone();
-        let chain_keypair = self.chain_key.clone();
 
         let channel_id = *channel;
 
@@ -947,8 +932,9 @@ impl HoprDbTicketOperations for HoprDb {
                     let to_be_aggregated = prerequisites
                         .filter_satisfying_ticket_models(to_be_aggregated, &channel_entry)?
                         .into_iter()
-                        .map(|m| model_to_acknowledged_ticket(&m, &ds, &chain_keypair).map_err(DbError::from))
-                        .collect::<Result<Vec<_>>>()?;
+                        .map(AcknowledgedTicket::try_from)
+                        .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
+                        .map_err(DbError::from)?;
 
                     // mark all tickets with appropriate characteristics as being aggregated
                     if !to_be_aggregated.is_empty() {
@@ -1092,8 +1078,8 @@ impl HoprDbTicketOperations for HoprDb {
 
         let acknowledged_tickets = acknowledged_tickets
             .into_iter()
-            .map(|m| model_to_acknowledged_ticket(&m, &domain_separator, &self.chain_key).map_err(DbError::from))
-            .collect::<Result<Vec<AcknowledgedTicket>>>()?;
+            .map(AcknowledgedTicket::try_from)
+            .collect::<hopr_db_entity::errors::Result<Vec<AcknowledgedTicket>>>()?;
 
         // can be done, because the tickets collection is tested for emptiness before
         let first_stored_ticket = acknowledged_tickets.first().unwrap();

@@ -10,6 +10,7 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
 };
+use crate::prelude::UnacknowledgedTicket;
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -269,7 +270,30 @@ impl ChannelChange {
     }
 }
 
-/// Contains the overall description of a ticket with a signature
+pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature, win_prob: &EncodedWinProb, response: &Response, vrf_params: &VrfParameters) -> Result<bool> {
+    // Signed winning probability
+    let mut signed_ticket_luck = [0u8; 8];
+    signed_ticket_luck[1..].copy_from_slice(win_prob);
+
+    // Computed winning probability
+    let mut computed_ticket_luck = [0u8; 8];
+    computed_ticket_luck[1..].copy_from_slice(
+        &Hash::create(&[
+            ticket_hash.as_ref(),
+            &vrf_params.v.as_uncompressed().as_bytes()[1..], // skip prefix
+            response.as_ref(),
+            ticket_signature.as_ref(),
+        ])
+            .as_ref()[0..7],
+    );
+
+    Ok(u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck))
+}
+
+/// Contains the overall description of a ticket with a signature.
+///
+/// This structure is not considered [verified](VerifiedTicket), unless
+/// the [Ticket::verify] or [Ticket::sign] methods are called.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ticket {
     pub channel_id: Hash,
@@ -330,35 +354,9 @@ impl Display for Ticket {
 }
 
 impl Ticket {
-    /// Creates a new Ticket given the raw Challenge and signs it using the given chain keypair.
-    #[allow(clippy::too_many_arguments)] // TODO: Refactor to use less inputs
-    pub fn new(
-        counterparty: &Address,
-        amount: Balance,
-        index: u64,
-        index_offset: u32,
-        win_prob: f64,
-        channel_epoch: u32,
-        challenge: EthereumChallenge,
-        signing_key: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> Result<Self> {
-        let mut ret = Self::new_partial(
-            &signing_key.public().to_address(),
-            counterparty,
-            amount,
-            index,
-            index_offset,
-            win_prob,
-            channel_epoch
-        )?;
-        ret.set_challenge(challenge, signing_key, domain_separator);
-
-        Ok(ret)
-    }
-
     /// Creates a ticket *without* signature and *without* a challenge set.
     /// This sets a default value as challenge.
+    // TODO: refactor this so it uses the Builder pattern
     pub fn new_partial(
         own_address: &Address,
         counterparty: &Address,
@@ -374,14 +372,26 @@ impl Ticket {
             ));
         }
 
+        let channel_id = generate_channel_id(own_address, counterparty);
+
+        Self::new_partial_with_id(channel_id, amount, index, index_offset, win_prob, channel_epoch)
+    }
+
+    // TODO: refactor this so it uses the Builder pattern
+    pub fn new_partial_with_id(
+        channel_id: Hash,
+        amount: Balance,
+        index: u64,
+        index_offset: u32,
+        win_prob: f64,
+        channel_epoch: u32
+    ) -> Result<Self> {
         Ticket::check_value_boundaries(
             &amount,
             index,
             win_prob,
             channel_epoch,
         )?;
-
-        let channel_id = generate_channel_id(own_address, counterparty);
 
         Ok(Self {
             channel_id,
@@ -393,6 +403,19 @@ impl Ticket {
             encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
         })
+    }
+
+    /// Convenience method for creating a zero-hop ticket
+    pub fn new_zero_hop(source: &Address, destination: &Address) -> Self {
+        Self::new_partial(
+            source,
+            destination,
+            BalanceType::HOPR.zero(),
+            0,
+            0,
+            0.0,
+            0,
+        ).expect("zero hop ticket must always satisfy the ticket value boundaries")
     }
 
     /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
@@ -437,22 +460,6 @@ impl Ticket {
         Ok(())
     }
 
-    /// Add the challenge property and signs the finished ticket afterward
-    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &ChainKeypair, domain_separator: &Hash) {
-        self.challenge = challenge;
-        self.sign(signing_key, domain_separator);
-    }
-
-    /// Encode winning probability such that it can get used in
-    /// the smart contract
-    pub fn win_prob(&self) -> f64 {
-        win_prob_to_f64(&self.encoded_win_prob)
-    }
-
-    /// Serializes the ticket with or without signature
-    ///
-    /// Signing requires hashing which requires serialization without signature.
-    /// Transferring ticket requires serialization with signature attached.
     fn encode_without_signature(&self) -> [u8; Self::SIZE - Signature::SIZE] {
         let mut ret = [0u8; Self::SIZE - Signature::SIZE];
         let mut offset = 0;
@@ -491,83 +498,34 @@ impl Ticket {
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
-    /// Signs the ticket using the given private key.
-    pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
+    /// Signs the ticket using the given private key, turning this ticket into [VerifiedTicket].
+    pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
+        let ticket_hash = self.get_hash(domain_separator);
         self.signature = Some(Signature::sign_hash(
-                self.get_hash(domain_separator).as_ref(),
+                ticket_hash.as_ref(),
                 signing_key,
             )
-        )
+        );
+        VerifiedTicket(self, ticket_hash, signing_key.public().to_address())
     }
 
-    /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Result<Self> {
-        Self::new(
-            destination,
-            BalanceType::HOPR.zero(),
-            0,
-            0,
-            0.0,
-            0,
-            EthereumChallenge::default(),
-            private_key,
-            domain_separator,
-        )
-    }
-
-    /// Based on the price of this ticket, determines the path position (hop number) this ticket
-    /// relates to.
-    ///
-    /// Does not support path lengths greater than 255
-    pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
-        (self.get_expected_payout() / price_per_packet)
-            .as_u64()
-            .try_into() // convert to u8
-            .map_err(|_| {
-                CoreTypesError::ArithmeticError(format!(
-                    "Cannot convert {} to u8",
-                    price_per_packet / self.get_expected_payout()
-                ))
-            })
-    }
-
-    fn get_expected_payout(&self) -> U256 {
-        let mut win_prob = [0u8; 8];
-        win_prob[1..].copy_from_slice(&self.encoded_win_prob);
-
-        // Add + 1 to project interval [0x00ffffffffffff, 0x00000000000000] to [0x00000000000001, 0x01000000000000]
-        // Add + 1 to "round to next integer"
-        let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
-
-        (self.amount.amount() * U256::from(win_prob)) >> U256::from(52u64)
-    }
-
-    /// Computes the VRF values to check or prove that the ticket
-    /// is a win. Called by the ticket recipient.
-    pub fn get_vrf_values(
-        &self,
-        chain_key: &ChainKeypair,
-        domain_separator: &Hash,
-    ) -> Result<VrfParameters> {
-        let ticket_hash = self.get_hash(domain_separator);
-        derive_vrf_parameters(&ticket_hash.into(), chain_key, domain_separator.as_ref())
-            .map_err(|e| e.into())
-    }
-
-    /// Verifies the signature of this ticket.
+    /// Verifies the signature of this ticket, turning this ticket into `VerifiedTicket`.
     ///
     /// This is done by recovering the signer from the signature and verifying that it matches
-    /// the given `signer` argument. This is possible due this specific instantiation of the ECDSA
+    /// the given `issuer` argument. This is possible due this specific instantiation of the ECDSA
     /// over the secp256k1 curve.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, signer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<()> {
+    pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> hopr_crypto_types::errors::Result<VerifiedTicket> {
+        let ticket_hash = self.get_hash(domain_separator);
+
+        // Verify that the recovered signature matches the issuer's address
         PublicKey::from_signature_hash(
-            self.get_hash(domain_separator).as_ref(),
-            self.signature.as_ref().expect("ticket not signed"),
+            ticket_hash.as_ref(),
+            self.signature.as_ref().ok_or(CryptoError::SignatureVerification)?,
         )?
         .to_address()
-        .eq(signer)
-        .then_some(())
+        .eq(issuer)
+        .then_some(VerifiedTicket(self, ticket_hash, *issuer))
         .ok_or(CryptoError::SignatureVerification)
     }
 
@@ -649,6 +607,190 @@ impl TryFrom<&[u8]> for Ticket {
 
 const TICKET_SIZE: usize = ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE;
 impl BytesEncodable<TICKET_SIZE> for Ticket {}
+
+/// Holds a ticket that has been already verified.
+/// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
+/// is always equal to [`VerifiedTicket::verified_hash`]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedTicket(Ticket, Hash, Address);
+
+impl VerifiedTicket {
+    /// Creates a new [VerifiedTicket] by creating a new [Ticket] with
+    /// the given raw [EthereumChallenge] and signing it with the given `signing_key`.
+    #[allow(clippy::too_many_arguments)] // TODO: Refactor using future Ticket's builder pattern
+    pub fn new(
+        counterparty: &Address,
+        amount: Balance,
+        index: u64,
+        index_offset: u32,
+        win_prob: f64,
+        channel_epoch: u32,
+        challenge: EthereumChallenge,
+        signing_key: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> Result<Self> {
+        let mut ret = Ticket::new_partial(
+            &signing_key.public().to_address(),
+            counterparty,
+            amount,
+            index,
+            index_offset,
+            win_prob,
+            channel_epoch
+        )?;
+        ret.challenge = challenge;
+        Ok(ret.sign(signing_key, domain_separator))
+    }
+
+    #[allow(clippy::too_many_arguments)] // TODO: Refactor using future Ticket's builder pattern
+    pub fn new_trusted(
+        channel_id: Hash,
+        amount: Balance,
+        index: u64,
+        index_offset: u32,
+        win_prob: f64,
+        channel_epoch: u32,
+        challenge: EthereumChallenge,
+        signature: Signature,
+        hash: Hash,
+    ) -> Result<Self> {
+        let mut ret = Ticket::new_partial_with_id(
+            channel_id,
+            amount,
+            index,
+            index_offset,
+            win_prob,
+            channel_epoch
+        )?;
+        ret.challenge = challenge;
+        ret.signature = Some(signature);
+
+        let issuer = PublicKey::from_signature_hash(
+            hash.as_ref(),
+            &signature,
+        )?.to_address();
+
+        Ok(Self(ret, hash, issuer))
+    }
+
+    /// Convenience method for creating a zero-hop ticket
+    pub fn new_zero_hop(destination: &Address, challenge: EthereumChallenge, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+        let mut ticket= Ticket::new_zero_hop(&private_key.public().to_address(), destination);
+        ticket.challenge = challenge;
+        ticket.sign(private_key, domain_separator)
+    }
+
+    /// Returns the verified encoded winning probability of the ticket
+    pub fn win_prob(&self) -> f64 {
+        win_prob_to_f64(&self.0.encoded_win_prob)
+    }
+
+    /// Checks if this ticket is considered a win.
+    /// Requires access to the private key to compute the VRF values.
+    ///
+    /// Computes the ticket's luck value and compares it against the
+    /// ticket's probability. If luck <= probability, the ticket is
+    /// considered a win.
+    ///
+    /// ## Ticket luck value
+    /// This ticket's `luck value` is the first 7 bytes of Keccak256 hash
+    /// of the concatenation of ticket's hash, VRF's encoded `v` value,
+    /// PoR response and the ticket's signature.
+    ///
+    /// ## Winning probability
+    /// Each ticket specifies a probability, given as an integer in
+    /// [0, 2^56 - 1] where 0 -> 0% and 2^56 - 1 -> 100% win
+    /// probability. If the ticket's luck value is greater than
+    /// the stated probability, it is considered a winning ticket.
+    pub fn is_winning(&self, response: &Response, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> Result<bool> {
+        let vrf_params = derive_vrf_parameters(
+            self.1,
+            chain_keypair,
+            domain_separator.as_ref(),
+        )?;
+
+        check_ticket_win(
+            &self.1,
+            self.0.signature.as_ref().expect("verified ticket have always a signature"),
+            &self.0.encoded_win_prob,
+            response,
+            &vrf_params
+        )
+    }
+
+    /// Based on the price of this ticket, determines the path position (hop number) this ticket
+    /// relates to.
+    ///
+    /// This is done by first determining the amount of tokens the ticket is worth
+    /// if it were a win and redeemed on-chain.
+    ///
+    /// Does not support path lengths greater than 255.
+    pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
+        let mut win_prob = [0u8; 8];
+        win_prob[1..].copy_from_slice(&self.0.encoded_win_prob);
+
+        // Add + 1 to project interval [0x00ffffffffffff, 0x00000000000000] to [0x00000000000001, 0x01000000000000]
+        // Add + 1 to "round to next integer"
+        let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
+
+        let expected_payout = (self.0.amount.amount() * U256::from(win_prob)) >> U256::from(52_u64);
+
+        (expected_payout / price_per_packet)
+            .as_u64()
+            .try_into() // convert to u8
+            .map_err(|_| {
+                CoreTypesError::ArithmeticError(format!("Cannot convert {} to u8",
+                    price_per_packet / expected_payout
+                ))
+            })
+    }
+
+    /// Ticket with already verified signature.
+    pub fn verified_ticket(&self) -> &Ticket {
+       &self.0
+    }
+    /// Fixed ticket hash that is guaranteed to be equal to
+    /// [`Ticket::get_hash`] of [`VerifiedTicket::verified_ticket`].
+    pub fn verified_hash(&self) -> &Hash {
+        &self.1
+    }
+
+    /// Verified issuer of the ticket.
+    /// The returned address is guaranteed to be equal to the signer
+    /// recovered from the [`VerifiedTicket::verified_ticket`]'s signature.
+    pub fn verified_issuer(&self) -> &Address {
+        &self.2
+    }
+
+    /// Deconstructs self back into the unverified [Ticket].
+    pub fn leak(self) -> Ticket {
+        self.0
+    }
+
+    /// Creates new unacknowledged ticket from the [VerifiedTicket],
+    /// given our own part of the PoR challenge.
+    pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
+        UnacknowledgedTicket { ticket: self, own_key }
+    }
+}
+
+impl Display for VerifiedTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "verified {}", self.0)
+    }
+}
+
+impl PartialOrd for VerifiedTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VerifiedTicket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
 
 /// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
 /// See [ALWAYS_WINNING] and [NEVER_WINNING].

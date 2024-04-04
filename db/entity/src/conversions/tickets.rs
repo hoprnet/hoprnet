@@ -1,55 +1,64 @@
-use crate::errors::DbEntityError;
+use sea_orm::Set;
 use crate::ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::Set;
+use crate::errors::DbEntityError;
 
-/// TODO: implement as TryFrom trait once https://github.com/hoprnet/hoprnet/pull/6018 is merged
-pub fn model_to_acknowledged_ticket(
-    db_ticket: &ticket::Model,
-    domain_separator: &Hash,
-    chain_keypair: &ChainKeypair,
-) -> crate::errors::Result<AcknowledgedTicket> {
-    let response = Response::try_from(db_ticket.response.as_ref())?;
+impl TryFrom<&ticket::Model> for AcknowledgedTicket {
+    type Error = DbEntityError;
 
-    // To be refactored with https://github.com/hoprnet/hoprnet/pull/6018
-    let mut ticket = Ticket::default();
-    ticket.channel_id = Hash::from_hex(&db_ticket.channel_id)?;
-    ticket.amount = BalanceType::HOPR.balance_bytes(&db_ticket.amount);
-    ticket.index = U256::from_be_bytes(&db_ticket.index).as_u64();
-    ticket.index_offset = db_ticket.index_offset as u32;
-    ticket.channel_epoch = U256::from_be_bytes(&db_ticket.channel_epoch).as_u32();
-    ticket.encoded_win_prob = db_ticket
-        .winning_probability
-        .clone()
-        .try_into()
-        .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?;
-    ticket.challenge = response.to_challenge().to_ethereum_challenge();
-    ticket.signature = Some(Signature::try_from(db_ticket.signature.as_ref())?);
+    fn try_from(value: &ticket::Model) -> Result<Self, Self::Error> {
+        let response = Response::try_from(value.response.as_ref())?;
 
-    let signer = PublicKey::from_signature_hash(ticket.get_hash(domain_separator).as_ref(), &ticket.signature.clone().unwrap())?.to_address();
-    //let signer = ticket.recover_signer(domain_separator)?.to_address();
+        let ticket = VerifiedTicket::new_trusted(
+            Hash::from_hex(&value.channel_id)?,
+            BalanceType::HOPR.balance_bytes(&value.amount),
+            U256::from_be_bytes(&value.index).as_u64(),
+            value.index_offset as u32,
+            win_prob_to_f64(value
+                .winning_probability
+                 .as_slice()
+                .try_into()
+                .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?
+            ),
+            U256::from_be_bytes(&value.channel_epoch).as_u32(),
+            response.to_challenge().to_ethereum_challenge(),
+            Signature::try_from(value.signature.as_ref())?,
+            Hash::try_from(value.hash.as_slice()).map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?
+        )
+        .map_err(|_| DbEntityError::ConversionError("could not validate ticket from the db".into()))?;
 
-    let mut ticket = AcknowledgedTicket::new(ticket, response, signer, chain_keypair, domain_separator)?;
-    ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8)
-        .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
 
-    Ok(ticket)
+        let mut ticket = AcknowledgedTicket::new(ticket, response);
+        ticket.status = AcknowledgedTicketStatus::try_from(value.state as u8)
+            .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
+
+        Ok(ticket)
+    }
+}
+
+impl TryFrom<ticket::Model> for AcknowledgedTicket {
+    type Error = DbEntityError;
+
+    fn try_from(value: ticket::Model) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
 }
 
 impl From<AcknowledgedTicket> for ticket::ActiveModel {
     fn from(value: AcknowledgedTicket) -> Self {
         ticket::ActiveModel {
-            channel_id: Set(value.ticket.channel_id.to_hex()),
-            amount: Set(value.ticket.amount.amount().to_be_bytes().to_vec()),
-            index: Set(value.ticket.index.to_be_bytes().to_vec()),
-            index_offset: Set(value.ticket.index_offset as i32),
-            winning_probability: Set(value.ticket.encoded_win_prob.to_vec()),
-            channel_epoch: Set(U256::from(value.ticket.channel_epoch).to_be_bytes().to_vec()),
-            signature: Set(value.ticket.signature.unwrap().as_ref().to_vec()),
+            channel_id: Set(value.verified_ticket().channel_id.to_hex()),
+            amount: Set(value.verified_ticket().amount.amount().to_be_bytes().to_vec()),
+            index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
+            index_offset: Set(value.verified_ticket().index_offset as i32),
+            winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),
+            channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
+            signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),
             response: Set(value.response.as_ref().to_vec()),
             state: Set(value.status as u8 as i32),
+            hash: Set(value.ticket.verified_hash().as_ref().to_vec()),
             ..Default::default()
         }
     }
