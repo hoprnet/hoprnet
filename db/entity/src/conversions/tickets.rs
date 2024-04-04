@@ -28,7 +28,8 @@ pub fn model_to_acknowledged_ticket(
     ticket.challenge = response.to_challenge().to_ethereum_challenge();
     ticket.signature = Some(Signature::try_from(db_ticket.signature.as_ref())?);
 
-    let signer = ticket.recover_signer(domain_separator)?.to_address();
+    let signer = PublicKey::from_signature_hash(ticket.get_hash(domain_separator).as_ref(), &ticket.signature.clone().unwrap())?.to_address();
+    //let signer = ticket.recover_signer(domain_separator)?.to_address();
 
     let mut ticket = AcknowledgedTicket::new(ticket, response, signer, chain_keypair, domain_separator)?;
     ticket.status = AcknowledgedTicketStatus::try_from(db_ticket.state as u8)

@@ -1274,11 +1274,11 @@ impl HoprDbTicketOperations for HoprDb {
 
         Ticket::new(
             &destination,
-            &final_value,
+            final_value,
             first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1) as u32,
             1.0, // Aggregated tickets have always 100% winning probability
-            channel_epoch,
+            channel_epoch.as_u32(),
             first_acked_ticket.ticket.challenge.clone(),
             me,
             &domain_separator,

@@ -380,6 +380,11 @@ impl HoprDbProtocolOperations for HoprDb {
 
                             myself.increment_outgoing_ticket_index(channel.get_id()).await?;
 
+                            // At this point after the ticket's signature has been verified
+                            // inside `validate_unacknowledged_ticket` we are sure that
+                            // the ticket's signer is really `previous_hop_addr`. Therefore,
+                            // we can create the `UnacknowledgedTicket` with `previous_hop_addr`
+                            // as its issuer.
                             myself
                                 .caches
                                 .unacked_tickets
@@ -530,11 +535,11 @@ impl HoprDb {
         let ticket = hopr_internal_types::channels::Ticket::new_partial(
             &me_onchain,
             &destination,
-            &amount,
+            amount,
             self.increment_outgoing_ticket_index(channel.get_id()).await?.into(),
-            U256::one(), // unaggregated always have index_offset == 1
+            1, // unaggregated always have index_offset == 1
             TICKET_WIN_PROB,
-            channel.channel_epoch,
+            channel.channel_epoch.as_u32(),
         )
         .map_err(|e| crate::errors::DbError::LogicalError(format!("failed to construct a ticket: {e}")))?;
 
