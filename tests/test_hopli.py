@@ -1,14 +1,10 @@
-import asyncio
 import random
 import json
-import re
 import logging
-from contextlib import AsyncExitStack, asynccontextmanager
 import os
 from subprocess import run
 
 import pytest
-import requests
 
 from .conftest import (
     PASSWORD,
@@ -21,20 +17,11 @@ from .conftest import (
     ANVIL_ENDPOINT,
     DEPLOYMENTS_SUMMARY_FILE,
     PWD,
-    API_TOKEN,
-    OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-    TICKET_AGGREGATION_THRESHOLD,
-    TICKET_PRICE_PER_HOP,
     default_nodes,
-    fund_nodes,
-    default_nodes_with_auth,
-    passive_node,
-    random_distinct_pairs_from,
 )
 from .test_integration import (
     balance_str_to_int,
 )
-from .hopr import HoprdAPI
 from .node import Node
 
 FIXTURES_PREFIX_NEW = "hopr-smoke-test-new"

@@ -350,12 +350,15 @@ where
                     .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
                     .await;
 
-                if let Err(e) = self
-                    .network
-                    .add(&peer, PeerOrigin::Initialization, multiaddresses)
-                    .await
-                {
-                    error!("Failed to store the peer observation: {e}");
+                // Self-reference is not needed in the network storage
+                if &peer != self.me() {
+                    if let Err(e) = self
+                        .network
+                        .add(&peer, PeerOrigin::Initialization, multiaddresses)
+                        .await
+                    {
+                        error!("Failed to store the peer observation: {e}");
+                    }
                 }
             }
         }
