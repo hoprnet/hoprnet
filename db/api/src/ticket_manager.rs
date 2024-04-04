@@ -121,10 +121,19 @@ impl TicketManager {
             ))
         })?;
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                &[&channel.to_string(), "unredeemed"],
+                (unrealized_value + value).amount().as_u128() as f64,
+            );
+        }
+
         self.caches
             .unrealized_value
             .insert(channel, unrealized_value + value)
             .await;
+
         Ok(())
     }
 
