@@ -811,32 +811,6 @@ impl Hopr {
         info!("Start the indexer and sync the chain");
         self.chain_api.sync_chain().await?;
 
-        // NOTE: strategy ticks must start after the chain is synced, otherwise
-        // the strategy would react to historical data and drain through the native
-        // balance on chain operations not relevant for the present network state
-        let multi_strategy_clone = self.multistrategy.clone();
-        spawn(async move {
-            execute_on_tick(Duration::from_secs(60), move || {
-                let multistrategy_clone = multi_strategy_clone.clone();
-
-                async move {
-                    info!("doing strategy tick");
-                    let _ = multistrategy_clone.on_tick().await;
-                    info!("strategy tick done");
-                }
-            })
-            .await;
-
-            error!(
-                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
-                HoprLoopComponents::StrategyTick
-            );
-            panic!(
-                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
-                HoprLoopComponents::StrategyTick
-            );
-        });
-
         info!("Loading initial peers from the storage");
         self.transport_api.init_from_db().await?;
 
@@ -929,6 +903,32 @@ impl Hopr {
             ],
             1.0,
         );
+
+        // NOTE: strategy ticks must start after the chain is synced, otherwise
+        // the strategy would react to historical data and drain through the native
+        // balance on chain operations not relevant for the present network state
+        let multi_strategy = self.multistrategy.clone();
+        spawn(async move {
+            execute_on_tick(Duration::from_secs(60), move || {
+                let multi_strategy = multi_strategy.clone();
+
+                async move {
+                    info!("doing strategy tick");
+                    let _ = multi_strategy.on_tick().await;
+                    info!("strategy tick done");
+                }
+            })
+            .await;
+
+            error!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+            panic!(
+                "CRITICAL: the core chain loop unexpectedly stopped: '{}'",
+                HoprLoopComponents::StrategyTick
+            );
+        });
 
         Ok(futures::future::pending())
     }
