@@ -3604,6 +3604,7 @@ dependencies = [
  "bincode",
  "bindings",
  "bloomfilter",
+ "cbor4ii",
  "ethers",
  "hex-literal",
  "hopr-crypto-random",
