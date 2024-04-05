@@ -5,7 +5,7 @@ use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
-use hopr_internal_types::acknowledgement::AcknowledgedTicket;
+use hopr_internal_types::tickets::AcknowledgedTicket;
 
 use crate::cache::HoprDbCaches;
 use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
@@ -65,9 +65,9 @@ impl TicketManager {
 
     /// Sends a new acknowledged ticket into the FIFO queue.
     pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
-        let channel = ticket.ticket.channel_id;
-        let value = ticket.ticket.amount;
-        let epoch = ticket.ticket.channel_epoch;
+        let channel = ticket.verified_ticket().channel_id;
+        let value = ticket.verified_ticket().amount;
+        let epoch = ticket.verified_ticket().channel_epoch;
 
         let unrealized_value = self.unrealized_value(TicketSelector::new(channel, epoch)).await?;
 

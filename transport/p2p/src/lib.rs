@@ -48,7 +48,7 @@ use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
 use serde::{Deserialize, Serialize};
 
 use core_network::messaging::ControlMessage;
-use hopr_internal_types::acknowledgement::Acknowledgement;
+use hopr_internal_types::protocol::Acknowledgement;
 use hopr_internal_types::prelude::*;
 
 /// `Ping` protocol base type for the ping operation

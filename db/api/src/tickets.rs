@@ -1140,9 +1140,9 @@ impl HoprDbTicketOperations for HoprDb {
     async fn aggregate_tickets(
         &self,
         destination: OffchainPublicKey,
-        mut acked_tickets: Vec<AcknowledgedTicket>,
+        mut acked_tickets: Vec<RedeemableTicket>,
         me: &ChainKeypair,
-    ) -> Result<Ticket> {
+    ) -> Result<VerifiedTicket> {
         if me.public().to_address() != self.me_onchain {
             return Err(DbError::LogicalError(
                 "chain key for ticket aggregation does not match the DB public address".into(),
@@ -1282,10 +1282,10 @@ impl HoprDb {
                 Box::pin(async move {
                     // For purpose of upserting, we must select only by the triplet (channel id, epoch, index)
                     let selector = TicketSelector::new(
-                        acknowledged_ticket.ticket.channel_id,
-                        acknowledged_ticket.ticket.channel_epoch,
+                        acknowledged_ticket.verified_ticket().channel_id,
+                        acknowledged_ticket.verified_ticket().channel_epoch,
                     )
-                    .with_index(acknowledged_ticket.ticket.index);
+                    .with_index(acknowledged_ticket.verified_ticket().index);
 
                     debug!("upserting ticket {acknowledged_ticket}");
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);

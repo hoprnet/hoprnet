@@ -10,6 +10,7 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
 };
+use tracing::error;
 use crate::prelude::UnacknowledgedTicket;
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -270,7 +271,7 @@ impl ChannelChange {
     }
 }
 
-pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature, win_prob: &EncodedWinProb, response: &Response, vrf_params: &VrfParameters) -> Result<bool> {
+pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature, win_prob: &EncodedWinProb, response: &Response, vrf_params: &VrfParameters) -> bool {
     // Signed winning probability
     let mut signed_ticket_luck = [0u8; 8];
     signed_ticket_luck[1..].copy_from_slice(win_prob);
@@ -284,10 +285,10 @@ pub(crate) fn check_ticket_win(ticket_hash: &Hash, ticket_signature: &Signature,
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
-            .as_ref()[0..7],
+        .as_ref()[0..7],
     );
 
-    Ok(u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck))
+    u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
 }
 
 /// Contains the overall description of a ticket with a signature.
@@ -702,20 +703,23 @@ impl VerifiedTicket {
     /// [0, 2^56 - 1] where 0 -> 0% and 2^56 - 1 -> 100% win
     /// probability. If the ticket's luck value is greater than
     /// the stated probability, it is considered a winning ticket.
-    pub fn is_winning(&self, response: &Response, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> Result<bool> {
-        let vrf_params = derive_vrf_parameters(
+    pub fn is_winning(&self, response: &Response, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> bool {
+        if let Ok(vrf_params) = derive_vrf_parameters(
             self.1,
             chain_keypair,
             domain_separator.as_ref(),
-        )?;
-
-        check_ticket_win(
-            &self.1,
-            self.0.signature.as_ref().expect("verified ticket have always a signature"),
-            &self.0.encoded_win_prob,
-            response,
-            &vrf_params
-        )
+        ) {
+            check_ticket_win(
+                &self.1,
+                self.0.signature.as_ref().expect("verified ticket have always a signature"),
+                &self.0.encoded_win_prob,
+                response,
+                &vrf_params
+            )
+        } else {
+            error!("cannot derive vrf parameters for {self}");
+            false
+        }
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
@@ -760,6 +764,11 @@ impl VerifiedTicket {
     /// recovered from the [`VerifiedTicket::verified_ticket`]'s signature.
     pub fn verified_issuer(&self) -> &Address {
         &self.2
+    }
+
+    /// Shorthand to retrieve reference to the verified ticket signature
+    pub fn verified_signature(&self) -> &Signature {
+        self.0.signature.as_ref().expect("verified ticket always has a signature")
     }
 
     /// Deconstructs self back into the unverified [Ticket].

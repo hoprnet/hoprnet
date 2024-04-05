@@ -5,46 +5,11 @@ use std::fmt::{Display, Formatter};
 use tracing::debug;
 
 use crate::{
-    channels::{Ticket},
-    errors::{
-        Result as CoreTypesResult,
-    },
+    channels::Ticket,
+    errors::Result as CoreTypesResult,
 };
+use crate::channels::check_ticket_win;
 use crate::prelude::VerifiedTicket;
-
-/// Represents packet acknowledgement
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Acknowledgement {
-    ack_signature: OffchainSignature,
-    pub ack_key_share: HalfKey,
-    validated: bool,
-}
-
-impl Acknowledgement {
-    pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
-        Self {
-            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
-            ack_key_share,
-            validated: true,
-        }
-    }
-
-    /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
-    /// any operations with the deserialized acknowledgement will panic.
-    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
-        self.validated = self
-            .ack_signature
-            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
-
-        self.validated
-    }
-
-    /// Obtains the acknowledged challenge out of this acknowledgment.
-    pub fn ack_challenge(&self) -> HalfKeyChallenge {
-        assert!(self.validated, "acknowledgement not validated");
-        self.ack_key_share.to_challenge()
-    }
-}
 
 /// Status of the acknowledged ticket.
 #[repr(u8)]
@@ -108,8 +73,30 @@ impl AcknowledgedTicket {
         }
     }
 
+    /// Convenience method to retrieve a reference to the underlying verified [Ticket].
     pub fn verified_ticket(&self) -> &Ticket {
         self.ticket.verified_ticket()
+    }
+
+    /// Checks if this acknowledged ticket is winning.
+    pub fn is_winning(&self, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> bool {
+        self.ticket.is_winning(&self.response, chain_keypair, domain_separator)
+    }
+
+    /// Transforms this ticket into [RedeemableTicket] that can be redeemed on-chain
+    /// or transformed into [TransferableWinningTicket] that can be sent for aggregation.
+    pub fn into_redeemable(self, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> crate::errors::Result<RedeemableTicket> {
+        let vrf_params = derive_vrf_parameters(
+            self.ticket.verified_hash(),
+            chain_keypair,
+            domain_separator.as_ref(),
+        )?;
+
+        Ok(RedeemableTicket {
+            ticket: self.ticket,
+            response: self.response,
+            vrf_params,
+        })
     }
 }
 
@@ -150,37 +137,83 @@ impl UnacknowledgedTicket {
     }
 }
 
-/// Represents a winning ticket that can be aggregated and redeemed.
+/// Represents a winning ticket that can be successfully redeemed on chain.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedeemableTicket {
     pub ticket: VerifiedTicket,
     pub response: Response,
     pub vrf_params: VrfParameters,
-    pub issuer: Address,
 }
 
 impl RedeemableTicket {
-    pub fn verify_and_check_if_winning(&self, destination: &Address, domain_separator: &Hash) -> CoreTypesResult<bool> {
-        todo!()
-
+    /// Convenience method to retrieve a reference to the underlying verified [Ticket].
+    pub fn verified_ticket(&self) -> &Ticket {
+        self.ticket.verified_ticket()
     }
 }
 
-/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
-/// or information if we wait for the acknowledgement as a sender.
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PendingAcknowledgement {
-    /// We're waiting for acknowledgement as a sender
-    WaitingAsSender,
-    /// We're waiting for the acknowledgement as a relayer with a ticket
-    WaitingAsRelayer(UnacknowledgedTicket),
+/// Represents a ticket that could be transferred over the wire
+/// and independently verified again by the other party.
+///
+/// The [TransferableWinningTicket] can be easily retrieved from [RedeemableTicket], which strips
+/// information about verification.
+/// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
+/// when verified via [`TransferableWinningTicket::into_redeemable`] again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransferableWinningTicket {
+    pub ticket: Ticket,
+    pub response: Response,
+    pub vrf_params: VrfParameters,
+    pub signer: Address,
+}
+
+impl TransferableWinningTicket {
+    /// Attempts to transform this ticket back into a [RedeemableTicket].
+    ///
+    /// Verifies that the `signer` matches the `expected_issuer` and that the
+    /// ticket has valid signature from the `signer`.
+    /// Then it verifies if the ticket is winning and therefore if it can be successfully
+    /// redeemed on-chain.
+    pub fn into_redeemable(self, expected_issuer: &Address, domain_separator: &Hash) -> crate::errors::Result<RedeemableTicket> {
+        if !self.signer.eq(expected_issuer) {
+            return Err(crate::errors::CoreTypesError::InvalidInputData("invalid ticket issuer".into()))
+        }
+
+        let verified_ticket = self.ticket.verify(&self.signer, domain_separator)?;
+
+        if check_ticket_win(
+            verified_ticket.verified_hash(),
+            &verified_ticket.verified_signature(),
+            &verified_ticket.verified_ticket().encoded_win_prob,
+            &self.response,
+            &self.vrf_params
+        ) {
+            Ok(RedeemableTicket {
+                ticket: verified_ticket,
+                response: self.response,
+                vrf_params: Default::default(),
+            })
+        } else {
+            Err(crate::errors::CoreTypesError::InvalidInputData("ticket is not a win".into()))
+        }
+    }
+}
+
+impl From<RedeemableTicket> for TransferableWinningTicket {
+    fn from(value: RedeemableTicket) -> Self {
+        Self {
+            response: value.response,
+            vrf_params: value.vrf_params,
+            signer: *value.ticket.verified_issuer(),
+            ticket: value.ticket.leak(),
+        }
+    }
 }
 
 #[cfg(test)]
 pub mod test {
     use crate::{
-        acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket},
+        tickets::{AcknowledgedTicket, UnacknowledgedTicket},
         channels::Ticket,
     };
     use hex_literal::hex;

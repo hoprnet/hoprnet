@@ -20,7 +20,7 @@ use bindings::{
         CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
         FinalizeOutgoingChannelClosureSafeCall, FundChannelCall, FundChannelSafeCall,
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
-        RedeemTicketSafeCall, RedeemableTicket, TicketData, Vrfparameters,
+        RedeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData, Vrfparameters,
     },
     hopr_node_management_module::ExecTransactionFromModuleCall,
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
@@ -73,7 +73,7 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<T>;
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<T>;
 
     /// Creates a transaction payload to register a Safe instance which is used
     /// to manage the node's funds
@@ -275,12 +275,10 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
-
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &domain_separator);
         let mut tx = create_eip1559_transaction();
         tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
         tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
@@ -473,12 +471,10 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket, domain_separator: Hash) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket, domain_separator: &Hash) -> Result<TypedTransaction> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
-        let ticket_hash = acked_ticket.ticket.get_hash(&domain_separator);
-
-        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &ticket_hash, &domain_separator);
+        let params = convert_vrf_parameters(&acked_ticket.vrf_params, &self.me, &acked_ticket.ticket.verified_hash(), &domain_separator);
 
         let call_data = RedeemTicketSafeCall {
             self_: self.me.into(),
@@ -557,20 +553,20 @@ pub fn convert_vrf_parameters(
 /// that the smart contract understands
 ///
 /// Not implemented using From trait because logic fits better here
-pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<RedeemableTicket> {
-    if let Some(ref signature) = off_chain.ticket.signature {
+pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRedeemableTicket> {
+    if let Some(ref signature) = off_chain.verified_ticket().signature {
         let serialized_signature = signature.as_ref();
 
         let mut encoded_win_prob = [0u8; 8];
-        encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
+        encoded_win_prob[1..].copy_from_slice(&off_chain.verified_ticket().encoded_win_prob);
 
-        Ok(RedeemableTicket {
+        Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channel_id: off_chain.ticket.channel_id.into(),
-                amount: off_chain.ticket.amount.amount().as_u128(),
-                ticket_index: off_chain.ticket.index,
-                index_offset: off_chain.ticket.index_offset,
-                epoch: off_chain.ticket.channel_epoch,
+                channel_id: off_chain.verified_ticket().channel_id.into(),
+                amount: off_chain.verified_ticket().amount.amount().as_u128(),
+                ticket_index: off_chain.verified_ticket().index,
+                index_offset: off_chain.verified_ticket().index_offset,
+                epoch: off_chain.verified_ticket().channel_epoch,
                 win_prob: u64::from_be_bytes(encoded_win_prob),
             },
             signature: CompactSignature {

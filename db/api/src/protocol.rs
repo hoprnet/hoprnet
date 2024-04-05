@@ -145,7 +145,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // and should not be done for bogus unacknowledged tickets
                             let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
 
-                            if ack_ticket.is_winning_ticket(&myself.chain_key, &domain_separator) {
+                            if ack_ticket.is_winning(&myself.chain_key, &domain_separator) {
                                 debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
                                 Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                             } else {

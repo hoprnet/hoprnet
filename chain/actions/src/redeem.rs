@@ -11,10 +11,10 @@
 //! - [redeem_ticket](TicketRedeemActions::redeem_ticket)
 //!
 //! Each method first checks if the tickets are redeemable.
-//! (= they are not marked as [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) or
-//! [BeingAggregated](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingAggregated) in the DB),
+//! (= they are not marked as [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) or
+//! [BeingAggregated](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingAggregated) in the DB),
 //! If they are redeemable, their state is changed to
-//! [BeingRedeemed](hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
+//! [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
 //! Subsequently, the ticket in such state is transmitted into the [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain.
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of each ticket redemption.

@@ -6,6 +6,7 @@ use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
+use crate::tickets::UnacknowledgedTicket;
 
 use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 
@@ -23,6 +24,51 @@ pub type Tag = u16;
 
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+
+/// Represents packet acknowledgement
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Acknowledgement {
+    ack_signature: OffchainSignature,
+    pub ack_key_share: HalfKey,
+    validated: bool,
+}
+
+impl Acknowledgement {
+    pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
+        Self {
+            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
+            ack_key_share,
+            validated: true,
+        }
+    }
+
+    /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
+    /// any operations with the deserialized acknowledgement will panic.
+    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
+        self.validated = self
+            .ack_signature
+            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
+
+        self.validated
+    }
+
+    /// Obtains the acknowledged challenge out of this acknowledgment.
+    pub fn ack_challenge(&self) -> HalfKeyChallenge {
+        assert!(self.validated, "acknowledgement not validated");
+        self.ack_key_share.to_challenge()
+    }
+}
+
+/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
+/// or information if we wait for the acknowledgement as a sender.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PendingAcknowledgement {
+    /// We're waiting for acknowledgement as a sender
+    WaitingAsSender,
+    /// We're waiting for the acknowledgement as a relayer with a ticket
+    WaitingAsRelayer(UnacknowledgedTicket),
+}
 
 /// Bloom filter for packet tags to detect packet replays.
 ///
@@ -226,3 +272,4 @@ mod tests {
         );
     }
 }
+

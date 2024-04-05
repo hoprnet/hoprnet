@@ -4,7 +4,7 @@
 /// Contains all types related to node identities.
 pub mod account;
 /// Implements types for ticket acknowledgement.
-pub mod acknowledgement;
+pub mod tickets;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
 
@@ -18,7 +18,7 @@ pub mod protocol;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::account::*;
-    pub use super::acknowledgement::*;
+    pub use super::tickets::*;
     pub use super::announcement::*;
     pub use super::channels::*;
     pub use super::errors::CoreTypesError;
