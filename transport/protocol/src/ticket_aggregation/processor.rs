@@ -50,7 +50,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
-    ToProcess(PeerId, Vec<legacy::AcknowledgedTicket>, T),
+    ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
     ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
 
@@ -58,9 +58,9 @@ pub enum TicketAggregationToProcess<T, U> {
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
-    Receive(PeerId, legacy::AcknowledgedTicket, U),
+    Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
-    Send(PeerId, Vec<legacy::AcknowledgedTicket>, TicketAggregationFinalizer),
+    Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
 }
 
 #[derive(Debug)]
@@ -341,7 +341,7 @@ where
                                     METRIC_AGGREGATION_COUNT.increment();
                                 }
 
-                                Some(TicketAggregationProcessed::Send(source.into(), tickets.into_iter().map(), finalizer))
+                                Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Ok(None) => { finalizer.finalize(); None },
                             Err(e) => {
@@ -392,76 +392,6 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(self).ack_event_queue.1.poll_next(cx)
-    }
-}
-
-// TODO: remove this in 3.0
-#[doc(hidden)]
-mod legacy {
-    use serde::{Deserialize, Serialize};
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-
-    #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
-    pub struct Address {
-        addr: [u8; Self::SIZE],
-    }
-
-    #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
-    pub struct Hash {
-        hash: [u8; Self::SIZE],
-    }
-
-    #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-    pub struct Response {
-        response: [u8; Self::SIZE],
-    }
-
-    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-    pub enum AcknowledgedTicketStatus {
-        /// The ticket is available for redeeming or aggregating
-        #[default]
-        Untouched,
-        /// Ticket is currently being redeemed in and on-going redemption process
-        BeingRedeemed { tx_hash: Hash },
-        /// Ticket is currently being aggregated in and on-going aggregation process
-        BeingAggregated { start: u64, end: u64 },
-    }
-
-
-    #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-    pub struct AcknowledgedTicket {
-        #[serde(default)]
-        pub status: AcknowledgedTicketStatus,
-        pub ticket: Ticket,
-        pub response: Response,
-        pub vrf_params: VrfParameters,
-        pub signer: Address,
-    }
-
-    impl From<AcknowledgedTicket> for hopr_internal_types::acknowledgement::AcknowledgedTicket {
-        fn from(value: AcknowledgedTicket) -> Self {
-            Self {
-                status: hopr_internal_types::acknowledgement::AcknowledgedTicketStatus::Untouched,
-                ticket: value.ticket,
-                response: hopr_crypto_types::types::Response::new(&value.response.response),
-                vrf_params: value.vrf_params,
-                signer: hopr_primitive_types::primitives::Address::new(&value.signer.addr),
-            }
-        }
-    }
-
-    impl From<hopr_internal_types::acknowledgement::AcknowledgedTicket> for AcknowledgedTicket {
-        fn from(value: hopr_internal_types::acknowledgement::AcknowledgedTicket) -> Self {
-            Self {
-                status: AcknowledgedTicketStatus::BeingAggregated {start: 0, end: 0}, // values not  used
-                ticket: value.ticket,
-                response: value.response,
-                vrf_params: Default::default(),
-                signer: Default::default(),
-            }
-        }
     }
 }
 
