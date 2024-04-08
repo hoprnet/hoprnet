@@ -1,3 +1,7 @@
+//! This module should be removed in 3.0. It introduces the missing binary format separation
+//! from business objects (AcknowledgedTicket), to ensure backwards compatibility of
+//! Ticket Aggregation in 2.x releases
+
 use ethers::core::k256::AffinePoint;
 use ethers::prelude::k256::elliptic_curve::sec1::FromEncodedPoint;
 use ethers::prelude::k256::Scalar;
