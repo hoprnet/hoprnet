@@ -411,7 +411,7 @@ async fn integration_test_indexer() {
         bob_chain_key.public().to_address()
     );
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
@@ -586,7 +586,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     let channel_bob_alice = alice_node
         .db
@@ -691,7 +691,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     };
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     let bob_ack_tickets = alice_node
         .db
@@ -799,7 +799,7 @@ async fn integration_test_indexer() {
         _ => panic!("invalid confirmation"),
     }
 
-    async_std::task::sleep(Duration::from_millis(100)).await;
+    async_std::task::sleep(Duration::from_millis(1000)).await;
 
     let channel_alice_bob = alice_node
         .db

@@ -101,7 +101,7 @@ pub fn build_ticket_aggregation<Db>(
     chain_keypair: &ChainKeypair,
 ) -> TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, OutboundRequestId>
 where
-    Db: HoprDbTicketOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
+    Db: HoprDbTicketOperations + HoprDbInfoOperations + Send + Sync + Clone + std::fmt::Debug + 'static,
 {
     TicketAggregationInteraction::new(db, chain_keypair)
 }
@@ -269,7 +269,7 @@ use core_protocol::errors::ProtocolError;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use hopr_db_api::errors::DbError;
-use hopr_db_api::prelude::HoprDbProtocolOperations;
+use hopr_db_api::prelude::{HoprDbInfoOperations, HoprDbProtocolOperations};
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_primitive_types::prelude::*;
 
