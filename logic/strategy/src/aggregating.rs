@@ -180,7 +180,7 @@ where
                     .await
                 {
                     Ok(_) => {
-                        debug!("completed ticket aggregation in channel {channel_id}");
+                        debug!("tried ticket aggregation in channel {channel_id} without any issues");
                     }
                     Err(e) => {
                         error!("cannot complete aggregation in channel {channel_id}: {e}");

@@ -340,7 +340,7 @@ where
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
-                            Ok(Some((source, tickets))) => {
+                            Ok(Some((source, tickets))) if !tickets.is_empty() => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
@@ -362,12 +362,14 @@ where
                                         None
                                     }
                                 }
-                            }
-                            Ok(None) => { finalizer.finalize(); None },
+                            },
                             Err(e) => {
                                 error!("An error occured when preparing the channel aggregation: {e}");
                                 None
                             },
+                            _ => {
+                                finalizer.finalize(); None
+                            }
                         }
                     }
                 };

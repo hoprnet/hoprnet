@@ -323,7 +323,7 @@ pub async fn p2p_loop<T>(
                 },
                 Inputs::TicketAggregation(task) => match task {
                     TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
-                        debug!("transport input - ticket aggregation - send request to '{peer}'");
+                        debug!("transport input - ticket aggregation - send request to '{peer}' to aggregate {} tickets", acked_tickets.len());
                         let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
