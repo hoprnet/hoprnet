@@ -1,13 +1,15 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
-use sea_orm::{ActiveModelTrait, EntityTrait, QueryFilter, TransactionTrait};
+use hopr_primitive_types::traits::ToHex;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
 use hopr_internal_types::acknowledgement::AcknowledgedTicket;
 
 use crate::cache::HoprDbCaches;
+use crate::prelude::DbError;
 use crate::{errors::Result, tickets::TicketSelector, OpenTransaction};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
@@ -45,12 +47,54 @@ impl TicketManager {
             // TODO: it would be beneficial to check the size hint and extract as much, as possible
             // in this step to avoid relocking for each individual ticket.
             while let Some(acknowledged_ticket) = rx.next().await {
-                let _guard = mutex_clone.lock().await;
-                if let Err(e) = hopr_db_entity::ticket::ActiveModel::from(acknowledged_ticket)
-                    .insert(&db_clone)
+                match db_clone
+                    .begin_with_config(None, None)
                     .await
+                    .map_err(crate::errors::DbError::BackendError)
                 {
-                    error!("failed to insert a winning ticket into the DB: {e}")
+                    Ok(transaction) => {
+                        let transaction = OpenTransaction(transaction, crate::TargetDb::Tickets);
+
+                        let _quard = mutex_clone.lock().await;
+
+                        if let Err(e) = transaction
+                            .perform(|tx| {
+                                Box::pin(async move {
+                                    let channel_id = acknowledged_ticket.ticket.channel_id.to_hex();
+
+                                    hopr_db_entity::ticket::ActiveModel::from(acknowledged_ticket)
+                                        .insert(tx.as_ref())
+                                        .await?;
+
+                                    if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
+                                        .filter(
+                                            hopr_db_entity::ticket_statistics::Column::ChannelId.eq(channel_id.clone()),
+                                        )
+                                        .one(tx.as_ref())
+                                        .await?
+                                    {
+                                        let winning_tickets = model.winning_tickets + 1;
+                                        let mut active_model = model.into_active_model();
+                                        active_model.winning_tickets = sea_orm::Set(winning_tickets);
+                                        active_model
+                                    } else {
+                                        hopr_db_entity::ticket_statistics::ActiveModel {
+                                            channel_id: sea_orm::Set(channel_id),
+                                            winning_tickets: sea_orm::Set(1),
+                                            ..Default::default()
+                                        }
+                                    }
+                                    .save(tx.as_ref())
+                                    .await
+                                    .map_err(DbError::from)
+                                })
+                            })
+                            .await
+                        {
+                            error!("failed to insert the winning ticket and update the ticket stats: {e}")
+                        };
+                    }
+                    Err(e) => error!("Failed to create a transaction for ticket insertion: {e}"),
                 }
             }
         });
@@ -77,10 +121,19 @@ impl TicketManager {
             ))
         })?;
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                &[&channel.to_string(), "unredeemed"],
+                (unrealized_value + value).amount().as_u128() as f64,
+            );
+        }
+
         self.caches
             .unrealized_value
             .insert(channel, unrealized_value + value)
             .await;
+
         Ok(())
     }
 

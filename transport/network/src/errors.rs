@@ -12,7 +12,7 @@ pub enum NetworkingError {
     #[error("error while decoding message data")]
     DecodingError,
 
-    #[error("error while performing an operation on own PeerId")]
+    #[error("performing an operation on own PeerId")]
     DisallowedOperationOnOwnPeerIdError,
 
     #[error("backend error: {0}")]

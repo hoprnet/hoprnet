@@ -335,8 +335,6 @@ where
     }
 
     pub async fn init_from_db(&self) -> errors::Result<()> {
-        info!("Loading initial peers from the storage");
-
         let index_updater = self.index_updater();
 
         for (peer, _address, multiaddresses) in self.get_public_nodes().await? {
@@ -350,12 +348,15 @@ where
                     .emit_indexer_update(IndexerToProcess::Announce(peer, multiaddresses.clone()))
                     .await;
 
-                if let Err(e) = self
-                    .network
-                    .add(&peer, PeerOrigin::Initialization, multiaddresses)
-                    .await
-                {
-                    error!("Failed to store the peer observation: {e}");
+                // Self-reference is not needed in the network storage
+                if &peer != self.me() {
+                    if let Err(e) = self
+                        .network
+                        .add(&peer, PeerOrigin::Initialization, multiaddresses)
+                        .await
+                    {
+                        error!("Failed to store the peer observation: {e}");
+                    }
                 }
             }
         }

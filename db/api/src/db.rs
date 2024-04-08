@@ -13,6 +13,7 @@ use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, Sq
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
+use tracing::debug;
 use tracing::log::LevelFilter;
 
 use crate::ticket_manager::TicketManager;
@@ -110,6 +111,14 @@ impl HoprDb {
             .await
             .expect("cannot apply database migration");
 
+        // Reset the peer network information
+        let res = hopr_db_entity::network_peer::Entity::delete_many()
+            .filter(sea_orm::Condition::all())
+            .exec(&peers_db)
+            .await
+            .expect("must reset peers on init");
+        debug!("Cleaned up {} rows from the 'peers' table", res.rows_affected);
+
         // Reset all BeingAggregated ticket states to Untouched
         ticket::Entity::update_many()
             .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -141,10 +150,14 @@ impl HoprDbAllOperations for HoprDb {}
 #[cfg(test)]
 mod tests {
     use crate::db::HoprDb;
+    use crate::peers::{HoprDbPeersOperations, PeerOrigin};
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
     use hopr_crypto_types::prelude::Keypair;
+    use libp2p_identity::PeerId;
     use migration::{MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+    use multiaddr::Multiaddr;
+    use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
     #[async_std::test]
     async fn test_basic_db_init() {
@@ -160,5 +173,53 @@ mod tests {
         MigratorPeers::status(db.conn(TargetDb::Peers))
             .await
             .expect("status must be ok");
+    }
+
+    #[async_std::test]
+    async fn test_peer_cleanup_on_database_start() {
+        let random_filename: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
+        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
+
+        let peer_id: PeerId = OffchainKeypair::random().public().into();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
+
+        {
+            let db = HoprDb::new(
+                random_tmp_file.clone(),
+                ChainKeypair::random(),
+                crate::db::HoprDbConfig::default(),
+            )
+            .await;
+
+            db.add_network_peer(
+                &peer_id,
+                PeerOrigin::IncomingConnection,
+                vec![ma_1.clone(), ma_2.clone()],
+                0.0,
+                25,
+            )
+            .await
+            .expect("should add peer");
+        }
+        {
+            let db = HoprDb::new(
+                random_tmp_file,
+                ChainKeypair::random(),
+                crate::db::HoprDbConfig::default(),
+            )
+            .await;
+
+            let not_found_peer = db
+                .get_network_peer(&peer_id)
+                .await
+                .expect("should not encounter a DB issue");
+
+            assert_eq!(not_found_peer, None);
+        }
     }
 }
