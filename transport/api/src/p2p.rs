@@ -95,8 +95,8 @@ impl From<IndexerProcessed> for Inputs {
     }
 }
 
-use std::net::ToSocketAddrs;
 use hopr_internal_types::legacy;
+use std::net::ToSocketAddrs;
 
 /// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
 fn replace_transport_with_unspecified(ma: &multiaddr::Multiaddr) -> crate::errors::Result<multiaddr::Multiaddr> {
@@ -324,7 +324,6 @@ pub async fn p2p_loop<T>(
                 Inputs::TicketAggregation(task) => match task {
                     TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                         debug!("transport input - ticket aggregation - send request to '{peer}'");
-                        let acked_tickets = acked_tickets.into_iter().map(legacy::AcknowledgedTicket::from).collect::<Vec<_>>();
                         let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
                         active_aggregation_requests.insert(request_id, finalizer);
                     },

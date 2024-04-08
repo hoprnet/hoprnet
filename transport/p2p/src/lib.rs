@@ -145,7 +145,9 @@ pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     Message(libp2p::request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
-    TicketAggregation(libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>),
+    TicketAggregation(
+        libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+    ),
     KeepAlive(void::Void),
 }
 
