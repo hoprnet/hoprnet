@@ -457,10 +457,11 @@ mod tests {
             match bob.next().await {
                 Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
                     let _ = finalizer.insert(request_finalizer);
-                    match alice
-                        .writer()
-                        .receive_aggregation_request(PEERS[1].public().into(), acked_tickets, ())
-                    {
+                    match alice.writer().receive_aggregation_request(
+                        PEERS[1].public().into(),
+                        acked_tickets.into_iter().map(AcknowledgedTicket::from).collect(),
+                        (),
+                    ) {
                         Ok(_) => {}
                         Err(e) => error!("{e}"),
                     }
