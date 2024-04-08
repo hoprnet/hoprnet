@@ -388,7 +388,10 @@ impl Default for ChannelTicketStatistics {
     }
 }
 
-async fn find_stats_for_channel(tx: &OpenTransaction, channel_id: &Hash) -> Result<ticket_statistics::Model> {
+pub(crate) async fn find_stats_for_channel(
+    tx: &OpenTransaction,
+    channel_id: &Hash,
+) -> Result<ticket_statistics::Model> {
     if let Some(model) = ticket_statistics::Entity::find()
         .filter(ticket_statistics::Column::ChannelId.eq(channel_id.to_hex()))
         .one(tx.as_ref())
@@ -672,6 +675,7 @@ impl HoprDbTicketOperations for HoprDb {
                                         acc.redeemed_value + BalanceType::HOPR.balance_bytes(stats.redeemed_value);
                                     acc.rejected_value =
                                         acc.rejected_value + BalanceType::HOPR.balance_bytes(stats.rejected_value);
+                                    acc.winning_tickets += stats.winning_tickets as u128;
                                     acc
                                 });
 

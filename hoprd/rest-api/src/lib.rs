@@ -2242,7 +2242,7 @@ mod node {
     /// Get the configuration of the running node.
     #[utoipa::path(
         get,
-        path = "/node/configuration",
+        path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
         responses(
             (status = 200, description = "Fetched node configuration", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),

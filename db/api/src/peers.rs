@@ -11,7 +11,7 @@ use multiaddr::Multiaddr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
-use tracing::{error, info, trace, warn};
+use tracing::{error, trace, warn};
 
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::network_peer;
@@ -164,9 +164,6 @@ pub trait HoprDbPeersOperations {
 
     /// Returns the [statistics](Stats) on the stored peers.
     async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats>;
-
-    /// Cleanup the peers table
-    async fn cleanup_network_peers(&self) -> Result<()>;
 }
 
 #[async_trait]
@@ -377,16 +374,6 @@ impl HoprDbPeersOperations for HoprDb {
                 .await? as u32,
         })
     }
-
-    async fn cleanup_network_peers(&self) -> Result<()> {
-        let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(sea_orm::Condition::all())
-            .exec(&self.peers_db)
-            .await?;
-
-        info!("Cleaned up {} rows from the 'peers' table", res.rows_affected);
-        Ok(())
-    }
 }
 
 /// Status of the peer as recorded by the [Network].
@@ -539,34 +526,6 @@ mod tests {
         expected_peer.multiaddresses = vec![ma_1, ma_2];
 
         assert_eq!(expected_peer, peer_from_db, "peer states must match");
-    }
-
-    #[async_std::test]
-    async fn test_cleanup() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await;
-
-        let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse().unwrap();
-
-        db.add_network_peer(
-            &peer_id,
-            PeerOrigin::IncomingConnection,
-            vec![ma_1.clone(), ma_2.clone()],
-            0.0,
-            25,
-        )
-        .await
-        .expect("should add peer");
-
-        assert!(db.cleanup_network_peers().await.is_ok());
-
-        let not_found_peer = db
-            .get_network_peer(&peer_id)
-            .await
-            .expect("should not encounter a DB issue");
-
-        assert_eq!(not_found_peer, None);
     }
 
     #[async_std::test]

@@ -7,7 +7,7 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use tracing::{debug, error};
+use tracing::debug;
 use validator::Validate;
 
 pub use hopr_db_api::peers::{PeerOrigin, PeerStatus, Stats};
@@ -173,10 +173,6 @@ where
             METRIC_PEERS_BY_QUALITY.set(&["public", "low"], 0.0);
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], 0.0);
             METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], 0.0);
-        }
-
-        if let Err(e) = async_std::task::block_on(db.cleanup_network_peers()) {
-            error!("Failed to initially cleanup the 'peers' database: {e}")
         }
 
         Self {
