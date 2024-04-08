@@ -166,32 +166,6 @@ pub struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-        long = "defaultStrategy",
-        help = "Default channel strategy to use after node starts up",
-        env = "HOPRD_DEFAULT_STRATEGY",
-        value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
-    )]
-    pub default_strategy: Option<String>,
-
-    #[arg(
-        long = "maxAutoChannels",
-        help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
-        env = "HOPRD_MAX_AUTO_CHANNELS",
-        value_name = "MAX_AUTO_CHANNELS",
-        value_parser = clap::value_parser ! (u32)
-    )]
-    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
-
-    #[arg(
-        long = "disableTicketAutoRedeem",
-        env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
-        help = "Disables automatic redeeming of winning tickets.",
-        action = ArgAction::Count
-    )]
-    pub auto_redeem_tickets: u8,
-
-    #[arg(
         long = "disableUnrealizedBalanceCheck",
         env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
@@ -393,6 +367,35 @@ pub struct CliArgs {
         help = "DEPRECATED",
     )]
     pub health_check_port: Option<u16>,
+
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "defaultStrategy",
+    help = "DEPRECATED",
+    env = "HOPRD_DEFAULT_STRATEGY",
+    value_name = "DEFAULT_STRATEGY",
+    value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
+    )]
+    pub default_strategy: Option<String>,
+
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "maxAutoChannels",
+    help = "DEPRECATED",
+    env = "HOPRD_MAX_AUTO_CHANNELS",
+    value_name = "MAX_AUTO_CHANNELS",
+    value_parser = clap::value_parser ! (u32)
+    )]
+    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
+
+    //#[deprecated] not marked as deprecated to allow showing a warning
+    #[arg(
+    long = "disableTicketAutoRedeem",
+    env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
+    help = "DEPRECATED",
+    action = ArgAction::Count
+    )]
+    pub auto_redeem_tickets: u8,
 }
 
 #[cfg(test)]
