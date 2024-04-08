@@ -115,7 +115,7 @@ impl From<HoprdConfig> for HoprLibConfig {
 
 use hopr_platform::file::native::read_to_string;
 
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::errors::HoprdError;
 
@@ -210,21 +210,28 @@ impl HoprdConfig {
         // TODO: strategy configuration from the CLI should be removed in 3.0!
 
         // strategy
-        if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
-            // Clear all the default strategies and just use the given one
-            cfg.hopr.strategy.strategies = vec![x];
+        if cli_args.default_strategy.is_some() {
+            warn!(
+                "DEPRECATION: 'defaultStrategy' (HOPRD_DEFAULT_STRATEGY) option is now deprecated \
+            and has no effect. It will be removed in future releases, please use configuration file \
+            to configure strategies"
+            );
         }
 
-        // Add auto-redeeming strategy if not already there
-        if cli_args.auto_redeem_tickets == 0
-            && !cfg
-                .hopr
-                .strategy
-                .strategies
-                .iter()
-                .any(|s| matches!(s, AutoRedeeming(_)))
-        {
-            cfg.hopr.strategy.strategies.push(AutoRedeeming(Default::default()));
+        if cli_args.auto_redeem_tickets == 1 {
+            warn!(
+                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEEM_TICKETS) \
+            option is now deprecated and has no effect. It will be removed in future releases, \
+            please use configuration file to configure strategies"
+            );
+        }
+
+        if cli_args.max_auto_channels.is_some() {
+            warn!(
+                "DEPRECATION: 'maxAutoChannels' (HOPRD_MAX_AUTO_CHANNELS) option is now deprecated \
+            and has no effect. It will be removed in future releases, please use configuration file \
+            to configure strategies"
+            );
         }
 
         // chain
