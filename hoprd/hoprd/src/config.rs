@@ -4,7 +4,7 @@ use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig, Strategy, Strategy::AutoRedeeming};
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig};
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
 
