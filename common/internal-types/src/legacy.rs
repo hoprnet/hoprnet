@@ -5,8 +5,6 @@
 use ethers::core::k256::AffinePoint;
 use ethers::prelude::k256::elliptic_curve::sec1::FromEncodedPoint;
 use ethers::prelude::k256::Scalar;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::channels::Ticket;
@@ -26,7 +24,20 @@ pub struct Response {
     response: [u8; 32],
 }
 
-#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub struct CurvePoint {
+    affine: AffinePoint,
+}
+
+impl From<AffinePoint> for CurvePoint {
+    fn from(value: AffinePoint) -> Self {
+        Self {
+            affine: value
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,
@@ -41,7 +52,7 @@ pub struct VrfParameters {
 impl From<VrfParameters> for hopr_crypto_types::vrf::VrfParameters {
     fn from(value: VrfParameters) -> Self {
         Self {
-            v: value.v,
+            v: value.v.affine.into(),
             h: value.h,
             s: value.s,
         }
@@ -71,17 +82,17 @@ pub struct AcknowledgedTicket {
 
 impl AcknowledgedTicket {
     pub fn new(
-        value: crate::acknowledgement::AcknowledgedTicket,
+        value: crate::tickets::TransferableWinningTicket,
         domain_separator: &hopr_crypto_types::types::Hash,
     ) -> Self {
         let mut response = Response::default();
-        response.response.copy_from_slice(&value.response.to_bytes());
+        response.response.copy_from_slice(value.response.as_ref());
 
         let mut signer = Address::default();
         signer.addr.copy_from_slice(value.signer.as_ref());
 
         let vrf_params = VrfParameters {
-            v: value.vrf_params.v,
+            v: AffinePoint::from_encoded_point(&value.vrf_params.v.as_compressed()).expect("invalid vrf params").into(),
             h: value.vrf_params.h,
             s: value.vrf_params.s,
             h_v: AffinePoint::from_encoded_point(&value.vrf_params.get_h_v_witness())
@@ -93,7 +104,7 @@ impl AcknowledgedTicket {
                     .get_s_b_witness(
                         &value.signer,
                         &value.ticket.get_hash(domain_separator).into(),
-                        domain_separator.as_slice(),
+                        domain_separator.as_ref(),
                     )
                     .expect("invalid vrf params"),
             )
@@ -111,14 +122,13 @@ impl AcknowledgedTicket {
     }
 }
 
-impl From<AcknowledgedTicket> for crate::acknowledgement::AcknowledgedTicket {
+impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
     fn from(value: AcknowledgedTicket) -> Self {
         Self {
-            status: crate::acknowledgement::AcknowledgedTicketStatus::Untouched,
             ticket: value.ticket,
-            response: hopr_crypto_types::types::Response::new(&value.response.response),
+            response: value.response.response.into(),
             vrf_params: value.vrf_params.into(),
-            signer: hopr_primitive_types::primitives::Address::new(&value.signer.addr),
+            signer: hopr_primitive_types::primitives::Address::new(&value.signer.addr)
         }
     }
 }
@@ -130,7 +140,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair};
     use hopr_crypto_types::types::Hash;
-    use hopr_primitive_types::prelude::{BalanceType, BinarySerializable, EthereumChallenge};
+    use hopr_primitive_types::prelude::{BalanceType, EthereumChallenge};
     use hopr_primitive_types::primitives::Address;
 
     #[test]
@@ -153,12 +163,12 @@ mod tests {
             2.into(),
             EthereumChallenge::new(&challenge),
             &ckp,
-            &Hash::new(&channel_dst),
+            &Hash::new(channel_dst),
         )
         .unwrap();
 
         let mut signer = crate::legacy::Address::default();
-        signer.addr.copy_from_slice(&ckp.public().to_address().to_bytes());
+        signer.addr.copy_from_slice(ckp.public().to_address().as_ref());
 
         let ack_ticket = crate::legacy::AcknowledgedTicket {
             status: crate::legacy::AcknowledgedTicketStatus::BeingAggregated { start: 0, end: 0 },
