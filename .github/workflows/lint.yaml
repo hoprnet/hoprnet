@@ -6,7 +6,7 @@ name: Lint
 
 env:
   RUST_BACKTRACE: "1"
-  needs_nix_setup: False
+  needs_nix_setup: false
 
 on:
   merge_group:

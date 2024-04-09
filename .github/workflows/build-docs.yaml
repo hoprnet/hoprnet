@@ -5,7 +5,7 @@
 name: "Build docs"
 
 env:
-  needs_nix_setup: False
+  needs_nix_setup: false
 
 # yamllint disable-line rule:truthy
 on:
