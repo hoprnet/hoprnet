@@ -44,7 +44,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Install Nix
-        if: env.needs_nix_setup
+        if: env.needs_nix_setup == true
         uses: cachix/install-nix-action@v25
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
