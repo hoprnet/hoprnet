@@ -7,6 +7,7 @@
 solc = "0.8.19"
 src = 'src'
 out = 'out'
+test = 'test'
 libs = ['lib']
 verbosity = 3
 fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
