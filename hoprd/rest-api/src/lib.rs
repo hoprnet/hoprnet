@@ -482,6 +482,7 @@ enum ApiErrorStatus {
     Timeout,
     Unauthorized,
     InvalidQuality,
+    InvalidAddress,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -1204,6 +1205,7 @@ mod channels {
             content_type = "application/json"),
         responses(
             (status = 201, description = "Channel successfully opened", body = OpenChannelResponse),
+            (status = 400, description = "Invalid counterparty address", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
@@ -1218,7 +1220,10 @@ mod channels {
     pub(super) async fn open_channel(mut req: Request<InternalState>) -> tide::Result<Response> {
         let hopr = req.state().hopr.clone();
 
-        let open_req: OpenChannelBodyRequest = req.body_json().await?;
+        let open_req: OpenChannelBodyRequest = match req.body_json().await {
+            Ok(r) => r,
+            Err(_) => return Ok(Response::builder(400).body(ApiErrorStatus::InvalidAddress).build()),
+        };
 
         match hopr
             .open_channel(
@@ -1372,6 +1377,7 @@ mod channels {
             (status = 200, description = "Channel funded successfully", body = String),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -1392,6 +1398,12 @@ mod channels {
                 Ok(hash) => Ok(Response::builder(200).body(hash.to_string()).build()),
                 Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                     Ok(Response::builder(404).body(ApiErrorStatus::ChannelNotFound).build())
+                }
+                Err(HoprLibError::ChainError(ChainActionsError::NotEnoughAllowance)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughAllowance).build())
+                }
+                Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
+                    Ok(Response::builder(403).body(ApiErrorStatus::NotEnoughBalance).build())
                 }
                 Err(e) => Ok(Response::builder(422).body(ApiErrorStatus::from(e)).build()),
             },
