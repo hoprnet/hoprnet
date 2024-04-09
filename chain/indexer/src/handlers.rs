@@ -510,6 +510,10 @@ where
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
 
+                if node_address == self.chain_key.public().to_address() {
+                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                }
+
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
                     NetworkRegistryStatus::Allowed,
@@ -520,6 +524,10 @@ where
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
+
+                if node_address == self.chain_key.public().to_address() {
+                    info!("Your node has been added to the registry and you can now continue the node activation process on http://hub.hoprnet.org/.");
+                }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
                     node_address,
