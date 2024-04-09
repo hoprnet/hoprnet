@@ -104,8 +104,8 @@
               echo "# placeholder" > $out/vendor/cargo/config.toml
             '';
           });
-          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release" }: craneLib.buildPackage (commonArgs // {
-            inherit pname version cargoArtifacts src CARGO_PROFILE;
+          rustPackage = { pname, version, cargoArtifacts, CARGO_PROFILE ? "release", postInstall ? null }: craneLib.buildPackage (commonArgs // {
+            inherit pname version cargoArtifacts src postInstall CARGO_PROFILE;
             cargoExtraArgs = "--offline -p ${pname}";
             preConfigure = ''
               echo "# placeholder" > vendor/cargo/config.toml
@@ -129,7 +129,14 @@
             });
             CARGO_PROFILE = "dev";
           });
-          hopli = rustPackage (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
+          hopliPackageConfig = {
+            cargoArtifacts = rustPackageDeps hopliCrateInfo;
+            postInstall = ''
+              mkdir -p $out/ethereum/contracts
+              cp ethereum/contracts/contracts-addresses.json $out/ethereum/contracts/
+            '';
+          };
+          hopli = rustPackage (hopliCrateInfo // hopliPackageConfig);
           hoprd-test = rustPackageTest (hoprdCrateInfo // { cargoArtifacts = rustPackageDeps hoprdCrateInfo; });
           hopli-test = rustPackageTest (hopliCrateInfo // { cargoArtifacts = rustPackageDeps hopliCrateInfo; });
           # FIXME: the docker image built is not working on macOS arm platforms
@@ -153,7 +160,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
               ];
@@ -179,9 +186,9 @@
               Env = [
                 # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
                 "RUST_BACKTRACE=full"
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 "ETHERSCAN_API_KEY=placeholder"
-                "CONTRACTS_ROOT=${hopli}/ethereum/contracts"
+                "HOPLI_CONTRACTS_ROOT=${hopli}/ethereum/contracts"
               ];
             };
           };
@@ -209,7 +216,7 @@
                 "/bin/hoprd"
               ];
               Env = [
-                "NO_COLOR=true"     # suppress colored log output
+                "NO_COLOR=true" # suppress colored log output
                 "RUST_LOG=debug,libp2p_mplex=info,multistream_select=info,isahc::handler=error,isahc::client=error"
                 "RUST_BACKTRACE=full"
               ];
