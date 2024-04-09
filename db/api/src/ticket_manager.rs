@@ -1,12 +1,12 @@
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use hopr_db_entity::ticket;
 use hopr_primitive_types::primitives::{Balance, BalanceType};
-use hopr_primitive_types::traits::ToHex;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::Arc;
 use tracing::error;
 
 use hopr_internal_types::tickets::AcknowledgedTicket;
+use hopr_primitive_types::prelude::ToHex;
 
 use crate::cache::HoprDbCaches;
 use crate::prelude::DbError;
@@ -60,7 +60,7 @@ impl TicketManager {
                         if let Err(e) = transaction
                             .perform(|tx| {
                                 Box::pin(async move {
-                                    let channel_id = acknowledged_ticket.ticket.channel_id.to_hex();
+                                    let channel_id = acknowledged_ticket.verified_ticket().channel_id.to_hex();
 
                                     hopr_db_entity::ticket::ActiveModel::from(acknowledged_ticket)
                                         .insert(tx.as_ref())
@@ -290,7 +290,7 @@ mod tests {
         );
 
         let ticket = generate_random_ack_ticket(1);
-        let ticket_value = ticket.ticket.amount;
+        let ticket_value = ticket.verified_ticket().amount;
 
         db.ticket_manager.insert_ticket(ticket).await?;
 

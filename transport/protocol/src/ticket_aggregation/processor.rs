@@ -51,8 +51,8 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
-    ToReceive(PeerId, std::result::Result<Ticket, String>, U),
-    ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
+    ToReceive(PeerId, std::result::Result<TransferableWinningTicket, String>, U),
+    ToProcess(PeerId, Vec<TransferableWinningTicket>, T),
     ToSend(Hash, AggregationPrerequisites, TicketAggregationFinalizer),
 }
 
@@ -60,8 +60,8 @@ pub enum TicketAggregationToProcess<T, U> {
 #[allow(clippy::large_enum_variant)] // TODO: refactor the large types used in the enum
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
-    Receive(PeerId, AcknowledgedTicket, U),
-    Reply(PeerId, std::result::Result<Ticket, String>, T),
+    Receive(PeerId, TransferableWinningTicket, U),
+    Reply(PeerId, std::result::Result<TransferableWinningTicket, String>, T),
     Send(
         PeerId,
         Vec<hopr_internal_types::legacy::AcknowledgedTicket>,
@@ -207,7 +207,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn receive_ticket(
         &mut self,
         source: PeerId,
-        ticket: std::result::Result<Ticket, String>,
+        ticket: std::result::Result<TransferableWinningTicket, String>,
         request: U,
     ) -> Result<()> {
         self.process(TicketAggregationToProcess::ToReceive(source, ticket, request))
@@ -217,7 +217,7 @@ impl<T, U> TicketAggregationActions<T, U> {
     pub fn receive_aggregation_request(
         &mut self,
         source: PeerId,
-        tickets: Vec<AcknowledgedTicket>,
+        tickets: Vec<TransferableWinningTicket>,
         request: T,
     ) -> Result<()> {
         self.process(TicketAggregationToProcess::ToProcess(source, tickets, request))
