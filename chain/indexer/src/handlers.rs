@@ -2154,7 +2154,7 @@ pub mod tests {
                 OutgoingChannelClosureInitiatedFilter::signature(),
                 H256::from_slice(&channel.get_id().to_bytes()),
             ],
-            data: Vec::from(U256::from(timestamp.duration_since(UNIX_EPOCH).unwrap().as_secs()).to_bytes()).into(),
+            data: Vec::from(U256::from(timestamp.saturating_sub(UNIX_EPOCH).as_secs()).to_bytes()).into(),
             ..test_log()
         };
 

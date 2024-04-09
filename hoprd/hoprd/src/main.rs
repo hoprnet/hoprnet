@@ -5,7 +5,7 @@ use async_lock::RwLock;
 use chrono::{DateTime, Utc};
 
 use futures::Stream;
-use hopr_lib::{ApplicationData, AsUnixTimestamp, ToHex, TransportOutput};
+use hopr_lib::{ApplicationData, AsUnixTimestamp, SaturatingSub, ToHex, TransportOutput};
 use hoprd::cli::CliArgs;
 use hoprd_api::run_hopr_api;
 use hoprd_keypair::key_pair::{HoprKeys, IdentityOptions};
@@ -180,7 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // TODO: remove RLP in 3.0
                     match hopr_lib::rlp::decode(&data.plain_text) {
                         Ok((msg, sent)) => {
-                            let latency = recv_at.duration_since(SystemTime::UNIX_EPOCH).unwrap() - sent;
+                            let latency = recv_at.saturating_sub(SystemTime::UNIX_EPOCH) - sent;
 
                             info!(
                                 r#"
